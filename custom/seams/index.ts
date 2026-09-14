@@ -101,6 +101,7 @@ export type {
   LLMProvider,
 } from './llm/types.ts'
 export { LLM_SEAM_DEFINITION } from './llm/types.ts'
+export { googleLLMProvider } from './llm/google-provider.ts'
 
 // 子代理 缝隙
 export type {
