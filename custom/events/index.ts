@@ -50,3 +50,7 @@ export type {
 
 // 实现
 export { DefaultEventBus, getEventBus, resetEventBus } from './bus.ts'
+
+// 适配器
+export { createEventAdapter, enhanceExtensionAPI } from './adapter.ts'
+export type { EnhancedExtensionAPI } from './adapter.ts'

@@ -32,6 +32,7 @@ export type {
 } from './shell/types.ts'
 export { SHELL_SEAM_DEFINITION } from './shell/types.ts'
 export { localShellProvider } from './shell/local-provider.ts'
+export { registerShellTool } from './shell/tool-consumer.ts'
 
 // 文件系统 缝隙
 export type {
@@ -55,6 +56,7 @@ export type {
 } from './fs/types.ts'
 export { FS_SEAM_DEFINITION } from './fs/types.ts'
 export { localFSProvider } from './fs/local-provider.ts'
+export { registerFSTools } from './fs/tool-consumer.ts'
 
 // 搜索 缝隙
 export type {
@@ -70,6 +72,7 @@ export type {
   SearchProvider,
 } from './search/types.ts'
 export { SEARCH_SEAM_DEFINITION } from './search/types.ts'
+export { registerSearchTools } from './search/tool-consumer.ts'
 
 // 沙箱 缝隙
 export type {
@@ -120,6 +123,7 @@ export type {
   CredentialsProvider,
 } from './credentials/types.ts'
 export { CREDENTIALS_SEAM_DEFINITION } from './credentials/types.ts'
+export { envCredentialsProvider } from './credentials/env-provider.ts'
 
 // 交互 缝隙
 export type {
@@ -133,6 +137,7 @@ export type {
   InteractionProvider,
 } from './interaction/types.ts'
 export { INTERACTION_SEAM_DEFINITION } from './interaction/types.ts'
+export { terminalInteractionProvider } from './interaction/terminal-provider.ts'
 
 // 设置管理 缝隙
 export type {
