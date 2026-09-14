@@ -5,7 +5,7 @@
  * 1. 加载 cordis.yml 配置
  * 2. 初始化 SeamRegistry
  * 3. 创建增强的 ExtensionAPI
- * 4. 加载并激活扩展
+ * 4. 发现并加载扩展
  */
 
 import { ConfigManager, type CordisConfig } from './config/manager.ts'
@@ -13,6 +13,7 @@ import { initializeSeamRegistry, enhanceAPIWithSeams, type EnhancedExtensionAPI 
 import { getSeamRegistry } from './seams/registry.ts'
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
 import { join } from 'node:path'
+import { ExtensionLoader, createExtensionLoader } from './extension-loader.ts'
 
 // ============================================================================
 // 启动上下文
@@ -27,6 +28,8 @@ export interface BootstrapContext {
   config: CordisConfig
   /** 项目根目录 */
   projectRoot: string
+  /** 扩展加载器 */
+  extensionLoader: ExtensionLoader
 }
 
 // ============================================================================
@@ -46,11 +49,14 @@ export async function bootstrap(
 ): Promise<BootstrapContext> {
   const root = projectRoot ?? process.cwd()
 
+  console.log('[bootstrap] 启动 my-pi 框架...')
+
   // 1. 加载配置
   const configPath = join(root, 'custom', 'cordis.yml')
   const configManager = new ConfigManager(configPath)
   await configManager.load()
   const config = configManager.getConfig()
+  console.log('[bootstrap] 配置加载完成')
 
   // 2. 初始化 SeamRegistry
   initializeSeamRegistry()
@@ -68,62 +74,35 @@ export async function bootstrap(
       }
     }
   }
+  console.log('[bootstrap] SeamRegistry 初始化完成')
 
-  // 4. 根据配置启用/禁用扩展
-  if (config.extensions) {
-    for (const extConfig of config.extensions) {
-      if (!extConfig.enabled) {
-        console.log(`[bootstrap] 跳过已禁用扩展: ${extConfig.id}`)
-      }
-    }
-  }
-
-  // 5. 创建增强的 API
+  // 4. 创建增强的 API
   const enhancedPi = enhanceAPIWithSeams(pi)
 
-  // 6. 注入项目根目录到设置缝隙
+  // 5. 创建扩展加载器
+  const extensionLoader = createExtensionLoader(root)
+
+  // 6. 自动发现并加载扩展
+  await extensionLoader.loadAll(enhancedPi)
+  console.log(`[bootstrap] 已加载 ${extensionLoader.getLoaded().length} 个扩展`)
+
+  // 7. 注入项目根目录到设置缝隙
   const settingsProvider = registry.getState('settings')
   if (settingsProvider && typeof settingsProvider === 'object') {
-    // 如果 settings provider 支持设置项目根目录
     const settingsImpl = settingsProvider as Record<string, unknown>
     if (typeof settingsImpl.setProjectRoot === 'function') {
       (settingsImpl.setProjectRoot as (root: string) => void)(root)
     }
   }
 
+  console.log('[bootstrap] 框架启动完成')
+
   return {
     pi: enhancedPi,
     configManager,
     config,
     projectRoot: root,
-  }
-}
-
-// ============================================================================
-// 扩展加载器
-// ============================================================================
-
-/**
- * 加载扩展并注入 seam 访问能力
- */
-export async function loadExtensions(
-  ctx: BootstrapContext,
-  extensions: Array<{ id: string; init: (pi: EnhancedExtensionAPI) => Promise<void> | void }>,
-): Promise<void> {
-  for (const ext of extensions) {
-    // 检查是否在配置中被禁用
-    const extConfig = ctx.config.extensions?.find(e => e.id === ext.id)
-    if (extConfig?.enabled === false) {
-      console.log(`[bootstrap] 跳过已禁用扩展: ${ext.id}`)
-      continue
-    }
-
-    try {
-      await ext.init(ctx.pi)
-      console.log(`[bootstrap] 扩展加载成功: ${ext.id}`)
-    } catch (err) {
-      console.error(`[bootstrap] 扩展加载失败: ${ext.id}`, err)
-    }
+    extensionLoader,
   }
 }
 
@@ -135,9 +114,13 @@ export async function loadExtensions(
  * 优雅关闭框架
  */
 export async function shutdown(ctx: BootstrapContext): Promise<void> {
-  const registry = getSeamRegistry()
+  console.log('[bootstrap] 开始关闭框架...')
 
-  // 销毁所有缝隙
+  // 1. 卸载所有扩展
+  await ctx.extensionLoader.unloadAll()
+
+  // 2. 销毁所有缝隙
+  const registry = getSeamRegistry()
   const seams = ['shell', 'fs', 'sandbox', 'credentials', 'interaction', 'settings', 'session-title', 'todo'] as const
 
   for (const seam of seams) {
@@ -154,7 +137,7 @@ export async function shutdown(ctx: BootstrapContext): Promise<void> {
     }
   }
 
-  // 保存配置
+  // 3. 保存配置
   await ctx.configManager.save()
 
   console.log('[bootstrap] 框架已关闭')
