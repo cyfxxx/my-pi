@@ -193,3 +193,12 @@ export type {
 } from './todo/types.ts'
 export { TODO_SEAM_DEFINITION } from './todo/types.ts'
 export { storeTodoProvider } from './todo/store-provider.ts'
+
+// 适配器（兼容层）
+export {
+  createShellAdapter,
+  createFSAdapter,
+  createSandboxAdapter,
+  createAdapters,
+  migrationGuide,
+} from './adapter.ts'
