@@ -9,6 +9,8 @@ import { dirname } from 'node:path'
 import type { CordisConfig, CordisPatch, ExtensionConfig, SeamConfig } from './types.ts'
 import { DEFAULT_CORDIS_CONFIG } from './types.ts'
 
+export type { CordisConfig, CordisPatch, ExtensionConfig, SeamConfig }
+
 // ============================================================================
 // 配置管理器
 // ============================================================================

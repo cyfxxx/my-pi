@@ -198,7 +198,6 @@ export { storeTodoProvider } from './todo/store-provider.ts'
 export {
   createShellAdapter,
   createFSAdapter,
-  createSandboxAdapter,
   createAdapters,
   migrationGuide,
 } from './adapter.ts'
