@@ -146,6 +146,7 @@ export type {
   SettingsProvider,
 } from './settings/types.ts'
 export { SETTINGS_SEAM_DEFINITION } from './settings/types.ts'
+export { fileSettingsProvider } from './settings/file-provider.ts'
 
 // 会话日志 缝隙
 export type {
@@ -178,6 +179,7 @@ export type {
   SessionTitleProvider,
 } from './session-title/types.ts'
 export { SESSION_TITLE_SEAM_DEFINITION } from './session-title/types.ts'
+export { llmSessionTitleProvider } from './session-title/llm-provider.ts'
 
 // Todo 缝隙
 export type {
@@ -189,3 +191,4 @@ export type {
   TodoProvider,
 } from './todo/types.ts'
 export { TODO_SEAM_DEFINITION } from './todo/types.ts'
+export { storeTodoProvider } from './todo/store-provider.ts'
