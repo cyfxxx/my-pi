@@ -112,6 +112,57 @@ npx tsgo --noEmit -p custom/tsconfig.json
 2. 导出默认工厂函数：`export default function(pi: ExtensionAPI) { ... }`
 3. 使用 `pi.on()`、`pi.registerTool()`、`pi.registerCommand()` 注册功能
 
+## 使用方法
+
+### 安装
+
+```bash
+# 1. 克隆仓库
+git clone -b feat/custom-integration git@github.com:cyfxxx/my-pi.git
+cd my-pi
+
+# 2. 安装依赖
+npm install --ignore-scripts
+
+# 3. 构建
+npm run build:offline
+
+# 4. 链接到全局（可选，推荐）
+npm link
+```
+
+`npm link` 后可以在任意目录使用 `pi` 命令，等同于官方 CLI 但内置了 12 个扩展。
+
+### 不想全局安装时的替代方案
+
+```bash
+# 方案 A：通过别名使用
+alias mypi="/path/to/my-pi/packages/coding-agent/dist/cli.js"
+
+# 方案 B：直接运行
+node /path/to/my-pi/packages/coding-agent/dist/cli.js
+```
+
+### 验证安装
+
+```bash
+pi list          # 应显示 12 个内置扩展
+pi --help        # 查看 CLI 选项
+```
+
+### 日常开发调试
+
+```bash
+# 修改扩展后，无需重新构建整个框架
+# 扩展通过 jiti 运行时加载，修改 custom/extensions/ 下的文件后直接生效
+
+# 仅检查类型
+npx tsgo --noEmit -p custom/tsconfig.json
+
+# 修改框架核心代码后需要重新构建
+npm run build:offline
+```
+
 ## 更新同步流程
 
 本仓库有两个上游来源，需要分别跟踪：
