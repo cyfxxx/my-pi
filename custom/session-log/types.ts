@@ -256,3 +256,21 @@ export interface DeriveMessagesOptions {
   /** 从哪个事件开始 */
   fromEventId?: string
 }
+
+// ============================================================================
+// 投影查询类型
+// ============================================================================
+
+/** Session Log 统计摘要 */
+export interface SessionLogStats {
+  /** 总事件数 */
+  totalEvents: number
+  /** 按类型统计 */
+  eventsByType: Record<string, number>
+  /** 工具统计 */
+  toolStats: Record<string, { count: number; totalTime: number; avgTime: number }>
+  /** 错误数 */
+  errorCount: number
+  /** 总 token 数 */
+  totalTokens: number
+}
