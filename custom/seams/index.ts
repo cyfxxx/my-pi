@@ -20,6 +20,9 @@ export type {
   SeamAPI,
 } from './types.ts'
 
+// 注册表
+export { DefaultSeamRegistry, getSeamRegistry, resetSeamRegistry, SeamError } from './registry.ts'
+
 // Shell 缝隙
 export type {
   ShellService,
@@ -28,6 +31,7 @@ export type {
   ShellProvider,
 } from './shell/types.ts'
 export { SHELL_SEAM_DEFINITION } from './shell/types.ts'
+export { localShellProvider } from './shell/local-provider.ts'
 
 // 文件系统 缝隙
 export type {
@@ -50,6 +54,7 @@ export type {
   FSProvider,
 } from './fs/types.ts'
 export { FS_SEAM_DEFINITION } from './fs/types.ts'
+export { localFSProvider } from './fs/local-provider.ts'
 
 // 搜索 缝隙
 export type {
@@ -75,6 +80,9 @@ export type {
   SandboxProvider,
 } from './sandbox/types.ts'
 export { SANDBOX_SEAM_DEFINITION } from './sandbox/types.ts'
+export { nullSandboxProvider } from './sandbox/null-provider.ts'
+export { landlockSandboxProvider } from './sandbox/landlock-provider.ts'
+export { seatbeltSandboxProvider } from './sandbox/seatbelt-provider.ts'
 
 // LLM 缝隙
 export type {

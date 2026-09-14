@@ -31,3 +31,5 @@ export type {
   DerivedMessage,
   DeriveMessagesOptions,
 } from './types.ts'
+
+export { JSONLSessionLog, createSessionLog } from './jsonl-writer.ts'
