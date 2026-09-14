@@ -4,6 +4,8 @@
 		"outDir": "./dist-custom",
 		"rootDir": ".",
 		"noEmit": true,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
 		"paths": {
 			"@earendil-works/chord": ["../chord/dist/index.d.ts"],
 			"@earendil-works/chord/bundler": ["../chord/dist/bundler.d.ts"],

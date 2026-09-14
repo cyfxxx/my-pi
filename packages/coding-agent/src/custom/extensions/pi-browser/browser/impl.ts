@@ -1,0 +1,596 @@
+import type { Browser, Page } from 'playwright-core'
+import type { BrowserConfig, PageInfo, NetworkEntry, DialogMode, DownloadFile } from './types'
+import { existsSync, readdirSync, realpathSync } from 'fs'
+import { mkdir } from 'fs/promises'
+import { basename, dirname, join, resolve } from 'path'
+import { tmpdir, homedir } from 'os'
+
+/**
+ * 当前进程专属截图暂存目录（os.tmpdir()：Linux=/tmp，Termux=$PREFIX/tmp）。
+ * 审计 LOW：子目录含 process.pid——多进程共享同名前缀目录时互不干扰，
+ * cleanScreenshots（index.ts）经本函数也只清本进程子目录，避免跨进程误删。
+ */
+export function shotDir(): string {
+  return join(tmpdir(), `pi-browser-screenshots-${process.pid}`)
+}
+
+/** 当前进程专属 PDF 暂存目录（同 shotDir：含 pid 防多进程共享目录冲突）。 */
+export function pdfDir(): string {
+  return join(tmpdir(), `pi-browser-pdf-${process.pid}`)
+}
+
+/** 当前进程专属下载目录默认值（同 shotDir：含 pid 防多进程共享目录冲突）。 */
+export function downloadsDirDefault(): string {
+  return join(tmpdir(), `pi-browser-downloads-${process.pid}`)
+}
+
+/**
+ * Windows 便携版：cloakbrowser 走 CLOAKBROWSER_BINARY_PATH；未设时自动探测
+ * 便携包内浏览器（优先官方 stealth 定制版 .cloakbrowser/chromium-<ver>/chrome.exe，
+ * 回退 npmmirror tools/chrome-win64）——不依赖 start.bat wrapper 环境
+ * （wrapper 循环内 set 不重跑）。非 win32 平台直接短路，零副作用。
+ */
+export function ensureLocalBinaryEnv(): void {
+  const envBin = process.env.CLOAKBROWSER_BINARY_PATH
+  if (envBin) {
+    // 审计修复：相对路径的 existsSync 依赖 cwd，cwd 变化后判断与使用不一致——
+    // 归一为绝对路径后再判断；存在则回写绝对路径（后续 launch 读 env 不再受 cwd 影响）
+    const abs = resolve(envBin)
+    if (existsSync(abs)) {
+      process.env.CLOAKBROWSER_BINARY_PATH = abs
+      return
+    }
+  }
+  // 审计 MEDIUM：env 残留但指向已删除文件（如旧 npmmirror 被清理）——必须清除变量。
+  // 原先非 win32 平台在此提前 return，既不复探也不清变量，cloakbrowser 读到失效
+  // 路径致 launch 失败难定位；清除后各平台均继续走下方正常探测链（win32 门控保持）
+  if (process.env.CLOAKBROWSER_BINARY_PATH) delete process.env.CLOAKBROWSER_BINARY_PATH
+  // 非 win32 无便携包可探测：清除残留后直接返回
+  if (process.platform !== 'win32') return
+  const root = process.env.USERPROFILE || homedir()
+  // 官方定制版缓存目录（cloakbrowser 结构：.cloakbrowser/chromium-<ver>/chrome.exe）
+  try {
+    const cacheDir = join(root, '.cloakbrowser')
+    if (existsSync(cacheDir)) {
+      for (const entry of readdirSync(cacheDir)) {
+        if (entry.startsWith('chromium-')) {
+          const chrome = join(cacheDir, entry, 'chrome.exe')
+          if (existsSync(chrome)) {
+            process.env.CLOAKBROWSER_BINARY_PATH = chrome
+            return
+          }
+        }
+      }
+    }
+  } catch { /* 缓存目录不可读 → 回退 */ }
+  // 回退：npmmirror chrome-for-testing
+  const chrome = join(root, 'tools', 'chrome-win64', 'chrome.exe')
+  if (existsSync(chrome)) {
+    process.env.CLOAKBROWSER_BINARY_PATH = chrome
+  }
+}
+
+/** 协议安全拒绝类错误（初始校验 / 重定向落地校验抛出）：不可重试、不可降级为笼统文案。 */
+function isProtocolSecurityError(e: unknown): boolean {
+  return e instanceof Error &&
+    (e.message.startsWith('重定向到不允许的协议') || e.message.startsWith('协议不支持'))
+}
+
+export class BrowserManager {
+  private browser: Browser | null = null
+  private page: Page | null = null
+  private config: BrowserConfig
+  private getProxyUrl: (() => string | null) | null
+  private initializing: Promise<Browser> | null = null
+  private networkLog: NetworkEntry[] = []
+  private dialogMode: DialogMode = 'dismiss'
+  private dialogText: string | null = null
+  private lastDialog: string | null = null
+  private readonly MAX_NETWORK = 1000
+  private downloadsDir = downloadsDirDefault()
+  private downloadedFiles: DownloadFile[] = []
+  /** 进行中下载占位（filename 集合）：与 downloadedFiles 共同参与同名去重，防并发覆盖。 */
+  private readonly activeDownloads = new Set<string>()
+  /** 唯一后缀序号（同毫秒时间戳下仍保证文件名唯一）。 */
+  private downloadSeq = 0
+
+  constructor(config: BrowserConfig, getProxyUrl?: () => string | null) {
+    this.config = config
+    this.getProxyUrl = getProxyUrl ?? null
+  }
+
+  async ensureBrowser(): Promise<Browser> {
+    if (this.browser?.isConnected()) return this.browser
+    if (this.initializing) return this.initializing
+
+    this.initializing = this.launchBrowser().catch(e => {
+      this.initializing = null
+      throw e
+    })
+    try {
+      const browser = await this.initializing
+      // 审计 LOW：crash 重连路径——networkLog/dialog 状态不清零会让旧页请求记录
+      // 混入新会话查询结果（dialogMode 保留属特性：用户设定的弹窗策略延续到新会话）
+      this.networkLog = []
+      this.dialogText = null
+      this.lastDialog = null
+      return browser
+    } finally {
+      this.initializing = null
+    }
+  }
+
+  private async launchBrowser(): Promise<Browser> {
+    ensureLocalBinaryEnv()
+    let launch: typeof import('cloakbrowser')['launch']
+    try {
+      launch = (await import('cloakbrowser')).launch
+    } catch (e) {
+      if (
+        (e as NodeJS.ErrnoException)?.code === 'MODULE_NOT_FOUND' ||
+        (e as Error)?.message?.includes('Cannot find module')
+      ) {
+        throw new Error(
+          '浏览器依赖未安装。请安装依赖：\n' +
+          '  cd ~/.pi/agent/extensions/pi-browser && npm install\n' +
+          '（并确保 Playwright 浏览器已下载，如 npx playwright install chromium）'
+        )
+      }
+      throw e
+    }
+
+    // 显式代理（config.proxy 或 getProxyUrl() 解析到的环境代理）优先于平台默认策略：
+    // win32 下仅当无显式代理配置时才附加 --no-proxy-server，有则尊重用户配置不覆盖
+    const proxyUrl = this.getProxyUrl?.()
+    const hasExplicitProxy = Boolean(proxyUrl ?? this.config.proxy)
+    const opts: Record<string, unknown> = {
+      headless: this.config.headless,
+      // Windows 便携版默认直连（Chrome 继承系统代理时无效/被墙代理 → ERR_NETWORK_ACCESS_DENIED）
+      ...(process.platform === 'win32' && !hasExplicitProxy ? { args: ['--no-proxy-server'] } : {}),
+    }
+
+    if (this.config.fingerprint_seed) {
+      opts.fingerprint = this.config.fingerprint_seed
+    }
+    if (proxyUrl) {
+      opts.proxy = { server: proxyUrl }
+    } else if (this.config.proxy) {
+      opts.proxy = { server: this.config.proxy }
+    }
+    if (this.config.data_dir) {
+      opts.userDataDir = this.config.data_dir
+    }
+
+    this.browser = await launch(opts)
+    return this.browser
+  }
+
+  private async ensurePage(): Promise<Page> {
+    await this.ensureBrowser()
+    if (this.page && !this.page.isClosed()) return this.page
+
+    this.page = await this.browser!.newPage()
+    await this.page.setViewportSize({
+      width: this.config.viewport_width,
+      height: this.config.viewport_height,
+    })
+
+    // 网络请求监听：持续记录最近 MAX_NETWORK 条，供 browser_network 查询
+    // （特性检测：单测 mock 的 page 可能无 on，真实 playwright Page 必带）
+    const pg = this.page as (Page & { on?: unknown }) | null
+    if (pg && typeof pg.on === 'function') {
+      pg.on('request', (req) => {
+        if (this.networkLog.length >= this.MAX_NETWORK) this.networkLog.shift()
+        this.networkLog.push({
+          url: req.url(),
+          method: req.method(),
+          type: req.resourceType(),
+          timestamp: Date.now(),
+        })
+      })
+      pg.on('response', (res) => {
+        // 回填最近一条相同 url 且尚未有 status 的条目（倒序避免覆盖同名后续请求）
+        for (let i = this.networkLog.length - 1; i >= 0; i--) {
+          if (this.networkLog[i].url === res.url() && this.networkLog[i].status === undefined) {
+            this.networkLog[i].status = res.status()
+            break
+          }
+        }
+      })
+      // 弹窗策略：默认 dismiss（避免阻塞），可经 browser_dialog 改为 accept/input。
+      // 审计 MEDIUM：async 回调内 accept/dismiss 在页面关闭竞态时 reject 会成为
+      // unhandledRejection 可崩进程——提取 Promise 补 .catch 记录调试日志（对照 download 监听）
+      pg.on('dialog', (dialog) => {
+        this.lastDialog = dialog.message()
+        const action =
+          this.dialogMode === 'accept'
+            ? dialog.accept()
+            : this.dialogMode === 'input'
+              ? dialog.accept(this.dialogText ?? '')
+              : dialog.dismiss()
+        action.catch((err) => {
+          console.warn('[browser] dialog action error:', (err as Error)?.message)
+        })
+      })
+      // 下载监听：保存到 downloadsDir，记录到 downloadedFiles
+      pg.on('download', (download) => {
+        const filename = download.suggestedFilename()
+        this.saveDownload(download, filename).catch(err => {
+          console.warn('[browser] download save error:', (err as Error)?.message)
+        })
+      })
+    }
+
+    return this.page
+  }
+
+  async navigate(url: string, signal?: AbortSignal): Promise<PageInfo> {
+    // 审计 MEDIUM：URL 协议校验——prompt 注入场景下导航 file:// 可读取本地文件内容
+    // 并经 extract_text 回传。只允许 http/https；内网地址保留（本地服务/开发测试合法用途）。
+    try {
+      const proto = new URL(url).protocol
+      if (proto !== 'http:' && proto !== 'https:') {
+        throw new Error(`协议不支持: ${proto}//（仅允许 http/https，拒绝 ${url.slice(0, 60)}）`)
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('协议不支持')) throw e
+      throw new Error(`无效 URL: ${String(url).slice(0, 80)}`)
+    }
+    const page = await this.ensurePage()
+    const errors: Error[] = []
+
+    for (const waitUntil of ['networkidle', 'load'] as const) {
+      try {
+        const gotoOpts: Record<string, unknown> = { waitUntil, timeout: 30000 }
+        if (signal) gotoOpts.signal = signal
+        await page.goto(url, gotoOpts)
+        // 审计 MEDIUM 修复：校验最终落地 URL（重定向后）——初始协议校验可被
+        // 302 → file:// 等绕过；Chromium 默认拦 http→file 顶层跳转，此处为纵深防御。
+        // about:blank 是浏览器初始空页（未导航/mock 未同步），排除在拒绝外
+        const finalUrl = page.url()
+        if (finalUrl && finalUrl !== 'about:blank') {
+          let fp: string
+          try {
+            fp = new URL(finalUrl).protocol
+          } catch {
+            throw new Error(`导航失败: 无效的最终 URL ${String(finalUrl).slice(0, 80)}`)
+          }
+          // 安全拒绝在 parse 的 try 外抛出：不被改写为笼统文案，
+          // 且经外层 isProtocolSecurityError 识别后立即终止、不以 load 模式重试
+          if (fp !== 'http:' && fp !== 'https:') {
+            throw new Error(`重定向到不允许的协议: ${fp}//（浏览器已拦截 ${finalUrl.slice(0, 60)}）`)
+          }
+        }
+        return this.getPageInfo()
+      } catch (e) {
+        if (signal?.aborted) throw new Error('导航已取消')
+        // 安全拒绝立即 rethrow：重试只会再次触发同一拒绝，且必须保留具体错误信息
+        if (isProtocolSecurityError(e)) throw e
+        errors.push(e as Error)
+      }
+    }
+
+    throw new Error(`导航失败: ${errors.map(e => e.message).join('; ')}`)
+  }
+
+  async getPageInfo(): Promise<PageInfo> {
+    const page = await this.ensurePage()
+    return {
+      url: page.url(),
+      title: await page.title(),
+      content: await page.content(),
+      textContent: await page.evaluate(() => document.body?.innerText?.trim() ?? ''),
+      viewport: page.viewportSize() ?? { width: 1280, height: 800 },
+    }
+  }
+
+  async click(x: number, y: number, button: 'left' | 'right' | 'middle' = 'left'): Promise<void> {
+    const page = await this.ensurePage()
+    await page.mouse.click(x, y, { button })
+  }
+
+  async clickSelector(selector: string): Promise<void> {
+    const page = await this.ensurePage()
+    const el = await page.$(selector)
+    if (!el) throw new Error(`未找到元素: ${selector}`)
+    const box = await el.boundingBox()
+    if (!box) throw new Error(`元素不可见: ${selector}`)
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  }
+
+  async typeText(text: string, selector?: string): Promise<void> {
+    const page = await this.ensurePage()
+    if (selector) {
+      await page.fill(selector, text)
+    } else {
+      await page.keyboard.type(text, { delay: 10 })
+    }
+  }
+
+  async scroll(deltaX: number, deltaY: number): Promise<void> {
+    const page = await this.ensurePage()
+    await page.evaluate(
+      ({ dx, dy }: { dx: number; dy: number }) => window.scrollBy(dx, dy),
+      { dx: deltaX, dy: deltaY },
+    )
+  }
+
+  async screenshot(fullPage: boolean = false): Promise<string> {
+    const page = await this.ensurePage()
+    const dir = shotDir()
+    await mkdir(dir, { recursive: true })
+    const path = join(dir, `pi-screenshot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`)
+    await page.screenshot({ path, fullPage })
+    return path
+  }
+
+  async evaluate(expression: string): Promise<unknown> {
+    const page = await this.ensurePage()
+    return page.evaluate(expression)
+  }
+
+  async extractContent(selector?: string): Promise<string> {
+    const page = await this.ensurePage()
+    if (selector) {
+      return page.evaluate((sel: string) => {
+        const el = document.querySelector(sel)
+        return el?.textContent?.trim() ?? ''
+      }, selector)
+    }
+    return page.evaluate(() => document.body?.innerText?.trim() ?? '')
+  }
+
+  async smartExtract(task?: string): Promise<{ summary: string; keyPoints: string[]; fullText: string }> {
+    const page = await this.ensurePage()
+    const fullText = await page.evaluate(() => document.body?.innerText?.trim() ?? '')
+
+    const structured = await page.evaluate(() => {
+      const text = document.body?.innerText?.trim() ?? ''
+      const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
+        .map(h => ({ tag: h.tagName, text: (h as HTMLElement).innerText?.trim() }))
+        .filter(h => h.text)
+
+      const paragraphs = Array.from(document.querySelectorAll('p, li, td, blockquote'))
+        .map(el => (el as HTMLElement).innerText?.trim())
+        .filter(t => t && t.length > 20)
+
+      return { text: text.slice(0, 2000), headings: headings.slice(0, 15), paragraphs: paragraphs.slice(0, 30) }
+    })
+
+    const summary = [
+      ...structured.headings.map(h => `${h.tag === 'H1' ? '# ' : h.tag === 'H2' ? '## ' : '### '}${h.text}`),
+      '',
+      ...structured.paragraphs.slice(0, 5).map(p => p.slice(0, 200)),
+    ].join('\n')
+
+    const keyPoints = structured.headings
+      .filter(h => h.tag !== 'H1')
+      .map(h => h.text!)
+      .slice(0, 8)
+
+    return { summary, keyPoints, fullText }
+  }
+
+  isPageActive(): boolean {
+    if (!this.browser || !this.browser.isConnected()) return false
+    if (!this.page || this.page.isClosed()) return false
+    return true
+  }
+
+  /** 等待：selector 到位或网络空闲。命中返回 true，超时返回 false（不抛错）。 */
+  async waitFor(
+    selector?: string,
+    opts: { state?: 'visible' | 'attached' | 'hidden' | 'detached'; timeout?: number } = {},
+  ): Promise<{ found: boolean; marker?: string }> {
+    const page = await this.ensurePage()
+    const timeout = opts.timeout ?? 10000
+    if (selector) {
+      const state = opts.state ?? 'visible'
+      try {
+        await page.waitForSelector(selector, { state, timeout })
+        return { found: true }
+      } catch {
+        return { found: false }
+      }
+    }
+    try {
+      await page.waitForLoadState('networkidle', { timeout })
+      return { found: true, marker: 'networkidle' }
+    } catch {
+      return { found: false }
+    }
+  }
+
+  /** 下拉框选择。byLabel=true 时按可见文本匹配，否则按 value。 */
+  async selectOption(selector: string, value: string, byLabel: boolean = false): Promise<void> {
+    const page = await this.ensurePage()
+    const el = await page.$(selector)
+    if (!el) throw new Error(`未找到下拉框: ${selector}`)
+    await page.selectOption(selector, byLabel ? { label: value } : value)
+  }
+
+  /** 设置弹窗处理策略：accept 自动确认 / dismiss 自动取消 / input 以文本填入 prompt。 */
+  setDialogMode(mode: DialogMode, text?: string): void {
+    this.dialogMode = mode
+    this.dialogText = mode === 'input' ? (text ?? '') : (text ?? null)
+  }
+
+  /** 最近一次弹窗文本（无弹窗则 null）。 */
+  getLastDialog(): string | null {
+    return this.lastDialog
+  }
+
+  /** 查询网络日志，支持 URL/方法/资源类型过滤，倒序返回最近 limit 条。 */
+  getNetwork(
+    filter?: { urlPattern?: string; method?: string; type?: string },
+    limit: number = 100,
+  ): NetworkEntry[] {
+    let entries = this.networkLog
+    if (filter?.urlPattern && filter.urlPattern) {
+      try {
+        entries = entries.filter(e => new RegExp(filter.urlPattern!).test(e.url))
+      } catch {
+        entries = entries.filter(e => e.url.includes(filter.urlPattern!))
+      }
+    }
+    if (filter?.method) entries = entries.filter(e => e.method.toUpperCase() === filter.method!.toUpperCase())
+    if (filter?.type) entries = entries.filter(e => e.type === filter.type)
+    return entries.slice(-limit).reverse()
+  }
+
+  /** 清空网络日志（browser_network 设置 clear=true 时调用）。 */
+  clearNetwork(): void {
+    this.networkLog = []
+  }
+
+  /** 设置下载目录（可选）；返回已记录的所有下载文件。 */
+  downloads(dir?: string): DownloadFile[] {
+    if (dir) this.downloadsDir = dir
+    return this.downloadedFiles.map(f => ({ ...f }))
+  }
+
+  private async saveDownload(download: import('playwright-core').Download, rawName: string): Promise<void> {
+    // 审计修复：filename 来自远端 suggestedFilename()，可能含路径分隔符/..段——
+    // 越目录写防护：统一分隔符后取 basename，滤掉 '.'/'..' 与空名（回退默认名）
+    let filename = basename(rawName.replace(/\\/g, '/'))
+    if (filename === '' || filename === '.' || filename === '..') filename = 'download'
+    // 防重名覆盖：去重依据 = 已完成记录（downloadedFiles）+ 进行中占位（activeDownloads）。
+    // 占位在首个 await 前同步登记，并发同名词下载不会双双通过检查而互相覆盖同一文件。
+    const taken = () =>
+      this.activeDownloads.has(filename) || this.downloadedFiles.some(f => f.filename === filename)
+    if (taken()) {
+      const dot = filename.lastIndexOf('.')
+      const base = dot > 0 ? filename.slice(0, dot) : filename
+      const ext = dot > 0 ? filename.slice(dot) : ''
+      do {
+        filename = `${base}-${Date.now()}-${++this.downloadSeq}${ext}`
+      } while (taken())
+    }
+    this.activeDownloads.add(filename)
+    try {
+      await mkdir(this.downloadsDir, { recursive: true })
+      const target = join(this.downloadsDir, filename)
+      await download.saveAs(target)
+      this.downloadedFiles.push({ filename, path: target, url: download.url(), timestamp: Date.now() })
+    } finally {
+      // 成功/失败均释放占位；失败者不长期占用名字，后续同名下载可正常落盘
+      this.activeDownloads.delete(filename)
+    }
+  }
+
+  /** 上传文件到 <input type=file>。
+   * 审计 MEDIUM：恶意页面 prompt 注入可诱导上传本机任意敏感文件（如 auth.json/私钥），
+   * 与 navigate 的协议守卫防护不对等——对已知敏感凭据路径拒绝（黑名单而非白名单，
+   * 兼顾正常业务文件上传的易用性）。 */
+  async uploadFile(selector: string, path: string): Promise<void> {
+    // 审计 MEDIUM 修复：解析 symlink 后再做黑名单匹配，防 symlink 绕过
+    // 文件不存在时直接校验原始路径（防止提前抛 ENOENT 影响正常功能）
+    const resolved = resolve(path)
+    let real = resolved
+    try { real = realpathSync(resolved) } catch { /* 文件不存在或符号链接断裂，用原始路径 */ }
+    const lowered = real.toLowerCase()
+    const SENSITIVE = [
+      '/.ssh/', '/.gnupg/', '/.aws/', '/.kube/', '/.config/gcloud/',
+      'auth.json', '.netrc', '.env', 'id_rsa', 'id_ed25519', 'id_ecdsa',
+      '.bash_history', '.zsh_history', '.sh_history', 'credentials.json', 'tokens.json',
+    ]
+    if (SENSITIVE.some(s => lowered.includes(s)) || /\.(pem|key|pfx|p12|kdbx)$/.test(lowered)) {
+      throw new Error(`已拒绝上传疑似敏感凭据文件（prompt 注入防护）：${path} (已解析: ${real})`)
+    }
+    const page = await this.ensurePage()
+    await page.setInputFiles(selector, path)
+  }
+
+  /** 读取当前页面域（或给定 url）的 cookies。
+   * 审计 MEDIUM：httpOnly cookie 的 value 脱敏返回——恶意页面 prompt 注入可诱导
+   * 读会话 cookie 外传；httpOnly 正是服务端防 JS 读取的会话凭据标志。 */
+  async getCookies(url?: string): Promise<{ name: string; value: string; domain: string }[]> {
+    const page = await this.ensurePage()
+    const cs = await page.context().cookies(url)
+    return cs.map(c => ({
+      name: c.name,
+      value: (c as { httpOnly?: boolean }).httpOnly ? '<redacted:httpOnly>' : c.value,
+      domain: c.domain,
+    }))
+  }
+
+  /** 为给定 url 添加一个 cookie。 */
+  async setCookie(url: string, name: string, value: string): Promise<void> {
+    const page = await this.ensurePage()
+    await page.context().addCookies([{ name, value, url }])
+  }
+
+  /**
+   * Shadow DOM 穿透定位：深层查找首个匹配 selector 的元素，
+   * 返回其中心坐标（视口像素，可直接用于 browser_click）与文本摘要。
+   * 找不到返回 null。
+   */
+  async findElement(selector: string): Promise<{ x: number; y: number; text: string } | null> {
+    const page = await this.ensurePage()
+    const found = await page.evaluate((sel: string) => {
+      const hasText = (el: Element): boolean => el.id === sel || el.className === sel || el.nodeName.toLowerCase() === sel
+      // 收集所有 shadow 根内与文档内的元素
+      const candidates: Element[] = []
+      const walk = (root: Document | ShadowRoot) => {
+        for (const el of Array.from(root.querySelectorAll(sel))) candidates.push(el)
+        // 遍历各层 shadow 根
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as HTMLElement).shadowRoot
+          if (sr) walk(sr)
+        }
+      }
+      walk(document)
+      if (candidates.length === 0) return null
+      const el = candidates[0] as HTMLElement
+      const r = el.getBoundingClientRect()
+      return {
+        x: Math.round(r.left + r.width / 2),
+        y: Math.round(r.top + r.height / 2),
+        text: (el.textContent ?? '').trim().slice(0, 200),
+      }
+    }, selector)
+    return (found as { x: number; y: number; text: string } | null) ?? null
+  }
+
+  /** 打印当前页为 PDF，返回保存路径。仅 Chromium 支持。 */
+  async exportPdf(path?: string): Promise<string> {
+    const page = await this.ensurePage()
+    // 审计 LOW：默认目录对齐截图模式含 pid（多进程隔离），全生命周期无残留——
+    // shutdown 时 index.ts cleanPdf 整目录递归删除
+    const target = path ?? join(pdfDir(), `pi-page-${Date.now()}.pdf`)
+    await mkdir(dirname(target), { recursive: true })
+    await page.pdf({ path: target, printBackground: true })
+    return target
+  }
+
+
+  async close(): Promise<void> {
+    // 竞态修复：launch 进行中时 close 必须等待其完成，否则 close 返回后
+    // launch 才完成并赋值 this.browser，浏览器进程泄漏。
+    // launch 失败（reject）无需关闭，静默吞掉。
+    if (this.initializing) {
+      try {
+        await this.initializing
+      } catch {
+        // launch 失败：无浏览器可关
+      }
+    }
+    try {
+      if (this.page && !this.page.isClosed()) await this.page.close()
+    } catch (e) {
+      console.warn('[browser] page close error:', (e as Error).message)
+    }
+    try {
+      if (this.browser) await this.browser.close()
+    } catch (e) {
+      console.warn('[browser] browser close error:', (e as Error).message)
+    }
+    this.page = null
+    this.browser = null
+    this.networkLog = []
+    this.lastDialog = null
+    this.dialogMode = 'dismiss'
+    this.dialogText = null
+    this.downloadedFiles = []
+  }
+}
