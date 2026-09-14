@@ -59,20 +59,33 @@ packages/coding-agent/src/custom/services/
 
 ```
 my-pi/
-├── packages/
-│   ├── coding-agent/
-│   │   ├── src/
-│   │   │   ├── core/           # 框架核心
-│   │   │   ├── custom/         # 自定义扩展和服务
-│   │   │   │   ├── extensions/ # 12 个扩展
-│   │   │   │   ├── services/   # 共享服务
-│   │   │   │   └── tsconfig.json
-│   │   │   └── ...             # 官方源码
-│   │   └── dist/bundle/        # 构建产物
+├── custom/                     # 自定义扩展和服务（顶层，便于维护）
+│   ├── extensions/             # 12 个扩展
+│   │   ├── pi-context/         # Token 优化中枢
+│   │   ├── plan-mode/          # 计划模式
+│   │   ├── pi-memory/          # 跨会话记忆
+│   │   ├── pi-autopilot/       # 自治操作
+│   │   ├── pi-web-search/      # 网页搜索
+│   │   ├── pi-browser/         # 浏览器自动化
+│   │   ├── pi-intervention/    # 干预捕获
+│   │   ├── pi-link/            # 多设备互联
+│   │   ├── pi-tmux/            # tmux 管理
+│   │   ├── pi-mode/            # 模式切换
+│   │   ├── pi-voice/           # 语音通信
+│   │   └── subagent/           # 子代理调度
+│   ├── services/               # 共享服务模块
+│   │   ├── token-budget/       # token 预算管理
+│   │   ├── diagnostics/        # 诊断工具
+│   │   ├── note-store.ts       # 笔记存储
+│   │   ├── atomic-write.ts     # 原子写入
+│   │   └── secrets.ts          # 密钥脱敏
+│   └── tsconfig.json           # 独立类型检查
+├── packages/                   # 官方框架包
+│   ├── coding-agent/           # 主 CLI（含框架核心）
 │   ├── ai/                     # LLM API 抽象
 │   ├── agent/                  # Agent 运行时
 │   ├── tui/                    # 终端 UI
-│   └── ...                     # 其他官方包
+│   └── ...
 └── ...
 ```
 
@@ -86,12 +99,12 @@ npm run check                 # 代码检查
 
 ### 自定义扩展开发
 
-自定义扩展位于 `packages/coding-agent/src/custom/extensions/`，通过 jiti 运行时加载，不参与主框架构建。
+自定义扩展位于 `custom/extensions/`，通过 jiti 运行时加载，不参与主框架构建。
 
 类型检查：
 
 ```bash
-npx tsgo --noEmit -p packages/coding-agent/src/custom/tsconfig.json
+npx tsgo --noEmit -p custom/tsconfig.json
 ```
 
 添加新扩展：

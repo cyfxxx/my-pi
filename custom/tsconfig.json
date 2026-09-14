@@ -1,0 +1,25 @@
+{
+	"extends": "../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "./dist-custom",
+		"rootDir": ".",
+		"noEmit": true,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"paths": {
+			"@earendil-works/chord": ["../packages/chord/dist/index.d.ts"],
+			"@earendil-works/chord/bundler": ["../packages/chord/dist/bundler.d.ts"],
+			"@earendil-works/chord/node": ["../packages/chord/dist/node.d.ts"],
+			"@earendil-works/pi-agent-core": ["../packages/agent/dist/index.d.ts"],
+			"@earendil-works/pi-agent-core/*": ["../packages/agent/dist/*.d.ts"],
+			"@earendil-works/pi-ai": ["../packages/ai/dist/index.d.ts"],
+			"@earendil-works/pi-ai/*": ["../packages/ai/dist/*.d.ts", "../packages/ai/dist/providers/*.d.ts"],
+			"@earendil-works/pi-tui": ["../packages/tui/dist/index.d.ts"],
+			"@earendil-works/pi-tui/*": ["../packages/tui/dist/*.d.ts", "../packages/tui/dist/components/*.d.ts"],
+			"@earendil-works/pi-coding-agent": ["../packages/coding-agent/dist/index.d.ts"],
+			"@earendil-works/pi-coding-agent/*": ["../packages/coding-agent/dist/*.d.ts"]
+		}
+	},
+	"include": ["**/*.ts"],
+	"exclude": ["node_modules", "*/tests/*", "*/test/*", "vitest.config.ts"]
+}
