@@ -1,7 +1,9 @@
 {
-	"extends": "../../tsconfig.base.json",
+	"extends": "../../../../tsconfig.base.json",
 	"compilerOptions": {
-		"outDir": "./dist",
+		"outDir": "./dist-custom",
+		"rootDir": ".",
+		"noEmit": true,
 		"paths": {
 			"@earendil-works/chord": ["../chord/dist/index.d.ts"],
 			"@earendil-works/chord/bundler": ["../chord/dist/bundler.d.ts"],
@@ -11,10 +13,11 @@
 			"@earendil-works/pi-ai": ["../ai/dist/index.d.ts"],
 			"@earendil-works/pi-ai/*": ["../ai/dist/*.d.ts", "../ai/dist/providers/*.d.ts"],
 			"@earendil-works/pi-tui": ["../tui/dist/index.d.ts"],
-			"@earendil-works/pi-tui/*": ["../tui/dist/*.d.ts", "../tui/dist/components/*.d.ts"]
-		},
-		"rootDir": "./src"
+			"@earendil-works/pi-tui/*": ["../tui/dist/*.d.ts", "../tui/dist/components/*.d.ts"],
+			"@earendil-works/pi-coding-agent": ["../coding-agent/dist/index.d.ts"],
+			"@earendil-works/pi-coding-agent/*": ["../coding-agent/dist/*.d.ts"]
+		}
 	},
-	"include": ["src/**/*.ts", "src/**/*.d.ts"],
-	"exclude": ["node_modules", "dist", "src/client", "src/experimental", "src/cli/experimental", "src/custom"]
+	"include": ["**/*.ts"],
+	"exclude": ["node_modules", "*/tests/*", "*/test/*", "vitest.config.ts"]
 }

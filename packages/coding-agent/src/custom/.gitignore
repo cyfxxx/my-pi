@@ -1,0 +1,18 @@
+# Runtime data
+*.pid
+*.lock
+*.json
+*.jsonl
+!package.json
+!vitest.config.ts
+!tsconfig.json
+!config/*.json
+
+# Scripts (runtime helpers, not source)
+scripts/
+
+# Test artifacts
+tests/__mocks__/
+
+# Logs
+*.log
