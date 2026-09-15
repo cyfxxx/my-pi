@@ -601,7 +601,7 @@ export class SessionScheduler {
           resolve()
         } else {
           const err = new Error(stderr.trim() || (timedOut ? `超时（${timeout / 1000}s）` : `exit ${code}`)) as Error & { exitCode?: number; outputLen?: number }
-          err.exitCode = timedOut ? 124 : (code ?? 1)
+          err.exitCode = timedOut ? 124 : code
           err.outputLen = stdout.length
           reject(err)
         }

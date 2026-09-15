@@ -396,7 +396,7 @@ export function registerTools(pi: ExtensionAPI): void {
       required: ['action'],
     },
     execute: async (_toolCallId, params) => {
-      const action = params.action as unknown as string
+      const action = params.action as string
 
       if (action === 'add') {
         if (!params.name || !params.type || !params.schedule || !params.prompt) {

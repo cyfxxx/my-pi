@@ -1,10 +1,9 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import crypto from 'node:crypto'
 import { loadEntries, storeEntry, deleteEntry, saveEntries, getStats, getTotalSize } from '../storage.ts'
 import { detectEnvironment, ENVIRONMENTS, type RuntimeEnv } from '../env.ts'
 import { CATEGORIES, type MemoryCategory, type MemoryEntry } from '../types.ts'
 
-export function registerMemoryStoreTools(pi: ExtensionAPI): void {
+export function registerMemoryStoreTools(pi: { registerTool: (def: unknown) => void }): void {
   // ── memory_store ──
   pi.registerTool({
     name: 'memory_store',

@@ -20,7 +20,7 @@ import {
   pruneToolEvents,
   recomputeToolUsage,
   type UsageRecord,
-} from "../../services/usage-diag.ts";
+} from "../../lib/usage-diag.ts";
 
 /** 诊断日志文件路径 */
 const DIAG_FILE = join(homedir(), ".pi", "logs", "warm-diag.jsonl");

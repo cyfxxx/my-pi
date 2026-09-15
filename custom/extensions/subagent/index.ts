@@ -149,8 +149,8 @@ export default function (pi: ExtensionAPI) {
 
 			if ((agentScope === "project" || agentScope === "both") && confirmProjectAgents) {
 				const requestedAgentNames = new Set<string>();
-				if (params.chain) for (const step of params.chain) if (step.agent) requestedAgentNames.add(step.agent);
-				if (params.tasks) for (const t of params.tasks) if (t.agent) requestedAgentNames.add(t.agent);
+				if (params.chain) for (const step of params.chain) requestedAgentNames.add(step.agent);
+				if (params.tasks) for (const t of params.tasks) requestedAgentNames.add(t.agent);
 				if (params.agent) requestedAgentNames.add(params.agent);
 
 				const projectAgentsRequested = Array.from(requestedAgentNames)
@@ -206,7 +206,7 @@ export default function (pi: ExtensionAPI) {
 					const result = await runSingleAgent(
 						ctx.cwd,
 						agents,
-						step.agent ?? 'default',
+						step.agent,
 						taskWithContext,
 						step.cwd,
 						i + 1,
@@ -282,7 +282,7 @@ export default function (pi: ExtensionAPI) {
 					const result = await runSingleAgent(
 						ctx.cwd,
 						agents,
-						t.agent ?? 'default',
+						t.agent,
 						t.task,
 						t.cwd,
 						undefined,

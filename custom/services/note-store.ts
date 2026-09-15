@@ -3,7 +3,7 @@ import { join } from "node:path"
 // 审计 MEDIUM 修复（2026-08-25）：脱敏复用 core/secrets 的 scrubSecrets（写时净化），
 // 消除双实现漂移——此前 note-store.saveNotes 不脱敏，plan-mode 经此路径写入的
 // 笔记可绕过密钥形态净化入库
-import { scrubSecrets } from "./secrets.ts"
+import { scrubSecrets } from "../core/secrets.ts"
 
 const HOME = process.env.HOME || "/root"
 // 审计 MEDIUM 修复（2026-08-25）：env 键与 pi-memory/storage 对齐——优先 PI_MEMORY_DIR，

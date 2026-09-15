@@ -1,7 +1,6 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { spawn } from 'node:child_process'
-import { recordToolUsage, estimateTokens } from '../../../services/context-budget.ts'
-import { recordOutput, pruneToolOutput } from '../../../services/prune.ts'
+import { recordToolUsage, estimateTokens } from '../../../lib/context-budget.ts'
+import { recordOutput, pruneToolOutput } from '../../../lib/prune.ts'
 
 const LANGUAGES: Record<string, { cmd: string; args: string[] }> = {
   js: { cmd: process.argv[0], args: ['-e'] },
@@ -72,7 +71,7 @@ async function execLanguageAsync(
   }
 }
 
-export function registerExecTool(pi: ExtensionAPI): void {
+export function registerExecTool(pi: { registerTool: (def: unknown) => void }): void {
   pi.registerTool({
     name: 'ctx_exec',
     label: 'Execute Code',

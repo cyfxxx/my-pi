@@ -91,8 +91,8 @@ export function writeJSONAtomic(file: string, data: unknown) {
 // 设计：形态匹配保守（长后缀+前缀限定），避免误伤 UUID 等正常文本；
 // 替换为占位符而非拒绝写入，保证记忆流程不中断。
 // 2026-09-09 重构：scrubSecrets 已提取到 core/secrets.ts，此处 re-export 保持兼容。
-export { scrubSecrets, SECRET_PATTERNS } from '../../services/secrets.ts'
-import { scrubSecrets } from '../../services/secrets.ts'
+export { scrubSecrets, SECRET_PATTERNS } from '../../core/secrets.ts'
+import { scrubSecrets } from '../../core/secrets.ts'
 
 function sanitizeEntry(e: MemoryEntry): MemoryEntry {
   return {

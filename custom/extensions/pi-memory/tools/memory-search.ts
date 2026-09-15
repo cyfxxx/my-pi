@@ -1,11 +1,10 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { loadEntries, touchAccessedAt, loadSummaries } from '../storage.ts'
 import { logSearchTrace, searchEntriesWithScores } from '../retrieval.ts'
 import { detectEnvironment, formatEnvironments } from '../env.ts'
 import { CATEGORIES, type MemoryCategory } from '../types.ts'
 import type { RuntimeEnv } from '../env.ts'
 
-export function registerMemorySearchTools(pi: ExtensionAPI): void {
+export function registerMemorySearchTools(pi: { registerTool: (def: unknown) => void }): void {
   // ── memory_search ──
   pi.registerTool({
     name: 'memory_search',

@@ -13,7 +13,7 @@ import { registerCommands } from './commands.ts'
 import { buildInjectionBlock, INJECT_TAG, filterInjectedMessages } from './inject.ts'
 import { extractConversation, extractTextFromEntries, isExtractWorker, processPendingExtracts, queuePendingExtract } from './extract.ts'
 import { writeCompactionSnapshot } from './snapshot.ts'
-import { resetOutputBudget } from '../../services/prune.ts'
+import { resetOutputBudget } from '../../lib/prune.ts'
 
 export default function (pi: ExtensionAPI): void {
   registerTools(pi)

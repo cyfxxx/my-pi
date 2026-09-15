@@ -1,4 +1,3 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadNotes, saveNotes, CHECKPOINTS_DIR } from '../storage.ts'
@@ -19,7 +18,7 @@ function sanitizeSnapName(raw: string): string | null {
   return trimmed
 }
 
-export function registerCheckpointTools(pi: ExtensionAPI): void {
+export function registerCheckpointTools(pi: { registerTool: (def: unknown) => void }): void {
   pi.registerTool({
     name: 'ctx_snap',
     label: 'Save Checkpoint',

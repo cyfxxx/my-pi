@@ -1,0 +1,393 @@
+#!/usr/bin/env node
+/**
+ * Cross-extension conflict detection.
+ * Scans all extension source files to detect:
+ * 1. Duplicate tool/command/event/flag names
+ * 2. Shared data directory collisions
+ * 3. Environment variable naming conventions
+ * 4. Import path correctness for shared libs
+ */
+
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdirSync, appendFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const EXTENSIONS_DIR = join(fileURLToPath(new URL('..', import.meta.url)))
+const ROOT = join(EXTENSIONS_DIR, '..') // agent/
+const EXT_NAMES = readdirSync(EXTENSIONS_DIR, { withFileTypes: true })
+  .filter(d => d.isDirectory() && d.name !== 'tests' && d.name !== 'types' && d.name !== 'node_modules')
+  .map(d => d.name)
+
+const ALL_EXTENSIONS = EXT_NAMES.sort()
+
+const TOOL_PATTERN = /registerTool\s*\(\s*\{[\s\S]*?name:\s*['"]([^'"]+)['"]/g
+const CMD_PATTERN = /registerCommand\s*\(\s*['"]([^'"]+)['"]/g
+const EVENT_PATTERN = /pi\.on\s*\(\s*['"]([^'"]+)['"]/g
+const FLAG_PATTERN = /registerFlag\s*\(\s*['"]([^'"]+)['"]/g
+const SHORTCUT_PATTERN = /registerShortcut\s*\(\s*(Key\.[a-zA-Z]+\(\s*['"][^'"]+['"]\s*\))/g
+
+function scanFile(filePath, patterns) {
+  if (!existsSync(filePath) || filePath.endsWith('.d.ts')) return []
+  try {
+    const content = readFileSync(filePath, 'utf-8')
+    const results = []
+    for (const { name, re } of patterns) {
+      re.lastIndex = 0
+      let m
+      while ((m = re.exec(content)) !== null) {
+        results.push({ type: name, value: m[1], file: relative(EXTENSIONS_DIR, filePath) })
+      }
+    }
+    return results
+  } catch {
+    return []
+  }
+}
+
+function scanExtension(dir) {
+  const results = []
+  const patterns = [
+    { name: 'tool', re: TOOL_PATTERN },
+    { name: 'command', re: CMD_PATTERN },
+    { name: 'event', re: EVENT_PATTERN },
+    { name: 'flag', re: FLAG_PATTERN },
+    { name: 'shortcut', re: SHORTCUT_PATTERN },
+  ]
+
+  function walk(d) {
+    let entries
+    try { entries = readdirSync(d, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      const p = join(d, e.name)
+      if (e.isDirectory()) {
+        if (e.name !== 'node_modules' && e.name !== 'tests') walk(p)
+      } else if (e.name.endsWith('.ts') && !e.name.endsWith('.d.ts')) {
+        results.push(...scanFile(p, patterns))
+      }
+    }
+  }
+  walk(dir)
+  return results
+}
+
+let passed = 0
+let failed = 0
+const failures = []
+
+function assert(cond, msg) {
+  if (!cond) { throw new Error(msg) }
+}
+
+function assertEqual(actual, expected, label) {
+  if (actual !== expected) throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`)
+}
+
+async function test(name, fn) {
+  try {
+    await fn()
+    passed++
+    console.log(`  \u2713 ${name}`)
+  } catch (e) {
+    failed++
+    failures.push({ name, error: e.message })
+    console.log(`  \u2717 ${name}: ${e.message}`)
+  }
+}
+
+async function main() {
+  console.log('cross-extension conflict check\n')
+
+  // ── Gather all registrations ──
+  const all = {}
+  for (const ext of ALL_EXTENSIONS) {
+    all[ext] = scanExtension(join(EXTENSIONS_DIR, ext))
+  }
+
+  // ── 1. Tool name uniqueness ──
+  await test('no duplicate tool names across extensions', () => {
+    const toolMap = {}
+    for (const [ext, items] of Object.entries(all)) {
+      for (const item of items) {
+        if (item.type !== 'tool') continue
+        if (toolMap[item.value]) {
+          throw new Error(`Tool "${item.value}" registered by "${toolMap[item.value]}" and "${ext}"`)
+        }
+        toolMap[item.value] = ext
+      }
+    }
+    const expected = [
+      'enable_tool', // pi-context 工具分层（2026-08-18）
+      'thinking_level', // pi-context 混合切档（2026-08-21，模型提议·规则审批）
+      'admin_status', 'admin_list_models', 'admin_set_model', 'admin_get_config',
+      'admin_set_config', 'admin_list_sessions', 'admin_switch_session', 'admin_restart',
+      'autopilot_status', 'autopilot_stats', 'autopilot_policy', 'autopilot_failover',
+      'verify_config', 'verify_report', 'verify_test', // pi-autopilot 验证工具
+      'memory_store', 'memory_search', 'memory_stats', 'memory_forget', 'memory_recall',
+      'schedule_task', 'ctx_exec', 'ctx_note', 'ctx_list', 'ctx_snap',
+      'todo', 'subagent', 'plan_enter', 'plan_exit',
+      'ask_user', // plan-mode 用户交互
+      'web_search', 'fetch_url', 'web_fetch',
+      'browser_navigate', 'browser_screenshot', 'browser_click', 'browser_type',
+      'browser_scroll', 'browser_extract', 'browser_evaluate', 'browser_close',
+      'browser_wait_for', 'browser_network', 'browser_select_option', 'browser_dialog',
+      'browser_download', 'browser_upload', 'browser_cookies', 'browser_find',
+      'browser_pdf', 'browser_help',
+      'tmux_run', 'tmux_status', 'tmux_read', 'tmux_send', 'tmux_stop', 'tmux_wait',
+      'link_send', 'link_status',
+    ]
+    const actual = Object.keys(toolMap).sort()
+    assertEqual(actual.length, expected.length, 'tool count')
+    for (const t of expected) {
+      assert(toolMap[t], `tool "${t}" not found in any extension`)
+    }
+  })
+
+  // ── 2. Command name uniqueness ──
+  await test('no duplicate command names across extensions', () => {
+    const cmdMap = {}
+    for (const [ext, items] of Object.entries(all)) {
+      for (const item of items) {
+        if (item.type !== 'command') continue
+        if (cmdMap[item.value]) {
+          throw new Error(`Command "${item.value}" registered by "${cmdMap[item.value]}" and "${ext}"`)
+        }
+        cmdMap[item.value] = ext
+      }
+    }
+    // 命令整合规范（2026-09）：每扩展 ≤2 命令，具体功能用子命令参数指定，description 标注 help 用法；
+    // 新增命令必须同步更新此清单（防 / 菜单噪音回归）
+    const expected = ['auto', 'schedule', 'memory', 'plan', 'usage-diag', 'voice', 'link', 'tools', 'intervention', 'mode']
+    const actual = Object.keys(cmdMap).sort()
+    const missing = expected.filter((c) => !cmdMap[c])
+    const extra = actual.filter((c) => !expected.includes(c))
+    if (missing.length) throw new Error(`expected commands missing: ${missing.join(', ')}`)
+    if (extra.length) throw new Error(`unexpected commands: ${extra.join(', ')}（每扩展命令须整合为 ≤2 个并同步更新本清单）`)
+  })
+
+  // ── 2b. Command integration gate ──
+  await test('extension commands follow integration convention (≤2 per ext, help supported)', () => {
+    const perExt = {}
+    for (const [ext, items] of Object.entries(all)) {
+      for (const item of items) {
+        if (item.type !== 'command') continue
+        if (!perExt[ext]) perExt[ext] = []
+        perExt[ext].push(item)
+      }
+    }
+    for (const [ext, cmds] of Object.entries(perExt)) {
+      if (cmds.length > 2) {
+        throw new Error(`Extension "${ext}" registers ${cmds.length} commands (>2)。请整合为单命令 + 子命令参数（如 /voice start|stop），并保留 help 子命令`)
+      }
+      for (const c of cmds) {
+        if (c.value === 'usage-diag') continue // 单功能命令例外
+        const filePath = join(EXTENSIONS_DIR, c.file)
+        if (!existsSync(filePath)) continue
+        const content = readFileSync(filePath, 'utf-8')
+        if (!content.includes('help')) {
+          console.log(`  ⚠ Command "${c.value}" (${ext}) 未包含 help 支持（建议: 子命令 help / -h / --help）`)
+        }
+      }
+    }
+  })
+
+  // ── 3. Event name analysis ──
+  await test('event handler registration (cross-extension listeners)', () => {
+    const eventMap = {}
+    for (const [ext, items] of Object.entries(all)) {
+      for (const item of items) {
+        if (item.type !== 'event') continue
+        if (!eventMap[item.value]) eventMap[item.value] = []
+        eventMap[item.value].push(ext)
+      }
+    }
+
+    // Log shared events
+    const shared = Object.entries(eventMap).filter(([, v]) => v.length > 1)
+    const sharedStr = shared.map(([e, v]) => `  "${e}": [${v.join(', ')}]`).join('\n')
+    if (sharedStr) {
+      console.log(`  \u2139 Events with multiple listeners:\n${sharedStr}`)
+    }
+
+    // Check critical shared events have expected listeners
+    const expectedListeners = {
+      'session_start': ['pi-autopilot', 'pi-memory', 'pi-web-search', 'pi-browser', 'plan-mode'],
+      'session_shutdown': ['pi-autopilot', 'pi-memory', 'pi-browser', 'plan-mode'],
+      'before_agent_start': ['pi-context', 'pi-memory', 'plan-mode', 'pi-intervention'],
+      'context': ['pi-context', 'plan-mode'],
+      'tool_call': ['plan-mode'],
+      'tool_result': ['pi-context'],
+      'turn_end': ['plan-mode'],
+      'agent_end': ['plan-mode', 'pi-intervention'],
+      'agent_start': ['plan-mode'],
+      'input': ['pi-intervention'],
+      'tool_execution_start': ['pi-intervention'],
+      'session_compact': ['pi-browser', 'plan-mode'],
+      'session_tree': ['plan-mode'],
+      'session_before_compact': ['pi-memory'],
+      'tool_execution_end': ['plan-mode'],
+    }
+    for (const [ev, exts] of Object.entries(expectedListeners)) {
+      const actualExts = eventMap[ev] || []
+      for (const e of exts) {
+        assert(actualExts.includes(e), `Expected "${e}" to listen to "${ev}", but found: [${actualExts.join(', ')}]`)
+      }
+    }
+  })
+
+  // ── 4. Environment variable naming convention ──
+  await test('environment variable naming convention (PI_WEB_TOOLKIT_* isolation)', () => {
+    const envMap = {}
+    for (const [ext, items] of Object.entries(all)) {
+      for (const item of items) {
+        const m = item.file ? item.file.match(/^[^/]+/) : null
+        const prefix = m ? m[0] : ext
+
+        // Scan file content for env var patterns
+        const filePath = join(EXTENSIONS_DIR, item.file)
+        if (!existsSync(filePath)) continue
+        const content = readFileSync(filePath, 'utf-8')
+        const envVars = content.match(/process\.env\.\w+/g) || []
+        for (const ev of envVars) {
+          const varName = ev.replace('process.env.', '')
+          if (envMap[varName] && envMap[varName] !== prefix) {
+            console.log(`  \u26a0 Env var "${varName}" used by "${envMap[varName]}" and "${prefix}"`)
+          }
+          envMap[varName] = prefix
+        }
+      }
+    }
+  })
+
+  // ── 5. Shared lib import path correctness ──
+  await test('shared library import paths are correct', () => {
+    const extDirs = ALL_EXTENSIONS.map(e => join(EXTENSIONS_DIR, e))
+    const sharedLib = join(EXTENSIONS_DIR, '..', 'lib')
+
+    for (const dir of extDirs) {
+      if (!existsSync(dir)) continue
+      function walk(d) {
+        let entries
+        try { entries = readdirSync(d, { withFileTypes: true }) } catch { return }
+        for (const e of entries) {
+          const p = join(d, e.name)
+          if (e.isDirectory()) {
+            if (e.name !== 'node_modules' && e.name !== 'tests') walk(p)
+          } else if (e.name.endsWith('.ts')) {
+            const content = readFileSync(p, 'utf-8')
+            const importMatches = content.matchAll(/from\s+['"]\.\.\/\.\.\/lib\/([^'"]+)['"]/g)
+            for (const m of importMatches) {
+              const libPath = join(sharedLib, m[1])
+              assert(existsSync(libPath), `Missing lib import: ${m[0]} in ${relative(EXTENSIONS_DIR, p)}`)
+            }
+          }
+        }
+      }
+      walk(dir)
+    }
+  })
+
+  // ── 6. Data directory isolation ──
+  await test('data directories do not overlap across extensions', () => {
+    const dataDirs = {}
+    for (const [ext, items] of Object.entries(all)) {
+      for (const item of items) {
+        const filePath = join(EXTENSIONS_DIR, item.file)
+        if (!existsSync(filePath)) continue
+        const content = readFileSync(filePath, 'utf-8')
+        const dirMatches = content.matchAll(/['"]([^'"]*\.pi\/(?:memory|scheduler|ctx-lite|searxng)[^'"]*)['"]/g)
+        for (const m of dirMatches) {
+          const dir = m[1]
+          if (dataDirs[dir] && dataDirs[dir] !== ext) {
+            console.log(`  \u26a0 Data dir "${dir}" used by "${dataDirs[dir]}" and "${ext}"`)
+          }
+          dataDirs[dir] = ext
+        }
+      }
+    }
+  })
+
+    // ── 7. Shortcut reservations: avoid pi built-ins and cross-extension duplicates ──
+  const SHORTCUT_PATTERN = /registerShortcut\s*\(\s*(Key\.[a-zA-Z]+\(\s*['"][^'"]+['"]\s*\))/g
+  const BUILTIN_SHORTCUTS = ['Key.ctrl("r")', "Key.ctrl('r')"] // pi 内置：Ctrl+R → app.session.rename
+  await test('registered shortcuts avoid built-in keys (ctrl+r = session.rename) and other extensions', () => {
+    const shortcutMap = {}
+    for (const [ext, items] of Object.entries(all)) {
+      for (const item of items) {
+        if (item.type !== 'shortcut') continue
+        if (BUILTIN_SHORTCUTS.includes(item.value)) {
+          throw new Error(`Shortcut "${item.value}" in "${ext}" conflicts with pi built-in (app.session.rename)`)
+        }
+        if (shortcutMap[item.value]) {
+          throw new Error(`Shortcut "${item.value}" registered by "${shortcutMap[item.value]}" and "${ext}"`)
+        }
+        shortcutMap[item.value] = ext
+      }
+    }
+  })
+
+  // ── 6. 工具定义指纹（跨会话漂移记录，2026-08-18）——
+  // 提取全部 registerTool 块的有效载荷（name/description/parameters/行为源码），
+  // 整体 sha256 追加到 agent/stats/tool-fingerprint.jsonl（跨会话累积）。
+  // 用途：与 cache-guard 注入面基线互补——工具 schema 是 system prompt 一部分，
+  // 跨会话漂移会破坏前缀缓存；指纹记录让漂移可追溯、可对照审计时间点。
+  await test('tool definition fingerprint (cross-session drift ledger)', () => {
+    const payloads = []
+    for (const ext of ALL_EXTENSIONS) {
+      const dir = join(EXTENSIONS_DIR, ext)
+      ;(function walk(d) {
+        let ents
+        try { ents = readdirSync(d, { withFileTypes: true }) } catch { return }
+        for (const e of ents) {
+          const p = join(d, e.name)
+          if (e.isDirectory()) {
+            if (e.name !== 'node_modules' && e.name !== 'tests') walk(p)
+          } else if (e.name.endsWith('.ts') && !e.name.endsWith('.d.ts')) {
+            const src = readFileSync(p, 'utf-8')
+            let idx = 0
+            while ((idx = src.indexOf('registerTool(', idx)) !== -1) {
+              // 平衡括号截取整个对象
+              let depth = 0, j = idx + 'registerTool('.length
+              for (; j < src.length; j++) {
+                if (src[j] === '(') depth++
+                else if (src[j] === ')') { depth--; if (depth === 0) break }
+              }
+              if (depth === 0) payloads.push(src.slice(idx, j + 1))
+              idx += 16
+            }
+          }
+        }
+      })(dir)
+    }
+    if (!payloads.length) throw new Error('未扫描到任何 registerTool 定义')
+    const fp = createHash('sha256').update(payloads.sort().join('\n')).digest('hex')
+    const statsDir = join(ROOT, 'stats')
+    const ledger = join(statsDir, 'tool-fingerprint.jsonl')
+    let prev = null
+    try {
+      const lines = readFileSync(ledger, 'utf-8').trim().split('\n').filter(Boolean)
+      if (lines.length) prev = JSON.parse(lines[lines.length - 1]).fingerprint
+    } catch { /* 首次运行 */ }
+    if (prev !== fp) {
+      mkdirSync(statsDir, { recursive: true })
+      appendFileSync(ledger, JSON.stringify({ ts: new Date().toISOString(), fingerprint: fp, toolBlocks: payloads.length }) + '\n')
+    }
+    const state = prev === null ? '首次记录' : (prev === fp ? '无漂移' : '漂移（本次变更已入账）')
+    console.log(`  工具定义指纹: ${fp.slice(0, 16)}… (${payloads.length} 块, ${state}) → ${relative(ROOT, ledger)}`)
+  })
+
+  // ── Summary ──
+  const total = passed + failed
+  console.log(`\n${'='.repeat(40)}`)
+  console.log(`Total: ${total} | Passed: ${passed} | Failed: ${failed}`)
+  if (failures.length > 0) {
+    console.log('\nFailures:')
+    for (const f of failures) {
+      console.log(`  - ${f.name}: ${f.error}`)
+    }
+    process.exit(1)
+  }
+}
+
+main().catch(e => { console.error('Fatal:', e); process.exit(1) })

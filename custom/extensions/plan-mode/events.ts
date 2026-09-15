@@ -2,8 +2,8 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { extractTodoItems, isPlanRevisionIntent, mergePlanRevision, truncateSubject, isSafeCommand, assertPlanSubagentAllowed } from "./utils.ts";
-import { getTokenPressureTag, getUrgencyHint, getBudgetReport, resetBudget } from "../../services/token-budget/index.ts";
-import { loadNotes, clearCompactionFlag } from "../../services/note-store.ts";
+import { getTokenPressureTag, getUrgencyHint, getBudgetReport, resetBudget } from "../../lib/token-budget.ts";
+import { loadNotes, clearCompactionFlag } from "../../lib/note-store.ts";
 import { Key } from "@earendil-works/pi-tui";
 
 import { type Task, type TaskState, cleanupReminderCheck } from "./state.ts";

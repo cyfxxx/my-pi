@@ -1,8 +1,7 @@
-import { pruneToolResults, type PruneMessage } from "../../services/prune.ts";
-import { estimateTokens } from "../../services/context-budget.ts";
+import { pruneToolResults, type PruneMessage } from "../../lib/prune.ts";
+import { estimateTokens } from "../../lib/context-budget.ts";
 import { buildPruneDumpRef, PRUNE_REFS_DIR, PRUNE_REFS_RETENTION_DAYS } from "./prune-dump.ts";
-import { sweepPruneRefs } from "../../services/prune.ts";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { sweepPruneRefs } from "../../lib/prune.ts";
 
 const DIAG_CUSTOM_TYPES = new Set(["usage-diag"]);
 
@@ -16,7 +15,7 @@ export function createMessageFilterState(): MessageFilterState {
 }
 
 export function registerMessageFilter(
-  pi: ExtensionAPI,
+  pi: { on: (event: string, handler: (...args: unknown[]) => unknown) => void },
   state: MessageFilterState,
 ): void {
   // R2/R3：context 阶段确定性过滤
@@ -60,11 +59,11 @@ export function registerMessageFilter(
     }
     if (latestSummaryIdx >= 0) {
       const hasOlder = messages.slice(0, latestSummaryIdx).some(
-        (m: { role?: string }) => m.role === "compactionSummary",
+        (m) => m.role === "compactionSummary",
       );
       if (hasOlder) {
         messages = messages.filter(
-          (m: { role?: string }, i: number) => !(m.role === "compactionSummary" && i !== latestSummaryIdx),
+          (m, i) => !(m.role === "compactionSummary" && i !== latestSummaryIdx),
         );
         modified = true;
       }

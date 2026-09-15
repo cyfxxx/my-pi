@@ -1,9 +1,8 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { loadNotes, saveNotes, updateNotes, getNotesSize } from '../storage.ts'
 
 const MAX_NOTES_SIZE = 2048 * 1024
 
-export function registerNotesTools(pi: ExtensionAPI): void {
+export function registerNotesTools(pi: { registerTool: (def: unknown) => void }): void {
   // ── ctx_note ──
   pi.registerTool({
     name: 'ctx_note',

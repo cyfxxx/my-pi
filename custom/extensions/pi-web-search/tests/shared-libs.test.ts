@@ -7,12 +7,12 @@ import { randomUUID } from 'crypto'
 // ─── token-budget shared lib ────────────────────────────────
 describe('shared lib: token-budget', () => {
   beforeEach(async () => {
-    const mod = await import('../../../services/token-budget/index')
+    const mod = await import('../../../lib/token-budget')
     mod.resetBudget()
   })
 
   it('multiple extensions can record tool usage', async () => {
-    const mod = await import('../../../services/token-budget/index')
+    const mod = await import('../../../lib/token-budget')
     mod.recordToolUsage('web_search', 100)
     mod.recordToolUsage('ctx_exec', 200)
     mod.recordToolUsage('web_fetch', 50)
@@ -21,21 +21,21 @@ describe('shared lib: token-budget', () => {
   })
 
   it('getTokenPressureTag returns null under threshold', async () => {
-    const mod = await import('../../../services/token-budget/index')
+    const mod = await import('../../../lib/token-budget')
     mod.resetBudget()
     mod.recordToolUsage('test', 100)
     expect(mod.getTokenPressureTag()).toBeNull()
   })
 
   it('estimateTokens works for various inputs', async () => {
-    const mod = await import('../../../services/token-budget/index')
+    const mod = await import('../../../lib/token-budget')
     expect(mod.estimateTokens('hello world')).toBeGreaterThan(0)
     expect(mod.estimateTokens('')).toBe(0)
     expect(mod.estimateTokens('a'.repeat(1000))).toBeGreaterThan(100)
   })
 
   it('truncateByTokens preserves prefix and shortens', async () => {
-    const mod = await import('../../../services/token-budget/index')
+    const mod = await import('../../../lib/token-budget')
     const text = 'hello world foo bar baz ' + 'x'.repeat(1000)
     const truncated = mod.truncateByTokens(text, 10)
     expect(truncated.length).toBeLessThan(text.length)
@@ -46,12 +46,12 @@ describe('shared lib: token-budget', () => {
 // ─── prune shared lib ───────────────────────────────────────
 describe('shared lib: prune', () => {
   beforeEach(async () => {
-    const mod = await import('../../../services/prune')
+    const mod = await import('../../../lib/prune')
     mod.resetOutputBudget()
   })
 
   it('recordOutput and pruneToolOutput work', async () => {
-    const mod = await import('../../../services/prune')
+    const mod = await import('../../../lib/prune')
     const output = 'x'.repeat(1000)
     const pruned = mod.pruneToolOutput(output, 'test_tool')
     expect(pruned).toBe(output)
@@ -62,7 +62,7 @@ describe('shared lib: prune', () => {
   })
 
   it('pruneToolOutput truncates when over budget', async () => {
-    const mod = await import('../../../services/prune')
+    const mod = await import('../../../lib/prune')
     // Exhaust token budget first (20K tokens ≈ 70K chars at 3.5 chars/token)
     mod.recordOutput('big_tool', 70000)
 
@@ -88,7 +88,7 @@ describe('shared lib: note-store (ctx-lite ↔ plan-mode)', () => {
   })
 
   it('notes written by ctx-lite can be read by plan-mode via same file', async () => {
-    const store = await import('../../../services/note-store')
+    const store = await import('../../../lib/note-store')
     // Simulate ctx-lite storing a note
     const notes = { 'task:current': 'implement feature X' }
     store.saveNotes(notes)
@@ -99,7 +99,7 @@ describe('shared lib: note-store (ctx-lite ↔ plan-mode)', () => {
   })
 
   it('ctx-lite writes compaction flag, plan-mode reads it', async () => {
-    const store = await import('../../../services/note-store')
+    const store = await import('../../../lib/note-store')
     // ctx-lite sets compaction flags
     const notes = {
       '_ctx.just_compacted': 'true',
@@ -119,7 +119,7 @@ describe('shared lib: note-store (ctx-lite ↔ plan-mode)', () => {
   })
 
   it('TTL notes expire correctly', async () => {
-    const store = await import('../../../services/note-store')
+    const store = await import('../../../lib/note-store')
     const expired = new Date(Date.now() - 1000).toISOString()
     const active = new Date(Date.now() + 86400000).toISOString()
     const notes = {
@@ -136,7 +136,7 @@ describe('shared lib: note-store (ctx-lite ↔ plan-mode)', () => {
   })
 
   it('getTotalSize excludes metadata keys', async () => {
-    const store = await import('../../../services/note-store')
+    const store = await import('../../../lib/note-store')
     const notes = {
       'data:key': 'hello world',
       '__ttl_data:key': 'some-date',
