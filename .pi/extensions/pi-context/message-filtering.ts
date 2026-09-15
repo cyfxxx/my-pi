@@ -1,7 +1,7 @@
-import { pruneToolResults, type PruneMessage } from "../../lib/prune.ts";
-import { estimateTokens } from "../../lib/context-budget.ts";
+import { pruneToolResults, type PruneMessage } from "../../services/token-budget/prune.ts";
+import { estimateTokens } from "../../services/token-budget/context-budget.ts";
 import { buildPruneDumpRef, PRUNE_REFS_DIR, PRUNE_REFS_RETENTION_DAYS } from "./prune-dump.ts";
-import { sweepPruneRefs } from "../../lib/prune.ts";
+import { sweepPruneRefs } from "../../services/token-budget/prune.ts";
 
 const DIAG_CUSTOM_TYPES = new Set(["usage-diag"]);
 

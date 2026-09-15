@@ -165,7 +165,7 @@ export function registerToolRegistrations(
   pi.registerCommand("usage-diag", {
     description: "显示会话 LLM 用量诊断（每轮 input/缓存/输出汇总）",
     handler: async (_args, ctx) => {
-      const { formatUsageSummary, loadDiagLines } = require("../../lib/usage-diag.ts");
+      const { formatUsageSummary, loadDiagLines } = require("../../services/diagnostics/usage-diag.ts");
       const content = formatUsageSummary(loadDiagLines());
       ctx.ui.notify(
         `usage-diag: ${content.split("\n").length} 行，已发送到聊天（不进 LLM 上下文）。`,

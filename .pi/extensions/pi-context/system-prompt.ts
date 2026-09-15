@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { setContextWindow, setUsedTokens } from "../../lib/context-budget.ts";
+import { setContextWindow, setUsedTokens } from "../../services/token-budget/context-budget.ts";
 import { resolveContext } from "./context-resolver.ts";
 import {
   EFFICIENCY_ADVICE,

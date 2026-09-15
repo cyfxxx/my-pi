@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import type { Usage } from "@earendil-works/pi-ai";
-import { estimateTokens, recordCacheUsage } from "../../lib/context-budget.ts";
+import { estimateTokens, recordCacheUsage } from "../../services/token-budget/context-budget.ts";
 import { recordToolCall, recordToolUsage } from "./diagnostics.ts";
 import { truncateToolContent, updateFailStreak } from "./tool-truncation.ts";
 

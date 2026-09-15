@@ -2,8 +2,8 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
 import { loadConfig } from './config'
 import type { SearchOnlyConfig } from './types'
 import { registerSearchTools } from './search/index'
-import { recordToolUsage, resetBudget, estimateTokens } from '../../lib/token-budget.ts'
-import { recordOutput, pruneToolOutput } from '../../lib/prune.ts'
+import { recordToolUsage, resetBudget, estimateTokens } from '../../services/token-budget/index.ts'
+import { recordOutput, pruneToolOutput } from '../../services/token-budget/prune.ts'
 import { searchDirect } from './fetch.ts'
 
 export default async function (pi: ExtensionAPI) {
@@ -139,7 +139,7 @@ export default async function (pi: ExtensionAPI) {
   // ─── lifecycle ───────────────────────────────────────────────
   pi.on('session_start', async () => {
     resetBudget()
-    const { resetOutputBudget } = await import('../../lib/prune.ts')
+    const { resetOutputBudget } = await import('../../services/token-budget/prune.ts')
     resetOutputBudget()
   })
 }

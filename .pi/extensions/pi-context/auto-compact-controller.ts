@@ -1,13 +1,13 @@
 import { recordAutoCompact, recordUsage, pruneToolEvents, recomputeToolUsage } from "./diagnostics.ts";
-import { recordTaskRecord } from "../../lib/task-record.ts";
+import { recordTaskRecord } from "../../services/diagnostics/task-record.ts";
 import { extractUserRequest } from "./message-utils.ts";
 import { inferTaskType } from "./thinking-level.ts";
-import { markCompacted } from "../../lib/context-budget.ts";
+import { markCompacted } from "../../services/token-budget/context-budget.ts";
 import { snapshotBeforeCompact } from "./compression.ts";
-import { makeAutoContinueGate, makeCompactDecider } from "../../lib/auto-compact.ts";
+import { makeAutoContinueGate, makeCompactDecider } from "../../services/token-budget/auto-compact.ts";
 import { readAdminStateAction } from "./admin-state.ts";
 import { resolveContext } from "./context-resolver.ts";
-import { sweepPruneRefs } from "../../lib/prune.ts";
+import { sweepPruneRefs } from "../../services/token-budget/prune.ts";
 import { PRUNE_REFS_DIR, PRUNE_REFS_RETENTION_DAYS } from "./prune-dump.ts";
 import {
   ABSOLUTE_TOKENS,

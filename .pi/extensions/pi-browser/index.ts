@@ -6,8 +6,8 @@ import { registerBrowserTools } from './browser/index'
 import { unlink, readdir, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { recordToolUsage, resetBudget } from '../../lib/token-budget.ts'
-import { resetOutputBudget } from '../../lib/prune.ts'
+import { recordToolUsage, resetBudget } from '../../services/token-budget/index.ts'
+import { resetOutputBudget } from '../../services/token-budget/prune.ts'
 
 const SCREENSHOT_PREFIX = 'pi-screenshot-'
 const MAX_SCREENSHOTS = 20
