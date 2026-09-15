@@ -1,0 +1,13 @@
+{
+  "_说明": "ntfy 通道；topic 随机生成防白嫖；文件含 topic(按密钥对待) 不入库",
+  "enabled": true,
+  "rateLimitMinutes": 60,
+  "channels": [
+    {
+      "id": "ntfy",
+      "type": "cmd",
+      "enabled": true,
+      "template": "curl -fsS -H 'Content-Type: application/json' -d '{ \"topic\": \"pi-tools-bc419b43\", \"title\":{{subject_json}},\"message\":{{body_json}},\"priority\":4,\"tags\":[\"rotating_light\"] }' 'https://ntfy.sh/'"
+    }
+  ]
+}
