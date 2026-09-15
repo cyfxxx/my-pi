@@ -1,0 +1,21 @@
+# 未合并改进（合并见 docs/SKILLS-MAINTENANCE.md）
+
+> 格式：`日期 | 触发任务 | 偏差/发现 | 建议改动`（证据导向：命令/路径/现象）
+
+- 2026-09-11 | 全项目修复闭环 | cache-guard 引用 `lib/prune.ts` 但文件已迁移至 `services/token-budget/prune.ts` | 建议在 SKILL.md 第 1 步或 cache-guard 脚本注释中提醒：注入面文件清单需随重构同步更新
+- 2026-09-11 | 全项目修复闭环 | pi-voice 测试因 Termux 检测在非 Termux 机器上误判失败 | 建议在 SKILL.md 第 2 步补充：有环境检测逻辑的扩展，测试须显式 mock 平台环境变量（如 `PI_VOICE_PLATFORM`）
+- 2026-09-11 | 全项目修复闭环 | doc-lint 误报 tool-groups.ts 组名为工具名 | 建议在 doc-lint.mjs 中排除 `tool-groups.ts` 或区分 tool registration vs group definition 模式
+
+# 已合并（保留最近 3 条批次摘要）
+
+## 2026-08-26 文档审查 + improvements 合并（v1.10）
+8 条历史建议全部并入正文：ERROR-CHECKLIST 完整路径（误报清单节）；缓存检查勿启用休眠工具组（运行检查节头）；清单类断言先 cat 核实（委派 prompt 要点）；vitest 必须扩展目录 cwd（第 2 步）；worker tsc 自检约束 + 契约测试 grep + 正则修改用 .mjs 脚本 + staged 残留/rebase 归属检查（第 6 步）。
+
+## 2026-08-26 审计修复闭环
+vitest 根目录污染（--only 分层验证纪律）→ 第 2 步；契约测试先行（pi-link TTL 缓存案例）→ 第 6 步；正则转义层叠用独立 .mjs → 第 6 步。
+
+## 2026-08-25 全项目审计 + 修复闭环
+多会话并行提交冲突预防 → 第 6 步提交推送；清单类断言先核实 → 委派 prompt 要点；worker tsc 类型兜底 → 第 6 步 worker 约束。
+
+## 2026-08-28 全项目审计
+tmux 全量测试 EXIT= 标记缺失判读 → 第 2 步建议（待合并）；复核截断按核实成本分流（主会话补验 vs 重委派）→ 第 4 步建议（待合并）。
