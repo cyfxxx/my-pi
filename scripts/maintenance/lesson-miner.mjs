@@ -7,8 +7,8 @@
  *       pi-memory。脚本本身不写 memory、不改任何配置/注入面（纯只读分析，缓存纪律）。
  *
  * 数据源：
- *   - ~/.pi/agent/.usage-diag.jsonl（pi-context 每轮 turn_end 记录；PI_AGENT_DIR 覆盖基线目录）
- *   - ~/.pi/agent/stats/tool-events.jsonl（tool-enable 事件台账；缺失时跳过归因）
+ *   - ~/.pi/.usage-diag.jsonl（pi-context 每轮 turn_end 记录；PI_AGENT_DIR 覆盖基线目录）
+ *   - ~/.pi/stats/tool-events.jsonl（tool-enable 事件台账；缺失时跳过归因）
  *   - usage-diag 内的 auto-compact / prune 事件行（断裂时刻 ±2min 窗口关联）
  *
  * 会话分段（与 usage-stats.mjs 同思路，独立实现，不改动它）：
@@ -33,7 +33,7 @@
  *   node scripts/maintenance/lesson-miner.mjs --limit 0           # 展开全部异常会话
  *   node scripts/maintenance/lesson-miner.mjs --limit 10          # 只看最严重的 10 个
  *   node scripts/maintenance/lesson-miner.mjs --out report.txt    # 报告同时写入文件（唯一允许的副作用）
- *   PI_AGENT_DIR=/path node scripts/maintenance/lesson-miner.mjs  # 覆盖数据基线目录（默认 ~/.pi/agent）
+ *   PI_AGENT_DIR=/path node scripts/maintenance/lesson-miner.mjs  # 覆盖数据基线目录（默认 ~/.pi）
  *
  * 幂等：默认纯只读，重复运行无副作用（--out 除外）。
  */
@@ -56,7 +56,7 @@ function usage() {
   console.log(`用法: node scripts/maintenance/lesson-miner.mjs [--limit N] [--out PATH]
   --limit N   展开异常会话数量上限（默认 25；0 = 全部展开）
   --out PATH  报告同时写入 PATH（唯一可选副作用；默认仅 stdout）
-  环境变量 PI_AGENT_DIR 覆盖数据基线目录（默认 ~/.pi/agent）
+  环境变量 PI_AGENT_DIR 覆盖数据基线目录（默认 ~/.pi）
   数据缺失时输出『暂无数据』并退出码 0（优雅降级）`)
 }
 if (args.includes('-h') || args.includes('--help')) { usage(); process.exit(0) }

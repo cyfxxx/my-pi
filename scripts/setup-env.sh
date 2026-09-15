@@ -62,7 +62,7 @@ else
     warn "mypi 命令不可用，请重新加载 shell"
 fi
 
-if [ -L "$HOME/.pi" ] || [ -d "$HOME/.pi/agent" ]; then
+if [ -L "$HOME/.pi" ] && [ -f "$HOME/.pi/settings.json" ]; then
     ok "配置目录可用"
 else
     warn "配置目录不可用，请运行 setup-config.sh"

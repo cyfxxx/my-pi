@@ -429,7 +429,7 @@ PY
   mkdir -p "$PI_HOME/agent/bin"
   ok "agent/bin/ 已就绪"
 
-  # 扩展自动发现：pi 0.83+ 从 ~/.pi/agent/extensions/ 目录自动加载，无需写入 settings.json extensions
+  # 扩展自动发现：pi 0.83+ 从 ~/.pi/extensions/ 目录自动加载，无需写入 settings.json extensions
   # （settings.json 的 extensions 数组仅作覆盖模式：! 排除 / + 强制包含 / - 强制排除，不再承担注册职责）
   # 动态扫描全部扩展目录（含新扩展免维护），逐个验证 index.ts 入口
   EXT_DIRS=""
@@ -1069,7 +1069,7 @@ EOF
     fi
     if [ "$NO_PIPER" = "0" ] && ! command -v piper >/dev/null 2>&1; then
       warn "piper 神经 TTS 未安装（当前用 espeak-ng 拼音合成）"
-      info "可选安装（63MB 模型，--no-piper 跳过）: 见 ~/.pi/agent/extensions/pi-voice/README.md"
+      info "可选安装（63MB 模型，--no-piper 跳过）: 见 ~/.pi/extensions/pi-voice/README.md"
     fi
   fi
 
@@ -1276,7 +1276,7 @@ print(('missing:'+','.join(missing)) if missing else ('ok:%d' % len(names)))
   [ -f "$PI_HOME/agent/models-store.json" ] && mfile="$PI_HOME/agent/models-store.json"
   if [ ! -f "$PI_HOME/agent/settings.json" ] || [ -z "$mfile" ]; then
     warn "settings.json / models 配置缺失——恢复到新设备后必须手动提供"
-    info "从原机安全传输: scp user@orig:~/.pi/agent/{settings.json,models.json,auth.json} $PI_HOME/agent/"
+    info "从原机安全传输: scp user@orig:~/.pi/{settings.json,models.json,auth.json} $PI_HOME/agent/"
     info "或原机打包: pi-backup create --with-auth 后 pi-backup restore 恢复"
     info "未提供时 pi 无可用模型，无法启动对话"
   elif [ -f "$PI_HOME/agent/settings.json" ] && [ -n "$mfile" ]; then

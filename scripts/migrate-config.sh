@@ -36,7 +36,7 @@ if [ ! -d "$SOURCE_PI" ]; then
 fi
 
 # 检查目标目录
-if [ -d "$PROJECT_DIR/.pi/agent" ] && [ "$(ls -A "$PROJECT_DIR/.pi/agent" 2>/dev/null)" ]; then
+if [ -d "$PROJECT_DIR/.pi" ] && [ "$(ls -A "$PROJECT_DIR/.pi" 2>/dev/null)" ]; then
     warn "目标目录已存在且不为空"
     read -p "是否覆盖？(y/N): " -n 1 -r
     echo ""
@@ -51,14 +51,14 @@ BACKUP="$PROJECT_DIR/.pi.backup.$(date +%Y%m%d%H%M%S)"
 [ -d "$PROJECT_DIR/.pi" ] && cp -r "$PROJECT_DIR/.pi" "$BACKUP" && ok "备份: $BACKUP"
 
 # 创建目标目录
-mkdir -p "$PROJECT_DIR/.pi/agent"/{extensions,services,sessions,stats,core}
+mkdir -p "$PROJECT_DIR/.pi"/{extensions,services,sessions,stats,core}
 mkdir -p "$PROJECT_DIR/.pi"/{scripts,packs,deploy,data,logs}
 
 # 迁移配置文件
 echo ""
 info "迁移配置文件..."
 for file in settings.json models.json auth.json modes.json keybindings.json scheduled-seeds.json AGENTS.md APPEND_SYSTEM.md; do
-    [ -f "$SOURCE_PI/agent/$file" ] && cp "$SOURCE_PI/agent/$file" "$PROJECT_DIR/.pi/agent/" && ok "$file"
+    [ -f "$SOURCE_PI/$file" ] && cp "$SOURCE_PI/$file" "$PROJECT_DIR/.pi/" && ok "$file"
 done
 
 # 迁移目录
@@ -68,8 +68,8 @@ for dir in extensions services core scripts packs deploy data logs; do
     [ -d "$SOURCE_PI/$dir" ] && cp -r "$SOURCE_PI/$dir/"* "$PROJECT_DIR/.pi/$dir/" 2>/dev/null && ok "$dir"
 done
 
-[ -d "$SOURCE_PI/agent/extensions" ] && cp -r "$SOURCE_PI/agent/extensions/"* "$PROJECT_DIR/.pi/agent/extensions/" 2>/dev/null && ok "agent/extensions"
-[ -d "$SOURCE_PI/agent/services" ] && cp -r "$SOURCE_PI/agent/services/"* "$PROJECT_DIR/.pi/agent/services/" 2>/dev/null && ok "agent/services"
+[ -d "$SOURCE_PI/extensions" ] && cp -r "$SOURCE_PI/extensions/"* "$PROJECT_DIR/.pi/extensions/" 2>/dev/null && ok "agent/extensions"
+[ -d "$SOURCE_PI/services" ] && cp -r "$SOURCE_PI/services/"* "$PROJECT_DIR/.pi/services/" 2>/dev/null && ok "agent/services"
 
 # 创建符号链接
 echo ""

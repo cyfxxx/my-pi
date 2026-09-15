@@ -65,12 +65,12 @@ test_analyzer "extension_fail" \
 
 test_analyzer "extension_runtime_error" \
   "TypeError: Class constructor WebSocketServer cannot be invoked without 'new'
-    at createServer (/root/.pi/agent/extensions/pi-browser/server.ts:276:39)" \
+    at createServer (/root/.pi/extensions/pi-browser/server.ts:276:39)" \
   "extension_fail"
 
 test_analyzer "extension_typeerror" \
   "TypeError: text.toLowerCase is not a function
-    at fuzzyMatch (/root/.pi/agent/extensions/pi-voice/index.ts:158:89)" \
+    at fuzzyMatch (/root/.pi/extensions/pi-voice/index.ts:158:89)" \
   "extension_fail"
 
 test_analyzer "syntax_error" \
@@ -216,10 +216,10 @@ else
   fail "pi-source-build.sh 不可执行"
 fi
 
-if [ -d "$HOME/.pi/agent/recovery/cache/dist" ]; then
+if [ -d "$HOME/.pi/recovery/cache/dist" ]; then
   ok "L4 源码缓存存在"
-  if [ -f "$HOME/.pi/agent/recovery/cache/version.json" ]; then
-    ver=$(node -e "console.log(require('$HOME/.pi/agent/recovery/cache/version.json').version||'?')" 2>/dev/null)
+  if [ -f "$HOME/.pi/recovery/cache/version.json" ]; then
+    ver=$(node -e "console.log(require('$HOME/.pi/recovery/cache/version.json').version||'?')" 2>/dev/null)
     if [ "$VERBOSE" -eq 1 ]; then
       info "  缓存版本: $ver"
     fi
@@ -238,14 +238,14 @@ fi
 # ── 测试 5: 救援模式配置 ──
 section "测试 5: 救援模式配置"
 
-if [ -f "$HOME/.pi/agent/recovery/rescue-prompt.md" ]; then
+if [ -f "$HOME/.pi/recovery/rescue-prompt.md" ]; then
   ok "rescue-prompt.md 存在"
-  if grep -q "bash\|edit\|write\|工具" "$HOME/.pi/agent/recovery/rescue-prompt.md"; then
+  if grep -q "bash\|edit\|write\|工具" "$HOME/.pi/recovery/rescue-prompt.md"; then
     ok "rescue-prompt.md 包含工具使用指令"
   else
     fail "rescue-prompt.md 缺少工具使用指令"
   fi
-  if grep -q "修复\|fix\|repair" "$HOME/.pi/agent/recovery/rescue-prompt.md"; then
+  if grep -q "修复\|fix\|repair" "$HOME/.pi/recovery/rescue-prompt.md"; then
     ok "rescue-prompt.md 包含主动修复指令"
   else
     fail "rescue-prompt.md 缺少主动修复指令"

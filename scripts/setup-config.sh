@@ -21,8 +21,8 @@ echo ""
 info "项目目录: $PROJECT_DIR"
 
 # 检查是否已存在配置目录
-if [ -d "$PROJECT_DIR/.pi/agent" ]; then
-    warn "配置目录已存在: $PROJECT_DIR/.pi/agent"
+if [ -f "$PROJECT_DIR/.pi/settings.json" ]; then
+    warn "配置目录已存在: $PROJECT_DIR/.pi/"
     read -p "是否继续？(y/N): " -n 1 -r
     echo ""
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -31,36 +31,18 @@ if [ -d "$PROJECT_DIR/.pi/agent" ]; then
     fi
 fi
 
-# 创建配置目录结构
+# 创建配置目录结构（扁平化，无 agent/ 嵌套）
 echo ""
 info "创建配置目录结构..."
-mkdir -p "$PROJECT_DIR/.pi/agent/extensions"
-mkdir -p "$PROJECT_DIR/.pi/agent/services"
-mkdir -p "$PROJECT_DIR/.pi/agent/sessions"
-mkdir -p "$PROJECT_DIR/.pi/agent/stats"
-mkdir -p "$PROJECT_DIR/.pi/agent/core"
-mkdir -p "$PROJECT_DIR/.pi/scripts"
-mkdir -p "$PROJECT_DIR/.pi/packs"
-mkdir -p "$PROJECT_DIR/.pi/deploy"
+mkdir -p "$PROJECT_DIR/.pi/extensions"
+mkdir -p "$PROJECT_DIR/.pi/services"
+mkdir -p "$PROJECT_DIR/.pi/sessions"
+mkdir -p "$PROJECT_DIR/.pi/stats"
+mkdir -p "$PROJECT_DIR/.pi/core"
+mkdir -p "$PROJECT_DIR/.pi/skills"
 mkdir -p "$PROJECT_DIR/.pi/data"
 mkdir -p "$PROJECT_DIR/.pi/logs"
 ok "配置目录结构创建完成"
-
-# 复制默认配置文件
-echo ""
-info "复制默认配置文件..."
-for file in settings.json modes.json keybindings.json scheduled-seeds.json; do
-    if [ -f "$PROJECT_DIR/custom/config/$file" ]; then
-        cp "$PROJECT_DIR/custom/config/$file" "$PROJECT_DIR/.pi/agent/"
-        ok "$file"
-    fi
-done
-
-# 复制扩展和服务
-echo ""
-info "复制扩展和服务..."
-[ -d "$PROJECT_DIR/custom/extensions" ] && cp -r "$PROJECT_DIR/custom/extensions/"* "$PROJECT_DIR/.pi/agent/extensions/" 2>/dev/null && ok "extensions"
-[ -d "$PROJECT_DIR/custom/services" ] && cp -r "$PROJECT_DIR/custom/services/"* "$PROJECT_DIR/.pi/agent/services/" 2>/dev/null && ok "services"
 
 # 创建符号链接
 echo ""
@@ -87,6 +69,7 @@ echo "配置目录: $PROJECT_DIR/.pi"
 echo "符号链接: ~/.pi -> $PROJECT_DIR/.pi"
 echo ""
 echo "下一步："
-echo "  1. 运行构建脚本: ./scripts/core/rebuild.sh"
-echo "  2. 验证安装: mypi --list-models"
+echo "  1. 运行构建: npm run build:offline"
+echo "  2. 运行环境配置: ./scripts/setup-env.sh"
+echo "  3. 验证安装: mypi --list-models"
 echo ""

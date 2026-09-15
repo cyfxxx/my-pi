@@ -80,17 +80,17 @@ fi
 # 桌面环境（WSLg/原生 X）不受影响，可显式 export PI_WEB_TOOLKIT_HEADLESS=false 覆盖）
 [ -d /data/data/com.termux ] && export PI_WEB_TOOLKIT_HEADLESS="${PI_WEB_TOOLKIT_HEADLESS:-true}"
 
-STATE_FILE="$HOME/.pi/agent/.pi-admin-state.json"
-CRASH_FILE="$HOME/.pi/agent/.pi-autopilot-crash.json"
-LASTGOOD_FILE="$HOME/.pi/agent/.pi-autopilot-lastgood.json"
-SETTINGS_FILE="$HOME/.pi/agent/settings.json"
+STATE_FILE="$HOME/.pi/.pi-admin-state.json"
+CRASH_FILE="$HOME/.pi/.pi-autopilot-crash.json"
+LASTGOOD_FILE="$HOME/.pi/.pi-autopilot-lastgood.json"
+SETTINGS_FILE="$HOME/.pi/settings.json"
 PI_AUTOPILOT=1
 export PI_AUTOPILOT
 CRASH_THRESHOLD=3
 RESCUE_THRESHOLD=5  # 连续崩溃达 5 次触发配置恢复
 RESCUE_PI_THRESHOLD=7  # 连续崩溃达 7 次启动救援模式 pi
 MAX_RECOVERY_ROUNDS=5  # 单次启动最大恢复循环轮数
-PI_SOURCE_CACHE="$HOME/.pi/agent/recovery/cache"  # L4 源码编译缓存
+PI_SOURCE_CACHE="$HOME/.pi/recovery/cache"  # L4 源码编译缓存
 LAST_ROLLBACK_TS=0
 CIRCUIT_BREAKER_THRESHOLD=5  # 熔断器阈值：连续失败5次触发熔断
 CIRCUIT_BREAKER_COOLDOWN=1800  # 熔断器冷却时间：30分钟（秒）
@@ -125,7 +125,7 @@ preserve_crash_log() {
 CRASH_WINDOW_MS=$((24 * 3600 * 1000))
 
 # 救援模式相关路径
-RESCUE_DIR="$HOME/.pi/agent/recovery"
+RESCUE_DIR="$HOME/.pi/recovery"
 SNAPSHOT_DIR="$HOME/.pi/.snapshots"
 RESCUE_CONFIG="$RESCUE_DIR/rescue-config.json"
 RESCUE_PROMPT="$RESCUE_DIR/rescue-prompt.md"
@@ -269,10 +269,10 @@ create_snapshot() {
   
   # 保存关键配置文件
   cp "$SETTINGS_FILE" "$snapshot_path/" 2>/dev/null || true
-  cp "$HOME/.pi/agent/modes.json" "$snapshot_path/" 2>/dev/null || true
+  cp "$HOME/.pi/modes.json" "$snapshot_path/" 2>/dev/null || true
   
   # 保存扩展列表
-  ls "$HOME/.pi/agent/extensions/" > "$snapshot_path/extensions.list" 2>/dev/null || true
+  ls "$HOME/.pi/extensions/" > "$snapshot_path/extensions.list" 2>/dev/null || true
   
   # 保存 git 状态
   cd "$HOME/.pi"
@@ -299,7 +299,7 @@ restore_snapshot() {
   
   # 恢复配置文件
   cp "$snapshot_path/settings.json" "$SETTINGS_FILE" 2>/dev/null || true
-  cp "$snapshot_path/modes.json" "$HOME/.pi/agent/modes.json" 2>/dev/null || true
+  cp "$snapshot_path/modes.json" "$HOME/.pi/modes.json" 2>/dev/null || true
   
   echo "[pi-wrapper] 已恢复快照: $snapshot_path" >&2
   return 0
@@ -341,7 +341,7 @@ start_rescue_pi() {
   "extensions": [],
   "skills": [],
   "systemPrompt": null,
-  "appendSystemPrompt": "~/.pi/agent/recovery/rescue-prompt.md",
+  "appendSystemPrompt": "~/.pi/recovery/rescue-prompt.md",
   "thinking": "low"
 }
 EOF
@@ -595,7 +595,7 @@ get_failed_extension_name() {
 # 临时禁用指定扩展（重命名 index.ts → index.ts.disabled）
 disable_extension() {
   local ext_name="$1"
-  local ext_dir="$HOME/.pi/agent/extensions/$ext_name"
+  local ext_dir="$HOME/.pi/extensions/$ext_name"
   if [ -f "$ext_dir/index.ts" ]; then
     mv "$ext_dir/index.ts" "$ext_dir/index.ts.disabled" 2>/dev/null
     echo "[pi-wrapper] 已临时禁用扩展: $ext_name" >&2
@@ -621,7 +621,7 @@ disable_extension() {
 # 在成功恢复后调用，确保下次启动时扩展可用
 reenable_disabled_extensions() {
   local reenabled=0
-  for ext_dir in "$HOME/.pi/agent/extensions"/*/; do
+  for ext_dir in "$HOME/.pi/extensions"/*/; do
     if [ -f "$ext_dir/index.ts.disabled" ] && [ ! -f "$ext_dir/index.ts" ]; then
       mv "$ext_dir/index.ts.disabled" "$ext_dir/index.ts" 2>/dev/null && reenabled=$((reenabled + 1))
     fi
@@ -682,7 +682,7 @@ fs.writeFileSync(p,JSON.stringify(pkg,null,2));
   elif [ -n "$missing_module" ]; then
     # 缺失内部模块（如 migrations.js）：尝试从源码缓存恢复
     echo "[pi-wrapper] 缺失模块: $missing_module" >&2
-    local source_cache="$HOME/.pi/agent/recovery/cache"
+    local source_cache="$HOME/.pi/recovery/cache"
     local module_name
     module_name="$(basename "$missing_module")"
     local dest_dir
@@ -744,7 +744,7 @@ recover_syntax_error() {
 # 因此解析失败时打印精确行号，交由用户/下次会话修复，而非静默丢功能。
 extension_source_ok() {
   local ext_name="$1"
-  local ext_dir="$HOME/.pi/agent/extensions/$ext_name"
+  local ext_dir="$HOME/.pi/extensions/$ext_name"
   local src=""
   # 优先检查 .ts 源码（jiti 解析入口），其次 .js
   if [ -f "$ext_dir/index.ts" ]; then
@@ -779,7 +779,7 @@ recover_extension_fail() {
   
   if [ -z "$ext_name" ]; then
     echo "[pi-wrapper] [恢复] 无法确定问题扩展，尝试禁用所有扩展" >&2
-    for ext_dir in "$HOME/.pi/agent/extensions"/*/; do
+    for ext_dir in "$HOME/.pi/extensions"/*/; do
       [ -f "$ext_dir/index.ts" ] && mv "$ext_dir/index.ts" "$ext_dir/index.ts.disabled" 2>/dev/null
     done
     return 0
@@ -795,8 +795,8 @@ recover_extension_fail() {
   # 检查是否是语法错误（ParseError, SyntaxError）
   if echo "$log_file" | grep -qE "ParseError|SyntaxError|Unexpected token"; then
     # 语法错误：尝试从源码缓存恢复扩展文件
-    local source_cache="$HOME/.pi/agent/recovery/cache"
-    local ext_dir="$HOME/.pi/agent/extensions/$ext_name"
+    local source_cache="$HOME/.pi/recovery/cache"
+    local ext_dir="$HOME/.pi/extensions/$ext_name"
     
     # 检查是否有备份的 index.ts
     if [ -f "$ext_dir/index.ts.bak" ]; then
@@ -1354,7 +1354,7 @@ validate_config() {
   fi
   
   # 校验 models.json
-  local models_file="$HOME/.pi/agent/models.json"
+  local models_file="$HOME/.pi/models.json"
   if [ -f "$models_file" ]; then
     if ! node -e "JSON.parse(require('fs').readFileSync('$models_file', 'utf-8'))" 2>/dev/null; then
       echo "[pi-wrapper] 配置错误: models.json 格式无效" >&2
@@ -1363,7 +1363,7 @@ validate_config() {
   fi
   
   # 校验 modes.json
-  local modes_file="$HOME/.pi/agent/modes.json"
+  local modes_file="$HOME/.pi/modes.json"
   if [ -f "$modes_file" ]; then
     if ! node -e "JSON.parse(require('fs').readFileSync('$modes_file', 'utf-8'))" 2>/dev/null; then
       echo "[pi-wrapper] 配置错误: modes.json 格式无效" >&2
@@ -1421,7 +1421,7 @@ resolve_mode() {
     current_mode=$(node -e "
       const fs = require('fs');
       try {
-        const modes = JSON.parse(fs.readFileSync('$HOME/.pi/agent/modes.json', 'utf-8'));
+        const modes = JSON.parse(fs.readFileSync('$HOME/.pi/modes.json', 'utf-8'));
         console.log(modes.current || modes.default || 'full');
       } catch(e) { console.log('full'); }
     " 2>/dev/null)
@@ -1438,7 +1438,7 @@ resolve_mode() {
   fi
 
   # 更新 modes.json 的 current 字段（pi-mode 扩展会读取此字段）
-  local modes_file="$HOME/.pi/agent/modes.json"
+  local modes_file="$HOME/.pi/modes.json"
   if [ -f "$modes_file" ]; then
     node -e "
       const fs = require('fs');
@@ -1453,7 +1453,7 @@ resolve_mode() {
   fi
 
   # 讀取模式配置
-  local modes_file="$HOME/.pi/agent/modes.json"
+  local modes_file="$HOME/.pi/modes.json"
   if [ ! -f "$modes_file" ]; then
     echo "[pi-wrapper] 模式配置文件不存在: $modes_file" >&2
     RESOLVED_ARGS=("${new_args[@]}")
@@ -1489,7 +1489,7 @@ resolve_mode() {
   elif [ -n "$ext_excludes" ]; then
     # 有排除列表：先禁用自动发现，再逐个加载允许的扩展
     extra_args+=("--no-extensions")
-    local ext_dir="$HOME/.pi/agent/extensions"
+    local ext_dir="$HOME/.pi/extensions"
     for ext_path in "$ext_dir"/*/; do
       local ext_name
       ext_name="$(basename "$ext_path")"
