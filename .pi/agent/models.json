@@ -1,0 +1,114 @@
+{
+ "providers": {
+  "amd-radeon": {
+   "baseUrl": "https://developer.amd.com.cn/radeon/api/v1",
+   "api": "openai-completions",
+   "apiKey": "rc-09a76af5a2554475bf56a8f4e8b4c4babe9f1e418ed608ee",
+   "models": [
+    {
+     "id": "DeepSeek-V4-Flash",
+     "name": "AMD Radeon DeepSeek V4 Flash",
+     "contextWindow": 1048576,
+     "maxTokens": 384000,
+     "reasoning": true,
+     "compat": {
+      "supportsDeveloperRole": false,
+      "supportsReasoningEffort": false,
+      "thinkingFormat": "none"
+     },
+     "thinkingLevelMap": {
+      "off": null,
+      "minimal": null,
+      "low": "low",
+      "medium": null,
+      "high": "high",
+      "xhigh": null,
+      "max": "max"
+     }
+    },
+    {
+     "id": "Qwen3.8-Flash-Next",
+     "name": "AMD Radeon Qwen3.8 Flash Next",
+     "contextWindow": 262144,
+     "maxTokens": 32768,
+     "reasoning": true,
+     "compat": {
+      "supportsDeveloperRole": false,
+      "supportsReasoningEffort": false
+     },
+     "thinkingLevelMap": {
+      "off": null,
+      "minimal": null,
+      "low": "low",
+      "medium": null,
+      "high": "high",
+      "xhigh": null,
+      "max": "max"
+     }
+    },
+    {
+     "id": "DeepSeek-V4-Flash-Vision-Exp",
+     "name": "AMD Radeon DeepSeek V4 Flash Vision",
+     "contextWindow": 1048576,
+     "maxTokens": 384000,
+     "reasoning": true,
+     "compat": {
+      "supportsDeveloperRole": false,
+      "supportsReasoningEffort": false,
+      "thinkingFormat": "none"
+     },
+     "thinkingLevelMap": {
+      "off": null,
+      "minimal": null,
+      "low": "low",
+      "medium": null,
+      "high": "high",
+      "xhigh": null,
+      "max": "max"
+     }
+    }
+   ]
+  },
+  "local-llama": {
+   "baseUrl": "http://localhost:8080/v1",
+   "api": "openai-completions",
+   "apiKey": "not-needed",
+   "compat": {
+    "supportsDeveloperRole": false,
+    "supportsReasoningEffort": false
+   },
+   "models": [
+    {
+     "id": "Qwen3.6-35B-HauhauCS-Q4_K_P.gguf",
+     "name": "Qwen3.6 35B Local",
+     "contextWindow": 131072,
+     "maxTokens": 32768,
+     "reasoning": true,
+     "compat": {
+      "thinkingFormat": "qwen-chat-template",
+      "supportsDeveloperRole": false,
+      "supportsReasoningEffort": false
+     }
+    }
+   ]
+  },
+  "freellmapi": {
+   "baseUrl": "http://localhost:3001/v1",
+   "api": "openai-completions",
+   "apiKey": "freellmapi-ddb63e3341b534661c2756e546fc0bac3dde6973cfa30fc9",
+   "models": [
+    {
+     "id": "auto",
+     "name": "FreeLLM Auto",
+     "contextWindow": 1048576,
+     "maxTokens": 65536,
+     "reasoning": true,
+     "compat": {
+      "supportsDeveloperRole": true,
+      "supportsReasoningEffort": true
+     }
+    }
+   ]
+  }
+ }
+}

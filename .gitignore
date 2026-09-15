@@ -4,18 +4,13 @@ dist/
 *.log
 .DS_Store
 *.tsbuildinfo
-# packages/*/node_modules/
 packages/*/dist/
 packages/*/dist-chrome/
 packages/*/dist-firefox/
 packages/ai/src/providers/data/
 packages/ai/src/providers/.model-generation-*/
 *.cpuprofile
-
-# Environment
 .env
-
-# Editor files
 .vscode/
 .zed/
 .idea/
@@ -23,8 +18,6 @@ packages/ai/src/providers/.model-generation-*/
 *.swp
 *.swo
 *~
-
-# Package specific
 .npm/
 coverage/
 .nyc_output/
@@ -39,7 +32,16 @@ out.html
 packages/coding-agent/binaries/
 todo.md
 plans/
-.pi/hf-sessions/
-.pi/hf-sessions-backup/
-collect.sh
 packages/agent/docs/extensions/pi-server-artifact/index.md
+
+# Pi 配置目录（运行时数据）
+.pi/agent/sessions/
+.pi/agent/stats/
+.pi/agent/models-store.json
+.pi/data/
+.pi/logs/
+.pi/agent/node_modules/
+.pi/agent/extensions/node_modules/
+
+# 备份目录
+*.bak.*

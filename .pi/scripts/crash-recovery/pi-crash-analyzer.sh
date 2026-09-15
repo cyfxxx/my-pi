@@ -1,0 +1,188 @@
+#!/bin/bash
+# pi-crash-analyzer.sh - Pi 崩溃原因分析器
+# 分析 pi 进程的 stderr 输出，分类崩溃类型，指导恢复策略
+#
+# 用法: source pi-crash-analyzer.sh  (由 pi-wrapper.sh 加载)
+#       或 bash pi-crash-analyzer.sh <crash_log_file>  (独立测试)
+
+# ── 崩溃类型常量 ──
+CRASH_MISSING_MODULE="missing_module"
+CRASH_SYNTAX_ERROR="syntax_error"
+CRASH_EXTENSION_FAIL="extension_fail"
+CRASH_CONFIG_CORRUPT="config_corrupt"
+CRASH_PROXY_ERROR="proxy_error"
+CRASH_LOCK_CONTENTION="lock_contention"
+CRASH_PROVIDER_ERROR="provider_error"
+CRASH_NODE_COMPAT="node_compat"
+CRASH_CLI_ARGUMENT="cli_argument_error"
+CRASH_NETWORK="network_error"
+CRASH_PERMISSION="permission_error"
+CRASH_OOM="oom_error"
+CRASH_DISK="disk_full"
+CRASH_TIMEOUT="timeout_error"
+CRASH_UNKNOWN="unknown"
+
+# ── 分析函数 ──
+
+# analyze_crash <log_file>
+# 读取 stderr 日志，返回崩溃类型字符串
+analyze_crash() {
+  local log_file="$1"
+  if [ ! -f "$log_file" ] || [ ! -s "$log_file" ]; then
+    echo "$CRASH_UNKNOWN"
+    return
+  fi
+
+  local content
+  content=$(cat "$log_file")
+
+  # 优先级从高到低匹配
+
+  # 1. 缺少 npm 模块（最常见）
+  if echo "$content" | grep -q "ERR_MODULE_NOT_FOUND"; then
+    # 区分 node: 内置模块 vs npm 包
+    if echo "$content" | grep -qE "Cannot find package 'node:"; then
+      echo "$CRASH_NODE_COMPAT"
+    else
+      echo "$CRASH_MISSING_MODULE"
+    fi
+    return
+  fi
+
+  # 2. 扩展加载失败
+  if echo "$content" | grep -qE "Failed to load extension|extension.*load.*fail|ExtensionError"; then
+    echo "$CRASH_EXTENSION_FAIL"
+    return
+  fi
+
+  # 2b. 扩展运行时崩溃（TypeError/ReferenceError 在扩展文件中）
+  #     错误信息可能跨多行，需要分别检查类型和路径
+  if echo "$content" | grep -qE "TypeError|ReferenceError|SyntaxError"; then
+    if echo "$content" | grep -qE "extensions/"; then
+      echo "$CRASH_EXTENSION_FAIL"
+      return
+    fi
+  fi
+
+  # 3. 语法错误（dist 文件损坏）— 排除 API 错误中的 JSON 片段
+  #    仅匹配本地文件路径上下文的 SyntaxError（如 dist/utils/xxx.js:2）
+  if echo "$content" | grep -qE "SyntaxError: Invalid or unexpected token|Unexpected token|ParseError"; then
+    # 如果错误发生在本地文件（含 dist/ 或 node_modules/），视为 syntax_error
+    if echo "$content" | grep -qE "(dist/|node_modules/).*SyntaxError|SyntaxError.*(dist/|node_modules/)"; then
+      echo "$CRASH_SYNTAX_ERROR"
+      return
+    fi
+    # 否则可能是 API 响应解析错误，不归为 syntax_error
+  fi
+
+  # 3b. TypeError/ReferenceError 在 dist 文件中（dist 损坏）
+  #     错误信息可能跨多行，需要分别检查类型和路径
+  if echo "$content" | grep -qE "TypeError|ReferenceError"; then
+    if echo "$content" | grep -qE "dist/|node_modules/@earendil-works/"; then
+      echo "$CRASH_SYNTAX_ERROR"
+      return
+    fi
+  fi
+
+  # 4. Provider/API 错误（5xx/429）— 提前到 config_corrupt 之前
+  #    匹配 HTTP 状态码、provider 错误关键词
+  if echo "$content" | grep -qE "50[0-9]|429|server_error|provider_error|provider_bad_req|rate.limit|Upstream request failed|All .* providers? rejected|All .* attempt.* failed|Provider error|stream interrupted"; then
+    echo "$CRASH_PROVIDER_ERROR"
+    return
+  fi
+
+  # 5. 配置文件损坏 — 仅匹配明确的本地配置文件错误
+  if echo "$content" | grep -qE "settings\.json.*corrupt|config.*invalid.*json|settings\.json.*SyntaxError|Unexpected token.*in JSON.*settings"; then
+    echo "$CRASH_CONFIG_CORRUPT"
+    return
+  fi
+
+  # 6. 代理/URL 错误
+  if echo "$content" | grep -qE "Invalid URL protocol|socks.*proxy|http_proxy|PROXY_URL"; then
+    echo "$CRASH_PROXY_ERROR"
+    return
+  fi
+
+  # 7. 调度锁竞争
+  if echo "$content" | grep -qE "无法获取调度锁|already.*held|lock.*contention|EADDRINUSE"; then
+    echo "$CRASH_LOCK_CONTENTION"
+    return
+  fi
+
+  # 8. CLI 参数错误（必须在 provider_error 之前，避免误判）
+  if echo "$content" | grep -qE "Unknown option|unknown flag|invalid option|Error:.*-m"; then
+    echo "$CRASH_CLI_ARGUMENT"
+    return
+  fi
+
+  # 9. 网络错误（ECONNREFUSED, ETIMEDOUT, DNS 等）
+  if echo "$content" | grep -qE "ECONNREFUSED|ETIMEDOUT|ECONNRESET|ENOTFOUND|getaddrinfo|network.*error|socket hang up"; then
+    echo "$CRASH_NETWORK"
+    return
+  fi
+
+  # 10. 权限错误
+  if echo "$content" | grep -qE "EACCES|permission denied|Permission denied|EPERM"; then
+    echo "$CRASH_PERMISSION"
+    return
+  fi
+
+  # 11. 内存不足（OOM）
+  if echo "$content" | grep -qE "JavaScript heap out of memory|ENOMEM|heap.*out.*of.*memory|FATAL ERROR.*limit"; then
+    echo "$CRASH_OOM"
+    return
+  fi
+
+  # 12. 磁盘空间不足
+  if echo "$content" | grep -qE "ENOSPC|No space left on device|disk.*full"; then
+    echo "$CRASH_DISK"
+    return
+  fi
+
+  # 13. 进程超时/挂死（非网络超时）
+  if echo "$content" | grep -qE "timeout.*exceeded|task.*abort|operation.*not.*permitted|watchdog.*timeout|heartbeat.*timeout"; then
+    echo "$CRASH_TIMEOUT"
+    return
+  fi
+
+  echo "$CRASH_UNKNOWN"
+}
+
+# get_crash_snippet <log_file> [max_lines]
+# 返回错误摘要（默认前 5 行）
+get_crash_snippet() {
+  local log_file="$1"
+  local max_lines="${2:-5}"
+  if [ ! -f "$log_file" ] || [ ! -s "$log_file" ]; then
+    echo "(无输出)"
+    return
+  fi
+  head -n "$max_lines" "$log_file" 2>/dev/null | tr '\n' ' ' | sed 's/"/\\"/g'
+}
+
+# get_failed_extension <log_file>
+# 从日志中提取导致崩溃的扩展名
+get_failed_extension() {
+  local log_file="$1"
+  if [ ! -f "$log_file" ]; then
+    echo ""
+    return
+  fi
+  # 匹配 "Failed to load extension "xxx"" 或类似模式
+  grep -oP 'Failed to load extension "?\K[^"]+' "$log_file" 2>/dev/null | head -1
+}
+
+# ── 独立测试模式 ──
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  if [ -z "$1" ]; then
+    echo "用法: $0 <crash_log_file>"
+    echo "示例: $0 /tmp/pi-crash-12345.log"
+    exit 1
+  fi
+  LOG_FILE="$1"
+  echo "=== 崩溃分析结果 ==="
+  echo "类型: $(analyze_crash "$LOG_FILE")"
+  echo "摘要: $(get_crash_snippet "$LOG_FILE")"
+  EXT=$(get_failed_extension "$LOG_FILE")
+  [ -n "$EXT" ] && echo "问题扩展: $EXT"
+fi

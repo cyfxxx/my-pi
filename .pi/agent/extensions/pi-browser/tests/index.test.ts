@@ -1,0 +1,251 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { join } from 'path'
+import { tmpdir } from 'os'
+
+const registeredTools: Array<{ name: string; execute: Function }> = []
+const lifecycleHandlers: Record<string, Function> = {}
+
+const mockPi = {
+  registerTool: vi.fn((tool: { name: string; execute: Function }) => {
+    registeredTools.push({ name: tool.name, execute: tool.execute })
+  }),
+  on: vi.fn((event: string, handler: Function) => {
+    lifecycleHandlers[event] = handler
+  }),
+}
+
+vi.mock('../config', () => ({
+  loadConfig: () => ({
+    browser: { headless: false, viewport_width: 1280, viewport_height: 800 },
+  }),
+}))
+
+// Mock cloakbrowser
+vi.mock('cloakbrowser', () => ({
+  launch: vi.fn().mockResolvedValue({
+    isConnected: vi.fn().mockReturnValue(true),
+    newPage: vi.fn().mockResolvedValue({
+      isClosed: vi.fn().mockReturnValue(false),
+      goto: vi.fn().mockResolvedValue(undefined),
+      setViewportSize: vi.fn(),
+      url: vi.fn().mockReturnValue('about:blank'),
+      title: vi.fn().mockResolvedValue(''),
+      content: vi.fn().mockResolvedValue('<html></html>'),
+      evaluate: vi.fn().mockResolvedValue({ text: '', headings: [], paragraphs: [] }),
+      screenshot: vi.fn().mockResolvedValue('/tmp/test-screenshot.png'),
+      pdf: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn(),
+      mouse: { click: vi.fn() },
+      fill: vi.fn(),
+      keyboard: { type: vi.fn() },
+      $: vi.fn(),
+      viewportSize: vi.fn().mockReturnValue({ width: 1280, height: 800 }),
+    }),
+    close: vi.fn(),
+  }),
+}))
+
+describe('pi-browser (entry point)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    registeredTools.length = 0
+    Object.keys(lifecycleHandlers).forEach(k => delete lifecycleHandlers[k])
+  })
+
+  it('should register browser tools and lifecycle hooks', async () => {
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    const toolNames = registeredTools.map(t => t.name).sort()
+    expect(toolNames).toEqual([
+      'browser_click', 'browser_close', 'browser_cookies', 'browser_dialog',
+      'browser_download', 'browser_evaluate', 'browser_extract', 'browser_find',
+      'browser_help', 'browser_navigate', 'browser_network', 'browser_pdf',
+      'browser_screenshot', 'browser_scroll', 'browser_select_option',
+      'browser_type', 'browser_upload', 'browser_wait_for',
+    ].sort())
+
+    expect(lifecycleHandlers['session_shutdown']).toBeDefined()
+    expect(lifecycleHandlers['session_compact']).toBeDefined()
+    expect(lifecycleHandlers['session_start']).toBeDefined()
+  })
+
+  it('browser_help should return interaction manual section', async () => {
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    const tool = registeredTools.find(t => t.name === 'browser_help')!
+    const r = await tool.execute('id', { topic: 'shadow' }, undefined, undefined, {} as any)
+    expect(r.content[0].text).toContain('Shadow DOM')
+
+    const full = await tool.execute('id', {}, undefined, undefined, {} as any)
+    expect(full.content[0].text).toContain('Web 交互操作手册')
+  })
+
+  it('browser_navigate should return page info', async () => {
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    const navTool = registeredTools.find(t => t.name === 'browser_navigate')!
+    const result = await navTool.execute('id', {
+      url: 'https://example.com',
+    }, undefined, undefined, {} as any)
+
+    expect(result.content[0].text).toContain('页面标题')
+  })
+
+  it('should handle screenshot tool', async () => {
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    const navTool = registeredTools.find(t => t.name === 'browser_navigate')!
+    await navTool.execute('id', { url: 'https://example.com' }, undefined, undefined, {} as any)
+
+    const ssTool = registeredTools.find(t => t.name === 'browser_screenshot')!
+    const result = await ssTool.execute('id', {}, undefined, undefined, {} as any)
+
+    expect(result.content[0].text).toContain('截图已保存')
+  })
+
+  it('should clean screenshots on session_shutdown', async () => {
+    const fs = await import('fs/promises')
+    // 审计 LOW：截图目录进程专属（含 pid）——cleanScreenshots 只清本进程子目录
+    const shotDir = join(tmpdir(), `pi-browser-screenshots-${process.pid}`)
+    await fs.mkdir(shotDir, { recursive: true })
+    const testFile = join(shotDir, 'pi-screenshot-test-clean.png')
+    await fs.writeFile(testFile, 'test')
+
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    await lifecycleHandlers['session_shutdown']()
+
+    const exists = await fs.access(testFile).then(() => true).catch(() => false)
+    expect(exists).toBe(false)
+  })
+
+  it('cleanScreenshots 只清本进程子目录，不触碰其他进程目录（审计 LOW：跨进程误删防护）', async () => {
+    const fs = await import('fs/promises')
+    const ownDir = join(tmpdir(), `pi-browser-screenshots-${process.pid}`)
+    const otherDir = join(tmpdir(), 'pi-browser-screenshots-otherproc')
+    await fs.mkdir(ownDir, { recursive: true })
+    await fs.mkdir(otherDir, { recursive: true })
+    const ownFile = join(ownDir, 'pi-screenshot-own.png')
+    const otherFile = join(otherDir, 'pi-screenshot-other.png')
+    await fs.writeFile(ownFile, 'test')
+    await fs.writeFile(otherFile, 'test')
+
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    await lifecycleHandlers['session_shutdown']()
+
+    // 本进程文件被清，其他进程目录文件保留
+    expect(await fs.access(ownFile).then(() => true).catch(() => false)).toBe(false)
+    expect(await fs.access(otherFile).then(() => true).catch(() => false)).toBe(true)
+
+    await fs.unlink(otherFile).catch(() => {})
+    await fs.rmdir(otherDir).catch(() => {})
+  })
+
+  it('审计回归：session_start 清扫崩溃残留的陈旧 pid 临时目录，不动本进程/非匹配目录', async () => {
+    const fs = await import('fs/promises')
+    // 崩溃残留：选一个几乎不可能存活的 pid
+    const deadPid = 99999999
+    try { process.kill(deadPid, 0); return } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ESRCH') return // 探活结果不确定则跳过
+    }
+    const staleDirs = [
+      join(tmpdir(), `pi-browser-screenshots-${deadPid}`),
+      join(tmpdir(), `pi-browser-pdf-${deadPid}`),
+      join(tmpdir(), `pi-browser-downloads-${deadPid}`),
+    ]
+    for (const d of staleDirs) {
+      await fs.mkdir(d, { recursive: true })
+      await fs.writeFile(join(d, 'stale.txt'), 'x')
+    }
+    // 本进程目录与非匹配名目录必须保留
+    const ownDir = join(tmpdir(), `pi-browser-screenshots-${process.pid}`)
+    const oddDir = join(tmpdir(), 'pi-browser-screenshots-notapid')
+    await fs.mkdir(ownDir, { recursive: true })
+    await fs.mkdir(oddDir, { recursive: true })
+
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+    await lifecycleHandlers['session_start']()
+    // 后台清扫异步落盘：轮询等待（容器高负载下 50ms 固定等待会抖动）
+    const gone = async () =>
+      (await Promise.all(staleDirs.map(d => fs.access(d).then(() => true).catch(() => false)))).every(x => !x)
+    for (let i = 0; i < 60 && !(await gone()); i++) {
+      await new Promise(r => setTimeout(r, 50))
+    }
+    expect(await gone()).toBe(true)
+    expect(await fs.access(ownDir).then(() => true).catch(() => false)).toBe(true)
+    expect(await fs.access(oddDir).then(() => true).catch(() => false)).toBe(true)
+
+    await fs.rm(oddDir, { recursive: true, force: true }).catch(() => {})
+  })
+
+  it('should trim screenshots on session_compact', async () => {
+    const fs = await import('fs/promises')
+    const shotDir = join(tmpdir(), `pi-browser-screenshots-${process.pid}`)
+    await fs.mkdir(shotDir, { recursive: true })
+    for (let i = 0; i < 25; i++) {
+      await fs.writeFile(join(shotDir, `pi-screenshot-test-compact-${i}.png`), 'test')
+    }
+
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    await lifecycleHandlers['session_compact']()
+
+    const files = (await fs.readdir(shotDir))
+      .filter(f => f.startsWith('pi-screenshot-test-compact-'))
+    expect(files.length).toBeLessThanOrEqual(20)
+
+    await Promise.all(files.map(f => fs.unlink(join(shotDir, f))))
+  })
+
+  // 审计 LOW：PDF 目录对齐截图模式——含 pid 隔离 + shutdown 全目录清理
+  it('pdfDir 含进程 pid，与旧固定 /tmp/pi-browser-pdf 隔离', async () => {
+    const { pdfDir } = await import('../browser/impl')
+    expect(pdfDir()).toBe(join(tmpdir(), `pi-browser-pdf-${process.pid}`))
+    expect(pdfDir()).not.toBe(join(tmpdir(), 'pi-browser-pdf'))
+  })
+
+  it('session_shutdown 清理本进程 PDF 目录（含文件），不触碰其他进程目录', async () => {
+    const fs = await import('fs/promises')
+    const ownPdf = join(tmpdir(), `pi-browser-pdf-${process.pid}`)
+    const otherPdf = join(tmpdir(), 'pi-browser-pdf-otherproc')
+    await fs.mkdir(ownPdf, { recursive: true })
+    await fs.mkdir(otherPdf, { recursive: true })
+    await fs.writeFile(join(ownPdf, 'pi-page-1.pdf'), 'test')
+    await fs.writeFile(join(otherPdf, 'pi-page-1.pdf'), 'test')
+
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    await lifecycleHandlers['session_shutdown']()
+
+    expect(await fs.access(ownPdf).then(() => true).catch(() => false)).toBe(false)
+    expect(await fs.access(join(otherPdf, 'pi-page-1.pdf')).then(() => true).catch(() => false)).toBe(true)
+
+    await fs.rm(otherPdf, { recursive: true, force: true })
+  })
+
+  it('browser_pdf 默认保存路径落在含 pid 的 PDF 目录', async () => {
+    const fs = await import('fs/promises')
+    const main = (await import('../index')).default
+    await main(mockPi as any)
+
+    const navTool = registeredTools.find(t => t.name === 'browser_navigate')!
+    await navTool.execute('id', { url: 'https://example.com' }, undefined, undefined, {} as any)
+
+    const pdfTool = registeredTools.find(t => t.name === 'browser_pdf')!
+    const result = await pdfTool.execute('id', {}, undefined, undefined, {} as any)
+    expect(result.content[0].text).toContain(`pi-browser-pdf-${process.pid}`)
+    expect(result.content[0].text).not.toContain('tmp/pi-browser-pdf/')
+
+    await fs.rm(join(tmpdir(), `pi-browser-pdf-${process.pid}`), { recursive: true, force: true })
+  })
+})
