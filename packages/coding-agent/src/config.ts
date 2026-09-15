@@ -530,6 +530,11 @@ export function getAgentDir(): string {
 	if (envDir) {
 		return expandTildePath(envDir);
 	}
+	// 优先查找项目级 .pi/ 配置目录（settings.json 存在即认定为配置目录）
+	const projectPiDir = join(process.cwd(), CONFIG_DIR_NAME);
+	if (existsSync(join(projectPiDir, "settings.json"))) {
+		return projectPiDir;
+	}
 	return join(homedir(), CONFIG_DIR_NAME, "agent");
 }
 

@@ -35,13 +35,14 @@ plans/
 packages/agent/docs/extensions/pi-server-artifact/index.md
 
 # Pi 配置目录（运行时数据）
-.pi/agent/sessions/
-.pi/agent/stats/
-.pi/agent/models-store.json
+.pi/sessions/
+.pi/stats/
+.pi/models-store.json
 .pi/data/
 .pi/logs/
-.pi/agent/node_modules/
-.pi/agent/extensions/node_modules/
+.pi/node_modules/
+.pi/extensions/node_modules/
+.pi/agent/
 
 # 备份目录
 *.bak.*
