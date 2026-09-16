@@ -3,6 +3,14 @@
 主线（master）稳定版本锚点。每个稳定版本打 tag（`stable-YYYYMMDD`），出现问题时可用
 `git checkout <tag>` 回退，或从该 tag 拉分支修复。
 
+## 2026-09-15 目录结构扁平化（扩展迁移 + 配置统一）
+
+- **扩展迁移**：12 个扩展从旧位置迁移到 `.pi/extensions/`
+- **目录扁平化**：`.pi/core/`、`.pi/services/`、`.pi/skills/` 直接位于 `.pi/` 下（不再嵌套在 `.pi/agent/`）
+- **配置统一化**：`settings.json`、`models.json` 等配置文件直接位于 `.pi/` 根目录
+- **脚本整理**：`scripts/` 目录补充 `deploy/`、`core/` 子目录，修正命名
+- **文档同步更新**：README、架构文档、目录结构文档等全面修正路径
+
 ## 2026-09-14 模块化重构（大文件拆分 + lib/ 清理）
 
 - **lib/ 兼容层清理**：10 个完整实现文件转为 thin re-export shim（消除 ~1746 行重复代码）

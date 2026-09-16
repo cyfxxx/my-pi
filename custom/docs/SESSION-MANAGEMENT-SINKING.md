@@ -1,5 +1,7 @@
 # 会话管理下沉方案
 
+> **状态：已完成** — 所有目标文件已下沉到 `custom/src/services/session/`。
+
 ## 1. 概述
 
 本文档详细描述如何将会话管理的纯计算逻辑下沉到 `custom/src/services/session/`，实现：
@@ -226,7 +228,7 @@ getContextUsage() {
 ### 3.4 Phase 3.9: 更新扩展导入路径
 
 ```typescript
-// custom/extensions/pi-context/auto-compact-controller.ts
+// .pi/extensions/pi-context/auto-compact-controller.ts
 // 修改前：
 import { setContextWindow } from '../../services/context-budget'
 

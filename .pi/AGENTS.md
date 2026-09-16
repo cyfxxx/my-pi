@@ -5,14 +5,10 @@ Pi 本地配置仓库：自定义扩展、共享库、技能、自托管 SearXNG
 ## 目录结构
 
 ```
-agent/
-  core/           Layer 0 基础层（config, registry, hook-registry, secrets）
-  services/       Layer 1 服务层（token-budget, diagnostics, shadow-review, note-store）
-  extensions/     Layer 2 扩展层（12 个独立扩展）
-  skills/         Layer 3 技能层（6 个内置技能）
-  agents/         Layer 4 Agent 编排层（scout, worker, reviewer）
-  prompts/        Layer 4 Prompt 模板
-  lib/            兼容层（2026-09-23 清理）
+core/             Layer 0 基础层（config, registry, hook-registry, secrets）
+services/         Layer 1 服务层（token-budget, diagnostics, shadow-review, note-store）
+extensions/       Layer 2 扩展层（12 个独立扩展）
+skills/           Layer 3 技能层（6 个内置技能）
 packs/            外部技能包
 scripts/          核心基础设施脚本
 data/             运行时数据（memory/logs/plans）
@@ -24,15 +20,15 @@ searxng/          自托管搜索
 ## 分层架构
 
 ```
-Layer 4 ─ Agent 编排层 ─────── agent/agents/ agent/prompts/
+Layer 4 ─ Agent 编排层 ─────── (由 pi 内置调度)
     ↑
-Layer 3 ─ 技能层 ───────────── agent/skills/ packs/
+Layer 3 ─ 技能层 ───────────── skills/ packs/
     ↑
-Layer 2 ─ 扩展层 ───────────── agent/extensions/ (每个扩展独立)
+Layer 2 ─ 扩展层 ───────────── extensions/ (每个扩展独立)
     ↑
-Layer 1 ─ 服务层 ───────────── agent/services/ (token-budget, diagnostics)
+Layer 1 ─ 服务层 ───────────── services/ (token-budget, diagnostics)
     ↑
-Layer 0 ─ 基础层 ───────────── agent/core/ (config, registry, secrets)
+Layer 0 ─ 基础层 ───────────── core/ (config, registry, secrets)
 ```
 
 **依赖规则**：单向（下层不能依赖上层）+ 同层独立（扩展之间禁止相互依赖）
@@ -96,7 +92,6 @@ bash scripts/test/test-all.sh --fast   # 快速模式
 | 模块化方案 | `docs/maintenance/MODULARIZATION-PLAN.md` |
 | Pi 官方文档 | https://pi.dev/docs/latest |
 | 扩展开发经验 | `extensions/pi-mode/LESSONS-LEARNED.md` |
-| 自动修复系统 | `agent/recovery/README.md`（wrapper 只分类/启动，修复由 pi 自身完成） |
 | Packs 技能索引 | `packs/INDEX.md`（外部技能包，按需加载：用户需求不被内置技能覆盖时查阅） |
 
 ## 已知噪音

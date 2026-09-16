@@ -15,7 +15,7 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│              custom/src/extensions/              │
+│              .pi/extensions/                     │
 │     (业务逻辑，频繁修改)                         │
 │     - pi-context: 上下文管理                     │
 │     - pi-memory: 记忆系统                        │
@@ -173,11 +173,10 @@ export { truncateHead, truncateTail, truncateLine } from '@my-pi/custom/services
 
 ```
 patches/
-├── 001-ai-tool-extend.patch
-├── 002-session-stats.patch
-├── 003-coding-agent-api.patch
-└── README.md
+└── README.md              # 补丁管理说明
 ```
+
+> 注意：补丁管理机制已就绪，当前尚无实际补丁文件。
 
 ### 5.2 补丁命名规范
 
@@ -319,22 +318,8 @@ export default function (pi: AdaptedExtensionAPI): void {
 
 ```
 custom/tests/
-├── unit/
-│   ├── tool-system/
-│   │   ├── truncation.test.ts
-│   │   ├── path-utils.test.ts
-│   │   └── ...
-│   └── session/
-│       ├── session-stats.test.ts
-│       └── ...
-├── integration/
-│   ├── adapters/
-│   │   ├── tool-adapter.test.ts
-│   │   └── ...
-│   └── services/
-│       └── ...
-└── e2e/
-    └── ...
+├── integration.test.ts     # 集成测试
+└── projection.test.ts      # 投影测试
 ```
 
 ## 9. 版本管理

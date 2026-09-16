@@ -18,12 +18,12 @@
 
 ### 4. ✅ 为 pi-mode 扩展创建测试
 **新增文件**:
-- `agent/extensions/pi-mode/vitest.config.ts` - vitest 配置
-- `agent/extensions/pi-mode/tests/__mocks__/pi-coding-agent.ts` - mock 文件
-- `agent/extensions/pi-mode/tests/config.test.ts` - 配置测试 (8 用例)
-- `agent/extensions/pi-mode/tests/apply.test.ts` - 应用测试 (12 用例)
-- `agent/extensions/pi-mode/tests/commands.test.ts` - 命令测试 (6 用例)
-- `agent/extensions/pi-mode/tests/index.test.ts` - 扩展测试 (6 用例)
+- `.pi/extensions/pi-mode/vitest.config.ts` - vitest 配置
+- `.pi/extensions/pi-mode/tests/__mocks__/pi-coding-agent.ts` - mock 文件
+- `.pi/extensions/pi-mode/tests/config.test.ts` - 配置测试 (8 用例)
+- `.pi/extensions/pi-mode/tests/apply.test.ts` - 应用测试 (12 用例)
+- `.pi/extensions/pi-mode/tests/commands.test.ts` - 命令测试 (6 用例)
+- `.pi/extensions/pi-mode/tests/index.test.ts` - 扩展测试 (6 用例)
 
 **测试结果**: 4 个测试文件，32 个测试用例全部通过
 

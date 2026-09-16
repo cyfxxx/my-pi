@@ -1,5 +1,7 @@
 # my-pi 全面优化方案
 
+> **当前进度**：架构基础阶段（Phase 1）已基本完成 — adapters 层、services 下沉、seams 定义均已就绪。详见 `custom/docs/IMPLEMENTATION-PLAN.md`。
+
 ## 决策记录
 
 - **优化位置**：全部在 my-pi 中进行，pi-tools 保持轻量原型

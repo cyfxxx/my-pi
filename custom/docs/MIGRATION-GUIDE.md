@@ -21,8 +21,8 @@
 
 ```bash
 # 使用 sed 批量更新
-find custom/extensions -name "*.ts" -exec sed -i 's|../../services/|../../src/services/|g' {} +
-find custom/extensions -name "*.ts" -exec sed -i 's|../../../services/|../../../src/services/|g' {} +
+find .pi/extensions -name "*.ts" -exec sed -i 's|../../services/|../../src/services/|g' {} +
+find .pi/extensions -name "*.ts" -exec sed -i 's|../../../services/|../../../src/services/|g' {} +
 ```
 
 ### 注意事项

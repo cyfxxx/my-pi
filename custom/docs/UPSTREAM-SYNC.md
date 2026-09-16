@@ -1,5 +1,7 @@
 # 上游同步
 
+> **注意**：`patches/` 目录当前仅包含 `README.md`，尚无实际补丁文件。补丁管理脚本（`create-patch.sh`、`apply-patches.sh`）已就绪。
+
 ## 1. 概述
 
 本文档描述如何从 pi 上游同步更新到 my-pi 项目。同步策略：

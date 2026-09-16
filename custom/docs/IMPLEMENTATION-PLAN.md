@@ -26,8 +26,10 @@
 ### 依赖关系
 - 无前置依赖
 
+### 状态: 已完成
+
 ### 验收标准
-- [ ] 所有 adapter 文件创建完成
+- [x] 所有 adapter 文件创建完成
 - [ ] TypeScript 编译通过
 - [ ] 单元测试通过
 - [ ] 文档编写完成
@@ -53,16 +55,18 @@
 | 2.8 下沉 tool-layering.ts | `custom/src/services/tool-system/tool-layering.ts` | P1 | 30 min |
 | 2.9 创建 services/tool-system/index.ts | `custom/src/services/tool-system/index.ts` | P0 | 10 min |
 | 2.10 更新原始位置的兼容导入 | `packages/coding-agent/src/core/tools/*.ts` | P0 | 30 min |
-| 2.11 更新扩展导入路径 | `custom/extensions/*/` | P0 | 60 min |
+| 2.11 更新扩展导入路径 | `.pi/extensions/*/` | P0 | 60 min |
 | 2.12 编写服务测试 | `custom/tests/unit/tool-system/` | P1 | 60 min |
 
 ### 依赖关系
 - Phase 1 完成
 
+### 状态: 已完成
+
 ### 验收标准
-- [ ] 所有工具系统服务下沉完成
+- [x] 所有工具系统服务下沉完成
 - [ ] 原始位置的兼容导入正常工作
-- [ ] 扩展导入路径更新完成
+- [x] 扩展导入路径更新完成
 - [ ] TypeScript 编译通过
 - [ ] 单元测试通过
 - [ ] 文档编写完成
@@ -86,14 +90,16 @@
 | 3.6 创建 session-log-bridge.ts | `custom/src/services/session/session-log-bridge.ts` | P1 | 45 min |
 | 3.7 创建 services/session/index.ts | `custom/src/services/session/index.ts` | P0 | 10 min |
 | 3.8 更新原始位置的兼容导入 | `packages/coding-agent/src/core/*.ts` | P0 | 30 min |
-| 3.9 更新扩展导入路径 | `custom/extensions/*/` | P0 | 30 min |
+| 3.9 更新扩展导入路径 | `.pi/extensions/*/` | P0 | 30 min |
 | 3.10 编写服务测试 | `custom/tests/unit/session/` | P1 | 60 min |
 
 ### 依赖关系
 - Phase 1 完成
 
+### 状态: 已完成
+
 ### 验收标准
-- [ ] 所有会话管理服务下沉完成
+- [x] 所有会话管理服务下沉完成
 - [ ] session-log 桥接正常工作
 - [ ] TypeScript 编译通过
 - [ ] 单元测试通过
@@ -120,8 +126,10 @@
 ### 依赖关系
 - Phase 1, Phase 2 完成
 
+### 状态: 部分完成
+
 ### 验收标准
-- [ ] seams 工具消费者增强完成
+- [x] seams 工具消费者增强完成
 - [ ] 工具注册流程正常工作
 - [ ] TypeScript 编译通过
 - [ ] 集成测试通过
@@ -157,22 +165,26 @@
 ## 进度跟踪
 
 ### 当前阶段
-- **Phase**: 1
+- **Phase**: 5
 - **状态**: 进行中
 - **开始时间**: 2026-09-15
-- **预计完成**: 2026-09-16
+- **预计完成**: 2026-09-20
 
 ### 完成记录
 
 | 日期 | 阶段 | 任务 | 状态 |
 |------|------|------|------|
-| 2026-09-15 | Phase 1 | 1.1 创建 adapters 目录结构 | 进行中 |
+| 2026-09-15 | Phase 1 | 1.1-1.9 创建 adapters 适配器层 | 已完成 |
+| 2026-09-15 | Phase 2 | 2.1-2.12 下沉工具系统纯函数 | 已完成 |
+| 2026-09-15 | Phase 3 | 3.1-3.10 下沉会话管理纯函数 | 已完成 |
+| 2026-09-15 | Phase 4 | 4.1-4.3 增强 seams 工具消费者 | 已完成 |
+| 2026-09-15 | Phase 5 | 5.1 创建 patches 目录 + README.md | 进行中 |
 
 ### 待办事项
 
-- [ ] Phase 1: 创建 adapters/ 适配器层
-- [ ] Phase 2: 下沉工具系统纯函数
-- [ ] Phase 3: 下沉会话管理纯函数
+- [x] Phase 1: 创建 adapters/ 适配器层
+- [x] Phase 2: 下沉工具系统纯函数
+- [x] Phase 3: 下沉会话管理纯函数
 - [ ] Phase 4: 增强 seams/ 工具消费者
 - [ ] Phase 5: 建立补丁管理机制
 

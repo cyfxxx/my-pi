@@ -11,11 +11,10 @@
 
 ```
 patches/
-├── 001-ai-tool-extend.patch
-├── 002-session-stats.patch
-├── 003-coding-agent-api.patch
 └── README.md
 ```
+
+> 注意：补丁管理机制已就绪（`scripts/create-patch.sh` 和 `scripts/apply-patches.sh`），当前尚无实际补丁文件。
 
 ## 3. 补丁命名规范
 

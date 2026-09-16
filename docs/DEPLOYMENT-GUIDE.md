@@ -80,16 +80,20 @@ mypi --list-models
 ```
 my-pi/
 ├── .pi/                          # 配置目录
-│   ├── agent/                    # 主配置
-│   │   ├── settings.json         # 主配置
-│   │   ├── models.json           # 模型配置
+│   ├── agent/                    # 代理配置
+│   │   ├── settings.json         # 代理设置
 │   │   ├── auth.json             # API 密钥
-│   │   ├── extensions/           # 12 个扩展
-│   │   ├── services/             # 服务
+│   │   ├── models-store.json     # 本地模型存储
+│   │   ├── modes.json            # 模式配置
 │   │   └── sessions/             # 会话数据（git 忽略）
-│   ├── scripts/                  # 脚本
-│   ├── packs/                    # 技能包
-│   └── data/                     # 运行时数据（git 忽略）
+│   ├── core/                     # 核心模块
+│   ├── services/                 # 服务
+│   ├── extensions/               # 扩展
+│   ├── skills/                   # 技能包
+│   ├── settings.json             # 全局配置
+│   ├── models.json               # 模型配置
+│   └── data/                     # 运行时数据（git 忽略，为空）
+├── scripts/                      # 脚本（项目级别）
 └── packages/
     └── coding-agent/
         └── dist/bundle/cli.js    # 编译后的 bundle
@@ -126,9 +130,9 @@ ls -la ~/.pi
 
 ```bash
 # 重新安装扩展依赖
-cd .pi/agent/extensions
+cd .pi/extensions
 npm install
-cd ../../..
+cd ../..
 npm run build:offline
 ```
 
@@ -136,7 +140,7 @@ npm run build:offline
 
 ```bash
 # 检查 models.json
-cat .pi/agent/models.json
+cat .pi/models.json
 
 # 检查符号链接
 ls -la ~/.pi

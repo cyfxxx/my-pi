@@ -6,12 +6,10 @@
 
 ```
 patches/
-├── 001-ai-tool-extend.patch
-├── 001-ai-tool-extend.patch.description
-├── 002-session-stats.patch
-├── 002-session-stats.patch.description
-└── README.md
+└── README.md              # 本文件（补丁管理说明）
 ```
+
+> 注意：补丁管理机制已就绪（`scripts/create-patch.sh` 和 `scripts/apply-patches.sh`），当前尚无实际补丁文件。
 
 ## 补丁命名规范
 
@@ -20,8 +18,8 @@ patches/
 ```
 
 示例：
-- `001-ai-tool-extend.patch` - 扩展 AI 工具系统
-- `002-session-stats.patch` - 添加会话统计功能
+- `001-ai-tool-extend.patch` - 扩展 AI 工具系统（尚未创建）
+- `002-session-stats.patch` - 添加会话统计功能（尚未创建）
 
 ## 补丁描述文件
 

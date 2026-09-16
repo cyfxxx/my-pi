@@ -41,62 +41,45 @@ Service Definition  →  Service Provider  →  Consumer
 
 ```
 my-pi/
-├── custom/                     # 自定义扩展和服务
-│   ├── extensions/             # 12 个扩展
-│   │   ├── pi-context/         # Token 优化中枢
-│   │   ├── plan-mode/          # 计划模式
-│   │   ├── pi-memory/          # 跨会话记忆
-│   │   ├── pi-autopilot/       # 自治操作
-│   │   ├── pi-web-search/      # 网页搜索
-│   │   ├── pi-browser/         # 浏览器自动化
-│   │   ├── pi-intervention/    # 干预捕获
-│   │   ├── pi-link/            # 多设备互联
-│   │   ├── pi-tmux/            # tmux 管理
-│   │   ├── pi-mode/            # 模式切换
-│   │   ├── pi-voice/           # 语音通信
-│   │   └── subagent/           # 子代理调度
-│   ├── services/               # 共享服务模块
-│   │   ├── token-budget/       # token 预算管理
-│   │   ├── diagnostics/        # 诊断工具
-│   │   ├── note-store.ts       # 笔记存储
-│   │   ├── atomic-write.ts     # 原子写入
-│   │   └── secrets.ts          # 密钥脱敏
-│   ├── seams/                  # 能力缝隙定义
-│   │   ├── types.ts            # 核心接口
-│   │   ├── registry.ts         # 缝隙注册表
-│   │   ├── shell/              # Shell 缝隙
-│   │   ├── fs/                 # 文件系统缝隙
-│   │   ├── search/             # 搜索缝隙
-│   │   ├── sandbox/            # 沙箱缝隙
-│   │   ├── llm/                # LLM 缝隙
-│   │   ├── subagent/           # 子代理缝隙
-│   │   ├── credentials/        # 凭证缝隙
-│   │   ├── interaction/        # 交互缝隙
-│   │   ├── settings/           # 设置缝隙
-│   │   ├── session-log/        # 会话日志缝隙
-│   │   ├── webhook/            # Webhook 缝隙
-│   │   ├── session-title/      # 会话标题缝隙
-│   │   └── todo/               # Todo 缝隙
-│   ├── events/                 # 事件系统
-│   │   ├── types.ts            # 事件类型定义
-│   │   ├── bus.ts              # 事件总线实现
-│   │   └── index.ts            # 导出
-│   ├── session-log/            # Session Log 实现
-│   │   ├── types.ts            # 日志类型定义
-│   │   ├── projections/        # 投影器
-│   │   └── migrations/         # 格式迁移
-│   ├── tsconfig.json           # 独立类型检查
-│   └── cordis.yml              # 声明式配置（规划中）
-├── packages/                   # 官方框架包
-│   ├── coding-agent/           # 主 CLI（含框架核心）
-│   ├── ai/                     # LLM API 抽象
-│   ├── agent/                  # Agent 运行时
-│   ├── tui/                    # 终端 UI
+├── .pi/                          # Pi 本地配置
+│   ├── core/                     # 基础层（Layer 0）
+│   ├── services/                 # 服务层（Layer 1）
+│   ├── extensions/               # 12 个扩展（Layer 2）
+│   │   ├── pi-context/           # Token 优化中枢
+│   │   ├── pi-memory/            # 跨会话记忆
+│   │   ├── pi-autopilot/         # 自治操作
+│   │   ├── pi-web-search/        # 网页搜索
+│   │   ├── pi-browser/           # 浏览器自动化
+│   │   ├── pi-intervention/      # 干预捕获
+│   │   ├── pi-link/              # 多设备互联
+│   │   ├── pi-tmux/              # tmux 管理
+│   │   ├── pi-mode/              # 模式切换
+│   │   ├── pi-voice/             # 语音通信
+│   │   ├── plan-mode/            # 计划模式
+│   │   └── subagent/             # 子代理调度
+│   ├── skills/                   # 技能层（Layer 3）
+│   └── settings.json             # 主配置
+├── custom/                       # 自定义层
+│   ├── src/
+│   │   ├── adapters/             # 适配器层（隔离 pi API 变化）
+│   │   ├── services/             # 下沉服务（可独立修改）
+│   │   └── index.ts
+│   ├── seams/                    # 能力缝隙定义
+│   ├── events/                   # 事件系统
+│   ├── session-log/              # Session Log 实现
+│   ├── bootstrap.ts              # 启动引导
+│   ├── extension-loader.ts       # 扩展加载器
+│   ├── integration.ts            # 集成层
+│   ├── cordis.yml                # 声明式配置
+│   └── tsconfig.json             # 独立类型检查
+├── packages/                     # 官方框架包
+│   ├── coding-agent/             # 主 CLI（含框架核心）
+│   ├── ai/                       # LLM API 抽象
+│   ├── agent/                    # Agent 运行时
+│   ├── tui/                      # 终端 UI
 │   └── ...
-└── docs/                       # 文档
-    ├── architecture.md         # 本文档
-    ├── capability-seams.md     # 能力缝隙详解
-    └── event-system.md         # 事件系统详解
+└── docs/                         # 文档
+    └── architecture.md           # 本文档
 ```
 
 ## 架构图
@@ -139,7 +122,7 @@ my-pi/
 
 ## 扩展加载流程
 
-1. **发现**：扫描 `custom/extensions/` 目录
+1. **发现**：扫描 `.pi/extensions/` 目录
 2. **加载**：通过 jiti 运行时加载 TypeScript
 3. **初始化**：调用扩展工厂函数，注册工具和事件
 4. **绑定**：`ExtensionRunner.bindCore()` 替换 stub 方法
@@ -258,23 +241,16 @@ seams:
 - 使用 vitest + mock
 - 目标：100% 覆盖率
 
-### Snapshot 测试
-
-- 录制会话 → 回放验证
-- 无 API 消耗
-- 命令：`npm run test:snapshot`
-
 ### E2E 测试
 
 - 真实 API 端到端测试
 - 需要 API key（可选）
-- 命令：`npm run test:e2e`
 
 ## 开发指南
 
 ### 添加新扩展
 
-1. 在 `custom/extensions/` 下创建目录
+1. 在 `.pi/extensions/` 下创建目录
 2. 导出默认工厂函数
 3. 使用 `pi.registerTool()` 注册工具
 4. 使用 `pi.on()` 监听事件

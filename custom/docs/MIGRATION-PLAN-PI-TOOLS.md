@@ -1,5 +1,7 @@
 # pi-tools → my-pi 完整迁移计划
 
+> **Status: COMPLETE** — Migration finished. All extensions, services, and skills now live under `.pi/`.
+
 ## 一、迁移原则
 
 1. **不修改 pi-tools**：所有操作在 my-pi 中进行
@@ -36,8 +38,8 @@
 
 | 内容 | my-pi 位置 | 处理方式 |
 |------|------------|----------|
-| 12 个扩展 | custom/extensions/ | 以 pi-tools 为准，覆盖更新 |
-| services | custom/services/ + custom/src/services/ | 合并，保留 my-pi 的下沉架构 |
+| 12 个扩展 | .pi/extensions/ | 以 pi-tools 为准，覆盖更新 |
+| services | .pi/services/ + .pi/src/services/ | 合并，保留 my-pi 的下沉架构 |
 | scripts | scripts/ | 保留 my-pi 独有脚本，添加 pi-tools 脚本 |
 | docs | custom/docs/ | 整合 pi-tools 文档 |
 | package.json | package.json | 保留 my-pi 的 monorepo 配置 |
@@ -136,16 +138,16 @@ cp ~/.pi/scripts/environment/* scripts/environment/
 
 ```bash
 # 1. 复制扩展（以 pi-tools 为准）
-cp -r ~/.pi/agent/extensions/* custom/extensions/
+cp -r ~/.pi/agent/extensions/* .pi/extensions/
 
 # 2. 复制服务
-cp -r ~/.pi/agent/services/* custom/services/
+cp -r ~/.pi/agent/services/* .pi/services/
 
 # 3. 复制技能
-cp -r ~/.pi/agent/skills/* custom/skills/
+cp -r ~/.pi/agent/skills/* .pi/skills/
 
 # 4. 复制 Agent
-cp -r ~/.pi/agent/agents/* custom/agents/
+cp -r ~/.pi/agent/agents/* .pi/agents/
 
 # 5. 复制 Prompt
 cp -r ~/.pi/agent/prompts/* custom/prompts/
@@ -202,10 +204,10 @@ cp -r ~/.pi/.github .github/
 
 ```bash
 # 1. 对比扩展差异
-diff -r ~/.pi/agent/extensions/ custom/extensions/
+diff -r ~/.pi/agent/extensions/ .pi/extensions/
 
 # 2. 对比服务差异
-diff -r ~/.pi/agent/services/ custom/services/
+diff -r ~/.pi/agent/services/ .pi/services/
 
 # 3. 对比脚本差异
 diff ~/.pi/scripts/ scripts/
@@ -239,8 +241,8 @@ diff ~/.pi/scripts/ scripts/
 
 - **原则**：合并两者，保留 my-pi 的下沉架构
 - **方法**：
-  - 将 pi-tools 的 services 移动到 custom/services/
-  - 保留 my-pi 的 custom/src/services/ 下沉服务
+  - 将 pi-tools 的 services 移动到 .pi/services/
+  - 保留 my-pi 的 .pi/src/services/ 下沉服务
   - 更新导入路径
 
 ### 5.3 脚本冲突
@@ -297,7 +299,7 @@ rsync -av ~/.pi/agent/modes.json $TARGET_DEVICE/.pi/agent/
 rsync -av ~/.pi/agent/keybindings.json $TARGET_DEVICE/.pi/agent/
 
 # 同步扩展
-rsync -av ~/.pi/agent/extensions/ $TARGET_DEVICE/.pi/agent/extensions/
+rsync -av ~/.pi/agent/extensions/ $TARGET_DEVICE/.pi/extensions/
 
 # 同步服务
 rsync -av ~/.pi/agent/services/ $TARGET_DEVICE/.pi/agent/services/
@@ -415,8 +417,8 @@ cp -r /backup/my-pi /tmp/my-pi
 ```bash
 # 如果只是某个部分失败，可以单独回滚
 git checkout HEAD -- scripts/
-git checkout HEAD -- custom/extensions/
-git checkout HEAD -- custom/services/
+git checkout HEAD -- .pi/extensions/
+git checkout HEAD -- .pi/services/
 ```
 
 ## 十一、时间计划

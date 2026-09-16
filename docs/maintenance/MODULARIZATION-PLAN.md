@@ -60,13 +60,13 @@
 ```
 Layer 4 ─ Agent 编排层 ─────── agent/agents/ agent/prompts/
     ↑
-Layer 3 ─ 技能层 ───────────── agent/skills/ packs/
+Layer 3 ─ 技能层 ───────────── .pi/skills/ packs/
     ↑
-Layer 2 ─ 扩展层 ───────────── agent/extensions/ (每个扩展独立)
+Layer 2 ─ 扩展层 ───────────── .pi/extensions/ (每个扩展独立)
     ↑
-Layer 1 ─ 服务层 ───────────── agent/services/ (token-budget, diagnostics)
+Layer 1 ─ 服务层 ───────────── .pi/services/ (token-budget, diagnostics)
     ↑
-Layer 0 ─ 基础层 ───────────── agent/core/ (config, registry, secrets)
+Layer 0 ─ 基础层 ───────────── .pi/core/ (config, registry, secrets)
 ```
 
 ### 依赖规则
@@ -79,10 +79,10 @@ Layer 0 ─ 基础层 ───────────── agent/core/ (confi
 
 | 层 | 目录 | 职责 | 包含模块 |
 |----|------|------|----------|
-| L0 基础层 | `agent/core/` | 零依赖的基础工具 | config, registry, hook-registry, secrets |
-| L1 服务层 | `agent/services/` | 核心服务（仅依赖 L0） | token-budget, diagnostics, shadow-review, note-store |
-| L2 扩展层 | `agent/extensions/` | 功能模块（依赖 L0+L1） | 12 个独立扩展 |
-| L3 技能层 | `agent/skills/` + `packs/` | 用户技能（依赖 L0-L2） | 6 个内置技能 + 外部技能包 |
+| L0 基础层 | `.pi/core/` | 零依赖的基础工具 | config, registry, hook-registry, secrets |
+| L1 服务层 | `.pi/services/` | 核心服务（仅依赖 L0） | token-budget, diagnostics, shadow-review, note-store |
+| L2 扩展层 | `.pi/extensions/` | 功能模块（依赖 L0+L1） | 12 个独立扩展 |
+| L3 技能层 | `.pi/skills/` + `packs/` | 用户技能（依赖 L0-L2） | 6 个内置技能 + 外部技能包 |
 | L4 编排层 | `agent/agents/` + `agent/prompts/` | Agent 定义（依赖全部） | scout, worker, reviewer |
 
 ### 目录结构
@@ -231,8 +231,8 @@ Layer 0 ─ 基础层 ───────────── agent/core/ (confi
 ```bash
 # 1. 导入验证
 cd /root/.pi && node --experimental-strip-types -e "
-import { mergeLayers, scrubSecrets } from './agent/core/index.ts'
-import { estimateTokens } from './agent/services/index.ts'
+import { mergeLayers, scrubSecrets } from './core/index.ts'
+import { estimateTokens } from './services/index.ts'
 console.log('All imports OK')
 "
 

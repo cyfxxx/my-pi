@@ -126,7 +126,7 @@
 
 - `settings.json` — Pi 主配置（provider/model/extensions/skills；含密钥，git 忽略）
 - `stats/` — 运行时统计（git 忽略）：`usage-sessions.jsonl`（跨会话命中聚合）、`tool-fingerprint.jsonl`（工具定义指纹历史）
-- `package.json` — 统一依赖根（12 扩展共享 agent/node_modules）
+- `package.json` — 统一依赖根（12 扩展共享 node_modules）
 
 ### scripts/
 
@@ -140,12 +140,12 @@
 
 扩展专用脚本（symlink 到 scripts/ 供外部发现）：
 
-- `pi-cron.sh` → `agent/extensions/pi-autopilot/scripts/pi-cron.sh`
-- `task-metrics.mjs` → `agent/extensions/pi-autopilot/scripts/task-metrics.mjs`
-- `tool-stats-sync.mjs` → `agent/extensions/pi-context/scripts/tool-stats-sync.mjs`
-- `usage-stats.mjs` → `agent/extensions/pi-context/scripts/usage-stats.mjs`
-- `task-summarizer.mjs` → `agent/extensions/pi-context/scripts/task-summarizer.mjs`
-- `patch-*.mjs` → `agent/extensions/*/scripts/patch-*.mjs`
+- `pi-cron.sh` → `.pi/extensions/pi-autopilot/scripts/pi-cron.sh`
+- `task-metrics.mjs` → `.pi/extensions/pi-autopilot/scripts/task-metrics.mjs`
+- `tool-stats-sync.mjs` → `.pi/extensions/pi-context/scripts/tool-stats-sync.mjs`
+- `usage-stats.mjs` → `.pi/extensions/pi-context/scripts/usage-stats.mjs`
+- `task-summarizer.mjs` → `.pi/extensions/pi-context/scripts/task-summarizer.mjs`
+- `patch-*.mjs` → `.pi/extensions/*/scripts/patch-*.mjs`
 
 ### data/（运行时数据）
 
@@ -184,7 +184,7 @@
 ### packs/（统一外部技能仓库）
 
 - `packs/<name>/` — 已确认技能包（SKILL.md 入口 + bin/ lib/ references/ workflows/ 等资源）
-- `packs/drafts/` — 草稿（待人工确认，不入 agent/skills/ 防提示词膨胀）
+- `packs/drafts/` — 草稿（待人工确认，不入 .pi/skills/ 防提示词膨胀）
 - 详见 `packs/README.md`
 
 ### portable/（便携 pi，Windows 原生种子）
@@ -195,15 +195,15 @@
 
 ## 回归验证细节
 
-单套件：`cd agent/extensions/<ext> && ../../node_modules/vitest/vitest.mjs run`（统一依赖根 agent/node_modules）
+单套件：`cd .pi/extensions/<ext> && ../../node_modules/vitest/vitest.mjs run`（统一依赖根 node_modules）
 （基线用例数：pi-web-search 75+ / pi-memory 94+ / pi-autopilot 106+ / pi-browser 25+ / pi-context 92 / plan-mode 72 / pi-tmux 20+2 跳过 / pi-voice 128+ / pi-link 58 / pi-intervention 5，另 subagent vitest guards 7 用例；以 test-all.sh 当前输出为准）
 
-注册面：`cd agent/extensions/pi-web-search && ../../node_modules/vitest/vitest.mjs run tests/extensions.test.ts`
+注册面：`cd .pi/extensions/pi-web-search && ../../node_modules/vitest/vitest.mjs run tests/extensions.test.ts`
 （须在该目录跑使 mock alias 生效；顶层跑 subagent 用例会因真实包加载超时）
 
-subagent 双轨：mjs 测试 `cd agent/extensions/subagent && node --experimental-strip-types --import ./tests/loader.mjs ./tests/test.mjs`；另有 vitest 套件（vitest.config.ts + tests/subagent-guards.test.ts），随 test-all.sh 的 11 套 vitest 统一跑
+subagent 双轨：mjs 测试 `cd .pi/extensions/subagent && node --experimental-strip-types --import ./tests/loader.mjs ./tests/test.mjs`；另有 vitest 套件（vitest.config.ts + tests/subagent-guards.test.ts），随 test-all.sh 的 11 套 vitest 统一跑
 
-类型检查：`cd agent/extensions && ../node_modules/typescript/bin/tsc -p tsconfig.local.json --noEmit`
+类型检查：`cd .pi/extensions && ../node_modules/typescript/bin/tsc -p tsconfig.local.json --noEmit`
 （必须 local.json——共享 tsconfig.json 的 paths 为空会全量报 Cannot find module；缺失时回退共享配置）
 
 ## 缓存治理（2026-08-18，append-only 原则）
@@ -213,7 +213,7 @@ subagent 双轨：mjs 测试 `cd agent/extensions/subagent && node --experimenta
 - `services/token-budget/prune.ts` 阈值 = 缓存契约：`PRUNE_PROTECT_TOKENS=120K`（分层擦除保护带）、`PRUNE_MINIMUM_TOKENS=80K`（最低回收）、`DEFAULT_KEEP_THINKING_TOKENS=64K`（thinking 剪枝）——1M 窗口内普通会话全程不触发，清理交给 auto-compact；阈值回退会被 cache-guard 阻断
 - 历史背景：16K thinking 预算曾致 3.8h 会话 27 次缓存断裂、1.46M token 浪费（每 2-3 轮改早期消息 → 前缀断裂）；64K 后模拟断裂 39→4 次，实测 0 断裂/98%+
 - 工具 schema 是 system prompt 一部分：conflict-check 每次运行将 registerTool 块 sha256 入账 `stats/tool-fingerprint.jsonl`，跨会话漂移可追溯
-- 诊断：`node agent/extensions/pi-context/scripts/usage-stats.mjs` 看每会话命中/断裂/浪费；断裂轮 cacheRead ≈ 断裂点，对照该轮事件定位；`cache-guard.mjs` 查注入面漂移
+- 诊断：`node .pi/extensions/pi-context/scripts/usage-stats.mjs` 看每会话命中/断裂/浪费；断裂轮 cacheRead ≈ 断裂点，对照该轮事件定位；`cache-guard.mjs` 查注入面漂移
 - 流程层守门（2026-08-26，源自 dsh 生态 Reasonix 纪律）：`scripts/maintenance/check-cache-impact.sh` 经 `.githooks/commit-msg`（rebuild 自动配 `core.hooksPath`）强制触碰缓存敏感面的 commit 携带 `Cache-impact: <none|low|medium|high> - <理由>`；触碰 `agent/{skills,prompts,agents}/` 追加 `System-prompt-review:`（拒绝 none/占位）。手动报告：`bash scripts/maintenance/check-cache-impact.sh --staged`。与 cache-guard.mjs 分工：指纹管内容漂移，声明管流程纪律
 
 ## 补丁生命周期
@@ -233,7 +233,7 @@ subagent 双轨：mjs 测试 `cd agent/extensions/subagent && node --experimenta
 
 共 12 个 patch 文件由 rebuild.sh 自动执行（幂等）：11 个无条件 + `patch-playwright-core.mjs` 仅 Termux 条件执行；pi update 升级 dist 后需重跑 rebuild.sh（或手动 node 执行对应脚本）。
 
-补丁文件位置：`agent/extensions/*/scripts/patch-*.mjs`（rebuild.sh 直接读取各扩展 scripts/ 目录）
+补丁文件位置：`.pi/extensions/*/scripts/patch-*.mjs`（rebuild.sh 直接读取各扩展 scripts/ 目录）
 
 footer 状态栏口径速查：`Σ/↑/↓`=会话累计（Σ=总输入=命中+未命中 / ↑=累计未命中输入 / ↓=累计输出）；`CH{x}/{y}%`=左实时（最近一轮）/右会话累计；context 区 `34.5k/200k`=实时/窗口（>40% 追加 ⚠ 提示重启前先压缩、>70% 黄、>90% 红，无括号百分比）；`¥`=成本人民币（参考汇率 6.77=2026-08 近 90 天中位数，常量在 patch-footer-format.mjs，改汇率后重跑自动更新 dist）。
 

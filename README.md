@@ -20,38 +20,42 @@
 
 ```
 my-pi/
+├── .pi/                          # Pi 本地配置（扩展/服务/技能/运行时）
+│   ├── core/                     # 基础层：配置/注册表/钩子/密钥
+│   ├── services/                 # 服务层：token-budget/diagnostics/note-store
+│   ├── extensions/               # 12 个扩展（从 pi-tools 迁移）
+│   ├── skills/                   # 内置技能（pi-backup/pi-translate-zh 等）
+│   ├── settings.json             # 主配置
+│   ├── models.json               # 模型配置
+│   └── sessions/                 # 会话数据（运行时）
 ├── packages/                     # pi 上游包（只读同步）
 ├── custom/
 │   ├── src/
 │   │   ├── adapters/             # 适配器层（隔离 pi API 变化）
 │   │   ├── services/             # 下沉服务（可独立修改）
 │   │   └── index.ts
-│   ├── extensions/               # 12 个扩展（从 pi-tools 迁移）
-│   ├── services/                 # 独立服务层（从 pi-tools 迁移）
-│   ├── config/                   # 配置管理
 │   ├── seams/                    # 能力接缝
 │   ├── events/                   # 事件系统
 │   ├── session-log/              # 会话日志
+│   ├── config/                   # 配置管理
 │   ├── bootstrap.ts              # 启动引导
 │   ├── extension-loader.ts       # 扩展加载器
 │   ├── integration.ts            # 集成层
-│   ├── skills/                   # 技能层
-│   ├── agents/                   # Agent 编排
-│   ├── prompts/                  # Prompt 模板
+│   ├── cordis.yml                # 声明式配置
 │   ├── docs/                     # 项目文档
 │   └── tests/                    # 测试文件
 ├── scripts/
 │   ├── core/                     # 核心脚本（rebuild/wrapper/source-build）
 │   ├── crash-recovery/           # 崩溃恢复
 │   ├── maintenance/              # 日常维护
+│   ├── deploy/                   # 部署脚本
 │   ├── install/                  # 安装脚本
 │   ├── test/                     # 测试脚本
 │   ├── environment/              # 环境脚本
-│   ├── mypi                      # mypi 启动脚本
 │   ├── sync-upstream.sh          # 上游同步
 │   ├── create-patch.sh           # 补丁管理
 │   └── apply-patches.sh          # 补丁管理
-├── packs/                        # 技能包（18 个外部技能包）
+├── packs/                        # 技能包（15 个外部技能包）
 ├── deploy/                       # 部署配置（systemd, tmux）
 ├── portable/                     # 便携配置（Windows 便携包）
 ├── searxng/                      # SearXNG 自托管搜索
@@ -114,7 +118,7 @@ mypi -p "你的问题"
 | daily-health.mjs | 每日健康检查 |
 | verify-patches.mjs | 补丁版本匹配校验 |
 
-### 18 个技能包
+### 15 个技能包
 
 - cangjie-skill：书籍蒸馏
 - colab-bridge：Google Colab 远程 GPU
@@ -128,9 +132,9 @@ mypi -p "你的问题"
 - pcb-design：PCB 硬件设计
 - pdf-toolkit：PDF 处理
 - repo-size-audit：git 仓库审计
+- reverse-skill：安全技能路由
 - skill-integration：技能包整合
 - wechatide-skill：微信开发
-- ...
 
 ## 文档
 

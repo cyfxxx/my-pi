@@ -76,12 +76,12 @@ custom/src/adapters/
 
 ## 待完成工作
 
-### Phase 4: 增强 seams/ 工具消费者
+### Phase 4: 增强 seams/ 工具消费者 🔄 (部分完成)
 
-- 增强 shell/tool-consumer.ts
-- 增强 fs/tool-consumer.ts
-- 增强 search/tool-consumer.ts
-- 更新 integration.ts
+- ✅ 创建 `custom/seams/index-enhanced.ts` 增强版入口
+- ❌ 增强 `custom/seams/shell/tool-consumer-enhanced.ts` (文件不存在)
+- ❌ 增强 `custom/seams/fs/tool-consumer-enhanced.ts` (文件不存在)
+- ❌ 增强 `custom/seams/search/tool-consumer-enhanced.ts` (文件不存在)
 
 ### Phase 5: 建立补丁管理机制
 
@@ -94,6 +94,8 @@ custom/src/adapters/
 ```
 my-pi/
 ├── packages/                    # pi 上游（只读）
+├── .pi/
+│   └── extensions/              # 扩展模块
 ├── custom/
 │   ├── src/
 │   │   ├── adapters/            # 适配器层 ✅
@@ -101,7 +103,6 @@ my-pi/
 │   │   │   ├── tool-system/     # 工具系统服务 ✅
 │   │   │   ├── session/         # 会话管理服务 ✅
 │   │   │   └── token-budget/    # Token 预算服务 ✅
-│   │   ├── extensions/          # 扩展模块
 │   │   ├── seams/               # 能力接缝
 │   │   ├── events/              # 事件系统
 │   │   └── session-log/         # 会话日志

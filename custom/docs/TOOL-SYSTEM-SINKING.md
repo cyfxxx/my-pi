@@ -1,5 +1,7 @@
 # 工具系统下沉方案
 
+> **状态：已完成** — 所有目标文件已下沉到 `custom/src/services/tool-system/`。
+
 ## 1. 概述
 
 本文档详细描述如何将 pi 的工具系统纯函数逻辑下沉到 `custom/services/tool-system/`，实现：
@@ -157,8 +159,8 @@ cp packages/coding-agent/src/core/tools/file-mutation-queue.ts \
 ### 2.7 工具分层 (tool-layering.ts)
 
 **源位置**: 
-- `custom/extensions/pi-context/tool-groups.ts`
-- `custom/extensions/pi-context/tool-registrations.ts`
+- `.pi/extensions/pi-context/tool-groups.ts`
+- `.pi/extensions/pi-context/tool-registrations.ts`
 
 **目标位置**: `custom/src/services/tool-system/tool-layering.ts`
 
@@ -249,7 +251,7 @@ export { expandTilde, resolveRelative, matchMacOSVariant } from '@my-pi/custom/s
 ### 3.5 Phase 2.11: 更新扩展导入路径
 
 ```typescript
-// custom/extensions/pi-context/tool-lifecycle.ts
+// .pi/extensions/pi-context/tool-lifecycle.ts
 // 修改前：
 import { truncateHead } from '../../core/tools/truncate'
 

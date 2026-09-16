@@ -10,6 +10,17 @@ scripts/
 ├── pi-orig.sh             # 绕过 wrapper 直接启动 Pi CLI
 ├── rebuild.sh             # 全量重建 pi（extensions + skills + docs）
 ├── pi-source-build.sh     # 从源码构建 pi
+├── setup-config.sh        # 配置初始化
+├── setup-env.sh           # 环境初始化
+├── sync-upstream.sh       # 上游同步
+├── create-patch.sh        # 补丁创建
+├── apply-patches.sh       # 补丁应用
+│
+├── core/                  # 核心脚本（rebuild/wrapper/source-build）
+│   ├── rebuild.sh
+│   ├── pi-wrapper.sh
+│   ├── pi-source-build.sh
+│   └── pi-orig.sh
 │
 ├── crash-recovery/        # 崩溃恢复与诊断
 │   ├── pi-crash-analyzer.sh    # 崩溃原因分析器（13 种崩溃类型分类）
@@ -21,13 +32,18 @@ scripts/
 │   ├── pi-bench.sh             # 用量基准聚合报告
 │   ├── verify-patches.mjs      # 校验 TUI 补丁版本匹配
 │   ├── npm-missing-deps.py     # 检测缺失/损坏的 npm 依赖
-│   ├── migrate-tool-events.sh  # 一次性迁移 tool-use 事件文件
-│   ├── doc-lint.mjs            # 扩展 README 一致性检查
 │   ├── doc-extract.py          # 文档提取工具
+│   ├── doc-lint.mjs            # 扩展 README 一致性检查
 │   ├── lesson-miner.mjs        # 经验教训挖掘
 │   ├── check-cache-impact.sh   # 缓存影响检查
+│   ├── migrate-tool-events.sh  # 一次性迁移 tool-use 事件文件
 │   ├── packs-sync.sh           # 技能包同步
-│   └── golden-tasks.sh         # 黄金任务测试
+│   ├── golden-tasks.sh         # 黄金任务测试
+│   └── docker-rebuild-test.sh  # Docker 重建测试
+│
+├── deploy/                # 部署脚本
+│   ├── setup-new-device.sh     # 新设备部署
+│   └── sync-config.sh          # 配置同步
 │
 ├── install/               # 安装与配置
 │   ├── install-wrapper.sh      # 安装 pi-wrapper
@@ -40,12 +56,8 @@ scripts/
 │   ├── test-recovery.sh        # 恢复系统测试
 │   └── smoke-test.sh           # 重建后端到端冒烟测试
 │
-├── environment/           # 环境准备
-│   └── termux-prereq.sh        # Termux 环境依赖安装
-│
-└── docs/                  # 文档
-    ├── README-pi-bg.md         # 后台任务使用说明
-    └── README-recovery.md      # 自动修复系统快速指南
+└── environment/           # 环境准备
+    └── termux-prereq.sh        # Termux 环境依赖安装
 ```
 
 ## 核心脚本说明
@@ -81,6 +93,7 @@ scripts/
 | `pi-bench.sh` | 用量基准聚合报告（usage/timing/compare） | node |
 | `verify-patches.mjs` | 校验 TUI 补丁的目标 pi 版本与当前安装版本匹配 | node |
 | `npm-missing-deps.py` | 检测 node_modules 中缺失/损坏/版本不匹配的依赖 | python3 |
+| `doc-extract.py` | 文档提取工具 | python3 |
 | `doc-lint.mjs` | 扩展 README 与代码一致性检查（工具名/命令面） | node |
 
 ## 使用方式
@@ -104,7 +117,7 @@ bash scripts/maintenance/pi-bench.sh timing
 bash scripts/maintenance/pi-bench.sh compare <基准文件>
 
 # 检查 npm 依赖
-python3 scripts/maintenance/npm-missing-deps.py agent/extensions/pi-voice
+python3 scripts/maintenance/npm-missing-deps.py .pi/extensions/pi-voice
 
 # 文档一致性检查
 node scripts/maintenance/doc-lint.mjs
@@ -120,6 +133,5 @@ node scripts/maintenance/doc-lint.mjs
 
 ## 相关文档
 
-- 自动修复系统详情：`docs/README-recovery.md`
-- 后台任务使用说明：`docs/README-pi-bg.md`
-- 测试回归细节：`agent/AGENTS.md` → 验证章节
+- 项目开发规范：`AGENTS.md`
+- 架构文档：`docs/architecture.md`

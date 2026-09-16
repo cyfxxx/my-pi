@@ -74,27 +74,27 @@ custom/src/adapters/
 | `auto-compact.ts` | 自动压缩 | ✅ |
 | `index.ts` | 统一导出 | ✅ |
 
-### 6. Phase 4: 增强 seams/ 工具消费者 ✅
+### 6. Phase 4: 增强 seams/ 工具消费者 🔄 (部分完成)
 
-增强了 seams 层的工具消费者：
-
-| 文件 | 功能 | 状态 |
-|------|------|------|
-| `shell/tool-consumer-enhanced.ts` | 增强版 Shell 工具 | ✅ |
-| `fs/tool-consumer-enhanced.ts` | 增强版文件系统工具 | ✅ |
-| `search/tool-consumer-enhanced.ts` | 增强版搜索工具 | ✅ |
-| `index-enhanced.ts` | 增强版入口 | ✅ |
-
-### 7. Phase 5: 建立补丁管理机制 ✅
-
-建立了补丁管理机制：
+增强 seams 层的工具消费者：
 
 | 文件 | 功能 | 状态 |
 |------|------|------|
-| `patches/README.md` | 补丁说明 | ✅ |
-| `scripts/create-patch.sh` | 创建补丁脚本 | ✅ |
-| `scripts/apply-patches.sh` | 应用补丁脚本 | ✅ |
-| `scripts/sync-upstream.sh` | 上游同步脚本 | ✅ |
+| `custom/seams/index-enhanced.ts` | 增强版入口 | ✅ |
+| `custom/seams/shell/tool-consumer-enhanced.ts` | 增强版 Shell 工具 | ❌ 不存在 |
+| `custom/seams/fs/tool-consumer-enhanced.ts` | 增强版文件系统工具 | ❌ 不存在 |
+| `custom/seams/search/tool-consumer-enhanced.ts` | 增强版搜索工具 | ❌ 不存在 |
+
+### 7. Phase 5: 建立补丁管理机制 ⏳ (未开始)
+
+待建立补丁管理机制：
+
+| 文件 | 功能 | 状态 |
+|------|------|------|
+| `patches/README.md` | 补丁说明 | ⏳ 待创建 |
+| `scripts/create-patch.sh` | 创建补丁脚本 | ⏳ 待创建 |
+| `scripts/apply-patches.sh` | 应用补丁脚本 | ⏳ 待创建 |
+| `scripts/sync-upstream.sh` | 上游同步脚本 | ⏳ 待创建 |
 
 ### 8. 集成测试 ✅
 
@@ -112,6 +112,8 @@ custom/src/adapters/
 ```
 my-pi/
 ├── packages/                    # pi 上游（只读）
+├── .pi/
+│   └── extensions/              # 扩展模块
 ├── custom/
 │   ├── src/                     # 源代码
 │   │   ├── adapters/            # 适配器层 ✅
@@ -119,7 +121,6 @@ my-pi/
 │   │   │   ├── tool-system/     # 工具系统服务 ✅
 │   │   │   ├── session/         # 会话管理服务 ✅
 │   │   │   └── token-budget/    # Token 预算服务 ✅
-│   │   ├── extensions/          # 扩展模块
 │   │   ├── seams/               # 能力接缝 ✅
 │   │   ├── events/              # 事件系统
 │   │   └── session-log/         # 会话日志
@@ -133,7 +134,7 @@ my-pi/
 
 ```
 ┌─────────────────────────────────────────────────┐
-│              custom/src/extensions/              │
+│              .pi/extensions/                      │
 │     (业务逻辑，频繁修改)                         │
 └──────────────────────┬──────────────────────────┘
                        │ 只依赖 adapters/
