@@ -1,0 +1,104 @@
+{
+  "device": "MYPC",
+  "generatedAt": "2026-09-15T01:21:03.394Z",
+  "windowDays": 30,
+  "totalCalls": 259,
+  "tools": {
+    "bash": {
+      "calls": 197,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789360874610,
+      "lastTs": 1789435239923
+    },
+    "memory_search": {
+      "calls": 7,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789360886435,
+      "lastTs": 1789435088807
+    },
+    "ls": {
+      "calls": 3,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789361071777,
+      "lastTs": 1789369544510
+    },
+    "read": {
+      "calls": 36,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789361078924,
+      "lastTs": 1789435084170
+    },
+    "tmux_run": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789366547019,
+      "lastTs": 1789366547019
+    },
+    "tmux_read": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789366816499,
+      "lastTs": 1789366816499
+    },
+    "grep": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789367649722,
+      "lastTs": 1789367649722
+    },
+    "todo": {
+      "calls": 3,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789369536735,
+      "lastTs": 1789434815267
+    },
+    "edit": {
+      "calls": 7,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789369647885,
+      "lastTs": 1789370150579
+    },
+    "admin_restart": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789370252037,
+      "lastTs": 1789370252037
+    },
+    "find": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789434837367,
+      "lastTs": 1789434837367
+    },
+    "write": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1789434855071,
+      "lastTs": 1789434855071
+    }
+  }
+}
