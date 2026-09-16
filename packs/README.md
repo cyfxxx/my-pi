@@ -87,7 +87,6 @@ packs/
 | `gamedev/` | 游戏开发技能组（skills/{design,godot,web,workflow}） |
 | `reverse-skill/` | 逆向/CTF 技能包（含 burp-mcp 等） |
 | `dg-piagent/` | pi-agent SDK 开发助手（教程同步维护，API 基线 v0.83.0，含 sdk_doc/场景 references） |
-| `wechatide-skill/` | 微信开发者工具 agent 技能包（skillhub v0.3.9，外部收纳）：通过官方 `wechatide` CLI 驱动 IDE——安装/编译/预览/上传/自动化调试/云开发。9 个 scene 子技能 + tools.yaml 注册表；CLI 需 Windows/macOS 侧运行（WSL 走 interop，本地实测笔记见包内 LOCAL-NOTES.md） |
 | `novel-writing/` | 长篇网文工程化写作系统：六大协议（大纲/规划目录/草案/正文/体检/存档）+ 一致性/叙事/输出条例 + 文风溯源/去AI指纹 + 50章分批/事实锁/状态回证/伏笔追踪/双重审查。整合 tianming-skill 等 3 个开源仓库并优化（CC BY-NC-SA 4.0，来源见包内 README） |
 | `embedded-dev/` | 嵌入式/MCU 开发 AI 技能入口：构建/烧录/调试/串口/协议领域路由 + 开源工具链命令速查 + 执行闭环（证据驱动）。整合 embeddedskills(MIT) 与 embed-ai-tool(无LICENSE仅引用) 的通用能力；专用工具（llm-pid-tuner/garycli/on-MCU agent 等）记录在 references/specialized-tools.md |
 | `pcb-design/` | PCB/硬件设计 AI 技能入口：KiCad 工具链路由 + 设计审查契约（最小清单/证据分级）+ ERC/DRC/Gerber/SPICE/EMC 命令速查。提炼 kicad-happy(MIT)/skidl-skills(MIT)/hardware-agency-agents(MIT)；MCP server 与 ML 布局记录在 references/specialized-tools.md |
@@ -99,5 +98,4 @@ packs/
 ## 与 pi-backup 的关系
 
 packs 入库 Git（/root/.pi 仓库），随 pi-backup 同步，不依赖本机单独备份。
-| `repo-size-audit` | git 仓库体积审计：定位历史大对象与不该入库内容，忽略+说明或清历史分级处置 |
 | `skill-integration` | 外部技能包引入与整合统一流程：选包/许可核对/审查/验收/三层归置/整合纪律 |

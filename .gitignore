@@ -38,11 +38,13 @@ packages/agent/docs/extensions/pi-server-artifact/index.md
 .pi/sessions/
 .pi/stats/
 .pi/models-store.json
-.pi/data/
-.pi/logs/
 .pi/node_modules/
 .pi/extensions/node_modules/
 .pi/agent/
+
+# 运行时数据（data/ 目录）
+data/logs/
+data/plans/
 
 # 备份目录
 *.bak.*

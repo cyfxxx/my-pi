@@ -8,7 +8,8 @@ my-pi/
 ├── packages/                   # pi 上游包（只读同步）
 ├── custom/                     # 自定义层（适配器/服务/接缝/事件）
 ├── scripts/                    # 脚本工具（61 个脚本）
-├── packs/                      # 外部技能包（15 个）
+├── packs/                      # 外部技能包（13 个）
+├── data/                       # 运行时数据（memory/logs/plans/circuit-breaker）
 ├── deploy/                     # 部署配置（systemd, tmux）
 ├── portable/                   # 便携配置（Windows 便携包）
 ├── searxng/                    # SearXNG 自托管搜索
@@ -70,9 +71,6 @@ Pi 本地配置仓库，包含自定义扩展、共享库、技能和运行时�
 │   ├── models-store.json       # 模型存储
 │   ├── modes.json              # 模式配置
 │   └── sessions/               # 会话数据（gitignored）
-├── data/                       # 运行时数据（gitignored）
-├── logs/                       # 运行时日志（gitignored）
-├── memory/                     # 持久记忆数据
 ├── stats/                      # 统计数据（gitignored）
 ├── settings.json               # 主配置（provider/model/thinking）
 ├── models.json                 # 模型配置
@@ -239,7 +237,7 @@ scripts/
 
 ## packs/ 目录
 
-外部技能包，共 15 个。
+外部技能包，共 13 个。
 
 ```
 packs/
@@ -254,13 +252,25 @@ packs/
 ├── novel-writing/              # 长篇小说
 ├── pcb-design/                 # PCB 硬件设计
 ├── pdf-toolkit/                # PDF 处理
-├── repo-size-audit/            # git 仓库审计
 ├── reverse-skill/              # 安全技能路由
 ├── skill-integration/          # 技能包整合
-├── wechatide-skill/            # 微信开发
 ├── INDEX.md                    # 技能包索引（触发词/用法）
 └── README.md                   # 技能包说明
 ```
+
+## data/ 目录
+
+运行时数据，包含记忆、日志、计划和熔断器状态。
+
+```
+data/
+├── memory/                     # pi-memory 长期记忆（entries.json）
+├── logs/                       # 运行时日志（scheduler/crash-logs）
+├── plans/                      # plan-mode 计划存档
+└── circuit-breaker.json        # 熔断器状态（pi-wrapper 崩溃恢复）
+```
+
+> 注意：data/logs/ 和 data/plans/ 被 .gitignore 排除，不入库。data/memory/ 和 data/circuit-breaker.json 入库。
 
 ## deploy/ 目录
 

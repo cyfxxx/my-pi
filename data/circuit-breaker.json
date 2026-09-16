@@ -1,0 +1,7 @@
+{
+  "state": "closed",
+  "failures": 0,
+  "lastFailure": null,
+  "threshold": 5,
+  "resetTimeout": 60000
+}

@@ -55,7 +55,8 @@ my-pi/
 │   ├── sync-upstream.sh          # 上游同步
 │   ├── create-patch.sh           # 补丁管理
 │   └── apply-patches.sh          # 补丁管理
-├── packs/                        # 技能包（15 个外部技能包）
+├── packs/                        # 技能包（13 个外部技能包）
+├── data/                         # 运行时数据（memory/logs/plans/circuit-breaker）
 ├── deploy/                       # 部署配置（systemd, tmux）
 ├── portable/                     # 便携配置（Windows 便携包）
 ├── searxng/                      # SearXNG 自托管搜索
@@ -118,7 +119,7 @@ mypi -p "你的问题"
 | daily-health.mjs | 每日健康检查 |
 | verify-patches.mjs | 补丁版本匹配校验 |
 
-### 15 个技能包
+### 13 个技能包
 
 - cangjie-skill：书籍蒸馏
 - colab-bridge：Google Colab 远程 GPU
@@ -131,10 +132,8 @@ mypi -p "你的问题"
 - novel-writing：长篇小说
 - pcb-design：PCB 硬件设计
 - pdf-toolkit：PDF 处理
-- repo-size-audit：git 仓库审计
 - reverse-skill：安全技能路由
 - skill-integration：技能包整合
-- wechatide-skill：微信开发
 
 ## 文档
 
