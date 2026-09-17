@@ -137,6 +137,30 @@ mypi -p "你的问题"
 
 ## 文档
 
+### 开发规范
+
+AI 代理开发规范位于 `.pi/AGENTS.md`（pi 自动读取）。核心要点：
+
+**对话风格**
+- 保持回答简短精炼，不使用 emoji
+- 只使用技术性语言，直接了当
+- 用户提问时，先回答问题再进行编辑
+
+**代码质量**
+- 大范围更改前完整阅读文件
+- 不使用 `any`，检查 node_modules 获取外部 API 类型
+- 禁止内联导入，只使用顶层导入
+- 永远不要直接修改 `packages/ai/src/models.generated.ts`
+
+**Git 规范**
+- 只提交本次会话更改的文件
+- 暂存显式路径，永远不要 `git add -A`
+- 提交消息格式：`{feat,fix,docs}: <消息>`
+
+**命令**
+- 代码更改后运行 `npm run check`
+- 除非用户要求，不运行 `npm run build` 或 `npm test`
+
 ### 架构文档
 - [项目架构](custom/docs/ARCHITECTURE.md)
 - [实施计划](custom/docs/IMPLEMENTATION-PLAN.md)
