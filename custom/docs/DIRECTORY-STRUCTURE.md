@@ -195,44 +195,49 @@ custom/
 
 ```
 scripts/
-├── core/                       # 核心脚本
+├── core/                       # 核心脚本（进程管理/重建）
 │   ├── rebuild.sh              # 一键重建（幂等、并行、镜像加速）
 │   ├── pi-wrapper.sh           # 进程外生命周期管理器（崩溃恢复/熔断器/快照）
 │   ├── pi-source-build.sh      # 从源码构建 pi
 │   └── pi-orig.sh              # 原始 pi 启动器
+├── build/                      # 构建/发布脚本
+│   ├── build-binaries.sh       # 构建二进制文件
+│   ├── release.mjs             # 发布流程
+│   └── publish.mjs             # 发布到 npm
+├── check/                      # 检查脚本
+│   ├── check-browser-smoke.mjs # 浏览器冒烟测试
+│   ├── check-entry-graphs.mjs  # 入口图检查
+│   └── check-pinned-deps.mjs   # 依赖固定检查
+├── tools/                      # 工具脚本
+│   ├── apply-patches.sh        # 补丁应用
+│   ├── create-patch.sh         # 补丁创建
+│   ├── setup-config.sh         # 配置初始化
+│   ├── setup-env.sh            # 环境初始化
+│   └── sync-upstream.sh        # 上游同步
+├── ts/                         # TypeScript 入口文件
+│   └── *.ts                    # 各种 TS 入口
 ├── crash-recovery/             # 崩溃恢复
 │   ├── pi-crash-analyzer.sh    # 崩溃分析器
 │   ├── pi-recovery-audit.sh    # 恢复审计
 │   └── pi-rescue.sh            # 紧急救援
-├── maintenance/                # 日常维护
-│   ├── daily-health.mjs        # 每日健康检查
-│   ├── verify-patches.mjs      # 补丁版本匹配校验
-│   ├── pi-bench.sh             # 性能基准测试
-│   ├── doc-extract.mjs         # 文档提取
-│   ├── lesson-miner.mjs        # 经验挖掘
-│   └── packs-sync.mjs          # 技能包同步
 ├── deploy/                     # 部署脚本
 │   ├── setup-new-device.sh     # 新设备部署
 │   └── sync-config.sh          # 配置同步
 ├── install/                    # 安装脚本
-│   ├── cron.sh                 # Cron 安装
-│   ├── systemd.sh              # Systemd 安装
-│   ├── tool-sync-hooks.sh      # 工具同步钩子
-│   └── wrapper-install.sh      # Wrapper 安装
+│   ├── install-cron.sh         # Cron 安装
+│   ├── install-systemd.sh      # Systemd 安装
+│   └── install-wrapper.sh      # Wrapper 安装
+├── maintenance/                # 日常维护
+│   ├── daily-health.mjs        # 每日健康检查
+│   ├── verify-patches.mjs      # 补丁版本匹配校验
+│   ├── pi-bench.sh             # 性能基准测试
+│   └── lesson-miner.mjs        # 经验挖掘
 ├── test/                       # 测试脚本
 │   ├── smoke-test.sh           # 冒烟测试
 │   ├── test-all.sh             # 全量测试
 │   └── test-recovery.sh        # 恢复测试
-├── environment/                # 环境脚本
-│   └── termux-prereq.sh        # Termux 前置依赖
-├── sync-upstream.sh            # 上游同步
-├── create-patch.sh             # 补丁创建
-├── apply-patches.sh            # 补丁应用
-├── rebuild.sh                  # 重建脚本（根级入口）
-├── pi-wrapper.sh               # Wrapper 脚本（根级入口）
-├── pi-source-build.sh          # 源码构建（根级入口）
-├── setup-config.sh             # 配置初始化
-└── setup-env.sh                # 环境初始化
+└── environment/                # 环境脚本
+    └── termux-prereq.sh        # Termux 前置依赖
 ```
 
 ## packs/ 目录
