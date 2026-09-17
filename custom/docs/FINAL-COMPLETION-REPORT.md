@@ -92,9 +92,9 @@ custom/src/adapters/
 | 文件 | 功能 | 状态 |
 |------|------|------|
 | `patches/README.md` | 补丁说明 | ⏳ 待创建 |
-| `scripts/create-patch.sh` | 创建补丁脚本 | ⏳ 待创建 |
-| `scripts/apply-patches.sh` | 应用补丁脚本 | ⏳ 待创建 |
-| `scripts/sync-upstream.sh` | 上游同步脚本 | ⏳ 待创建 |
+| `scripts/tools/create-patch.sh` | 创建补丁脚本 | ⏳ 待创建 |
+| `scripts/tools/apply-patches.sh` | 应用补丁脚本 | ⏳ 待创建 |
+| `scripts/tools/sync-upstream.sh` | 上游同步脚本 | ⏳ 待创建 |
 
 ### 8. 集成测试 ✅
 
@@ -170,13 +170,13 @@ mypi -p "你的问题"
 
 ```bash
 # 创建补丁
-./scripts/create-patch.sh ai-tool-extend '扩展工具系统'
+./scripts/tools/create-patch.sh ai-tool-extend '扩展工具系统'
 
 # 应用所有补丁
-./scripts/apply-patches.sh
+./scripts/tools/apply-patches.sh
 
 # 从上游同步
-./scripts/sync-upstream.sh
+./scripts/tools/sync-upstream.sh
 ```
 
 ## 下一步行动

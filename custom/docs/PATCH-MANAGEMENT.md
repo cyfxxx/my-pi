@@ -14,7 +14,7 @@ patches/
 └── README.md
 ```
 
-> 注意：补丁管理机制已就绪（`scripts/create-patch.sh` 和 `scripts/apply-patches.sh`），当前尚无实际补丁文件。
+> 注意：补丁管理机制已就绪（`scripts/tools/create-patch.sh` 和 `scripts/tools/apply-patches.sh`），当前尚无实际补丁文件。
 
 ## 3. 补丁命名规范
 
@@ -163,7 +163,7 @@ cat patches/001-ai-tool-extend.patch.description
 
 ```bash
 #!/bin/bash
-# scripts/create-patch.sh
+# scripts/tools/create-patch.sh
 
 set -e
 
@@ -201,7 +201,7 @@ echo "补丁已创建: $PATCH_FILE"
 
 ```bash
 #!/bin/bash
-# scripts/apply-patches.sh
+# scripts/tools/apply-patches.sh
 
 set -e
 

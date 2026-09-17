@@ -36,10 +36,10 @@
 | pi-link 密钥脚本 | `agent/extensions/pi-link/scripts/pi-link-keys.sh` | 公钥 install/export/add（新设备接入流程） |
 | 部署配置 | `deploy/systemd/` | systemd unit 模板（pi-searxng/pi-whisper，`%PI_HOME%` 占位；rebuild.sh 安装时替换） |
 | 调度安装脚本 | `scripts/install/install-cron.sh`、`scripts/install/install-systemd.sh` | crontab / systemd 安装 |
-| 生命周期脚本 | `scripts/pi-wrapper.sh` | 进程外生命周期管理器（自动重启） |
+| 生命周期脚本 | `scripts/core/pi-wrapper.sh` | 进程外生命周期管理器（自动重启） |
 | 生命周期安装脚本 | `scripts/install/install-wrapper.sh` | wrapper 安装/卸载 |
-| 生命周期直启脚本 | `scripts/pi-orig.sh` | 绕过 wrapper 直接启动（故障逃生） |
-| 全局重建脚本 | `scripts/rebuild.sh` | 一键重建依赖（npm、venv、二进制） |
+| 生命周期直启脚本 | `scripts/core/pi-orig.sh` | 绕过 wrapper 直接启动（故障逃生） |
+| 全局重建脚本 | `scripts/core/rebuild.sh` | 一键重建依赖（npm、venv、二进制） |
 | 回归测试脚本 | `scripts/test/test-all.sh` | 一键全量回归（测试+类型+冲突检查） |
 | 重建回归脚本 | `scripts/maintenance/docker-rebuild-test.sh` | Docker 干净环境重建回归（clone→rebuild→判定） |
 | 核心补丁 | `agent/extensions/*/scripts/patch-*.mjs`（pi-context、pi-voice、plan-mode、pi-browser 等扩展各自的补丁） | rebuild.sh Phase 3 自动执行；**漏备份则 restore 后 rebuild 无法打补丁** |

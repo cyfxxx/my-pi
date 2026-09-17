@@ -331,7 +331,7 @@ git pull origin main
 
 # 同步 pi 上游更新
 cd /tmp/my-pi
-./scripts/sync-upstream.sh
+./scripts/tools/sync-upstream.sh
 ```
 
 ## 八、数据未同步处理

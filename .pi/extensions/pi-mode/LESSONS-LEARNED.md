@@ -175,7 +175,7 @@ reenable_disabled_extensions() {
 
 ## 相关文件
 
-- `~/.pi/scripts/pi-wrapper.sh` - 生命周期管理、模式解析
+- `~/.pi/scripts/core/pi-wrapper.sh` - 生命周期管理、模式解析
 - `~/.pi/agent/extensions/pi-mode/commands.ts` - 命令处理
 - `~/.pi/agent/extensions/pi-mode/config.ts` - 配置读写
 - `~/.pi/agent/modes.json` - 模式配置文件

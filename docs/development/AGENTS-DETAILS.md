@@ -243,7 +243,7 @@ footer 状态栏口径速查：`Σ/↑/↓`=会话累计（Σ=总输入=命中+�
 - **dsh 调研要点**（npm 包 @deepseek-ai/dsh 0.1.0-rc.7 源码）：无显式缓存优化代码，缓存友好是架构默认——静态 persona（{{model}}/{{cwd}} 启动时解析一次，无时间戳）、compaction 阈值 0.8+retainRatio 0.16、token-meter 按 input+cacheRead+cacheWrite 算压力。我们已全部对齐/超额。
 - **自动重启间隔**：看门狗 maxIdleMinutes 由用户改为 180（3 小时，.pi-autopilot-config.json；types.ts 默认同步），挂死判定放宽避免误杀长思考。
 
-补丁恢复保障：pi update 经 pi-wrapper.sh L3 拦截（CLI 一次性命令），成功后自动重跑 rebuild.sh 恢复全部补丁；手动 `bash scripts/rebuild.sh` 同样幂等可恢复。
+补丁恢复保障：pi update 经 pi-wrapper.sh L3 拦截（CLI 一次性命令），成功后自动重跑 rebuild.sh 恢复全部补丁；手动 `bash scripts/core/rebuild.sh` 同样幂等可恢复。
 
 ## 已知噪音（勿误判为 bug）
 

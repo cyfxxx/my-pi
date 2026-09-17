@@ -148,7 +148,7 @@
 |------|------|--------|----------|
 | 5.1 创建 patches 目录 | `patches/` | P2 | 5 min |
 | 5.2 编写 patches/README.md | `patches/README.md` | P2 | 20 min |
-| 5.3 编写 sync-upstream.sh | `scripts/sync-upstream.sh` | P2 | 30 min |
+| 5.3 编写 sync-upstream.sh | `scripts/tools/sync-upstream.sh` | P2 | 30 min |
 | 5.4 测试同步流程 | 手动测试 | P2 | 30 min |
 | 5.5 编写同步文档 | `custom/docs/UPSTREAM-SYNC.md` | P2 | 30 min |
 

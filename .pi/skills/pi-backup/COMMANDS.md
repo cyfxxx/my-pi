@@ -226,7 +226,7 @@ GitHub 同步完成
 
 1. 后台执行二选一（**先探测 `command -v tmux`**；重建场景可能恰好没有 tmux——它是 Phase 2-F2 的重建项）：
    - **有 tmux**：`tmux_run` 后台执行，输出落盘 `~/.pi/logs/tmux/<会话>.log`，轮询用 `tmux_read`。
-   - **无 tmux**：用 `nohup` 后台执行并重定向日志：`mkdir -p ~/.pi/logs && nohup bash ~/.pi/scripts/rebuild.sh --yes > ~/.pi/logs/rebuild.log 2>&1 &`；轮询用 `tail -n 30 ~/.pi/logs/rebuild.log`（bash 直跑，不依赖 tmux）。记录 PID（`echo $!`）供卡死判定时 `kill -0` 探活。
+   - **无 tmux**：用 `nohup` 后台执行并重定向日志：`mkdir -p ~/.pi/logs && nohup bash ~/.pi/scripts/core/rebuild.sh --yes > ~/.pi/logs/rebuild.log 2>&1 &`；轮询用 `tail -n 30 ~/.pi/logs/rebuild.log`（bash 直跑，不依赖 tmux）。记录 PID（`echo $!`）供卡死判定时 `kill -0` 探活。
    - 单条短命令（如 `mkdir`）可前台执行，但 npm/pip/git clone/模型下载必须后台。
 2. **进度报告节奏：每 60 秒检查一次日志（tmux 用 `tmux_read`、无 tmux 用 `tail`），主动向用户输出一行进度**（用户没问也报告）：
    - 格式：`[重建进度 +3m12s] Phase 1/2 完成 ✓；当前：Phase 2-B searxng venv pip install（预估 5-15 分钟）；已完成 6/13 项`
@@ -359,7 +359,7 @@ tmux 是 pi-tmux 扩展与 pi 自身 TUI 的运行依赖。系统包管理器不
 | wrapper 自愈 | `bash ~/.pi/scripts/install/install-wrapper.sh --ensure --quiet`（幂等重装 shim，`pi-original` 保留） |
 | 端到端冒烟测试 | `timeout 90 pi -p "回复 OK"`——输出 `OK` 且 exit 0 即全部扩展加载成功 + 模型链路可用；失败会指明具体扩展（如 pi-voice 报 `Extension runtime not initialized` 时检查 `PI_DIST`，见注意事项 13） |
 | whisper 服务 | `bash ~/.pi/agent/extensions/pi-voice/scripts/pi-whisper.sh status`（输出"运行中"或重启后首用自动加载） |
-| 语音跳过提示 | `bash ~/.pi/scripts/rebuild.sh --yes`（无 `pi-voice.json` 时输出"跳过 whisper/语音依赖"一行提示，确认不装多余） |
+| 语音跳过提示 | `bash ~/.pi/scripts/core/rebuild.sh --yes`（无 `pi-voice.json` 时输出"跳过 whisper/语音依赖"一行提示，确认不装多余） |
 
 **示例输出：**
 

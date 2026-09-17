@@ -184,7 +184,7 @@ Pi 在无人值守场景下需要：
 
 ```bash
 # 通过 rebuild.sh 自动安装
-bash scripts/rebuild.sh --yes
+bash scripts/core/rebuild.sh --yes
 
 # 或手动安装 cron
 bash scripts/install/install-cron.sh

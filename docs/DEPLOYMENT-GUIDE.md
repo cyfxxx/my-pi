@@ -46,8 +46,8 @@ npm run build:offline
 ### Step 4: 初始化配置
 
 ```bash
-./scripts/setup-config.sh
-./scripts/setup-env.sh
+./scripts/tools/setup-config.sh
+./scripts/tools/setup-env.sh
 source ~/.bashrc
 ```
 
@@ -122,8 +122,8 @@ my-pi/
 ls -la ~/.pi
 
 # 重新初始化
-./scripts/setup-config.sh
-./scripts/setup-env.sh
+./scripts/tools/setup-config.sh
+./scripts/tools/setup-env.sh
 ```
 
 ### 扩展加载失败

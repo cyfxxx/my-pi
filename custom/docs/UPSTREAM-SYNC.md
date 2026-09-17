@@ -43,7 +43,7 @@ git commit -m "sync: 从 pi 上游同步 packages/"
 ### 3.2 后续同步
 
 ```bash
-# scripts/sync-upstream.sh
+# scripts/tools/sync-upstream.sh
 #!/bin/bash
 
 set -e
@@ -93,7 +93,7 @@ echo "=== 同步完成 ==="
 
 ```bash
 # 1. 尝试同步
-./scripts/sync-upstream.sh
+./scripts/tools/sync-upstream.sh
 
 # 2. 如果有冲突，查看冲突文件
 git status

@@ -229,7 +229,7 @@ done
 ### 6.2 同步流程
 
 ```bash
-# scripts/sync-upstream.sh
+# scripts/tools/sync-upstream.sh
 #!/bin/bash
 set -e
 

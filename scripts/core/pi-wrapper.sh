@@ -245,8 +245,8 @@ if [ "$1" = "update" ]; then
   UPD_EXIT=$?
   if [ "$UPD_EXIT" -eq 0 ]; then
     echo "[pi-wrapper] update 完成，自动重跑 rebuild.sh 恢复补丁..." >&2
-    if [ -x "$HOME/.pi/scripts/rebuild.sh" ]; then
-      bash "$HOME/.pi/scripts/rebuild.sh"
+    if [ -x "$HOME/.pi/scripts/core/rebuild.sh" ]; then
+      bash "$HOME/.pi/scripts/core/rebuild.sh"
       echo "[pi-wrapper] rebuild 完成（exit $?），补丁已恢复" >&2
     else
       echo "[pi-wrapper] 警告：rebuild.sh 不存在，补丁未恢复，请手动重跑或重新安装" >&2
@@ -728,8 +728,8 @@ fs.writeFileSync(p,JSON.stringify(pkg,null,2));
 # 崩溃类型：syntax_error — 重跑 rebuild 恢复补丁
 recover_syntax_error() {
   echo "[pi-wrapper] [恢复] 重跑 rebuild 恢复补丁..." >&2
-  if [ -x "$HOME/.pi/scripts/rebuild.sh" ]; then
-    bash "$HOME/.pi/scripts/rebuild.sh" 2>&1 | tail -5 >&2
+  if [ -x "$HOME/.pi/scripts/core/rebuild.sh" ]; then
+    bash "$HOME/.pi/scripts/core/rebuild.sh" 2>&1 | tail -5 >&2
   else
     echo "[pi-wrapper] rebuild.sh 不存在" >&2
     return 1
@@ -1041,8 +1041,8 @@ recover_from_source() {
   else
     # 无缓存：尝试实时构建
     echo "[pi-wrapper] [L4] 无预编译缓存，尝试实时构建..." >&2
-    if [ -x "$HOME/.pi/scripts/pi-source-build.sh" ]; then
-      bash "$HOME/.pi/scripts/pi-source-build.sh" 2>&1 | tail -5 >&2
+    if [ -x "$HOME/.pi/scripts/core/pi-source-build.sh" ]; then
+      bash "$HOME/.pi/scripts/core/pi-source-build.sh" 2>&1 | tail -5 >&2
       if [ ! -f "$cache_bundle" ]; then
         echo "[pi-wrapper] [L4] 实时构建失败" >&2
         return 1
@@ -1717,8 +1717,8 @@ while true; do
           local good_pi="$PI_SOURCE_CACHE/dist/cli.js"
           if [ ! -f "$good_pi" ]; then
             echo "[pi-wrapper] 源码缓存 pi 不存在，尝试实时构建..." >&2
-            if [ -x "$HOME/.pi/scripts/pi-source-build.sh" ]; then
-              bash "$HOME/.pi/scripts/pi-source-build.sh" 2>&1 | tail -5 >&2
+            if [ -x "$HOME/.pi/scripts/core/pi-source-build.sh" ]; then
+              bash "$HOME/.pi/scripts/core/pi-source-build.sh" 2>&1 | tail -5 >&2
             fi
           fi
           if [ -f "$good_pi" ]; then

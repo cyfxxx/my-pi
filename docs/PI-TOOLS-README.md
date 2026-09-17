@@ -143,11 +143,11 @@ pi-backup verify                 # 体检：git 卫生 / 密钥泄漏 / 冒烟�
 
 两种方式：
 
-**方式一（推荐）：`scripts/rebuild.sh`**
+**方式一（推荐）：`scripts/core/rebuild.sh`**
 
 ```bash
-./scripts/rebuild.sh             # 交互式重建
-./scripts/rebuild.sh --yes       # 静默自动重建
+./scripts/core/rebuild.sh             # 交互式重建
+./scripts/core/rebuild.sh --yes       # 静默自动重建
 ```
 
 **方式二：pi-backup skill**
@@ -192,7 +192,7 @@ pi-backup rebuild --yes          # 静默自动重建
 
 ```bash
 git clone https://github.com/cyfxxx/pi-tools.git ~/.pi
-cd ~/.pi && bash scripts/rebuild.sh --yes
+cd ~/.pi && bash scripts/core/rebuild.sh --yes
 bash scripts/install/install-wrapper.sh   # 可选：安装自动重启 wrapper
 ```
 
@@ -431,8 +431,8 @@ bash scripts/test/test-all.sh
 
 | 文件 | 大小 | 来源 | 重建方式 |
 |------|------|------|---------|
-| `searxng/venv/` | ~94 MB | `python3 -m venv` | `scripts/rebuild.sh` 自动创建 |
-| `searxng/repo/` | ~28 MB | `git clone searxng/searxng` | `scripts/rebuild.sh` 自动克隆 |
+| `searxng/venv/` | ~94 MB | `python3 -m venv` | `scripts/core/rebuild.sh` 自动创建 |
+| `searxng/repo/` | ~28 MB | `git clone searxng/searxng` | `scripts/core/rebuild.sh` 自动克隆 |
 
 ## 常见问题
 
@@ -453,7 +453,7 @@ cd searxng && bash generate-config.sh --force
 ```bash
 apt-get install -y python3-venv
 rm -rf ~/.pi/searxng/venv
-bash ~/.pi/scripts/rebuild.sh --yes
+bash ~/.pi/scripts/core/rebuild.sh --yes
 ```
 
 ### pi 启动报 "Extension runtime not initialized"
@@ -469,7 +469,7 @@ echo $PI_DIST
 
 **解决：** 重新运行重建：
 ```bash
-bash ~/.pi/scripts/rebuild.sh --yes
+bash ~/.pi/scripts/core/rebuild.sh --yes
 ```
 
 ### 定时任务没有在指定时间触发

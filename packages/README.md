@@ -4,8 +4,8 @@
 
 当需要修改时：
 1. 使用 `patches/` 目录跟踪变更
-2. 使用 `scripts/sync-upstream.sh` 从上游同步
-3. 使用 `scripts/create-patch.sh` 和 `scripts/apply-patches.sh` 管理补丁
+2. 使用 `scripts/tools/sync-upstream.sh` 从上游同步
+3. 使用 `scripts/tools/create-patch.sh` 和 `scripts/tools/apply-patches.sh` 管理补丁
 
 ## 目录结构
 
