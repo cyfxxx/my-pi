@@ -12,29 +12,17 @@
       "schedule": "20 8 * * *",
       "prompt": "执行每日知识订阅（零 LLM 流程，渠道见 scripts/knowledge-fetch.py）：1) 先跑 python3 scripts/knowledge-fetch.py 抓取官方源/RSS 最新内容；2) 若当日有新增（logs/knowledge/ 下当日 md），筛选 3-5 条真正有价值的条目 （时效强/漏洞/重大新闻，排除过时教程与多源冗余），memory_search 查重后逐条 memory_store；3) 收尾写 ~/.pi/logs/knowledge/summary-{{date}}.md 概要（来源+一句话要点，无新内容则如实说明）；4) 将当日结果写入 memory/daily-results/{{date}}-knowledge-<本机hostname>.md（3-5 行：新增条数与分区分布、入库条目标题、summary 路径；无新内容也写一行'无新增'），git add 该文件 commit（message: 'knowledge: {{date}}'）后 push（推送冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。【提醒】需要修改订阅渠道/排查订阅不触发/调整过滤规则时，使用 packs/knowledge-fetch 技能（含完整搭建与迭代流程）。",
       "enabled": true,
-      "lastRun": "2026-09-17T05:24:06.482Z",
+      "lastRun": "2026-09-17T07:09:07.335Z",
       "lastResult": "failed",
-      "lastOutput": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
-      "nextRun": "2026-09-17T05:24:40.876Z",
+      "lastOutput": "failover 熔断：连续切换模型已达上限 1（failoverCount=1），暂停任务待人工介入",
+      "nextRun": null,
       "useSubagent": true,
       "notifyOnCompletion": false,
       "notifyMain": true,
       "waitForUserOnLocal": true,
       "maxRunTime": 900,
-      "runCount": 8,
+      "runCount": 9,
       "history": [
-        {
-          "time": "2026-09-10T02:47:08.505Z",
-          "result": "success",
-          "output": "",
-          "durationMs": 399432
-        },
-        {
-          "time": "2026-09-11T00:43:09.673Z",
-          "result": "failed",
-          "output": "验证前: 连续失败 1 次，启用 Best-of-N 验证重试",
-          "durationMs": 67386
-        },
         {
           "time": "2026-09-11T00:44:33.262Z",
           "result": "failed",
@@ -82,6 +70,18 @@
           "result": "failed",
           "output": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
           "durationMs": 23330
+        },
+        {
+          "time": "2026-09-17T07:04:57.344Z",
+          "result": "failed",
+          "output": "failover: 连续 1 次 provider 故障，切换模型",
+          "durationMs": 11690
+        },
+        {
+          "time": "2026-09-17T07:09:07.335Z",
+          "result": "failed",
+          "output": "failover 熔断：连续切换模型已达上限 1（failoverCount=1），暂停任务待人工介入",
+          "durationMs": 13254
         }
       ],
       "tags": [
@@ -89,11 +89,11 @@
         "knowledge"
       ],
       "retries": 1,
-      "failCount": 1,
+      "failCount": 0,
       "pendingInject": false,
       "recoveryCount": 0,
       "createdAt": "2026-09-08T14:19:25.863Z",
-      "updatedAt": "2026-09-17T05:24:06.482Z",
+      "updatedAt": "2026-09-17T07:09:07.335Z",
       "failoverCount": 0
     },
     {
@@ -180,12 +180,12 @@
         "review"
       ],
       "retries": 1,
-      "failCount": 2,
+      "failCount": 0,
       "pendingInject": false,
       "recoveryCount": 0,
       "createdAt": "2026-09-08T14:19:25.873Z",
       "updatedAt": "2026-09-17T05:24:54.056Z",
-      "failoverCount": 1
+      "failoverCount": 0
     },
     {
       "id": "58effa5f-0dcc-40c1-8e3c-93eab23f1776",
@@ -194,23 +194,17 @@
       "schedule": "30 23 * * *",
       "prompt": "执行工具统计每日聚合（当天数据已完整）：运行 node ~/.pi/scripts/tool-stats-sync.mjs --daily，确认生成 memory/stats/tool-count-<hostname>.json 后提交推送：git add 相应文件并 commit（message: 'chore: tool stats {{date}}'）后 git push（推送前先按仓库约定确认 remote URL 无 token）。若与远端冲突（其他设备也推送过计数），先 git pull --rebase 再推。",
       "enabled": true,
-      "lastRun": "2026-09-17T05:23:56.739Z",
+      "lastRun": "2026-09-17T07:09:04.827Z",
       "lastResult": "failed",
-      "lastOutput": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
-      "nextRun": "2026-09-17T05:24:17.821Z",
+      "lastOutput": "failover 熔断：连续切换模型已达上限 1（failoverCount=1），暂停任务待人工介入",
+      "nextRun": null,
       "useSubagent": true,
       "notifyOnCompletion": false,
       "notifyMain": true,
       "waitForUserOnLocal": true,
       "maxRunTime": 600,
-      "runCount": 7,
+      "runCount": 8,
       "history": [
-        {
-          "time": "2026-09-08T15:33:28.632Z",
-          "result": "success",
-          "output": "",
-          "durationMs": 180274
-        },
         {
           "time": "2026-09-10T02:34:42.373Z",
           "result": "success",
@@ -258,6 +252,18 @@
           "result": "failed",
           "output": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
           "durationMs": 13555
+        },
+        {
+          "time": "2026-09-17T07:06:28.677Z",
+          "result": "failed",
+          "output": "failover: 连续 1 次 provider 故障，切换模型",
+          "durationMs": 13199
+        },
+        {
+          "time": "2026-09-17T07:09:04.827Z",
+          "result": "failed",
+          "output": "failover 熔断：连续切换模型已达上限 1（failoverCount=1），暂停任务待人工介入",
+          "durationMs": 10743
         }
       ],
       "tags": [
@@ -265,11 +271,11 @@
         "stats"
       ],
       "retries": 1,
-      "failCount": 1,
+      "failCount": 0,
       "pendingInject": false,
       "recoveryCount": 0,
       "createdAt": "2026-09-08T14:19:25.882Z",
-      "updatedAt": "2026-09-17T05:23:56.739Z",
+      "updatedAt": "2026-09-17T07:09:04.827Z",
       "failoverCount": 0
     },
     {
@@ -279,23 +285,17 @@
       "schedule": "50 7 * * *",
       "prompt": "每日健康度量（确定性主流程，勿做其他事）：运行 node ~/.pi/scripts/maintenance/daily-health.mjs（输出结论行并自动追加本机 logs/daily-health.log，日志不入库；口径与告警规则见脚本头注释）。仅当输出含 结论=alert 时：将该行与原因写入 memory/daily-results/{{date}}-health-<本机hostname>.md（内容=alert 行+一行原因分析，勿读大文件勿跑诊断），git add 该文件后 commit（message: 'daily-health: alert {{date}}'）并 push（推送冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。结论=ok 时立即结束，不写文件不提交。",
       "enabled": true,
-      "lastRun": "2026-09-17T05:23:54.333Z",
+      "lastRun": "2026-09-17T06:12:24.286Z",
       "lastResult": "failed",
-      "lastOutput": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
-      "nextRun": "2026-09-17T05:24:27.745Z",
+      "lastOutput": "failover: 连续 2 次 provider 故障，切换模型",
+      "nextRun": null,
       "useSubagent": true,
       "notifyOnCompletion": false,
       "notifyMain": true,
       "waitForUserOnLocal": true,
       "maxRunTime": 900,
-      "runCount": 7,
+      "runCount": 8,
       "history": [
-        {
-          "time": "2026-09-10T02:34:19.196Z",
-          "result": "success",
-          "output": "",
-          "durationMs": 193405
-        },
         {
           "time": "2026-09-11T00:43:10.042Z",
           "result": "failed",
@@ -349,6 +349,12 @@
           "result": "failed",
           "output": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
           "durationMs": 11171
+        },
+        {
+          "time": "2026-09-17T06:12:24.286Z",
+          "result": "failed",
+          "output": "failover: 连续 2 次 provider 故障，切换模型",
+          "durationMs": 10168
         }
       ],
       "tags": [
@@ -356,11 +362,11 @@
         "daily"
       ],
       "retries": 1,
-      "failCount": 1,
+      "failCount": 0,
       "pendingInject": false,
       "recoveryCount": 0,
       "createdAt": "2026-09-08T14:19:25.890Z",
-      "updatedAt": "2026-09-17T05:23:54.333Z",
+      "updatedAt": "2026-09-17T06:12:24.327Z",
       "failoverCount": 0
     },
     {
@@ -370,10 +376,10 @@
       "schedule": "30 7 * * *",
       "prompt": "执行防退化基准（确定性零 LLM 主流程，勿做其他事）：运行 bash ~/.pi/scripts/maintenance/golden-tasks.sh（--fast 档：F1-F5 本地脚本断言）。全部 ✓ 则输出一行'golden-fast 全绿'即结束，不写文件不提交。任一 ✗ 红项：将失败行与 golden 输出尾部 10 行写入 memory/daily-results/{{date}}-golden-<本机hostname>.md，git add 该文件后 commit（message: 'golden: fail {{date}}'）并 push（冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。",
       "enabled": true,
-      "lastRun": "2026-09-17T05:23:53.442Z",
+      "lastRun": "2026-09-17T07:09:11.106Z",
       "lastResult": "failed",
-      "lastOutput": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
-      "nextRun": "2026-09-17T05:24:17.689235+00:00",
+      "lastOutput": "failover: 连续 1 次 provider 故障，切换模型",
+      "nextRun": "2026-09-17T07:09:49.976Z",
       "useSubagent": true,
       "notifyOnCompletion": false,
       "notifyMain": true,
@@ -381,12 +387,6 @@
       "maxRunTime": 300,
       "runCount": 7,
       "history": [
-        {
-          "time": "2026-09-11T00:43:10.817Z",
-          "result": "failed",
-          "output": "验证前: 连续失败 1 次，启用 Best-of-N 验证重试",
-          "durationMs": 68785
-        },
         {
           "time": "2026-09-11T00:43:23.826Z",
           "result": "failed",
@@ -440,6 +440,12 @@
           "result": "failed",
           "output": "provider 故障（第 1 次）：重试额度已用尽（retries=1），未达 failoverAfter=2 阈值，任务失败",
           "durationMs": 10260
+        },
+        {
+          "time": "2026-09-17T07:09:11.106Z",
+          "result": "failed",
+          "output": "failover: 连续 1 次 provider 故障，切换模型",
+          "durationMs": 17026
         }
       ],
       "tags": [
@@ -447,12 +453,12 @@
         "golden"
       ],
       "retries": 1,
-      "failCount": 0,
+      "failCount": 1,
       "pendingInject": false,
       "recoveryCount": 0,
       "createdAt": "2026-09-08T14:19:25.938Z",
-      "updatedAt": "2026-09-17T05:23:53.442Z",
-      "failoverCount": 0
+      "updatedAt": "2026-09-17T07:09:11.126Z",
+      "failoverCount": 1
     }
   ]
 }
