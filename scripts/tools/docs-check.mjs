@@ -136,7 +136,7 @@ function main() {
     return rel.startsWith('docs/') ||
            rel.match(/^agent\/extensions\/[^/]+\/README\.md$/) ||
            rel.match(/^agent\/skills\/[^/]+\/SKILL\.md$/) ||
-           rel.includes('agent/recovery/README.md') ||
+           rel.includes('recovery/README.md') ||
            rel.includes('agent/AGENTS.md') ||
            rel === 'README.md';
   });

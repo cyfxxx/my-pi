@@ -81,7 +81,7 @@ function main() {
     return rel.startsWith('docs/') ||
            rel.match(/^agent\/extensions\/[^/]+\/README\.md$/) ||
            rel.match(/^agent\/skills\/[^/]+\/SKILL\.md$/) ||
-           rel.includes('agent/recovery/README.md');
+           rel.includes('recovery/README.md');
   });
 
   // 检查每个文件

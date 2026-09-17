@@ -5,7 +5,7 @@
 set -e
 
 PI_DIR="$HOME/.pi"
-RESCUE_DIR="$PI_DIR/agent/recovery"
+RESCUE_DIR="$PI_DIR/recovery"
 SNAPSHOT_DIR="$PI_DIR/.snapshots"
 
 # 颜色定义
@@ -99,7 +99,7 @@ reinstall_deps() {
 # 重新运行 rebuild
 run_rebuild() {
   echo -e "${YELLOW}重新运行 rebuild...${NC}"
-  bash "$PI_DIR/scripts/rebuild.sh" --yes
+  bash "$PI_DIR/scripts/core/rebuild.sh" --yes
   echo -e "${GREEN}rebuild 完成${NC}"
 }
 
@@ -108,8 +108,13 @@ start_rescue_pi() {
   echo -e "${YELLOW}启动救援模式 pi...${NC}"
   cd "$PI_DIR"
   
-  # 使用救援配置启动 pi
-  node "$(cat "$PI_DIR/scripts/.pi-cli-path" 2>/dev/null || echo "$PI_DIR/agent/node_modules/.bin/pi")" \
+  # 使用救援配置启动 pi（通过锚点找到真实 CLI）
+  local pi_js="$(cat "$PI_DIR/scripts/.pi-cli-path" 2>/dev/null || echo '')"
+  if [ -z "$pi_js" ] || [ ! -f "$pi_js" ]; then
+    echo -e "${RED}错误：找不到 pi CLI 入口，请先运行 pi-wrapper.sh 初始化${NC}"
+    return 1
+  fi
+  node "$pi_js" \
     --no-extensions \
     --no-skills \
     --append-system-prompt "$RESCUE_DIR/rescue-prompt.md"
