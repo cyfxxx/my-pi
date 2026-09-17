@@ -67,6 +67,12 @@ if [ -n "$PI_JS" ] && [ -f "$PI_JS" ]; then
   export PI_DIST="$(dirname "$PI_JS")"
 fi
 
+# 将 pi 配置目录重定向到项目 .pi/，避免依赖全局 ~/.pi/agent/
+# 项目 .pi/ 已包含 settings.json / models.json / auth.json / trust.json 等完整配置
+if [ -z "$PI_CODING_AGENT_DIR" ] && [ -d "$HOME/my-pi/.pi" ]; then
+  export PI_CODING_AGENT_DIR="$HOME/my-pi/.pi"
+fi
+
 # Termux 重建：cloakbrowser 官方只发布 linux/darwin/win 预编译包，
 # Termux (platform=android) 用本地 Chromium（pkg install x11-repo chromium），
 # playwright-core 已打 android→linux 补丁（见 rebuild 记录）。
@@ -98,8 +104,20 @@ CIRCUIT_BREAKER_FILE="$HOME/.pi/data/circuit-breaker.json"
 
 # 加载崩溃分析器和审计日志模块
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/pi-crash-analyzer.sh"
-source "$SCRIPT_DIR/pi-recovery-audit.sh"
+# 查找 crash-recovery 目录（可能在项目 scripts/ 下或 ~/.pi/scripts/ 下）
+CRASH_RECOVERY_DIR=""
+for candidate in "$SCRIPT_DIR/../crash-recovery" "$HOME/.pi/scripts/crash-recovery" "$HOME/my-pi/scripts/crash-recovery"; do
+  if [ -f "$candidate/pi-crash-analyzer.sh" ]; then
+    CRASH_RECOVERY_DIR="$candidate"
+    break
+  fi
+done
+if [ -z "$CRASH_RECOVERY_DIR" ]; then
+  echo "[pi-wrapper] 警告: 找不到 crash-recovery 目录" >&2
+else
+  source "$CRASH_RECOVERY_DIR/pi-crash-analyzer.sh"
+  source "$CRASH_RECOVERY_DIR/pi-recovery-audit.sh"
+fi
 
 # 输出函数（从 pi-source-build.sh 移植，供 L4 恢复使用）
 ok()   { echo -e "\033[0;32m✓\033[0m $1" >&2; }
