@@ -10,17 +10,17 @@
 #
 # 环境约定：
 #   PI_HOME    agent 区位置（Termux/Linux 默认 $HOME/.pi；Windows 便携传包根，
-#              如 PI_HOME=D:/path/pi-portable，EXTS=$PI_HOME/agent/extensions）
+#              如 PI_HOME=D:/path/pi-portable，EXTS=$PI_HOME/extensions）
 #   PI_SDK_PATH 可选，指向 pi 包（subagent mjs 测试用；便携自动探测 pi-global）
 set -uo pipefail
 
 PI_HOME="${PI_HOME:-$HOME/.pi}"
-EXTS="$PI_HOME/agent/extensions"
+EXTS="$PI_HOME/extensions"
 # 脚本目录：test-all.sh 在 scripts/test/ 下，项目脚本根为 scripts/
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_SCRIPTS_DIR="$(cd "$TEST_DIR/.." && pwd)"
 # 统一依赖根（11 扩展共享 agent/node_modules；Node 向上寻径解析）
-AGENT_NM="$PI_HOME/agent/node_modules"
+AGENT_NM="$PI_HOME/node_modules"
 VITEST_MJS="$AGENT_NM/vitest/vitest.mjs"
 TSC_BIN="$AGENT_NM/typescript/bin/tsc"
 FAILED=0
@@ -178,7 +178,7 @@ if (idxLess.length) errs.push("目录缺 index.ts 且未被覆盖排除: " + idx
 console.log("发现 " + discovered.length + " 个扩展: " + discovered.join(", "));
 if (rules.length) console.log("settings.json 覆盖规则(" + rules.length + "): " + rules.join(" "));
 if (errs.length) { console.error("ERR: " + errs.join(" | ")); process.exit(1); }
-' "$EXTS" "$PI_HOME/agent/settings.json"
+' "$EXTS" "$PI_HOME/settings.json"
 report $? "扩展目录 index.ts 齐备（动态发现 + 覆盖规则比对）"
 
 if [ "$FAILED" -gt 0 ]; then

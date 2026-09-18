@@ -26,7 +26,7 @@ cat > "$HOOK_DIR/post-merge" <<HOOK
 #!/bin/bash
 # ${MARKER}: git pull 合并后自动聚合跨设备工具使用统计（30 天窗口；失败静默不阻塞 pull）
 PI_HOME="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-SCRIPT="\$PI_HOME/agent/extensions/pi-context/scripts/tool-stats-sync.mjs"
+SCRIPT="\$PI_HOME/extensions/pi-context/scripts/tool-stats-sync.mjs"
 [ -f "\$SCRIPT" ] || exit 0
 if command -v node >/dev/null 2>&1; then
   node "\$SCRIPT" >/dev/null 2>&1 &

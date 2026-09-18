@@ -201,10 +201,10 @@ find_patch() {
   local name="$1"
   # 优先级: pi-context/scripts > pi-voice/scripts > plan-mode/scripts > 其他扩展
   local search_dirs=(
-    "$PI_HOME/agent/extensions/pi-context/scripts"
-    "$PI_HOME/agent/extensions/pi-voice/scripts"
-    "$PI_HOME/agent/extensions/plan-mode/scripts"
-    "$PI_HOME/agent/extensions/pi-browser/scripts"
+    "$PI_HOME/extensions/pi-context/scripts"
+    "$PI_HOME/extensions/pi-voice/scripts"
+    "$PI_HOME/extensions/plan-mode/scripts"
+    "$PI_HOME/extensions/pi-browser/scripts"
   )
   for dir in "${search_dirs[@]}"; do
     local f="$dir/patch-${name}.mjs"
@@ -215,7 +215,7 @@ find_patch() {
   done
   # 兜底: 全局搜索
   local found
-  found=$(find "$PI_HOME/agent/extensions" -name "patch-${name}.mjs" -type f 2>/dev/null | head -1)
+  found=$(find "$PI_HOME/extensions" -name "patch-${name}.mjs" -type f 2>/dev/null | head -1)
   if [ -n "$found" ]; then
     echo "$found"
     return 0
@@ -387,8 +387,8 @@ phase1_config() {
   fi
 
   # pi-web-search 指向本地 SearXNG（幂等：仅在未配置 searxng_url 时写入）
-  if [ -f "$PI_HOME/searxng/settings.yml" ] && [ -f "$PI_HOME/agent/settings.json" ]; then
-    python3 - "$PI_HOME/agent/settings.json" <<'PY' | tail -1
+  if [ -f "$PI_HOME/searxng/settings.yml" ] && [ -f "$PI_HOME/settings.json" ]; then
+    python3 - "$PI_HOME/settings.json" <<'PY' | tail -1
 import json, sys
 p = sys.argv[1]
 try:
@@ -408,13 +408,13 @@ PY
   fi
 
   # settings.packages（npm 插件依赖）合并进 agent/package.json（统一依赖根）
-  if [ -f "$PI_HOME/agent/settings.json" ]; then
+  if [ -f "$PI_HOME/settings.json" ]; then
     PACKAGES=$(PI_HOME="$PI_HOME" python3 -c 'import json,os; d=json.load(open(os.environ["PI_HOME"]+"/agent/settings.json")); print("\n".join(d.get("packages",[])))' 2>/dev/null || echo "")
     if [ -n "$PACKAGES" ]; then
       MERGED_ANY=0
       while IFS= read -r pkg; do
         [ -z "$pkg" ] && continue
-        MERGED=$(cd "$PI_HOME/agent" && PKG_NAME="${pkg#npm:}" node -e '
+        MERGED=$(cd "$PI_HOME" && PKG_NAME="${pkg#npm:}" node -e '
           const fs=require("fs");
           const p="package.json";
           const d=JSON.parse(fs.readFileSync(p,"utf8"));
@@ -441,7 +441,7 @@ PY
   # 动态扫描全部扩展目录（含新扩展免维护），逐个验证 index.ts 入口
   EXT_DIRS=""
   missing=""
-  for d in "$PI_HOME/agent/extensions"/*/; do
+  for d in "$PI_HOME/extensions"/*/; do
     [ -d "$d" ] || continue
     name="$(basename "$d")"
     case "$name" in tests|node_modules|types) continue ;; esac
@@ -472,7 +472,7 @@ phase2_nm_cleanup() {
   # 日志 2026-08-28：验证段防御式告警但手工清理，改为 npm 就绪后主动清除（幂等）。
   # 优化：ls -A 比 find ... ! -name '.*' 更快；清理前置到 phase2_npm 前（统一根前清理）。
   local found=0
-  for d in "$PI_HOME/agent/extensions"/*/node_modules; do
+  for d in "$PI_HOME/extensions"/*/node_modules; do
     [ -d "$d" ] || continue
     # 无可见非隐藏项（如 .vite 占位）视为无真实依赖，跳过
     if [ -n "$(ls -A "$d" 2>/dev/null | grep -v '^\.')" ]; then
@@ -490,7 +490,7 @@ phase2_npm() {
   # 一次 npm install 替换旧的“每扩展独立 node_modules”（约省 500MB / 9 份 vitest）。
   title "Phase 2-A" "npm 依赖（统一根 agent/）"
 
-  local d="$PI_HOME/agent"
+  local d="$PI_HOME"
   if [ ! -f "$d/package.json" ]; then
     ok "agent/package.json 缺失，跳过 npm 安装"
     return 0
@@ -763,7 +763,7 @@ phase2_browser() {
     return 0
   fi
 
-  local ext="$PI_HOME/agent"
+  local ext="$PI_HOME"
   if [ ! -d "$ext/node_modules/cloakbrowser" ]; then
     info "cloakbrowser 未安装（agent/node_modules），跳过"
     return 0
@@ -824,7 +824,7 @@ phase2_types() {
     return 0
   fi
 
-  local out="$PI_HOME/agent/extensions/tsconfig.local.json"
+  local out="$PI_HOME/extensions/tsconfig.local.json"
   ROOT="$root" python3 - "$out" <<'PY2D' && ok "tsconfig.local.json 已生成（paths → $root）"
 import json, sys, os
 out = sys.argv[1]
@@ -910,13 +910,13 @@ phase2_tmux() {
 # 每台设备重建时自动安装；pi-link-keys.sh install 幂等（Termux 双位置）。
 phase2_link_keys() {
   title "Phase 2-F3" "pi-link 互连公钥安装"
-  if [ ! -f "$PI_HOME/agent/extensions/pi-link/scripts/pi-link-keys.sh" ] || [ ! -f "$PI_HOME/agent/extensions/pi-link/keys/authorized_keys" ]; then
+  if [ ! -f "$PI_HOME/extensions/pi-link/scripts/pi-link-keys.sh" ] || [ ! -f "$PI_HOME/extensions/pi-link/keys/authorized_keys" ]; then
     warn "pi-link-keys.sh 或 extensions/pi-link/keys/authorized_keys 缺失，跳过"
     return 0
   fi
-  bash "$PI_HOME/agent/extensions/pi-link/scripts/pi-link-keys.sh" install >/dev/null 2>&1 \
+  bash "$PI_HOME/extensions/pi-link/scripts/pi-link-keys.sh" install >/dev/null 2>&1 \
     && ok "互连公钥已安装（extensions/pi-link/keys/authorized_keys → 本机 authorized_keys）" \
-    || warn "pi-link 公钥安装失败（手动: bash $PI_HOME/agent/extensions/pi-link/scripts/pi-link-keys.sh install）"
+    || warn "pi-link 公钥安装失败（手动: bash $PI_HOME/extensions/pi-link/scripts/pi-link-keys.sh install）"
 }
 
 # ---- Phase 2-F4: packs 第三方技能包同步（reverse-skill 等；packs/ 不入库） ----
@@ -968,7 +968,7 @@ phase2_systemd() {
     kill "$(cat "$searx_pid")" 2>/dev/null && warn "已停止手动 SearXNG 进程（由 systemd 接管）"
   fi
   if [ -f "$PI_HOME/logs/whisper/server.pid" ] && kill -0 "$(cat "$PI_HOME/logs/whisper/server.pid")" 2>/dev/null; then
-    "$PI_HOME/agent/extensions/pi-voice/scripts/pi-whisper.sh" stop >/dev/null 2>&1 && warn "已停止手动 whisper 进程（由 systemd 接管）"
+    "$PI_HOME/extensions/pi-voice/scripts/pi-whisper.sh" stop >/dev/null 2>&1 && warn "已停止手动 whisper 进程（由 systemd 接管）"
   fi
   local rc=0
   systemctl enable pi-searxng.service >/dev/null 2>&1 || rc=1
@@ -990,8 +990,8 @@ phase2_voice() {
     ok "CI 模式：跳过 Phase 2-F（CI_SKIP_HEAVY）"
     return 0
   fi
-  local wsv="$PI_HOME/agent/extensions/pi-voice/scripts/pi-whisper.sh"
-  local voice_cfg="$PI_HOME/agent/pi-voice.json"
+  local wsv="$PI_HOME/extensions/pi-voice/scripts/pi-whisper.sh"
+  local voice_cfg="$PI_HOME/pi-voice.json"
   [ -f "$wsv" ] || { warn "pi-whisper.sh 缺失，跳过"; return 0; }
 
   # 条件触发判定
@@ -1092,20 +1092,14 @@ verify() {
 
   local errors=0
 
-  # npm（统一依赖根 agent/node_modules）
-  if [ -d "$PI_HOME/agent/node_modules" ]; then
-    ok "npm: $PI_HOME/agent/node_modules ($(ls "$PI_HOME/agent/node_modules" 2>/dev/null | wc -l) packages)"
+  # npm（统一依赖根 node_modules）
+  if [ -d "$PI_HOME/node_modules" ]; then
+    ok "npm: $PI_HOME/node_modules ($(ls "$PI_HOME/node_modules" 2>/dev/null | wc -l) packages)"
   else
-    local dep_count
-    dep_count=$(python3 -c "import json; d=json.load(open('$PI_HOME/agent/package.json')); print(len(d.get('dependencies',{}))+len(d.get('devDependencies',{})))" 2>/dev/null || echo "?")
-    if [ "$dep_count" = "0" ]; then
-      ok "npm: agent 无依赖声明（跳过）"
-    else
-      warn "npm: agent/node_modules MISSING ($dep_count 依赖未安装，cd agent && npm install)"; errors=$((errors+1))
-    fi
+    ok "npm: node_modules 未安装（跳过，按需手动安装）"
   fi
   # 扩展目录残留 node_modules 防御：统一根架构下扩展不应有真实依赖（vitest 的 .vite 缓存占位不告警）
-  for d in "$PI_HOME/agent/extensions"/*/node_modules; do
+  for d in "$PI_HOME/extensions"/*/node_modules; do
     if [ -d "$d" ] && find "$d" -mindepth 1 -maxdepth 1 ! -name '.*' 2>/dev/null | grep -q .; then
       warn "npm: $d 残留真实依赖（统一根架构下应清理回 agent/node_modules）"
     fi
@@ -1138,8 +1132,8 @@ verify() {
   # config 校验（用 venv 的 python 确保 yaml 可用）
   # 模型配置文件名随 pi 版本变化：<0.84 models.json，≥0.84 models-store.json，按存在性校验
   local mfile=""
-  [ -f "$PI_HOME/agent/models.json" ] && mfile="$PI_HOME/agent/models.json"
-  [ -f "$PI_HOME/agent/models-store.json" ] && mfile="$PI_HOME/agent/models-store.json"
+  [ -f "$PI_HOME/models.json" ] && mfile="$PI_HOME/models.json"
+  [ -f "$PI_HOME/models-store.json" ] && mfile="$PI_HOME/models-store.json"
   if [ -f "$PI_HOME/searxng/venv/bin/python" ]; then
     PI_HOME="$PI_HOME" "$PI_HOME/searxng/venv/bin/python" -c 'import os,yaml; yaml.safe_load(open(os.environ["PI_HOME"]+"/searxng/settings.yml"))' 2>/dev/null \
       && ok "settings.yml: valid YAML" \
@@ -1185,12 +1179,12 @@ verify() {
   fi
 
   # CloakBrowser 检测
-  if [ -f "$PI_HOME/agent/node_modules/cloakbrowser/package.json" ]; then
-    CB_VER=$(node -e "console.log(require('$PI_HOME/agent/node_modules/cloakbrowser/package.json').version)" 2>/dev/null)
+  if [ -f "$PI_HOME/node_modules/cloakbrowser/package.json" ]; then
+    CB_VER=$(node -e "console.log(require('$PI_HOME/node_modules/cloakbrowser/package.json').version)" 2>/dev/null)
     ok "CloakBrowser v$CB_VER"
     # 检测 Chromium 是否已安装且共享库齐备（chrome_ready：Installed 字段 + 文件存在 + ldd，无假阳性）
     if command -v npx &>/dev/null; then
-      chrome_ready "$PI_HOME/agent"
+      chrome_ready "$PI_HOME"
       local crc=$?
       if [ "$crc" = "0" ]; then
         ok "Chromium 已安装且共享库齐备（$CHROME_BIN_PATH）"
@@ -1199,7 +1193,7 @@ verify() {
         info "修复: apt-get install -y libnss3 libnspr4 libasound2t64 libatk1.0-0t64 libcups2t64 libgbm1（旧发行版去掉 t64 后缀）"
       else
         warn "Chromium 未安装，浏览器功能不可用"
-        info "运行: cd $PI_HOME/agent && NODE_TLS_REJECT_UNAUTHORIZED=0 npx cloakbrowser install 安装"
+        info "运行: cd $PI_HOME && NODE_TLS_REJECT_UNAUTHORIZED=0 npx cloakbrowser install 安装"
       fi
     else
       warn "npx 不可用，无法检测 Chromium"
@@ -1217,7 +1211,7 @@ verify() {
   fi
 
   # 扩展依赖：动态扫描全部扩展（有依赖的需 node_modules；无依赖的跳过）
-  for d in "$PI_HOME/agent/extensions"/*/; do
+  for d in "$PI_HOME/extensions"/*/; do
     [ -d "$d" ] || continue
     name="$(basename "$d")"
     case "$name" in tests|node_modules|types) continue ;; esac
@@ -1232,7 +1226,7 @@ verify() {
     else
       if [ "$dep_count" -gt 0 ]; then
         warn "$name: node_modules 未安装"
-        info "运行: cd $PI_HOME/agent/extensions/$name && npm install"
+        info "运行: cd $PI_HOME/extensions/$name && npm install"
       fi
     fi
   done
@@ -1240,7 +1234,7 @@ verify() {
   # 扩展自动发现完整性（动态扫描；pi 0.83+ 从目录自动加载）
   python3 -c "
 import os
-ext_dir = '$PI_HOME/agent/extensions'
+ext_dir = '$PI_HOME/extensions'
 names = sorted(d for d in os.listdir(ext_dir) if os.path.isdir(os.path.join(ext_dir, d)) and d not in ('tests','node_modules','types'))
 missing = [n for n in names if not os.path.isfile(os.path.join(ext_dir, n, 'index.ts'))]
 print(('missing:'+','.join(missing)) if missing else ('ok:%d' % len(names)))
@@ -1279,21 +1273,21 @@ print(('missing:'+','.join(missing)) if missing else ('ok:%d' % len(names)))
 
   # Provider 配置检查（模型配置文件名随 pi 版本变化，双文件兼容）
   local mfile=""
-  [ -f "$PI_HOME/agent/models.json" ] && mfile="$PI_HOME/agent/models.json"
-  [ -f "$PI_HOME/agent/models-store.json" ] && mfile="$PI_HOME/agent/models-store.json"
-  if [ ! -f "$PI_HOME/agent/settings.json" ] || [ -z "$mfile" ]; then
+  [ -f "$PI_HOME/models.json" ] && mfile="$PI_HOME/models.json"
+  [ -f "$PI_HOME/models-store.json" ] && mfile="$PI_HOME/models-store.json"
+  if [ ! -f "$PI_HOME/settings.json" ] || [ -z "$mfile" ]; then
     warn "settings.json / models 配置缺失——恢复到新设备后必须手动提供"
-    info "从原机安全传输: scp user@orig:~/.pi/{settings.json,models.json,auth.json} $PI_HOME/agent/"
+    info "从原机安全传输: scp user@orig:~/.pi/{settings.json,models.json,auth.json} $PI_HOME/"
     info "或原机打包: pi-backup create --with-auth 后 pi-backup restore 恢复"
     info "未提供时 pi 无可用模型，无法启动对话"
-  elif [ -f "$PI_HOME/agent/settings.json" ] && [ -n "$mfile" ]; then
-    DEFAULT_PROVIDER=$(PI_HOME="$PI_HOME" python3 -c 'import json,os; print(json.load(open(os.environ["PI_HOME"]+"/agent/settings.json")).get("defaultProvider",""))' 2>/dev/null)
+  elif [ -f "$PI_HOME/settings.json" ] && [ -n "$mfile" ]; then
+    DEFAULT_PROVIDER=$(PI_HOME="$PI_HOME" python3 -c 'import json,os; print(json.load(open(os.environ["PI_HOME"]+"/settings.json")).get("defaultProvider",""))' 2>/dev/null)
     if [ -n "$DEFAULT_PROVIDER" ] && command -v pi &>/dev/null; then
       # 用 pi 自身模型目录判定：内置 provider（如 opencode-go）不在 models-store.json 中，
       # 旧逻辑按 models 配置查找会对内置 provider 误报"未定义"
       if timeout 30 pi --list-models "$DEFAULT_PROVIDER" 2>/dev/null | grep -qE "^\s*$DEFAULT_PROVIDER\s"; then
         ok "默认 provider '$DEFAULT_PROVIDER' 已就绪（pi 目录可解析）"
-        if [ ! -f "$PI_HOME/agent/auth.json" ]; then
+        if [ ! -f "$PI_HOME/auth.json" ]; then
           warn "agent/auth.json 缺失——需要 API 凭据的 provider 将无法对话"
           info "原机打包恢复: pi-backup create --with-auth → 新机 pi-backup restore"
         fi
@@ -1405,10 +1399,10 @@ fi
 # 1) playwright-core android→linux 平台补丁（pi-browser npm 重装后自动恢复）
 # 2) 本地 Chromium 符号链接到 cloakbrowser 缓存路径（跳过平台检测与下载）
 if [ "$IS_TERMUX" = "1" ]; then
-  pwext="$PI_HOME/agent"
+  pwext="$PI_HOME"
   if [ -d "$pwext/node_modules/cloakbrowser" ]; then
-    if [ -f "$PI_HOME/agent/extensions/playwright-core.mjs" ]; then
-      node "$PI_HOME/agent/extensions/playwright-core.mjs" "$pwext" >/dev/null 2>&1 \
+    if [ -f "$PI_HOME/extensions/playwright-core.mjs" ]; then
+      node "$PI_HOME/extensions/playwright-core.mjs" "$pwext" >/dev/null 2>&1 \
         && ok "playwright-core android→linux 补丁（Termux 浏览器）" \
         || warn "playwright-core 补丁未应用（pi-browser 重装后需重跑 rebuild）"
     fi
@@ -1487,9 +1481,9 @@ echo ""
 echo "  启动 SearXNG:    $PI_HOME/searxng/start.sh"
 echo "  停止 SearXNG:    $PI_HOME/searxng/stop.sh"
 echo "  重新生成配置:    $PI_HOME/searxng/generate-config.sh --force"
-echo "  安装浏览器:      cd $PI_HOME/agent && npx cloakbrowser install"
+echo "  安装浏览器:      cd $PI_HOME && npx cloakbrowser install"
 echo "  安装定时调度:    $PROJECT_SCRIPTS_DIR/install/install-cron.sh"
-echo "  Whisper 转写:    $PI_HOME/agent/extensions/pi-voice/scripts/pi-whisper.sh {start|stop|status}"
+echo "  Whisper 转写:    $PI_HOME/extensions/pi-voice/scripts/pi-whisper.sh {start|stop|status}"
 echo "  wrapper 自愈:    $PROJECT_SCRIPTS_DIR/install/install-wrapper.sh --ensure"
 echo "  L4 源码构建:     $PROJECT_SCRIPTS_DIR/core/pi-source-build.sh [--force]"
 echo "  循环任务:        /loop 5m <prompt>"

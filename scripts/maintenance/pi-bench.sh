@@ -14,7 +14,7 @@
 
 set -uo pipefail
 PI_HOME="${PI_HOME:-$HOME/.pi}"
-DIAG="$PI_HOME/agent/.usage-diag.jsonl"
+DIAG="$PI_HOME/.usage-diag.jsonl"
 
 usage_report() {
   local since="${1:-}"
@@ -71,7 +71,7 @@ timing_report() {
   # 1. lib 加载 + 注入块构建（pi-memory 空库）
   local t0=$(date +%s%N)
   node --experimental-strip-types -e "
-    import('$PI_HOME/agent/extensions/pi-memory/inject.ts').then(async (m) => {
+    import('$PI_HOME/extensions/pi-memory/inject.ts').then(async (m) => {
       const r = m.buildInjectionBlock([], [], 500, 'linux')
       return r.block.length
     }).catch(() => 0)
@@ -82,14 +82,14 @@ timing_report() {
   # 2. estimateTokens 调用
   t0=$(date +%s%N)
   node --experimental-strip-types -e "
-    import('$PI_HOME/agent/lib/context-budget.ts').then((m) => { m.estimateTokens('x'.repeat(2000)); })
+    import('$PI_HOME/core/context-budget.ts').then((m) => { m.estimateTokens('x'.repeat(2000)); })
   " > /dev/null 2>&1
   t1=$(date +%s%N)
   echo "estimateTokens(2K字符): $(( (t1-t0)/1000000 )) ms"
 
   # 3. pi-context 套件启动（vitest 冷启动，代理测试基础设施开销）
   t0=$(date +%s%N)
-  (cd "$PI_HOME/agent/extensions/pi-context" && ./node_modules/.bin/vitest run tests/registry.test.ts > /dev/null 2>&1)
+  (cd "$PI_HOME/extensions/pi-context" && ./node_modules/.bin/vitest run tests/registry.test.ts > /dev/null 2>&1)
   t1=$(date +%s%N)
   echo "vitest 单文件套件: $(( (t1-t0)/1000000 )) ms"
 }

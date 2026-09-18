@@ -327,13 +327,13 @@ restore_config_from_git() {
   cd "$HOME/.pi"
   
   # 检查是否有未提交的更改
-  if git diff --quiet agent/settings.json 2>/dev/null; then
+  if git diff --quiet settings.json 2>/dev/null; then
     echo "[pi-wrapper] settings.json 无更改，跳过 git 恢复" >&2
     return 1
   fi
   
   # 恢复 settings.json
-  git checkout HEAD -- agent/settings.json 2>/dev/null
+  git checkout HEAD -- settings.json 2>/dev/null
   if [ $? -eq 0 ]; then
     echo "[pi-wrapper] 已从 git 恢复 settings.json" >&2
     return 0

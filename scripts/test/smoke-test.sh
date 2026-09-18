@@ -20,7 +20,7 @@ else
 fi
 
 echo "[2/8] pi-web-search 配置"
-if python3 -c "import json,sys; d=json.load(open('$PI_HOME/agent/settings.json')); ws=d.get('pi-web-search',{}); sys.exit(0 if '127.0.0.1:8889' in ws.get('searxng_url','') else 1)" 2>/dev/null; then
+if python3 -c "import json,sys; d=json.load(open('$PI_HOME/settings.json')); ws=d.get('pi-web-search',{}); sys.exit(0 if '127.0.0.1:8889' in ws.get('searxng_url','') else 1)" 2>/dev/null; then
   ok "settings.json 指向本地 SearXNG"
 else
   fail "pi-web-search 未指向本地 SearXNG（重跑 rebuild.sh 或手动配置 settings.json）"
@@ -43,7 +43,7 @@ else
 fi
 if [ -n "$TTS_BIN" ]; then
   # 服务端配置 whisperToken 时转写接口强制 Bearer 鉴权——不带 token 必然 401 假失败
-  TOKEN=$(python3 -c "import json; print(json.load(open('$PI_HOME/agent/pi-voice.json')).get('whisperToken',''))" 2>/dev/null)
+  TOKEN=$(python3 -c "import json; print(json.load(open('$PI_HOME/pi-voice.json')).get('whisperToken',''))" 2>/dev/null)
   if [ -n "$TOKEN" ]; then
     RESP=$(curl -s --max-time 90 -H "Authorization: Bearer $TOKEN" --data-binary @"$TMPWAV" "http://127.0.0.1:18766/transcribe?lang=zh" 2>/dev/null)
   else
@@ -66,7 +66,7 @@ fi
 # pi-browser 目录查找：优先 PI_CODING_AGENT_DIR，其次 PI_HOME/agent，最后 PI_HOME
 BROWSER_DIR=""
 for candidate in "${PI_CODING_AGENT_DIR:-}/extensions/pi-browser" \
-                 "$PI_HOME/agent/extensions/pi-browser" \
+                 "$PI_HOME/extensions/pi-browser" \
                  "$PI_HOME/extensions/pi-browser"; do
   if [ -d "$candidate" ]; then BROWSER_DIR="$candidate"; break; fi
 done
