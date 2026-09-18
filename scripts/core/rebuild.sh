@@ -14,6 +14,13 @@ if [ ! -d "$PI_HOME" ]; then
   echo "请先克隆仓库: git clone https://github.com/cyfxxx/pi-tools.git $PI_HOME" >&2
   exit 1
 fi
+# 脚本目录：rebuild.sh 在 scripts/core/ 下，项目脚本根为 scripts/
+REBUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$REBUILD_DIR/.." && pwd)"
+# 兼容 .pi/scripts/rebuild.sh 通过 symlink 调用的场景
+if [ ! -d "$PROJECT_SCRIPTS_DIR/maintenance" ]; then
+  PROJECT_SCRIPTS_DIR="$PI_HOME/scripts"
+fi
 
 # 统一 SIGPIPE 防御：日志管道读端（tee/外部 tail）被杀时脚本不应随之死亡
 # （A1：管道中断导致 rebuild 被连带杀死的事故根因）。--yes 模式在 tee 前设 trap，
@@ -457,7 +464,7 @@ PY
 # 并发：≤3 个 npm install 同时跑（滚动窗口，避免 npm 缓存争抢/registry 压力）。
 # 逻辑抽离至 scripts/maintenance/npm-missing-deps.py（便于单测与复用）。
 npm_missing_deps() {
-  python3 "$PI_HOME/scripts/maintenance/npm-missing-deps.py" "$1" 2>/dev/null
+  python3 "$PROJECT_SCRIPTS_DIR/maintenance/npm-missing-deps.py" "$1" 2>/dev/null
 }
 
 phase2_nm_cleanup() {
@@ -1371,14 +1378,14 @@ elif [ "$SKIP_PATCHES" = "1" ]; then
 else
 # 版本关联校验（2026-08-19）：12 个 patch-*.mjs 头部声明 @target-version <major.minor>，
 # 与当前 pi 版本失配时显式失败——避免 pi update 后补丁静默失效（footer 无实时 token / 回车被吞等回退）
-if node "$PI_HOME/scripts/maintenance/verify-patches.mjs" "$PI_DIST" >/dev/null 2>&1; then
+if node "$PROJECT_SCRIPTS_DIR/maintenance/verify-patches.mjs" "$PI_DIST" >/dev/null 2>&1; then
   ok "补丁目标版本匹配（$(node -e "console.log(require('$(dirname "$PI_DIST")/package.json').version)" 2>/dev/null)）"
 else
   # 审计 MEDIUM：此前 exit 1 直接中止——playwright-core 补丁、install-cron、最终 verify 等
   # 与补丁无关的维护项全部被连带跳过。改为 warn 继续（后续逐补丁应用会自然暴露失配项），
   # 失配明细由 verify-patches.mjs 输出
   warn "补丁与当前 pi 版本可能不匹配：pi update 后需逐补丁核对并更新 @target-version 声明"
-  info "失配明细：node scripts/maintenance/verify-patches.mjs <pi-dist>；本次继续执行后续维护项"
+  info "失配明细：node $PROJECT_SCRIPTS_DIR/maintenance/verify-patches.mjs <pi-dist>；本次继续执行后续维护项"
 fi
 # 使用自动发现函数应用补丁（幂等：已打补丁自动跳过）
 apply_patch "footer-live-context" "footer 实时上下文 token 补丁"
@@ -1435,7 +1442,7 @@ if [ -f "$PI_HOME/scripts/install/install-cron.sh" ]; then
 fi
 
 # L4 源码编译缓存（可选）
-if [ -f "$PI_HOME/scripts/pi-source-build.sh" ]; then
+if [ -f "$PROJECT_SCRIPTS_DIR/core/pi-source-build.sh" ]; then
   title "Phase 5" "L4 源码编译缓存"
   # 仅在缓存不存在或源码有更新时构建
   CACHE_DIR="$PI_HOME/recovery/cache"
@@ -1458,7 +1465,7 @@ if [ -f "$PI_HOME/scripts/pi-source-build.sh" ]; then
     fi
   fi
   if [ "$NEED_BUILD" = "1" ]; then
-    bash "$PI_HOME/scripts/pi-source-build.sh" 2>&1 | while IFS= read -r line; do
+    bash "$PROJECT_SCRIPTS_DIR/core/pi-source-build.sh" 2>&1 | while IFS= read -r line; do
       if echo "$line" | grep -q "✓"; then
         ok "${line#  }"
       elif echo "$line" | grep -q "✗"; then
@@ -1481,10 +1488,10 @@ echo "  启动 SearXNG:    $PI_HOME/searxng/start.sh"
 echo "  停止 SearXNG:    $PI_HOME/searxng/stop.sh"
 echo "  重新生成配置:    $PI_HOME/searxng/generate-config.sh --force"
 echo "  安装浏览器:      cd $PI_HOME/agent && npx cloakbrowser install"
-echo "  安装定时调度:    $PI_HOME/scripts/install/install-cron.sh"
+echo "  安装定时调度:    $PROJECT_SCRIPTS_DIR/install/install-cron.sh"
 echo "  Whisper 转写:    $PI_HOME/agent/extensions/pi-voice/scripts/pi-whisper.sh {start|stop|status}"
-echo "  wrapper 自愈:    $PI_HOME/scripts/install/install-wrapper.sh --ensure"
-echo "  L4 源码构建:     $PI_HOME/scripts/pi-source-build.sh [--force]"
+echo "  wrapper 自愈:    $PROJECT_SCRIPTS_DIR/install/install-wrapper.sh --ensure"
+echo "  L4 源码构建:     $PROJECT_SCRIPTS_DIR/core/pi-source-build.sh [--force]"
 echo "  循环任务:        /loop 5m <prompt>"
 echo "  定时任务:        /schedule cron \"0 9 * * 1-5\" <prompt>"
 echo "  提醒:            /remind +30m <prompt>"

@@ -48,3 +48,6 @@ data/plans/
 
 # 备份目录
 *.bak.*
+
+# Packs (独立 git 仓库)
+.pi/scripts/packs/

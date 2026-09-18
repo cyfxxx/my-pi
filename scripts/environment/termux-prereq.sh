@@ -53,4 +53,4 @@ fi
 ok "CLOAKBROWSER_BINARY_PATH 已写入 ~/.bashrc"
 
 echo ""
-echo "下一步: bash $HOME/.pi/scripts/rebuild.sh --yes"
+echo "下一步: bash $HOME/.pi/scripts/core/rebuild.sh --yes"

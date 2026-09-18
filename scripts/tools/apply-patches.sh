@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/apply-patches.sh - 应用所有补丁
+# scripts/tools/apply-patches.sh - 应用所有补丁
 
 set -e
 

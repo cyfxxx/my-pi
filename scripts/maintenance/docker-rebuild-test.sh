@@ -2,7 +2,7 @@
 # ============================================================
 # docker-rebuild-test.sh — Docker 干净环境完整重建测试
 # 在全新 ubuntu 容器中验证 pi-tools 仓库可完整重建（模拟新设备）。
-# 用法: bash scripts/docker-rebuild-test.sh [分支] [镜像]
+# 用法: bash scripts/maintenance/docker-rebuild-test.sh [分支] [镜像]
 #   分支: 默认 test/portable-win-merge（合并测试分支）
 #   镜像: 默认 ubuntu:24.04
 # 依赖: docker 可用；~/.ssh 含 GitHub 认证密钥（挂载进容器）
@@ -36,7 +36,7 @@ docker exec "$CONTAINER" bash -c "git config --global core.sshCommand 'ssh -o St
 
 LOG="/root/.pi/logs/docker-rebuild-${CONTAINER}.log"
 info "容器内执行 rebuild.sh --yes（完整重建，耗时取决于网络；日志: $LOG）..."
-docker exec "$CONTAINER" bash -c "cd /root/.pi && bash scripts/rebuild.sh --yes" 2>&1 | tee "$LOG" >/dev/null
+docker exec "$CONTAINER" bash -c "cd /root/.pi && bash scripts/core/rebuild.sh --yes" 2>&1 | tee "$LOG" >/dev/null
 RC=${PIPESTATUS[0]}
 
 echo "===== Docker 重建测试结论（分支 $BRANCH）====="

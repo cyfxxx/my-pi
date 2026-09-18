@@ -8,7 +8,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 PI_HOME="${PI_HOME:-$HOME/.pi}"
-CRON_SCRIPT="$PI_HOME/scripts/pi-cron.sh"
+CRON_SCRIPT="$PI_HOME/extensions/pi-autopilot/scripts/pi-cron.sh"
 SERVICE_NAME="pi-autopilot"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 TIMER_FILE="/etc/systemd/system/${SERVICE_NAME}.timer"

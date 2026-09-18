@@ -3,7 +3,7 @@
 set -u
 
 PI_HOME="${PI_HOME:-$HOME/.pi}"
-CRON_SCRIPT="$PI_HOME/scripts/pi-cron.sh"
+CRON_SCRIPT="$PI_HOME/extensions/pi-autopilot/scripts/pi-cron.sh"
 
 if [ ! -f "$CRON_SCRIPT" ]; then
   echo "错误: 未找到 $CRON_SCRIPT"

@@ -16,6 +16,9 @@ set -uo pipefail
 
 PI_HOME="${PI_HOME:-$HOME/.pi}"
 EXTS="$PI_HOME/agent/extensions"
+# 脚本目录：test-all.sh 在 scripts/test/ 下，项目脚本根为 scripts/
+TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$TEST_DIR/.." && pwd)"
 # 统一依赖根（11 扩展共享 agent/node_modules；Node 向上寻径解析）
 AGENT_NM="$PI_HOME/agent/node_modules"
 VITEST_MJS="$AGENT_NM/vitest/vitest.mjs"
@@ -70,7 +73,7 @@ report() {
 
 cyn "== vitest 套件（统一根 $AGENT_NM） =="
 if [ ! -f "$VITEST_MJS" ]; then
-  red "✗ $VITEST_MJS 不存在（需先重建依赖: bash scripts/rebuild.sh --yes 或 cd agent && npm install）"; FAILED=$((FAILED+1))
+  red "✗ $VITEST_MJS 不存在（需先重建依赖: bash scripts/core/rebuild.sh --yes 或 cd agent && npm install）"; FAILED=$((FAILED+1))
 fi
 for ext in $ALL_EXTS; do
   if [ -d "$EXTS/$ext" ]; then
@@ -150,7 +153,7 @@ report $? "cache-guard (注入面指纹/阈值契约/动态源)"
 
 
 cyn "== 文档一致性守门（doc-lint） =="
-"$NODE" "$PI_HOME/scripts/maintenance/doc-lint.mjs" >/dev/null 2>&1
+"$NODE" "$PROJECT_SCRIPTS_DIR/maintenance/doc-lint.mjs" >/dev/null 2>&1
 report $? "doc-lint (README 工具/slash 命令清单一致)"
 
 cyn "== 扩展自动发现完整性（pi 0.83+ 从目录自动加载，settings.json 覆盖规则动态比对） =="

@@ -56,10 +56,10 @@ fi
 title "4/6" "配置环境"
 if [ "$SKIP_CONFIG" -eq 0 ]; then
     # 初始化配置目录
-    bash "$MY_PI_DIR/scripts/setup-config.sh" && ok "配置目录" || warn "配置目录初始化失败"
+    bash "$MY_PI_DIR/scripts/tools/setup-config.sh" && ok "配置目录" || warn "配置目录初始化失败"
 
     # 配置环境变量
-    bash "$MY_PI_DIR/scripts/setup-env.sh" && ok "环境变量" || warn "环境变量配置失败"
+    bash "$MY_PI_DIR/scripts/tools/setup-env.sh" && ok "环境变量" || warn "环境变量配置失败"
 else
     warn "跳过配置"
 fi

@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/sync-upstream.sh - 从 pi 上游同步
+# scripts/tools/sync-upstream.sh - 从 pi 上游同步
 
 set -e
 

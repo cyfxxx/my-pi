@@ -113,7 +113,7 @@ echo "[7/8] autopilot 离线调度"
 if command -v crontab >/dev/null 2>&1 && crontab -l 2>/dev/null | grep -q pi-cron; then
   ok "crontab 已安装 pi-cron"
 else
-  skip "未安装 crontab 调度（可选: $PI_HOME/scripts/install-cron.sh）"
+  skip "未安装 crontab 调度（可选: $PI_HOME/scripts/install/install-cron.sh）"
 fi
 
 echo "[8/8] TUI 补丁 + 状态循环"

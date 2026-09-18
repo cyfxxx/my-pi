@@ -8,7 +8,7 @@ set -euo pipefail
 #
 # From the repository root, install with:
 #   mkdir -p "$HOME/.local/bin"
-#   ln -s "$PWD/scripts/auto-pi.sh" "$HOME/.local/bin/pi"
+#   ln -s "$PWD/scripts/tools/auto-pi.sh" "$HOME/.local/bin/pi"
 #
 # ~/.local/bin must appear before the stable pi installation on PATH.
 

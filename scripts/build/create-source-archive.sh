@@ -3,7 +3,7 @@
 #
 # Usage:
 #   npm run hydrate:model-data
-#   ./scripts/create-source-archive.sh --version <version> --ref <git-ref> --out <archive.tar.gz>
+#   ./scripts/build/create-source-archive.sh --version <version> --ref <git-ref> --out <archive.tar.gz>
 
 set -euo pipefail
 

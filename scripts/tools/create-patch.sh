@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/create-patch.sh - 创建补丁脚本
+# scripts/tools/create-patch.sh - 创建补丁脚本
 
 set -e
 

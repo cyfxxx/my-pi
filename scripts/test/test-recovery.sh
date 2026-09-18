@@ -210,7 +210,9 @@ else
   fail "源码 node_modules 不存在"
 fi
 
-if [ -x "$HOME/.pi/scripts/pi-source-build.sh" ]; then
+RECOVERY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$RECOVERY_DIR/.." && pwd)"
+if [ -x "$PROJECT_SCRIPTS_DIR/core/pi-source-build.sh" ]; then
   ok "pi-source-build.sh 可执行"
 else
   fail "pi-source-build.sh 不可执行"
