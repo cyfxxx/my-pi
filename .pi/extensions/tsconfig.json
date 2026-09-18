@@ -15,7 +15,6 @@
     "types": [
       "node"
     ],
-    "baseUrl": ".",
     "paths": {}
   },
   "include": [
@@ -24,12 +23,17 @@
     "pi-context/**/*.ts",
     "subagent/**/*.ts",
     "plan-mode/**/*.ts",
-    "pi-browser/**/*.ts",
     "pi-web-search/**/*.ts",
     "pi-tmux/**/*.ts",
     "pi-voice/**/*.ts",
     "pi-link/**/*.ts",
     "pi-intervention/**/*.ts",
     "pi-mode/**/*.ts"
+  ],
+  "exclude": [
+    "**/tests/**",
+    "**/test/**",
+    "**/__mocks__/**",
+    "pi-browser/**"
   ]
 }

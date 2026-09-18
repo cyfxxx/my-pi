@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import ts from "typescript";
-import { getPublicWorkspacePackages } from "./release-packages.mjs";
+import { getPublicWorkspacePackages } from "../build/release-packages.mjs";
 
 const failures = [];
 

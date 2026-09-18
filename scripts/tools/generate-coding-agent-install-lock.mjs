@@ -5,7 +5,7 @@ import { dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(scriptDir, "..");
+const repoRoot = resolve(scriptDir, "../..");
 const codingAgentDir = join(repoRoot, "packages/coding-agent");
 const outputDir = join(codingAgentDir, "install-lock");
 const rootLockfilePath = join(repoRoot, "package-lock.json");

@@ -63,7 +63,16 @@ echo "[4/8] 浏览器（CloakBrowser）"
 if [ -d /data/data/com.termux ] && [ -z "${CLOAKBROWSER_BINARY_PATH:-}" ] && command -v chromium-browser >/dev/null 2>&1; then
   export CLOAKBROWSER_BINARY_PATH="$(command -v chromium-browser)"
 fi
-if (cd "$PI_HOME/agent/extensions/pi-browser" && timeout 90 node --input-type=module -e "
+# pi-browser 目录查找：优先 PI_CODING_AGENT_DIR，其次 PI_HOME/agent，最后 PI_HOME
+BROWSER_DIR=""
+for candidate in "${PI_CODING_AGENT_DIR:-}/extensions/pi-browser" \
+                 "$PI_HOME/agent/extensions/pi-browser" \
+                 "$PI_HOME/extensions/pi-browser"; do
+  if [ -d "$candidate" ]; then BROWSER_DIR="$candidate"; break; fi
+done
+if [ -z "$BROWSER_DIR" ]; then
+  fail "浏览器不可用（未找到 pi-browser 扩展目录）"
+elif (cd "$BROWSER_DIR" && timeout 90 node --input-type=module -e "
 import { launch } from 'cloakbrowser';
 try {
   const b = await launch({ headless: true });
@@ -76,7 +85,7 @@ try {
 " 2>/dev/null | grep -q "^OK"); then
   ok "浏览器可打开页面"
 else
-  fail "浏览器不可用（安装: cd $PI_HOME/agent && npx cloakbrowser install；缺库: apt-get install libnss3 libnspr4）"
+  fail "浏览器不可用（安装: npx cloakbrowser install；缺库: apt-get install libnss3 libnspr4）"
 fi
 
 echo "[5/8] tmux"
