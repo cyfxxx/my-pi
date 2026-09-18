@@ -3,6 +3,27 @@
 主线（master）稳定版本锚点。每个稳定版本打 tag（`stable-YYYYMMDD`），出现问题时可用
 `git checkout <tag>` 回退，或从该 tag 拉分支修复。
 
+## 2026-09-18 迁移后修复和优化
+
+- **PI_CODING_AGENT_DIR 环境变量**：在 mypi 和 pi-wrapper.sh 中设置，解决 "No API key found" 崩溃
+- **脚本路径全面修复**：
+  - rebuild.sh: 添加 PROJECT_SCRIPTS_DIR 变量
+  - install-cron.sh / install-systemd.sh: pi-cron.sh 路径修正
+  - setup-new-device.sh: setup-*.sh 路径修正
+  - test-all.sh: 添加 PROJECT_SCRIPTS_DIR，doc-lint 路径修正
+  - test-recovery.sh: pi-source-build 路径修正
+  - docker-rebuild-test.sh / termux-prereq.sh: rebuild.sh 路径修正
+  - smoke-test.sh: install-cron.sh 路径修正
+- **pre-commit hook 修复**：check-lockfile-commit.mjs 路径更新
+- **TypeScript 配置修复**：tsconfig.json 移除 baseUrl，排除 tests 和 pi-browser
+- **Biome 配置修复**：排除 .pi/searxng 目录（第三方代码）
+- **npm 检查脚本路径更新**：package.json 中 npm scripts 指向新路径
+- **check 脚本排除 .pi 目录**：check-pinned-deps.mjs 和 check-ts-relative-imports.mjs
+- **smoke-test 浏览器路径修复**：兼容 PI_CODING_AGENT_DIR
+- **锁文件同步**：更新 package-lock.json
+- **.pi/scripts/ 符号链接**：旧 flat 文件替换为符号链接指向项目 scripts/
+- **文档更新**：MIGRATION-PLAN-PI-TOOLS.md、MODULARIZATION-PLAN.md、.pi/README.md 全面修正
+
 ## 2026-09-15 目录结构扁平化（扩展迁移 + 配置统一）
 
 - **扩展迁移**：12 个扩展从旧位置迁移到 `.pi/extensions/`

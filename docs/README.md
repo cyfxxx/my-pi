@@ -45,6 +45,7 @@
 |------|------|
 | OPTIMIZATION-LOG.md | 优化日志 |
 | MODULARIZATION-PLAN.md | 模块化计划 |
+| LESSONS-LEARNED.md | 迁移经验总结（问题和解决方案） |
 | GIT-HISTORY-REWRITE.md | Git 历史重写 |
 
 ## 相关文档
