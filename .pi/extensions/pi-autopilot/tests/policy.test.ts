@@ -84,8 +84,8 @@ describe('decide', () => {
   })
 
   it('failover circuit break: maxFailovers reached suspends instead of ping-pong', () => {
-    // failoverCount >= maxFailovers（默认 1）：A→B 切过一次后 B 再失败不得切回 A
-    const action = decide(makeTask({ failCount: 3, failoverCount: 1 }), 'provider_down', defaultPolicy, chain, info)
+    // failoverCount >= maxFailovers（默认 2）：A→B 切过两次后 B 再失败不得切回 A
+    const action = decide(makeTask({ failCount: 3, failoverCount: 2 }), 'provider_down', defaultPolicy, chain, info)
     expect(action.type).toBe('suspend_task')
     expect(action.type === 'suspend_task' && action.note).toContain('熔断')
   })

@@ -106,7 +106,7 @@ Pi 在无人值守场景下需要：
 | 服务不可用 | provider/api/connection/network/429/503/502 等 | `failoverAfter`(2) 次后切换 fallback 链 |
 | 逻辑错误 | Error:/invalid 等 | 直接失败（不烧重启成本） |
 | 连续失败 | failCount ≥ `suspendAfter`(5) | 暂停任务 + Webhook 告警 |
-| failover 熔断 | failoverCount ≥ `maxFailovers`(1) | 暂停任务——连续切换模型已达上限 |
+| failover 熔断 | failoverCount ≥ `maxFailovers`(2) | 暂停任务——连续切换模型已达上限 |
 | 鉴权错误 | 401/403/unauthorized/invalid api key | 直接失败（重试无意义） |
 
 **关键机制**：
@@ -151,7 +151,7 @@ Pi 在无人值守场景下需要：
   "requeueOnRestart": true,
   "maxIdleMinutes": 180,
   "budget": { "maxRunsPerDay": 50, "maxCostPerDay": 0, "allowedModels": [] },
-  "policy": { "failoverAfter": 2, "suspendAfter": 5, "timeoutFactor": 2, "maxFailovers": 1 },
+  "policy": { "failoverAfter": 2, "suspendAfter": 5, "timeoutFactor": 2, "maxFailovers": 2 },
   "fallbackModels": []
 }
 ```
@@ -169,7 +169,7 @@ Pi 在无人值守场景下需要：
 | `policy.failoverAfter` | number | 2 | 失败多少次后切换模型 |
 | `policy.suspendAfter` | number | 5 | 失败多少次后暂停任务 |
 | `policy.timeoutFactor` | number | 2 | 超时因子 |
-| `policy.maxFailovers` | number | 1 | 最大 failover 次数 |
+| `policy.maxFailovers` | number | 2 | 最大 failover 次数 |
 | `fallbackModels` | string[] | [] | 备选模型列表 |
 
 ### 4.3 enabled 门控语义

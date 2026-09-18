@@ -73,7 +73,7 @@ export interface AutopilotPolicy {
   failoverAfter?: number
   suspendAfter?: number
   timeoutFactor?: number
-  /** failover 熔断：同一任务连续切换模型次数上限（防双模型 ping-pong 无限重启），默认 1 */
+  /** failover 熔断：同一任务连续切换模型次数上限（防双模型 ping-pong 无限重启），默认 2 */
   maxFailovers?: number
   /** 验证触发阈值：失败 N 次后启用 Best-of-N 验证（默认 1） */
   verifyAfter?: number

@@ -376,23 +376,17 @@
       "schedule": "30 7 * * *",
       "prompt": "执行防退化基准（确定性零 LLM 主流程，勿做其他事）：运行 bash ~/.pi/scripts/maintenance/golden-tasks.sh（--fast 档：F1-F5 本地脚本断言）。全部 ✓ 则输出一行'golden-fast 全绿'即结束，不写文件不提交。任一 ✗ 红项：将失败行与 golden 输出尾部 10 行写入 memory/daily-results/{{date}}-golden-<本机hostname>.md，git add 该文件后 commit（message: 'golden: fail {{date}}'）并 push（冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。",
       "enabled": true,
-      "lastRun": "2026-09-17T07:09:11.106Z",
+      "lastRun": "2026-09-17T07:21:57.830Z",
       "lastResult": "failed",
-      "lastOutput": "failover: 连续 1 次 provider 故障，切换模型",
-      "nextRun": "2026-09-17T07:09:49.976Z",
+      "lastOutput": "failover 熔断：连续切换模型已达上限 1（failoverCount=1），暂停任务待人工介入",
+      "nextRun": "2026-09-18T07:52:49.818Z",
       "useSubagent": true,
       "notifyOnCompletion": false,
       "notifyMain": true,
       "waitForUserOnLocal": true,
       "maxRunTime": 300,
-      "runCount": 7,
+      "runCount": 8,
       "history": [
-        {
-          "time": "2026-09-11T00:43:23.826Z",
-          "result": "failed",
-          "output": "验证前: 连续失败 2 次，启用 Best-of-N 验证重试",
-          "durationMs": 27682
-        },
         {
           "time": "2026-09-12T00:00:39.357Z",
           "result": "success",
@@ -446,6 +440,12 @@
           "result": "failed",
           "output": "failover: 连续 1 次 provider 故障，切换模型",
           "durationMs": 17026
+        },
+        {
+          "time": "2026-09-17T07:21:57.830Z",
+          "result": "failed",
+          "output": "failover 熔断：连续切换模型已达上限 1（failoverCount=1），暂停任务待人工介入",
+          "durationMs": 24067
         }
       ],
       "tags": [
@@ -453,12 +453,12 @@
         "golden"
       ],
       "retries": 1,
-      "failCount": 1,
+      "failCount": 0,
       "pendingInject": false,
       "recoveryCount": 0,
       "createdAt": "2026-09-08T14:19:25.938Z",
-      "updatedAt": "2026-09-17T07:09:11.126Z",
-      "failoverCount": 1
+      "updatedAt": "2026-09-17T07:52:49.824Z",
+      "failoverCount": 0
     }
   ]
 }

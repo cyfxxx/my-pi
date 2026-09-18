@@ -31,7 +31,7 @@ export function decide(
   const failoverAfter = policy.failoverAfter ?? 2
   const suspendAfter = policy.suspendAfter ?? 5
   const timeoutFactor = policy.timeoutFactor ?? 2
-  const maxFailovers = policy.maxFailovers ?? 1
+  const maxFailovers = policy.maxFailovers ?? 2
   const verifyAfter = policy.verifyAfter ?? 1
   // failover 熔断：连续切换模型超过上限后不再切（防双模型链 ping-pong 无限重启，
   // 每次 failover 都写 set_model 重启请求，代价高且无收敛）。仅拦截 failover，不影响 retry。
