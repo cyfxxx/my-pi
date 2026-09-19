@@ -1,7 +1,7 @@
 #!/bin/bash
 # install-tool-sync-hooks.sh — 安装/刷新 tool-stats 同步 git hooks（幂等）
 #
-# 同步时机（配合 agent/extensions/pi-context/scripts/tool-stats-sync.mjs）：
+# 同步时机（配合 extensions/pi-context/scripts/tool-stats-sync.mjs）：
 #   - post-merge：git pull 合并后自动聚合跨设备工具使用统计（30 天窗口）
 #   - push 侧无需 hook：pi-backup sync 的 `git add -A` 自动带上本机事件文件
 #     （memory/stats/tool-use-<device>.jsonl 按设备分文件，Git 合并无冲突）
@@ -10,7 +10,11 @@
 # 挂载：install-wrapper.sh --ensure（各环境 cron 自愈时自动部署）
 set -u
 
-PI_HOME="${PI_HOME:-$HOME/.pi}"
+# 加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
 QUIET=0
 [ "${1:-}" = "--quiet" ] && QUIET=1
 

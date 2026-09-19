@@ -7,11 +7,20 @@
 
 # 手动处理关键路径的错误，不使用 set -e
 
+# 加载路径配置（唯一定义所有路径变量）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# 兼容 .pi/scripts/ 通过 symlink 调用的场景
+if [ ! -d "$PROJECT_SCRIPTS_DIR/maintenance" ]; then
+  PROJECT_SCRIPTS_DIR="${HOME}/.pi/scripts"
+fi
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
 # 持久化锚点：记录最近一次解析出的真实 cli.js 路径。
 # pi update 重装 npm 包后路径不变（更新目录内的同一 cli.js），
 # 而 bin/pi 可能被 update 覆盖成官方 symlink，导致 wrapper 被绕过，
 # 此锚点 + 自动重建 pi-original 保证 wrapper 在 update 后仍接管。
-ANCHOR_FILE="$HOME/.pi/scripts/.pi-cli-path"
+ANCHOR_FILE="$PI_HOME/scripts/.pi-cli-path"
 
 # 找到原始 pi CLI 的 JS 入口（绕过 wrapper 防循环）
 # 不能直接执行 pi-original symlink，因为 Node 拒绝非 .js 扩展名
@@ -86,27 +95,27 @@ fi
 # 桌面环境（WSLg/原生 X）不受影响，可显式 export PI_WEB_TOOLKIT_HEADLESS=false 覆盖）
 [ -d /data/data/com.termux ] && export PI_WEB_TOOLKIT_HEADLESS="${PI_WEB_TOOLKIT_HEADLESS:-true}"
 
-STATE_FILE="$HOME/.pi/.pi-admin-state.json"
-CRASH_FILE="$HOME/.pi/.pi-autopilot-crash.json"
-LASTGOOD_FILE="$HOME/.pi/.pi-autopilot-lastgood.json"
-SETTINGS_FILE="$HOME/.pi/settings.json"
+STATE_FILE="$PI_HOME/.pi-admin-state.json"
+CRASH_FILE="$PI_HOME/.pi-autopilot-crash.json"
+LASTGOOD_FILE="$PI_HOME/.pi-autopilot-lastgood.json"
+SETTINGS_FILE="$SETTINGS_JSON"
 PI_AUTOPILOT=1
 export PI_AUTOPILOT
 CRASH_THRESHOLD=3
 RESCUE_THRESHOLD=5  # 连续崩溃达 5 次触发配置恢复
 RESCUE_PI_THRESHOLD=7  # 连续崩溃达 7 次启动救援模式 pi
 MAX_RECOVERY_ROUNDS=5  # 单次启动最大恢复循环轮数
-PI_SOURCE_CACHE="$HOME/.pi/recovery/cache"  # L4 源码编译缓存
+PI_SOURCE_CACHE="$PI_HOME/recovery/cache"  # L4 源码编译缓存
 LAST_ROLLBACK_TS=0
 CIRCUIT_BREAKER_THRESHOLD=5  # 熔断器阈值：连续失败5次触发熔断
 CIRCUIT_BREAKER_COOLDOWN=1800  # 熔断器冷却时间：30分钟（秒）
-CIRCUIT_BREAKER_FILE="$HOME/.pi/data/circuit-breaker.json"
+CIRCUIT_BREAKER_FILE="$PI_HOME/data/circuit-breaker.json"
 
 # 加载崩溃分析器和审计日志模块
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 查找 crash-recovery 目录（可能在项目 scripts/ 下或 ~/.pi/scripts/ 下）
 CRASH_RECOVERY_DIR=""
-for candidate in "$SCRIPT_DIR/../crash-recovery" "$HOME/.pi/scripts/crash-recovery" "$HOME/my-pi/scripts/crash-recovery"; do
+for candidate in "$SCRIPT_DIR/../crash-recovery" "$PROJECT_SCRIPTS_DIR/crash-recovery" "$PROJECT_SCRIPTS_DIR/crash-recovery"; do
   if [ -f "$candidate/pi-crash-analyzer.sh" ]; then
     CRASH_RECOVERY_DIR="$candidate"
     break
@@ -128,7 +137,7 @@ warn() { echo -e "\033[0;33m⚠\033[0m $1" >&2; }
 preserve_crash_log() {
   local crash_log="${1:-}"
   if [ -n "$crash_log" ] && [ -f "$crash_log" ] && [ -s "$crash_log" ]; then
-    local preserve_dir="$HOME/.pi/data/logs/crash-logs"
+    local preserve_dir="$PI_HOME/data/logs/crash-logs"
     mkdir -p "$preserve_dir"
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local preserve_file="$preserve_dir/crash_${timestamp}_$$.log"
@@ -142,8 +151,8 @@ preserve_crash_log() {
 CRASH_WINDOW_MS=$((24 * 3600 * 1000))
 
 # 救援模式相关路径
-RESCUE_DIR="$HOME/.pi/recovery"
-SNAPSHOT_DIR="$HOME/.pi/.snapshots"
+RESCUE_DIR="$PI_HOME/recovery"
+SNAPSHOT_DIR="$PI_HOME/.snapshots"
 RESCUE_CONFIG="$RESCUE_DIR/rescue-config.json"
 RESCUE_PROMPT="$RESCUE_DIR/rescue-prompt.md"
 
@@ -262,8 +271,8 @@ if [ "$1" = "update" ]; then
   UPD_EXIT=$?
   if [ "$UPD_EXIT" -eq 0 ]; then
     echo "[pi-wrapper] update 完成，自动重跑 rebuild.sh 恢复补丁..." >&2
-    if [ -x "$HOME/.pi/scripts/core/rebuild.sh" ]; then
-      bash "$HOME/.pi/scripts/core/rebuild.sh"
+    if [ -x "$REBUILD_SCRIPT" ]; then
+      bash "$REBUILD_SCRIPT"
       echo "[pi-wrapper] rebuild 完成（exit $?），补丁已恢复" >&2
     else
       echo "[pi-wrapper] 警告：rebuild.sh 不存在，补丁未恢复，请手动重跑或重新安装" >&2
@@ -286,13 +295,13 @@ create_snapshot() {
   
   # 保存关键配置文件
   cp "$SETTINGS_FILE" "$snapshot_path/" 2>/dev/null || true
-  cp "$HOME/.pi/modes.json" "$snapshot_path/" 2>/dev/null || true
+  cp "$MODES_JSON" "$snapshot_path/" 2>/dev/null || true
   
   # 保存扩展列表
-  ls "$HOME/.pi/extensions/" > "$snapshot_path/extensions.list" 2>/dev/null || true
+  ls "$EXTENSIONS_DIR/" > "$snapshot_path/extensions.list" 2>/dev/null || true
   
   # 保存 git 状态
-  cd "$HOME/.pi"
+  cd "$PI_HOME"
   git rev-parse HEAD > "$snapshot_path/git-commit" 2>/dev/null || true
   git status --porcelain > "$snapshot_path/git-status" 2>/dev/null || true
   
@@ -316,7 +325,7 @@ restore_snapshot() {
   
   # 恢复配置文件
   cp "$snapshot_path/settings.json" "$SETTINGS_FILE" 2>/dev/null || true
-  cp "$snapshot_path/modes.json" "$HOME/.pi/modes.json" 2>/dev/null || true
+  cp "$snapshot_path/modes.json" "$MODES_JSON" 2>/dev/null || true
   
   echo "[pi-wrapper] 已恢复快照: $snapshot_path" >&2
   return 0
@@ -324,7 +333,7 @@ restore_snapshot() {
 
 # 恢复配置：从 git 恢复配置文件
 restore_config_from_git() {
-  cd "$HOME/.pi"
+  cd "$PI_HOME"
   
   # 检查是否有未提交的更改
   if git diff --quiet settings.json 2>/dev/null; then
@@ -443,7 +452,7 @@ health_check() {
 
   # 5. 磁盘空间检查：确保有足够空间运行
   local disk_usage
-  disk_usage=$(df -h "$HOME/.pi" 2>/dev/null | tail -1 | awk '{print $5}' | tr -d '%')
+  disk_usage=$(df -h "$PI_HOME" 2>/dev/null | tail -1 | awk '{print $5}' | tr -d '%')
   if [ -n "$disk_usage" ] && [ "$disk_usage" -gt 90 ]; then
     echo "[pi-wrapper] 健康检查警告：磁盘使用率 ${disk_usage}%（>90%）" >&2
     # 不返回失败，但记录警告
@@ -521,11 +530,11 @@ run_fix_pi() {
 - npm 全局目录: $global_dir
 - Node 版本: $(node --version 2>/dev/null || echo '未知')
 - 操作系统: $(uname -s) $(uname -r)
-- 磁盘使用: $(df -h "$HOME/.pi" 2>/dev/null | tail -1 | awk '{print $5}' || echo '未知')
+- 磁盘使用: $(df -h "$PI_HOME" 2>/dev/null | tail -1 | awk '{print $5}' || echo '未知')
 - 源码缓存: $PI_SOURCE_CACHE
-- 恢复目录: $HOME/.pi/recovery
-- 扩展目录: $HOME/.pi/extensions
-- 配置文件: $HOME/.pi/settings.json
+- 恢复目录: $PI_HOME/recovery
+- 扩展目录: $PI_HOME/extensions
+- 配置文件: $SETTINGS_JSON
 "
 
   local instruction
@@ -722,8 +731,8 @@ recover_from_source() {
   else
     # 无缓存：尝试实时构建
     echo "[pi-wrapper] [L4] 无预编译缓存，尝试实时构建..." >&2
-    if [ -x "$HOME/.pi/scripts/core/pi-source-build.sh" ]; then
-      bash "$HOME/.pi/scripts/core/pi-source-build.sh" 2>&1 | tail -5 >&2
+    if [ -x "$PI_HOME/scripts/core/pi-source-build.sh" ]; then
+      bash "$PI_HOME/scripts/core/pi-source-build.sh" 2>&1 | tail -5 >&2
       if [ ! -f "$cache_bundle" ]; then
         echo "[pi-wrapper] [L4] 实时构建失败" >&2
         return 1
@@ -772,7 +781,7 @@ recover_from_source() {
   # 同步源码构建依赖：源码 dist 引用 @earendil-works/* 包的新 API，
   # 但 npm 安装的嵌套 node_modules 可能是旧版本。将源码的 workspace 包
   # 复制到 global_dir/node_modules 确保 API 兼容。
-  local src_nm="$HOME/.pi/pi-source/node_modules/@earendil-works"
+  local src_nm="$PI_HOME/pi-source/node_modules/@earendil-works"
   local dst_nm="$global_dir/node_modules/@earendil-works"
   if [ -d "$src_nm" ]; then
     mkdir -p "$dst_nm"
@@ -1035,7 +1044,7 @@ validate_config() {
   fi
   
   # 校验 models.json
-  local models_file="$HOME/.pi/models.json"
+  local models_file="$PI_HOME/models.json"
   if [ -f "$models_file" ]; then
     if ! node -e "JSON.parse(require('fs').readFileSync('$models_file', 'utf-8'))" 2>/dev/null; then
       echo "[pi-wrapper] 配置错误: models.json 格式无效" >&2
@@ -1044,7 +1053,7 @@ validate_config() {
   fi
   
   # 校验 modes.json
-  local modes_file="$HOME/.pi/modes.json"
+  local modes_file="$MODES_JSON"
   if [ -f "$modes_file" ]; then
     if ! node -e "JSON.parse(require('fs').readFileSync('$modes_file', 'utf-8'))" 2>/dev/null; then
       echo "[pi-wrapper] 配置错误: modes.json 格式无效" >&2
@@ -1102,7 +1111,7 @@ resolve_mode() {
     current_mode=$(node -e "
       const fs = require('fs');
       try {
-        const modes = JSON.parse(fs.readFileSync('$HOME/.pi/modes.json', 'utf-8'));
+        const modes = JSON.parse(fs.readFileSync('$MODES_JSON', 'utf-8'));
         console.log(modes.current || modes.default || 'full');
       } catch(e) { console.log('full'); }
     " 2>/dev/null)
@@ -1119,7 +1128,7 @@ resolve_mode() {
   fi
 
   # 更新 modes.json 的 current 字段（pi-mode 扩展会读取此字段）
-  local modes_file="$HOME/.pi/modes.json"
+  local modes_file="$MODES_JSON"
   if [ -f "$modes_file" ]; then
     node -e "
       const fs = require('fs');
@@ -1134,7 +1143,7 @@ resolve_mode() {
   fi
 
   # 讀取模式配置
-  local modes_file="$HOME/.pi/modes.json"
+  local modes_file="$MODES_JSON"
   if [ ! -f "$modes_file" ]; then
     echo "[pi-wrapper] 模式配置文件不存在: $modes_file" >&2
     RESOLVED_ARGS=("${new_args[@]}")
@@ -1170,7 +1179,7 @@ resolve_mode() {
   elif [ -n "$ext_excludes" ]; then
     # 有排除列表：先禁用自动发现，再逐个加载允许的扩展
     extra_args+=("--no-extensions")
-    local ext_dir="$HOME/.pi/extensions"
+    local ext_dir="$PI_HOME/extensions"
     for ext_path in "$ext_dir"/*/; do
       local ext_name
       ext_name="$(basename "$ext_path")"
@@ -1366,8 +1375,8 @@ while true; do
           local good_pi="$PI_SOURCE_CACHE/dist/cli.js"
           if [ ! -f "$good_pi" ]; then
             echo "[pi-wrapper] 源码缓存不存在，尝试实时构建..." >&2
-            if [ -x "$HOME/.pi/scripts/core/pi-source-build.sh" ]; then
-              bash "$HOME/.pi/scripts/core/pi-source-build.sh" 2>&1 | tail -5 >&2
+            if [ -x "$PI_HOME/scripts/core/pi-source-build.sh" ]; then
+              bash "$PI_HOME/scripts/core/pi-source-build.sh" 2>&1 | tail -5 >&2
             fi
           fi
           if [ -f "$good_pi" ]; then

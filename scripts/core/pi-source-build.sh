@@ -5,7 +5,11 @@
 # ============================================================
 set -uo pipefail
 
-PI_HOME="${PI_HOME:-$HOME/.pi}"
+# 加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
 SOURCE_DIR="$PI_HOME/recovery/source"
 CACHE_DIR="$PI_HOME/recovery/cache"
 REPO_URL="https://github.com/earendil-works/pi.git"

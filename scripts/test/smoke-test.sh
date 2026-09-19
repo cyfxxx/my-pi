@@ -5,7 +5,11 @@
 # 退出码: 0=全部通过或跳过，1=有失败
 set -uo pipefail
 
-PI_HOME="${PI_HOME:-$HOME/.pi}"
+# 加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
 PASS=0; FAIL=0; SKIP=0
 ok()   { PASS=$((PASS+1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL+1)); echo "  ✗ $1"; }

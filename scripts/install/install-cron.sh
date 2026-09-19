@@ -2,8 +2,12 @@
 # install-cron.sh — 安装 pi-autopilot 的 crontab 条目
 set -u
 
-PI_HOME="${PI_HOME:-$HOME/.pi}"
-CRON_SCRIPT="$PI_HOME/extensions/pi-autopilot/scripts/pi-cron.sh"
+# 加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
+CRON_SCRIPT="$EXTENSIONS_DIR/pi-autopilot/scripts/pi-cron.sh"
 
 if [ ! -f "$CRON_SCRIPT" ]; then
   echo "错误: 未找到 $CRON_SCRIPT"

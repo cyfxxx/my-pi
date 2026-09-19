@@ -13,7 +13,12 @@
 # 输出为文本报告；compare 模式输出关键指标增减，退出码 1 表示退化。
 
 set -uo pipefail
-PI_HOME="${PI_HOME:-$HOME/.pi}"
+
+# 加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
 DIAG="$PI_HOME/.usage-diag.jsonl"
 
 usage_report() {

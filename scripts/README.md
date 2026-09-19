@@ -6,101 +6,64 @@ Pi 项目脚本集合，按职责分类到子目录。
 
 ```
 scripts/
-├── core/                  # 核心脚本（进程管理/重建）
-│   ├── pi-wrapper.sh      # 进程外生命周期管理器（入口）
-│   ├── pi-orig.sh         # 绕过 wrapper 直接启动 Pi CLI
-│   ├── rebuild.sh         # 全量重建 pi
-│   └── pi-source-build.sh # 从源码构建 pi
+├── paths.sh                 # 路径集中定义（所有脚本 source 引用）
+├── core/                    # 核心脚本（进程管理/重建）
+│   ├── pi-wrapper.sh        # 进程外生命周期管理器（入口）
+│   ├── pi-orig.sh           # 绕过 wrapper 直接启动 Pi CLI
+│   ├── rebuild.sh           # 全量重建 pi
+│   └── pi-source-build.sh   # 从源码构建 pi
 │
-├── build/                 # 构建/发布脚本
-│   ├── build-binaries.sh  # 构建二进制文件
-│   ├── build-coding-agent-bundle.mjs
-│   ├── create-source-archive.sh
-│   ├── local-release.mjs
-│   ├── package-workspaces.mjs
-│   ├── publish.mjs
-│   ├── publish-model-catalog.mjs
-│   ├── publish-release-announcement.mjs
-│   ├── release.mjs
-│   ├── release-notes.mjs
-│   └── release-packages.mjs
+├── build/                   # 构建/发布脚本
+│   ├── build-binaries.sh    # 构建二进制文件
+│   └── ...
 │
-├── check/                 # 检查脚本
-│   ├── check-browser-smoke.mjs
-│   ├── check-entry-graphs.mjs
-│   ├── check-lockfile-commit.mjs
-│   ├── check-pinned-deps.mjs
-│   ├── check-runtime-deps.mjs
-│   ├── check-ts-relative-imports.mjs
-│   └── coding-agent-consumer.mjs
+├── check/                   # 检查脚本
+│   ├── check-paths.sh       # 路径一致性检查
+│   └── ...
 │
-├── tools/                 # 工具脚本
-│   ├── apply-patches.sh
-│   ├── create-patch.sh
-│   ├── setup-config.sh
-│   ├── setup-env.sh
-│   ├── sync-upstream.sh
-│   ├── auto-pi.sh
-│   ├── migrate-config.sh
-│   ├── update-source-imports-to-ts.sh
-│   ├── diff-model-catalog.mjs
-│   ├── docs-check.mjs
-│   ├── docs-freshness.mjs
-│   ├── edit-tool-stats.mjs
-│   ├── generate-coding-agent-install-lock.mjs
-│   ├── generate-coding-agent-shrinkwrap.mjs
-│   ├── generate-thinking-capabilities.mjs
-│   ├── profile-coding-agent-node.mjs
-│   ├── read-tool-stats.mjs
-│   ├── session-context-stats.mjs
-│   ├── sync-versions.js
-│   └── repro-5893-wsl-bash.mjs
-│
-├── ts/                    # TypeScript 入口文件
-│   ├── agent-treeshake-smoke-entry.ts
-│   ├── browser-smoke-entry.ts
-│   ├── cost.ts
-│   ├── session-transcripts.ts
-│   ├── stats.ts
-│   └── tool-stats.ts
-│
-├── crash-recovery/        # 崩溃恢复
-│   ├── pi-crash-analyzer.sh
-│   ├── pi-recovery-audit.sh
-│   └── pi-rescue.sh
-│
-├── deploy/                # 部署脚本
-│   ├── setup-new-device.sh
-│   └── sync-config.sh
-│
-├── environment/           # 环境准备
-│   └── termux-prereq.sh
-│
-├── install/               # 安装脚本
-│   ├── install-cron.sh
-│   ├── install-systemd.sh
-│   └── install-wrapper.sh
-│
-├── maintenance/           # 日常维护
-│   ├── daily-health.mjs
-│   ├── pi-bench.sh
-│   ├── verify-patches.mjs
-│   ├── npm-missing-deps.py
-│   ├── doc-extract.py
-│   ├── doc-lint.mjs
-│   ├── lesson-miner.mjs
-│   ├── check-cache-impact.sh
-│   ├── migrate-tool-events.sh
-│   ├── packs-sync.sh
-│   ├── golden-tasks.sh
-│   └── docker-rebuild-test.sh
-│
-├── test/                  # 测试脚本
-│   ├── test-all.sh
-│   ├── test-recovery.sh
-│   └── smoke-test.sh
-│
-└── README.md              # 本说明
+├── tools/                   # 工具脚本
+├── ts/                      # TypeScript 入口文件
+├── crash-recovery/          # 崩溃恢复
+├── deploy/                  # 部署脚本
+├── environment/             # 环境准备
+├── install/                 # 安装脚本
+├── maintenance/             # 日常维护
+├── test/                    # 测试脚本
+└── README.md                # 本说明
+```
+
+## 路径管理（重要）
+
+**所有路径通过 `paths.sh` 集中定义**，目录结构调整时只需修改此文件。
+
+### 使用方式
+
+```bash
+# 在脚本开头加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
+# 使用路径变量
+echo "$SETTINGS_JSON"      # → ~/.pi/settings.json
+echo "$EXTENSIONS_DIR"     # → ~/.pi/extensions
+echo "$REBUILD_SCRIPT"     # → scripts/core/rebuild.sh
+```
+
+### 路径验证
+
+```bash
+# 检查脚本中是否存在硬编码的旧路径
+bash scripts/check/check-paths.sh
+```
+
+### 新增路径
+
+在 `paths.sh` 中添加新路径变量：
+```bash
+# 新增路径
+NEW_DIR="$PI_HOME/new-dir"
+NEW_SCRIPT="$SCRIPTS_DIR/new-script.sh"
 ```
 
 ## 使用方式
@@ -134,8 +97,10 @@ node scripts/maintenance/doc-lint.mjs
 - **rebuild.sh** 必须在 pi 停止时执行（避免 dist 文件被占用）
 - **test-all.sh** 支持 `--only`/`--fast`/`--no-tsc` 参数分层验证
 - 所有脚本遵循 `set -euo pipefail` 严格模式
+- **路径硬编码禁止**：新脚本必须使用 `paths.sh` 中的变量
 
 ## 相关文档
 
 - 项目开发规范：`.pi/AGENTS.md`
 - 架构文档：`docs/architecture.md`
+- 迁移经验：`docs/maintenance/LESSONS-LEARNED.md`

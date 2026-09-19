@@ -7,19 +7,20 @@
 # 不启用 set -e：关键步骤手动容错，避免单点失败终止整个重建
 set -uo pipefail
 
-PI_HOME="${PI_HOME:-$HOME/.pi}"
+# 加载路径配置（唯一定义所有路径变量）
+REBUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$REBUILD_DIR/.." && pwd)"
+# 兼容 .pi/scripts/rebuild.sh 通过 symlink 调用的场景
+if [ ! -d "$PROJECT_SCRIPTS_DIR/maintenance" ]; then
+  PROJECT_SCRIPTS_DIR="${PI_HOME:-$HOME/.pi}/scripts"
+fi
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
 # PI_HOME 必须存在（仓库/配置未就绪时后续相对路径全部失效）
 if [ ! -d "$PI_HOME" ]; then
   echo "rebuild.sh: PI_HOME 不存在: $PI_HOME" >&2
   echo "请先克隆仓库: git clone https://github.com/cyfxxx/pi-tools.git $PI_HOME" >&2
   exit 1
-fi
-# 脚本目录：rebuild.sh 在 scripts/core/ 下，项目脚本根为 scripts/
-REBUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_SCRIPTS_DIR="$(cd "$REBUILD_DIR/.." && pwd)"
-# 兼容 .pi/scripts/rebuild.sh 通过 symlink 调用的场景
-if [ ! -d "$PROJECT_SCRIPTS_DIR/maintenance" ]; then
-  PROJECT_SCRIPTS_DIR="$PI_HOME/scripts"
 fi
 
 # 统一 SIGPIPE 防御：日志管道读端（tee/外部 tail）被杀时脚本不应随之死亡
@@ -407,9 +408,9 @@ else:
 PY
   fi
 
-  # settings.packages（npm 插件依赖）合并进 agent/package.json（统一依赖根）
+  # settings.packages（npm 插件依赖）合并进 package.json（统一依赖根）
   if [ -f "$PI_HOME/settings.json" ]; then
-    PACKAGES=$(PI_HOME="$PI_HOME" python3 -c 'import json,os; d=json.load(open(os.environ["PI_HOME"]+"/agent/settings.json")); print("\n".join(d.get("packages",[])))' 2>/dev/null || echo "")
+    PACKAGES=$(PI_HOME="$PI_HOME" python3 -c 'import json,os; d=json.load(open(os.environ["PI_HOME"]"+"settings.json")); print("\n".join(d.get("packages",[])))' 2>/dev/null || echo "")
     if [ -n "$PACKAGES" ]; then
       MERGED_ANY=0
       while IFS= read -r pkg; do
@@ -426,15 +427,15 @@ PY
         [ -n "$MERGED" ] && echo "$MERGED"
       done <<< "$PACKAGES"
       if [ "$MERGED_ANY" = "1" ]; then
-        ok "settings.packages 已合并进 agent/package.json（下次 rebuild 安装）"
+        ok "settings.packages 已合并进 package.json（下次 rebuild 安装）"
       else
-        ok "settings.packages 已在 agent/package.json 中"
+        ok "settings.packages 已在 package.json 中"
       fi
     fi
   fi
 
   mkdir -p "$PI_HOME/agent/bin"
-  ok "agent/bin/ 已就绪"
+  ok "agent/bin (fd/rg) 已就绪"
 
   # 扩展自动发现：pi 0.83+ 从 ~/.pi/extensions/ 目录自动加载，无需写入 settings.json extensions
   # （settings.json 的 extensions 数组仅作覆盖模式：! 排除 / + 强制包含 / - 强制排除，不再承担注册职责）
@@ -486,13 +487,13 @@ phase2_nm_cleanup() {
 }
 
 phase2_npm() {
-  # 统一依赖根：11 个扩展共享 agent/node_modules（Node 向上寻径解析，见 agent/package.json）。
-  # 一次 npm install 替换旧的“每扩展独立 node_modules”（约省 500MB / 9 份 vitest）。
-  title "Phase 2-A" "npm 依赖（统一根 agent/）"
+  # 统一依赖根：扩展共享 node_modules（Node 向上寻径解析）。
+  # 一次 npm install 替换旧的"每扩展独立 node_modules"（约省 500MB / 9 份 vitest）。
+  title "Phase 2-A" "npm 依赖"
 
   local d="$PI_HOME"
   if [ ! -f "$d/package.json" ]; then
-    ok "agent/package.json 缺失，跳过 npm 安装"
+    ok "package.json 缺失，跳过 npm 安装"
     return 0
   fi
 
@@ -505,9 +506,9 @@ phase2_npm() {
   if [ "$missing" = "PKGERR" ]; then
     echo "  ✗ package.json 解析失败，请人工检查: $d/package.json（本阶段跳过依赖安装）"
   elif [ -n "$missing" ]; then
-    info "安装依赖: agent/（缺失: $missing）"
+    info "安装依赖: （缺失: $missing）"
     if (cd "$d" && timeout $NPM_INSTALL_TIMEOUT npm install --no-fund --no-audit >/dev/null 2>&1); then
-      ok "agent/node_modules 依赖安装完成（$(ls "$d/node_modules" 2>/dev/null | wc -l) packages）"
+      ok "node_modules 依赖安装完成（$(ls "$d/node_modules" 2>/dev/null | wc -l) packages）"
     else
       echo "  ✗ npm install 失败: $d"
       # A3：失败重跑一次捕获输出尾部，避免无从排查
@@ -515,7 +516,7 @@ phase2_npm() {
       (cd "$d" && timeout $NPM_INSTALL_TIMEOUT npm install --no-fund --no-audit 2>&1 | tail -10 | sed 's/^/    /')
     fi
   else
-    ok "agent/node_modules/ 依赖齐备"
+    ok "node_modules/ 依赖齐备"
   fi
 }
 
@@ -765,7 +766,7 @@ phase2_browser() {
 
   local ext="$PI_HOME"
   if [ ! -d "$ext/node_modules/cloakbrowser" ]; then
-    info "cloakbrowser 未安装（agent/node_modules），跳过"
+    info "cloakbrowser 未安装（node_modules），跳过"
     return 0
   fi
 
@@ -981,7 +982,7 @@ phase2_systemd() {
 }
 
 # ---- Phase 2-F: 语音服务（pi-voice 后端，条件触发） ----
-# 触发条件：agent/pi-voice.json 存在（本机配置过语音）或 --voice 强制；--no-voice 强制跳过。
+# 触发条件：pi-voice.json 存在（本机配置过语音）或 --voice 强制；--no-voice 强制跳过。
 # 子项按平台/能力分支：termux 提示 termux-api；linux 装 espeak-ng/paplay；
 # GPU 检测提示 CUDA 库（--no-gpu 跳过）；piper 可选（--no-piper 跳过）。
 phase2_voice() {
@@ -1001,7 +1002,7 @@ phase2_voice() {
   elif [ -f "$voice_cfg" ]; then want=1
   fi
   if [ "$want" = "0" ]; then
-    info "未检测到语音配置（agent/pi-voice.json 不存在），跳过 whisper/语音依赖（需要时: rebuild --voice）"
+    info "未检测到语音配置（pi-voice.json 不存在），跳过 whisper/语音依赖（需要时: rebuild --voice）"
     return 0
   fi
 
@@ -1108,7 +1109,7 @@ verify() {
   # git 卫生（D2）：敏感文件不得被意外追踪（与 pi-backup verify 对齐——审计 LOW：
   # 此前只查 4 个，漏 pi-voice.json/trust.json/searxng settings.yml/pi-link.json）
   if [ -d "$PI_HOME/.git" ]; then
-    if git -C "$PI_HOME" ls-files agent/auth.json agent/settings.json agent/models.json agent/models-store.json agent/pi-voice.json agent/trust.json searxng/settings.yml pi-link.json 2>/dev/null | grep -q .; then
+    if git -C "$PI_HOME" ls-files auth.json settings.json models.json models-store.json pi-voice.json trust.json searxng/settings.yml pi-link.json 2>/dev/null | grep -q .; then
       warn "敏感文件被 git 追踪（auth/settings/models/pi-voice/trust/searxng.yml/pi-link.json）——运行 git rm --cached 排除"; errors=$((errors+1))
     else
       ok "git 卫生：敏感文件未被追踪"
@@ -1138,7 +1139,7 @@ verify() {
     PI_HOME="$PI_HOME" "$PI_HOME/searxng/venv/bin/python" -c 'import os,yaml; yaml.safe_load(open(os.environ["PI_HOME"]+"/searxng/settings.yml"))' 2>/dev/null \
       && ok "settings.yml: valid YAML" \
       || warn "settings.yml: YAML 校验失败"
-    PI_HOME="$PI_HOME" "$PI_HOME/searxng/venv/bin/python" -c 'import os,json; json.load(open(os.environ["PI_HOME"]+"/agent/settings.json"))' 2>/dev/null \
+    PI_HOME="$PI_HOME" "$PI_HOME/searxng/venv/bin/python" -c 'import os,json; json.load(open(os.environ["PI_HOME"]"+"settings.json"))' 2>/dev/null \
       && ok "settings.json: valid JSON" \
       || warn "settings.json: JSON 校验失败"
     if [ -n "$mfile" ]; then
@@ -1147,7 +1148,7 @@ verify() {
         || warn "models config: JSON 校验失败 ($mfile)"
     fi
   else
-    PI_HOME="$PI_HOME" python3 -c 'import os,json; json.load(open(os.environ["PI_HOME"]+"/agent/settings.json"))' 2>/dev/null \
+    PI_HOME="$PI_HOME" python3 -c 'import os,json; json.load(open(os.environ["PI_HOME"]"+"settings.json"))' 2>/dev/null \
       && ok "settings.json: valid JSON" \
       || warn "settings.json: JSON 校验失败"
     if [ -n "$mfile" ]; then

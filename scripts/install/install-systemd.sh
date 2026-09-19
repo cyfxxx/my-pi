@@ -7,8 +7,12 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-PI_HOME="${PI_HOME:-$HOME/.pi}"
-CRON_SCRIPT="$PI_HOME/extensions/pi-autopilot/scripts/pi-cron.sh"
+# 加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
+CRON_SCRIPT="$EXTENSIONS_DIR/pi-autopilot/scripts/pi-cron.sh"
 SERVICE_NAME="pi-autopilot"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 TIMER_FILE="/etc/systemd/system/${SERVICE_NAME}.timer"

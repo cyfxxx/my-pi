@@ -389,6 +389,35 @@ node scripts/check/check-lockfile-commit.mjs
 3. **用户反馈**：向用户提供清晰的错误信息
 4. **文档记录**：记录常见错误和解决方案
 
+### 5.5 路径集中管理（推荐方案）
+
+**教训**：目录结构调整时，分散的路径引用会导致大量手动修改。
+
+**解决方案**：使用 `scripts/paths.sh` 集中管理所有路径变量。
+
+```bash
+# 在脚本开头加载路径配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_SCRIPTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
+# 使用路径变量（不再硬编码）
+echo "$SETTINGS_JSON"      # → ~/.pi/settings.json
+echo "$EXTENSIONS_DIR"     # → ~/.pi/extensions
+echo "$REBUILD_SCRIPT"     # → scripts/core/rebuild.sh
+```
+
+**目录结构调整流程**：
+1. 修改 `scripts/paths.sh` 中的路径定义
+2. 运行 `bash scripts/check/check-paths.sh` 检查旧路径引用
+3. 更新受影响的脚本
+
+**验证方法**：
+```bash
+# 检查路径一致性
+bash scripts/check/check-paths.sh
+```
+
 ## 六、相关文档
 
 - [MIGRATION-PLAN-PI-TOOLS.md](./custom/docs/MIGRATION-PLAN-PI-TOOLS.md) - 迁移计划

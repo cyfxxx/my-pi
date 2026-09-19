@@ -14,12 +14,13 @@
 #   PI_SDK_PATH 可选，指向 pi 包（subagent mjs 测试用；便携自动探测 pi-global）
 set -uo pipefail
 
-PI_HOME="${PI_HOME:-$HOME/.pi}"
-EXTS="$PI_HOME/extensions"
-# 脚本目录：test-all.sh 在 scripts/test/ 下，项目脚本根为 scripts/
+# 加载路径配置
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_SCRIPTS_DIR="$(cd "$TEST_DIR/.." && pwd)"
-# 统一依赖根（11 扩展共享 agent/node_modules；Node 向上寻径解析）
+source "$PROJECT_SCRIPTS_DIR/paths.sh"
+
+EXTS="$EXTENSIONS_DIR"
+# 统一依赖根（扩展共享 node_modules；Node 向上寻径解析）
 AGENT_NM="$PI_HOME/node_modules"
 VITEST_MJS="$AGENT_NM/vitest/vitest.mjs"
 TSC_BIN="$AGENT_NM/typescript/bin/tsc"
