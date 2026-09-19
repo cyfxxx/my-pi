@@ -131,7 +131,7 @@ export function registerFSTools(pi: ExtensionAPI, fs: FSService): void {
       '编辑前建议先用 read 查看文件内容',
     ],
     parameters: EditParamsSchema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    execute: (async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const { filePath, oldString, newString, replaceAll } = params as {
         filePath: string
         oldString: string
@@ -154,7 +154,7 @@ export function registerFSTools(pi: ExtensionAPI, fs: FSService): void {
         content: [{ type: 'text', text: `Successfully edited ${filePath}` }],
         details: `File: ${filePath} | Changes: ${result.changes}`,
       }
-    },
+    }) as any,
   })
 
   // mkdir 工具
@@ -193,10 +193,10 @@ export function registerFSTools(pi: ExtensionAPI, fs: FSService): void {
       '返回匹配的文件路径列表',
     ],
     parameters: GlobParamsSchema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    execute: (async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const { pattern, path } = params as { pattern: string; path?: string }
 
-      const result = await fs.glob(pattern, { path })
+      const result = await fs.find(pattern, { path })
 
       if (result.files.length === 0) {
         return {
@@ -208,7 +208,7 @@ export function registerFSTools(pi: ExtensionAPI, fs: FSService): void {
         content: [{ type: 'text', text: result.files.join('\n') }],
         details: `Found ${result.files.length} files`,
       }
-    },
+    }) as any,
   })
 }
 

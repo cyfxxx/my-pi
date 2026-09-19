@@ -64,7 +64,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
       '可以指定搜索路径和文件过滤',
     ],
     parameters: GrepParamsSchema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    execute: (async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const { pattern, path, include, exclude } = params as {
         pattern: string
         path?: string
@@ -88,7 +88,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
         content: [{ type: 'text', text: output }],
         details: `Found ${result.totalMatches} matches`,
       }
-    },
+    }) as any,
   })
 
   // find 工具
@@ -103,7 +103,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
       '可以限制搜索深度',
     ],
     parameters: FindParamsSchema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    execute: (async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const { pattern, path, maxDepth } = params as {
         pattern: string
         path?: string
@@ -122,7 +122,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
         content: [{ type: 'text', text: result.files.join('\n') }],
         details: `Found ${result.files.length} files`,
       }
-    },
+    }) as any,
   })
 
   // ls 工具
@@ -136,7 +136,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
       '可以显示隐藏文件',
     ],
     parameters: LsParamsSchema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    execute: (async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const { path, includeHidden } = params as {
         path?: string
         includeHidden?: boolean
@@ -158,7 +158,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
         content: [{ type: 'text', text: output }],
         details: `Listed ${result.entries.length} entries`,
       }
-    },
+    }) as any,
   })
 
   // rg 工具（ripgrep 增强版）
@@ -173,7 +173,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
       '比 grep 更快，推荐优先使用',
     ],
     parameters: RgParamsSchema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    execute: (async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const { pattern, path, include, context, caseInsensitive, literal } = params as {
         pattern: string
         path?: string
@@ -204,7 +204,7 @@ export function registerSearchTools(pi: ExtensionAPI, search: SearchService): vo
         content: [{ type: 'text', text: output }],
         details: `Found ${result.totalMatches} matches`,
       }
-    },
+    }) as any,
   })
 }
 

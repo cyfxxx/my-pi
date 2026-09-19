@@ -42,7 +42,7 @@ export function registerShellTool(pi: ExtensionAPI, shell: ShellService): void {
       '长时间运行的命令请考虑使用后台执行',
     ],
     parameters: BashParamsSchema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
+    execute: (async (_toolCallId: string, params: Record<string, unknown>, _signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const { command } = params as { command: string }
 
       const result: ShellResult = await shell.execute(command, {
@@ -69,7 +69,7 @@ export function registerShellTool(pi: ExtensionAPI, shell: ShellService): void {
         details: `Exit code: ${result.exitCode} | Duration: ${result.duration}ms`,
         isError: result.exitCode !== 0,
       }
-    },
+    }) as any,
   })
 }
 

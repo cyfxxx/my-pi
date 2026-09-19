@@ -53,13 +53,13 @@ export interface SeamServices {
  */
 export function registerSeamTools(pi: ExtensionAPI, services: SeamServices): void {
   // 注册 Shell 工具
-  registerShellTool(pi, services.shell)
+  registerShellTool(pi, services.shell as any)
 
   // 注册文件系统工具
-  registerFSTools(pi, services.fs)
+  registerFSTools(pi, services.fs as any)
 
   // 注册搜索工具
-  registerSearchTools(pi, services.search)
+  registerSearchTools(pi, services.search as any)
 }
 
 /**
