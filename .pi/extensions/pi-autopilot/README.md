@@ -265,11 +265,11 @@ bash scripts/install/install-systemd.sh
 | `.pi-autopilot-telemetry.json` | 遥测数据（1000 条上限） |
 | `.pi-autopilot-lastgood.json` | 最后一次成功运行的模型 |
 | `.pi-autopilot-crash.json` | 崩溃记录 |
-| `agent/extensions/pi-autopilot/scheduler.lock` | 调度锁（与 pi-cron 共享） |
+| `extensions/pi-autopilot/scheduler.lock` | 调度锁（与 pi-cron 共享） |
 
 ### 7.2 调度锁
 
-`agent/extensions/pi-autopilot/scheduler.lock`（与 pi-cron 共享）——内容 `PID:时间戳`，24h 租约 TTL（进程存活但调度停摆/PID 复用时不永久占用）。
+`extensions/pi-autopilot/scheduler.lock`（与 pi-cron 共享）——内容 `PID:时间戳`，24h 租约 TTL（进程存活但调度停摆/PID 复用时不永久占用）。
 
 ---
 
@@ -285,7 +285,7 @@ bash scripts/install/install-systemd.sh
 ### 9.1 运行测试
 
 ```bash
-cd agent/extensions/pi-autopilot
+cd .pi/extensions/pi-autopilot
 npm install
 npx vitest run
 ```

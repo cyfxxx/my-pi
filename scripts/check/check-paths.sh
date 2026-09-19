@@ -90,19 +90,20 @@ main() {
   echo "检查脚本目录: $SCRIPTS_DIR"
   echo ""
 
-  # 检查所有 shell 脚本
-  while IFS= read -r file; do
-    if ! check_file "$file" "$fix_mode"; then
-      total_issues=$((total_issues+1))
-    fi
-  done < <(find "$SCRIPTS_DIR" -name "*.sh" -type f 2>/dev/null)
+# 检查所有 shell 脚本（排除自身和 paths.sh）
+while IFS= read -r file; do
+  if [[ "$file" == *check-paths.sh ]] || [[ "$file" == *paths.sh ]]; then continue; fi
+  if ! check_file "$file" "$fix_mode"; then
+    total_issues=$((total_issues+1))
+  fi
+done < <(find "$SCRIPTS_DIR" -name "*.sh" -type f 2>/dev/null)
 
-  # 检查所有 mjs 脚本
-  while IFS= read -r file; do
-    if ! check_file "$file" "$fix_mode"; then
-      total_issues=$((total_issues+1))
-    fi
-  done < <(find "$SCRIPTS_DIR" -name "*.mjs" -type f 2>/dev/null)
+# 检查所有 mjs 脚本
+while IFS= read -r file; do
+  if ! check_file "$file" "$fix_mode"; then
+    total_issues=$((total_issues+1))
+  fi
+done < <(find "$SCRIPTS_DIR" -name "*.mjs" -type f 2>/dev/null)
 
   echo ""
   if [ "$total_issues" -eq 0 ]; then
