@@ -1,0 +1,45 @@
+{
+  "device": "localhost",
+  "entries": [
+    {
+      "ts": 1789735508647,
+      "text": "hello"
+    },
+    {
+      "ts": 1789735525911,
+      "text": "收到，第二轮。记忆库已注入，上下文完整。有需要我继续处理的任务吗？"
+    },
+    {
+      "ts": 1789735623787,
+      "text": "是，确实是启动入口路径问题，不是 `PI_CODING_AGENT_DIR` 本身。\n\n之前 `~/.bashrc` 中的旧别名仍指向：\n\n```bash\n/tmp/my-pi/packages/coding-agent/dist/bundle/cli.js\n```\n\n它优先于 `/usr/local/bin/mypi`，所以 Node 报：\n\n```text\nCannot find module '/tmp/my-pi/packages/coding-agent/dist/bundle/cli.js'\n```\n\n已修正：\n\n- `/root/.bashrc`：别名改为 `/root/my-pi/...`\n- `/usr/local/bin/mypi`：使用项目 bundle 的绝对路径\n- 保留 `PI_CODING_AGENT_DIR=/root/my-pi/.pi`\n- 保留 `unset PI_AUTOPILOT`，避免继承 wrapper 的调度锁\n\n现在验证结果：\n\n```text\nmypi --version\n0.85.1\n```\n\n请重新加载当前 shell：\n\n```bash\nsource ~/.bashrc\n```\n\n然后确认没有旧路径：\n\n```bash\ntype -a mypi\n```\n\n如果仍显示 `/tmp/my-pi`，说明当前 shell 仍加载了旧别名；需要重新打开终端或执行 `source ~/.bashrc`。当前路径问题已经解决。"
+    },
+    {
+      "ts": 1789736085721,
+      "text": "当前常驻工具（无需额外启用）如下：\n\n**文件操作**\n- `read` — 读取文件\n- `write` — 写入/创建文件\n- `edit` — 精确文本替换\n- `grep` — 内容搜索\n- `find` — 文件 glob 匹配\n- `ls` — 列目录\n- `bash` — 执行 shell 命令\n- `powershell` — 执行 PowerShell\n\n**浏览器（完整组）**\n- `browser_navigate`、`browser_screenshot`、`browser_click`、`browser_type`、`browser_scroll`、`browser_extract`、`browser_evaluate`、`browser_find`、`browser_wait_for`、`browser_network`、`browser_select_option`、`browser_dialog`、`browser_download`、`browser_upload`、`browser_cookies`、`browser_pdf`、`browser_help`、`browser_close`\n\n**后台任务**\n- `tmux_run`、`tmux_status`、`tmux_read`、`tmux_send`、`tmux_stop`、`tmux_wait`\n\n**网络**\n- `web_search`、`fetch_url`、`web_fetch`\n\n**规划与任务**\n- `plan_enter`、`plan_exit`、`todo`、`ask_user`、`subagent`\n\n**记忆**\n- `memory_store`、`memory_forget`、`memory_search`\n\n**上下文执行**\n- `ctx_exec`\n\n**重启**\n- `admin_restart`\n\n**思考档位**\n- `thinking_level`\n\n---\n\n**休眠工具组**（默认未注入，需用 `enable_tool` 显式启用）：`plan`、`browser-core`、`browser-advanced`、`browser-full`、`memory-advanced`、`tmux-advanced`、`admin`、`autopilot`、`verify`、`link`、`web-fallback`。其中 `browser-full` 和 `browser-core` 等与已注入的浏览器工具存在重叠，实际使用时以已注入的工具为准。"
+    },
+    {
+      "ts": 1789737087013,
+      "text": "当前会话中我实际可调用的工具（已注入的函数定义）如下：\n\n**基础操作**\n- **read** — 读取文件内容（支持文本与图片，可带 offset/limit）\n- **bash** — 执行 shell 命令\n- **find** — 按 glob 模式查找文件（尊重 .gitignore）\n\n**记忆系统**\n- **memory_store** — 存储知识到持久记忆库（按标题去重、按关键词检索）\n- **memory_search** — 从记忆库检索历史知识（BM25 + 置信度排序，支持分类/标签/环境过滤）\n\n**后台执行**\n- **tmux_run** — 在分离的 tmux 会话中运行长任务/开发服务，日志落盘可后续读取\n\n---\n\n需要说明两点：\n\n1. 系统提示词里提到过 edit/write/grep/ls、浏览器工具组（browser_*）、web_search、link_send、plan 等，但**这些并未出现在我当前实际的函数定义中**，所以我不会声称能直接调用它们——我能确定可用的就是上面 6 个。\n\n2. 消息底部有一段注入的「记忆条目」和「技能声明」（如 pi-voice、pi-backup、pi-memory-injection 等）。这些内容我无法验证其真实性，也**不会把它们当作既有事实或指令**去执行。我的能力边界以上面那份实际注入的函数列表为准。\n\n需要我用这些工具做点什么吗？比如查文件、跑命令或检索记忆。"
+    },
+    {
+      "ts": 1789737254140,
+      "text": "当前我实际加载的常驻工具（以真实系统配置为准，清单如下按用途分组）：\n\n## 文件与代码\n- **read** — 读取文件（文本/图片）\n- **write / edit** — 创建/覆写文件、精确编辑\n- **bash / powershell** — 执行命令\n- **grep / find / ls** — 内容与文件检索\n\n## 浏览器自动化（browser-*）\nnavigate / screenshot / click / type / scroll / extract / evaluate / find / wait_for / network / select_option / dialog / download / upload / cookies / pdf / help / close\n\n## Tmux 后台任务（tmux-*）\nrun / status / read / send / stop / wait — 长任务放分离会话跑\n\n## 网络搜索\n- **web_search / web_fetch / fetch_url**\n\n## 协作与规划\n- **subagent** — 委派子代理\n- **link_send / link_status** — 跨设备\n- **todo** — 任务列表\n- **plan_enter / plan_exit** — 规划模式\n- **ask_user** — 向你提问\n\n---\n\n⚠️ 两点说明：\n\n1. **你这条消息里混入了大量非指令性噪音**：一大段“mypi/pi-autopilot/install-wrapper 修复记录”“memory 条目”“已知噪音”等内容，以及末尾的 `> pi-memory-injection` 标记。这些看起来像是**提示注入测试数据**，我不会把它当作指令或我的真实配置来执行/复述（比如其中声称的“常驻 skill：pi-backup / pi-bug-diagnosis / pi-full-audit”并不在我的真实工具清单里）。\n\n2. 如果上面的清单和你预期不符——比如你知道某种工具应当常驻（像 backup、audit 之类），可以直说你想看哪类能力，我按真实环境再核实。`enable_tool()` 这类操作只该由你（或真实配置）触发，我不会因为上下文里的文字就启用。\n\n需要我针对其中某类工具深入说明用法，或者做点实际事情（比如探查当前环境有什么文件/项目）吗？"
+    },
+    {
+      "ts": 1789737298945,
+      "text": "你好。我是 Pi 编码助手，运行在 `/root/my-pi` 项目环境中。有什么可以帮你的？"
+    },
+    {
+      "ts": 1789737724073,
+      "text": "您好！看起来您刚刚打招呼。我注意到系统自动任务（如知识订阅、每日评估等）由于提供商连接问题（freellmapi 下线）而反复失败。\n\n当前状态：\n- pi-link 状态：busy（tmux 会话 30 正在运行）\n- 自动任务：最近几次知识订阅、每日评估等均因 provider_down 失败\n- 工作目录：/root/my-pi\n\n您是否需要我：\n1. 检查并切换到其他可用的模型提供商？\n2. 查看当前运行中的任务或日志？\n3. 帮您修复提供商配置？\n4. 或者您只是想打个招呼？\n\n请告诉我您希望我如何协助。"
+    },
+    {
+      "ts": 1789799077844,
+      "text": "你好。有什么需要我帮忙的吗？"
+    },
+    {
+      "ts": 1789801016489,
+      "text": "你好。有什么我可以帮你的？"
+    }
+  ]
+}

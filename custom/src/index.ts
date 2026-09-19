@@ -5,12 +5,15 @@
  */
 
 // 适配器层
-export * from './adapters'
+export {
+  createAdaptedAPI,
+  createEnhancedAPI,
+  createToolAdapter,
+  ToolRegistry,
+  createSessionAdapter,
+  createExportAdapter,
+} from './adapters'
 
-// 服务层
-export * from './services'
-
-// 类型定义
 export type {
   AdaptedExtensionAPI,
   ToolAdapter,
@@ -21,3 +24,15 @@ export type {
   SessionStats,
   ContextUsage,
 } from './adapters/types'
+
+export type { ExportOptions } from './adapters/session/export-adapter'
+
+// 服务层
+export {
+  archiveOutput,
+  archivedStub,
+  sweepPruneRefs,
+  setContextWindow,
+  setUsedTokens,
+  getBudgetReport,
+} from './services/token-budget'

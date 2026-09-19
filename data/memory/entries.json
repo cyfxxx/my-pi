@@ -68,7 +68,7 @@
       "recurrence": 1,
       "createdAt": "2026-07-31T13:00:33.061Z",
       "updatedAt": "2026-07-31T13:00:33.061Z",
-      "accessedAt": "2026-07-31T13:00:33.061Z",
+      "accessedAt": "2026-09-18T10:25:38.695Z",
       "observedAt": "2026-07-31T13:00:33.061Z",
       "deleted": false,
       "environments": [
@@ -4564,7 +4564,7 @@
       "recurrence": 1,
       "createdAt": "2026-08-13T00:09:32.667Z",
       "updatedAt": "2026-08-13T00:09:32.667Z",
-      "accessedAt": "2026-08-13T00:09:32.667Z",
+      "accessedAt": "2026-09-18T10:25:38.695Z",
       "observedAt": "2026-08-13T00:09:32.667Z",
       "environments": [
         "termux"
@@ -12820,7 +12820,7 @@
       "recurrence": 1,
       "createdAt": "2026-08-26T05:29:36.591Z",
       "updatedAt": "2026-08-26T05:29:36.591Z",
-      "accessedAt": "2026-09-11T13:39:34.881Z",
+      "accessedAt": "2026-09-18T10:25:38.695Z",
       "environments": [
         "all"
       ],
@@ -12918,7 +12918,7 @@
       "recurrence": 1,
       "createdAt": "2026-08-26T05:42:37.007Z",
       "updatedAt": "2026-08-26T05:42:37.007Z",
-      "accessedAt": "2026-09-11T13:39:34.881Z",
+      "accessedAt": "2026-09-18T10:25:38.695Z",
       "environments": [
         "all"
       ],
@@ -18214,36 +18214,6 @@
       "contentHash": "4619aabb4891e057"
     },
     {
-      "id": "9aacd090-0abb-4de4-a74f-abf05637aa71",
-      "category": "procedure",
-      "title": "每日知识订阅标准流程",
-      "content": "每日知识订阅为零 LLM 流程：1) 运行 python3 scripts/knowledge-fetch.py 抓取官方源与 RSS；2) 若 logs/knowledge/ 下有当日 md 新增，筛选 3-5 条高价值条目（时效强/漏洞/重大新闻，排除过时教程与多源冗余），memory_search 查重后逐条 memory_store；3) 写 ~/.pi/logs/knowledge/summary-YYYY-MM-DD.md（来源+一句话要点，无新内容如实说明）；4) 写 memory/daily-results/YYYY-MM-DD-knowledge-<本机hostname>.md（3-5 行：新增条数与分区分布、入库条目标题、summary 路径，无新内容写一行'无新增'）；5) git add 该文件，commit message 固定为 'knowledge: YYYY-MM-DD'，随后 push；推送冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞。",
-      "tags": [
-        "知识管理",
-        "自动化",
-        "日常流程",
-        "knowledge",
-        "daily",
-        "subscription",
-        "git"
-      ],
-      "confidence": 0.9,
-      "source": "extract",
-      "recurrence": 2,
-      "createdAt": "2026-09-03T05:10:12.411Z",
-      "updatedAt": "2026-09-13T06:54:48.170Z",
-      "accessedAt": "2026-09-11T01:06:25.484Z",
-      "observedAt": "2026-09-11T01:06:25.484Z",
-      "environments": [
-        "termux"
-      ],
-      "lastSessionId": "01a06589-31dc-7687-b71e-04a61a52371c",
-      "deleted": true,
-      "contentHash": "cae7dc97eaca4136",
-      "supersededBy": "8a0cb66c-9eba-4189-af5f-0cd7096acc59",
-      "validUntil": "2026-09-13T06:54:48.170Z"
-    },
-    {
       "id": "4896af90-d974-4fc8-9522-02bb3a454f95",
       "category": "reference",
       "title": "知识订阅渠道修改与排查入口",
@@ -22294,33 +22264,6 @@
       "contentHash": "2a292f93c2e6e609"
     },
     {
-      "id": "5ebc3c3f-35d0-450c-8b5b-0437c55b9d9b",
-      "category": "fact",
-      "title": "golden-fast 管线 F1/F2b 失败模式",
-      "content": "2026-09-12 golden-fast 结果为 2 项失败：F1 task-metrics 管线异常、F2b usage-stats 异常；F2a、F3、F4、F5 全绿。结果写入 data/memory/daily-results/2026-09-12-golden-localhost.md，提交为 a7eaff3 golden: fail 2026-09-12 并推送 master。健康告警在 golden 通过验收前不视为已解决，需先诊断 F1/F2b 再重跑 golden-fast。",
-      "tags": [
-        "golden-fast",
-        "task-metrics",
-        "usage-stats",
-        "CI"
-      ],
-      "confidence": 0.95,
-      "source": "extract",
-      "recurrence": 1,
-      "createdAt": "2026-09-12T19:28:25.544Z",
-      "updatedAt": "2026-09-13T06:54:08.420Z",
-      "accessedAt": "2026-09-12T19:28:25.544Z",
-      "observedAt": "2026-09-12T19:28:25.544Z",
-      "environments": [
-        "termux"
-      ],
-      "lastSessionId": "01a0924c-824c-7352-9163-b63aac91e039",
-      "deleted": true,
-      "contentHash": "44d2db782dac0672",
-      "supersededBy": "d85d7ae4-6344-479e-a627-7d8c13bd0201",
-      "validUntil": "2026-09-13T06:54:08.420Z"
-    },
-    {
       "id": "d3025cce-1d5f-4dd0-be39-950a02a0493c",
       "category": "fact",
       "title": "2026-09-12 会话挂死自动重启",
@@ -22613,33 +22556,6 @@
       "deleted": false
     },
     {
-      "id": "f922c7b0-8c72-4516-829c-fe1e225e9333",
-      "category": "solutions",
-      "title": "golden-tasks.sh ROOT 路径 bug 修复",
-      "content": "golden-tasks.sh（~/.pi/scripts/maintenance/golden-tasks.sh）第 33 行 ROOT 原取值为 dirname \"$SCRIPTS\"，仅上溯到 scripts/ 目录，导致 AUTOPILOT_SCRIPTS/CONTEXT_SCRIPTS 指向不存在的 scripts/agent/... 路径，F1/F2b 断言误报失败。修正为 dirname $(dirname $SCRIPTS) 后指向仓库根 .pi，重跑 6 项断言（F1-F5 等）全部通过。修复尚未提交。",
-      "tags": [
-        "golden-tasks",
-        "bug-fix",
-        "scripts",
-        "path"
-      ],
-      "confidence": 0.95,
-      "source": "extract",
-      "recurrence": 1,
-      "createdAt": "2026-09-13T01:22:21.962Z",
-      "updatedAt": "2026-09-13T06:54:48.000Z",
-      "accessedAt": "2026-09-13T01:22:21.962Z",
-      "observedAt": "2026-09-13T01:22:21.962Z",
-      "environments": [
-        "termux"
-      ],
-      "lastSessionId": "01a0981e-f16b-77ad-905b-eed9b18db1b7",
-      "deleted": true,
-      "contentHash": "7d39b5a9bc35456f",
-      "supersededBy": "67dad97e-184c-4e86-87a3-bedd14e844ac",
-      "validUntil": "2026-09-13T06:54:48.000Z"
-    },
-    {
       "id": "0a3e62bb-f396-4736-b4f5-55fac6afcec2",
       "category": "procedure",
       "title": "golden-fast 防退化基准流程",
@@ -22795,34 +22711,6 @@
       "deleted": false
     },
     {
-      "id": "d85d7ae4-6344-479e-a627-7d8c13bd0201",
-      "category": "fact",
-      "title": "MYPC 设备任务执行长期中断（自 2026-09-07）",
-      "content": "MYPC 设备自 2026-09-07T00:08 daily-health 后无任何新记录，缺 09-08 至 09-13 全部五类任务（daily-health / knowledge-subscribe / golden-benchmark / tool-stats / memory-backup）。localhost 同期正常轮转。跨设备结果对比作为早期检测器：任一设备超 3 天无记录即视为离线，需告警并检查调度。已入库 fact 条目记录此事。",
-      "tags": [
-        "设备",
-        "MYPC",
-        "调度",
-        "中断",
-        "跨设备对比"
-      ],
-      "confidence": 0.95,
-      "source": "extract",
-      "recurrence": 1,
-      "createdAt": "2026-09-13T06:54:07.962Z",
-      "updatedAt": "2026-09-13T06:54:48.363Z",
-      "accessedAt": "2026-09-13T06:54:07.963Z",
-      "observedAt": "2026-09-13T06:54:07.963Z",
-      "environments": [
-        "termux"
-      ],
-      "lastSessionId": "01a0985a-83c1-70d6-8f97-45e14881a3c5",
-      "deleted": true,
-      "contentHash": "fa22e111e0c53a3f",
-      "supersededBy": "3aa312b2-ae0f-47a1-b2dc-920c2c85c182",
-      "validUntil": "2026-09-13T06:54:48.363Z"
-    },
-    {
       "id": "6408d317-881a-412d-9bcf-61b849197e37",
       "category": "solutions",
       "title": "自动化任务链可靠性三层闭环（insight）",
@@ -22966,7 +22854,9 @@
       "environments": [
         "termux"
       ],
-      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44"
+      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44",
+      "deleted": false,
+      "contentHash": "036b75d93e659b17"
     },
     {
       "id": "67dad97e-184c-4e86-87a3-bedd14e844ac",
@@ -22988,7 +22878,9 @@
       "environments": [
         "termux"
       ],
-      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44"
+      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44",
+      "deleted": false,
+      "contentHash": "63b30798047b7ac8"
     },
     {
       "id": "8a0cb66c-9eba-4189-af5f-0cd7096acc59",
@@ -23010,7 +22902,9 @@
       "environments": [
         "termux"
       ],
-      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44"
+      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44",
+      "deleted": false,
+      "contentHash": "edc3e6fef675800b"
     },
     {
       "id": "3aa312b2-ae0f-47a1-b2dc-920c2c85c182",
@@ -23032,7 +22926,9 @@
       "environments": [
         "termux"
       ],
-      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44"
+      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44",
+      "deleted": false,
+      "contentHash": "c6664d2ec75256f7"
     },
     {
       "id": "bb26e050-1ae6-44f8-9ea6-554a350875df",
@@ -23053,7 +22949,9 @@
       "environments": [
         "termux"
       ],
-      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44"
+      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44",
+      "deleted": false,
+      "contentHash": "c041290266e3fe45"
     },
     {
       "id": "3bf3f3fb-42ac-4793-bc72-c0bf4dd874cd",
@@ -23074,7 +22972,9 @@
       "environments": [
         "termux"
       ],
-      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44"
+      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44",
+      "deleted": false,
+      "contentHash": "a1ffed573829225c"
     },
     {
       "id": "6f011175-fcc8-4cd6-a39e-a6ed9214d5b4",
@@ -23096,7 +22996,319 @@
       "environments": [
         "termux"
       ],
-      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44"
+      "lastSessionId": "01a093fe-696c-7153-a068-6cc217064e44",
+      "deleted": false,
+      "contentHash": "df71878c9efd84a5"
+    },
+    {
+      "id": "caa61bc7-1c54-45cb-b0fc-e28887d92262",
+      "category": "procedure",
+      "title": "pi-autopilot scheduler.lock 冲突处理",
+      "content": "pi-autopilot 扩展启动时需获取 scheduler.lock 调度锁，若锁被其他进程持有则拒绝启动。排查步骤：读取锁文件确认 PID 与时间戳（格式为 PID:时间戳），用 ps aux | grep <PID> 确认持有者是否为残留实例，再选择 kill <PID> 释放锁、查看旧任务内容，或在 settings.json 中临时禁用该扩展以跳过调度功能。",
+      "tags": [
+        "pi-autopilot",
+        "scheduler.lock",
+        "故障排查"
+      ],
+      "confidence": 0.9,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T10:23:27.194Z",
+      "updatedAt": "2026-09-18T10:23:27.194Z",
+      "accessedAt": "2026-09-18T10:23:27.194Z",
+      "observedAt": "2026-09-18T10:23:27.194Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b407-e89c-7772-a11d-0657ba6484ad",
+      "deleted": false,
+      "contentHash": "84884826eed10ae2"
+    },
+    {
+      "id": "17980f6c-aaa0-4500-9ec8-05118c77d50d",
+      "category": "fact",
+      "title": "mypi 命令因缺失 dist bundle 而不可用",
+      "content": "在当前环境（Node.js v22.23.1）执行 mypi 命令时，抛出 Error: Cannot find module '/tmp/my-pi/packages/coding-agent/dist/bundle/cli.js'，code 为 MODULE_NOT_FOUND，requireStack 为空。说明 mypi 启动器指向的 /tmp/my-pi/packages/coding-agent/dist/bundle/cli.js 构建产物不存在，需先运行构建生成该 bundle，或修正启动脚本中的路径。相关启动脚本为 /usr/local/bin/mypi，项目配置目录为 $HOME/my-pi/.pi。",
+      "tags": [
+        "mypi",
+        "启动故障",
+        "MODULE_NOT_FOUND",
+        "构建产物"
+      ],
+      "confidence": 0.95,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T10:25:07.743Z",
+      "updatedAt": "2026-09-18T10:25:07.743Z",
+      "accessedAt": "2026-09-18T10:25:38.695Z",
+      "observedAt": "2026-09-18T10:25:07.743Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b409-dac0-7424-8578-a6c641eb6564",
+      "deleted": false,
+      "contentHash": "95f9e53272a27e4d"
+    },
+    {
+      "id": "dc87f8dd-b31e-4da9-86d3-9ebde2bb7d68",
+      "category": "fact",
+      "title": "freellmapi-start.sh 后台启动脚本",
+      "content": "环境中有两个 freellmapi-start.sh 后台启动脚本：$HOME/freellmapi-start.sh 与 /root/freellmapi-start.sh。会话中二者均以 nohup 方式启动并已执行完成（[1]- Done / [2]+ Done），用于在后台启动 freellmapi 服务。",
+      "tags": [
+        "freellmapi",
+        "启动脚本",
+        "后台任务"
+      ],
+      "confidence": 0.9,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T10:25:07.743Z",
+      "updatedAt": "2026-09-18T10:25:07.743Z",
+      "accessedAt": "2026-09-18T10:25:07.743Z",
+      "observedAt": "2026-09-18T10:25:07.743Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b409-dac0-7424-8578-a6c641eb6564",
+      "deleted": false,
+      "contentHash": "d866963a4708fe09"
+    },
+    {
+      "id": "991d381b-6b4b-4f42-b940-4f7f7be28518",
+      "category": "fact",
+      "title": "mypi 命令实现与环境变量传递",
+      "content": "mypi 位于 /usr/local/bin/mypi，内容为 exec node ~/my-pi/packages/coding-agent/dist/bundle/cli.js \"$@\"。wrapper 脚本 /root/.pi/scripts/pi-wrapper.sh 在启动 pi 前设置 PI_AUTOPILOT=1。这两个机制共同导致直接运行 mypi 的用户继承了 wrapper 的环境变量，进而与 wrapper 主实例的调度锁产生冲突。修复后 mypi 在执行 node 前显式 unset PI_AUTOPILOT。",
+      "tags": [
+        "mypi",
+        "环境变量",
+        "wrapper"
+      ],
+      "confidence": 0.95,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T12:01:54.499Z",
+      "updatedAt": "2026-09-18T12:01:54.499Z",
+      "accessedAt": "2026-09-18T12:01:54.499Z",
+      "observedAt": "2026-09-18T12:01:54.499Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b40b-d77c-7424-8578-a6c92f73f218",
+      "deleted": false,
+      "contentHash": "91bb8ade4776c350"
+    },
+    {
+      "id": "31cfd5c2-3df8-426d-92ac-8b3a09f154b2",
+      "category": "fact",
+      "title": "长期运行进程持有锁文件的排查方法",
+      "content": "当出现锁相关故障时，应先用 ps 排查是否有长期运行的僵尸进程持有锁文件。本次会话中 PID 5395 自 2023-09-04 起运行，是导致锁冲突的直接原因之一。排查命令：ps -eo pid,ppid,lstart,etime,stat,cmd | grep pi。确认后可用 kill <pid> 清理。",
+      "tags": [
+        "排查",
+        "僵尸进程",
+        "锁"
+      ],
+      "confidence": 0.85,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T12:01:54.499Z",
+      "updatedAt": "2026-09-18T12:01:54.499Z",
+      "accessedAt": "2026-09-18T12:01:54.499Z",
+      "observedAt": "2026-09-18T12:01:54.499Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b40b-d77c-7424-8578-a6c92f73f218",
+      "deleted": false,
+      "contentHash": "b24f9a5d05de7a8b"
+    },
+    {
+      "id": "098cb607-214b-44ea-939c-81cb2c14a15b",
+      "category": "solutions",
+      "title": "pi-autopilot 调度锁冲突修复方案",
+      "content": "pi-autopilot 扩展在 session_start 事件中调用 acquireSessionLock() 会阻塞所有 pi/mypi 启动，因为 wrapper 脚本 /root/.pi/scripts/pi-wrapper.sh 启动的 pi 进程已持有该锁。修复方法：(1) 从 /root/my-pi/.pi/extensions/pi-autopilot/index.ts 的 session_start 中移除 acquireSessionLock() 调用；(2) 在 scheduler.ts 的 start() 方法中改为 async，先 await acquireSessionLock() 再启动 setInterval；(3) 在 /usr/local/bin/mypi 脚本中执行 node 前加入 unset PI_AUTOPILOT，避免继承 wrapper 设置的环境变量。验证方式：mypi --version 返回 0.85.1，mypi 无锁报错正常退出。相关文件：index.ts、scheduler.ts、/usr/local/bin/mypi。",
+      "tags": [
+        "pi-autopilot",
+        "调度锁",
+        "并发",
+        "mypi",
+        "PI_AUTOPILOT"
+      ],
+      "confidence": 0.95,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T13:01:26.148Z",
+      "updatedAt": "2026-09-18T13:01:26.148Z",
+      "accessedAt": "2026-09-18T13:01:26.148Z",
+      "observedAt": "2026-09-18T13:01:26.148Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b40b-d77c-7424-8578-a6c92f73f218",
+      "deleted": false,
+      "contentHash": "dfd42912fe03af42"
+    },
+    {
+      "id": "511b2065-4dba-4311-ab93-beb87a62f4fb",
+      "category": "solutions",
+      "title": "mypi 启动路径 Cannot find module 修复",
+      "content": "mypi 启动时报 Cannot find module '/tmp/my-pi/packages/coding-agent/dist/bundle/cli.js'，根因是 ~/.bashrc 中的旧别名和 /usr/local/bin/mypi 脚本均指向不存在的 /tmp/my-pi 路径。修复：将 ~/.bashrc 中 mypi 别名改为 /root/my-pi/packages/coding-agent/dist/bundle/cli.js，同时修正 /usr/local/bin/mypi 脚本第 2 行的 node 执行路径。保留 PI_CODING_AGENT_DIR=/root/my-pi/.pi 和 unset PI_AUTOPILOT。验证：source ~/.bashrc 后 type -a mypi 显示正确路径，mypy --version 返回 0.85.1。",
+      "tags": [
+        "mypi",
+        "bashrc",
+        "路径",
+        "环境变量"
+      ],
+      "confidence": 0.95,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T13:01:26.148Z",
+      "updatedAt": "2026-09-18T13:01:26.148Z",
+      "accessedAt": "2026-09-18T13:01:26.148Z",
+      "observedAt": "2026-09-18T13:01:26.148Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b40b-d77c-7424-8578-a6c92f73f218",
+      "deleted": false,
+      "contentHash": "aba7251bc1dbde3a"
+    },
+    {
+      "id": "cd7da22e-f9bd-4ff1-a5e4-88e78402a3ea",
+      "category": "fact",
+      "title": "pi-autopilot 扩展目录结构与关键文件",
+      "content": "pi-autopilot 扩展位于 /root/my-pi/.pi/extensions/pi-autopilot/，核心文件包括 index.ts（会话生命周期与锁管理）和 scheduler.ts（SessionScheduler 类，负责定时调度与锁的获取释放）。SessionScheduler 类包含 timer、firing、injectedIds、injectingIds 等字段，start() 方法原为同步，改为 async 后在内部获取锁。锁文件路径由 lockPath() 函数确定，锁内容格式为 pid:timestamp。",
+      "tags": [
+        "pi-autopilot",
+        "扩展",
+        "scheduler.ts",
+        "index.ts"
+      ],
+      "confidence": 0.9,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T13:01:26.148Z",
+      "updatedAt": "2026-09-18T13:01:26.148Z",
+      "accessedAt": "2026-09-18T13:01:26.148Z",
+      "observedAt": "2026-09-18T13:01:26.148Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b40b-d77c-7424-8578-a6c92f73f218",
+      "deleted": false,
+      "contentHash": "78767bdef3e5f299"
+    },
+    {
+      "id": "4fe7e73d-0fd7-473c-9714-b265fc1cc026",
+      "category": "fact",
+      "title": "wrapper 脚本与 PI_AUTOPILOT 环境变量关系",
+      "content": "/root/.pi/scripts/pi-wrapper.sh 是 pi 的启动包装脚本，在启动 pi 前设置 PI_AUTOPILOT=1 环境变量。该变量被 pi-autopilot 扩展用于判断是否应该运行调度器。直接运行 mypi 时若继承了该变量，会尝试获取已被 wrapper 实例持有的调度锁，导致启动失败。因此需要在 mypi 脚本中 unset 该变量。",
+      "tags": [
+        "wrapper",
+        "PI_AUTOPILOT",
+        "环境变量"
+      ],
+      "confidence": 0.9,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T13:01:26.148Z",
+      "updatedAt": "2026-09-18T13:01:26.148Z",
+      "accessedAt": "2026-09-18T13:01:26.148Z",
+      "observedAt": "2026-09-18T13:01:26.148Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b40b-d77c-7424-8578-a6c92f73f218",
+      "deleted": false,
+      "contentHash": "a9ce12171eeb2d73"
+    },
+    {
+      "id": "dfbba303-222e-452c-a720-b42ac144295c",
+      "category": "procedure",
+      "title": "pi 扩展修改后的验证流程",
+      "content": "修改 pi-autopilot 扩展或 mypi 脚本后，验证步骤：(1) 执行 mypi --version 确认版本号正常返回；(2) 在 shell 中实际启动 mypi 并发送 /quit 指令，确认退出码为 0 且无锁相关报错；(3) 使用 type -a mypi 检查最终解析的可执行文件路径是否正确；(4) 若涉及并发锁，用 ps 确认无残留进程持有锁文件。修改 ~/.bashrc 后需执行 source ~/.bashrc 或重新打开终端生效。",
+      "tags": [
+        "验证",
+        "mypi",
+        "测试流程"
+      ],
+      "confidence": 0.9,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-18T13:01:26.148Z",
+      "updatedAt": "2026-09-18T13:01:26.148Z",
+      "accessedAt": "2026-09-18T13:01:26.148Z",
+      "observedAt": "2026-09-18T13:01:26.148Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b40b-d77c-7424-8578-a6c92f73f218",
+      "deleted": false,
+      "contentHash": "e826ecd05dcf0734"
+    },
+    {
+      "id": "53eb0d1d-defe-407e-8464-aff1d3b56882",
+      "category": "fact",
+      "title": "pi环境位于/root/my-pi，自定义功能待修复",
+      "content": "用户使用pi编码助手，项目配置目录为/root/my-pi（由PI_CODING_AGENT_DIR指定）。用户反馈自定义功能（扩展）未生效，要求执行重建脚本修复。该重建脚本具体路径与名称在对话中未明确，需在项目内定位。",
+      "tags": [
+        "pi",
+        "environment",
+        "rebuild"
+      ],
+      "confidence": 0.9,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-19T06:57:36.320Z",
+      "updatedAt": "2026-09-19T06:57:36.320Z",
+      "accessedAt": "2026-09-19T06:57:36.320Z",
+      "observedAt": "2026-09-19T06:57:36.320Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b4a7-a49d-7407-b357-210a1fa493e5"
+    },
+    {
+      "id": "52931ba2-49a5-4538-8d4e-6b94ed45566f",
+      "category": "fact",
+      "title": "freellmapi提供商疑似下线",
+      "content": "助手在回应中指出freellmapi提供商连接失败（provider_down），导致知识订阅、每日评估等自动任务反复失败。该信息仅由助手单方面陈述，未经用户确认或命令验证，可信度中等。",
+      "tags": [
+        "provider",
+        "freellmapi",
+        "outage"
+      ],
+      "confidence": 0.6,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-19T06:57:36.321Z",
+      "updatedAt": "2026-09-19T06:57:36.321Z",
+      "accessedAt": "2026-09-19T06:57:36.321Z",
+      "observedAt": "2026-09-19T06:57:36.321Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b4a7-a49d-7407-b357-210a1fa493e5"
+    },
+    {
+      "id": "5c0d83d9-ec76-4b5b-8115-cad67c3facb8",
+      "category": "preference",
+      "title": "用户期望直接执行修复脚本",
+      "content": "用户提出'执行一下重建脚本'时，期望助手直接运行相应脚本完成修复。助手未执行而是反问与报告状态，偏离用户诉求。后续类似指令应优先直接执行。",
+      "tags": [
+        "user-preference",
+        "direct-action"
+      ],
+      "confidence": 0.8,
+      "source": "extract",
+      "recurrence": 1,
+      "createdAt": "2026-09-19T06:57:36.321Z",
+      "updatedAt": "2026-09-19T06:57:36.321Z",
+      "accessedAt": "2026-09-19T06:57:36.321Z",
+      "observedAt": "2026-09-19T06:57:36.321Z",
+      "environments": [
+        "termux"
+      ],
+      "lastSessionId": "01a0b4a7-a49d-7407-b357-210a1fa493e5"
     }
   ]
 }

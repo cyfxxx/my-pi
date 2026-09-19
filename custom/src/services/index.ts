@@ -5,10 +5,34 @@
  */
 
 // 工具系统服务
-export * from './tool-system'
-
-// 会话管理服务
-export * from './session'
+export {
+  truncateHead,
+  truncateTail,
+  truncateLine,
+  expandTilde,
+  resolveRelative,
+  matchMacOSVariant,
+  shortenPath,
+  replaceTabs,
+  getTextOutput,
+  fuzzyFindText,
+  applyEdits,
+  generateDiff,
+  OutputAccumulator,
+  CORE_TOOLS,
+  SLEEPING_GROUPS,
+  SLEEPING_TOOL_SET,
+  validateGroups,
+  buildSleepingSummary,
+  computeActiveTools,
+} from './tool-system'
 
 // Token 预算服务
-export * from './token-budget'
+export {
+  archiveOutput,
+  archivedStub,
+  sweepPruneRefs,
+  setContextWindow,
+  setUsedTokens,
+  getBudgetReport,
+} from './token-budget'

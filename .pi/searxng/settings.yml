@@ -1,0 +1,74 @@
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: ".pi SearXNG"
+
+search:
+  safe_search: 0
+  autocomplete: 'duckduckgo'
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "3d22f83ced513dce5b1b5718cfc8d98e87ccdc40741c9011e65e178a0da83fed"
+  limiter: false
+  image_proxy: true
+  bind_address: "127.0.0.1"
+  port: 8889
+
+ui:
+  static_use_hash: true
+  default_theme: simple
+  default_locale: zh-Hans-CN
+
+enabled_plugins:
+  - 'Basic Calculator'
+  - 'Hash plugin'
+  - 'Self Information'
+  - 'Tracker URL scraper'
+  - 'Search on category select'
+
+outgoing:
+  request_timeout: 10
+  max_request_timeout: 30
+  useragent_suffix: ""
+  max_redirects: 5
+
+engines:
+  # 国内直接可达的搜索引擎
+  - name: baidu
+    disabled: false
+  - name: bing
+    engine: bing
+    base_url: https://cn.bing.com
+    disabled: false
+  - name: sogou
+    disabled: false
+  - name: 360search
+    disabled: false
+  - name: bilibili
+    disabled: false
+  - name: yandex
+    disabled: false
+  - name: stackoverflow
+    disabled: false
+  - name: github
+    disabled: false
+  # 以下引擎被 GFW 封锁且无代理可用，暂不启用
+  - name: google
+    disabled: true
+  - name: duckduckgo
+    disabled: true
+  - name: wikipedia
+    disabled: true
+  - name: brave
+    disabled: true
+  - name: yahoo
+    disabled: true
+  # GFW 封锁且初始化超时（2026-08-04 实测 wikidata/startpage 启动即超时致服务退出）
+  - name: wikidata
+    disabled: true
+  - name: startpage
+    disabled: true

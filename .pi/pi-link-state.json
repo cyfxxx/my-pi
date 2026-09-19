@@ -1,5 +1,6 @@
 {
   "device": "localhost",
-  "status": "busy",
-  "updatedAt": 1789474561732
+  "status": "idle",
+  "tmuxSession": "30",
+  "updatedAt": 1789801016543
 }

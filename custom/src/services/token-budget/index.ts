@@ -4,21 +4,19 @@
  * 导出所有 Token 预算服务
  */
 
+// 输出归档
+export { archiveOutput, archivedStub } from './output-archive'
+
 // 输出擦除
-export { archiveOutput, archivedStub, sweepPruneRefs } from './prune'
+export { sweepPruneRefs } from './prune'
 
 // 上下文预算
 export {
   setContextWindow,
   setUsedTokens,
   getBudgetReport,
-  isUnderPressure,
-  getPressureLabel,
 } from './context-budget'
 
 // 自动压缩
 export {
-  shouldAutoCompact,
-  getAutoCompactThreshold,
-  getCooldownMs,
 } from './auto-compact'

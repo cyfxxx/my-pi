@@ -17,13 +17,16 @@ export function createAdaptedAPI(pi: ExtensionAPI): AdaptedExtensionAPI {
     on: pi.on.bind(pi),
     
     // 工具系统 - 绑定原始方法
-    tool: pi.tool.bind(pi),
+    registerTool: pi.registerTool.bind(pi),
     
     // 命令系统 - 绑定原始方法
-    command: pi.command.bind(pi),
+    registerCommand: pi.registerCommand.bind(pi),
     
-    // 会话管理 - 绑定原始方法
-    session: pi.session.bind(pi),
+    // 快捷键系统 - 绑定原始方法
+    registerShortcut: pi.registerShortcut.bind(pi),
+    
+    // 标志系统 - 绑定原始方法
+    registerFlag: pi.registerFlag.bind(pi),
     
     // 保留原始 pi 引用（用于需要直接访问的场景）
     _original: pi,

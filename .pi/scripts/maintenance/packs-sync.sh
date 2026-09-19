@@ -1,0 +1,1 @@
+../../../scripts/maintenance/packs-sync.sh

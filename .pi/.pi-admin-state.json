@@ -1,5 +1,10 @@
 {
-  "action": "none",
-  "timestamp": 0,
-  "restartLog": null
+  "action": "restart",
+  "timestamp": 1789800987866,
+  "restartLog": {
+    "action": "restart",
+    "reason": "用户请求重启",
+    "timestamp": 1789800987866
+  },
+  "reason": "用户请求重启"
 }

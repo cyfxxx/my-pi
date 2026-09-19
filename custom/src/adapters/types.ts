@@ -15,13 +15,16 @@ export interface AdaptedExtensionAPI {
   on: ExtensionAPI['on']
   
   // 工具系统
-  tool: ExtensionAPI['tool']
+  registerTool: ExtensionAPI['registerTool']
   
   // 命令系统
-  command: ExtensionAPI['command']
+  registerCommand: ExtensionAPI['registerCommand']
   
-  // 会话管理
-  session: ExtensionAPI['session']
+  // 快捷键系统
+  registerShortcut: ExtensionAPI['registerShortcut']
+  
+  // 标志系统
+  registerFlag: ExtensionAPI['registerFlag']
   
   // 其他可能需要的方法
   [key: string]: unknown

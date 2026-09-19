@@ -4,7 +4,7 @@
  * 桥接工具注册，提供稳定的工具注册接口
  */
 
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
+import type { ExtensionAPI, AgentToolResult } from '@earendil-works/pi-coding-agent'
 import type { ToolAdapter, ToolDefinition } from '../types'
 
 /**
@@ -16,12 +16,15 @@ export function createToolAdapter(pi: ExtensionAPI): ToolAdapter {
      * 注册单个工具
      */
     registerTool(definition: ToolDefinition): void {
-      pi.tool({
+      pi.registerTool({
         name: definition.name,
         description: definition.description,
-        parameters: definition.parameters,
-        execute: definition.execute,
-      })
+        parameters: definition.parameters as any,
+        execute: async (toolCallId: string, params: any, signal: AbortSignal | undefined, onUpdate: any, ctx: any) => {
+          const result = await definition.execute(params, signal!)
+          return result as AgentToolResult<any>
+        },
+      } as any)
     },
     
     /**
@@ -29,12 +32,7 @@ export function createToolAdapter(pi: ExtensionAPI): ToolAdapter {
      */
     registerTools(definitions: ToolDefinition[]): void {
       for (const def of definitions) {
-        pi.tool({
-          name: def.name,
-          description: def.description,
-          parameters: def.parameters,
-          execute: def.execute,
-        })
+        this.registerTool(def)
       }
     },
   }

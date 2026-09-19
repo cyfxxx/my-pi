@@ -20,7 +20,7 @@ export { fuzzyFindText, applyEdits, generateDiff } from './edit-diff'
 export { OutputAccumulator } from './output-accumulator'
 
 // 文件变更队列
-export { FileMutationQueue } from './file-mutation-queue'
+export { withFileMutationQueue } from './file-mutation-queue'
 
 // 工具分层管理
 export {
