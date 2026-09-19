@@ -87,8 +87,13 @@ export class SessionScheduler {
     this.pi = pi
   }
 
-  start(): void {
+  async start(): Promise<void> {
     if (this.timer) return
+    // 会话锁（防多实例）：在实际执行任务前获取锁，保证多个 Pi 实例可同时启动
+    const locked = await acquireSessionLock()
+    if (!locked) {
+      throw new Error('调度锁被其他 Pi 实例持有')
+    }
     this.timer = setInterval(() => this.tick(), 30000)
     // unref（2026-08-28）：定时器不应阻止进程退出——提取器等 pi -p 一次性进程
     // 若加载本扩展且锁获取成功，无 unref 的 interval 会挂住 event loop 致永不退出

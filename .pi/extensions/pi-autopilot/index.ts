@@ -15,6 +15,7 @@ export default function piAutopilotExtension(pi: ExtensionAPI): void {
   let scheduler = new SessionScheduler(pi)
   let notified = false
   let requeued = false
+  let lockAcquired = false
   // ProgressTracker：验证启用时逐步骤评分，提前放弃无望任务
   let progressTracker: ProgressTracker | null = null
 
@@ -34,14 +35,21 @@ export default function piAutopilotExtension(pi: ExtensionAPI): void {
       return
     }
 
-    // 会话锁（防多实例）
-    const locked = await acquireSessionLock()
-    if (!locked) {
-      console.warn('[pi-autopilot] 无法获取调度锁，另一个 Pi 实例可能已持有')
+    // 非自主运行实例（mypi 等用户手动启动）不执行 wrapper 专属的会话启动逻辑
+    // （种子对账/恢复报告/离线通知等）。此前这些逻辑由锁获取失败后的 early return
+    // 隐式跳过；把锁下移到 scheduler.start() 后必须显式守卫，否则 mypi 交互会话
+    // 会跑完整 session_start 流程而挂起（实测 124 超时）。
+    if (process.env.PI_AUTOPILOT !== '1') {
       return
     }
 
-    scheduler.start()
+    try {
+      await scheduler.start()
+      lockAcquired = true
+    } catch (e) {
+      console.warn('[pi-autopilot] 无法获取调度锁，另一个 Pi 实例可能已持有')
+      return
+    }
     touchActivity()
 
     // 种子任务对账（2026-08-27）：补注册本地缺失的每日任务（跨设备通用定义见
@@ -148,7 +156,11 @@ export default function piAutopilotExtension(pi: ExtensionAPI): void {
 
   pi.on('session_shutdown', async () => {
     scheduler.stop()
-    await releaseSessionLock()
+    // 仅本实例实际获取过锁时才释放——非 wrapper 实例（mypi 等）从未获取锁，
+    // 调用 releaseSessionLock 会误删其他实例持有的锁文件（竞态）。
+    if (lockAcquired) {
+      await releaseSessionLock()
+    }
   })
 
   // 用户输入视为活动：正常对话/挂机不应被挂死判定重启
