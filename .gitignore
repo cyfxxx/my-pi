@@ -46,6 +46,9 @@ packages/agent/docs/extensions/pi-server-artifact/index.md
 data/logs/
 data/plans/
 
+# 根目录 memory/ 应在 .pi/data/memory/
+memory/
+
 # 备份目录
 *.bak.*
 
