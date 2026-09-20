@@ -15,9 +15,8 @@
 my-pi/
 ├── vendor/pi/                        # 上游 vendored 代码（只读）
 │   ├── packages/                     # pi 上游包
-│   ├── package.json                  # piConfig (name: my-pi)
-│   ├── LAST_SYNC_POINT               # 上游同步点
-│   └── patches/                      # 上游补丁
+│   ├── package.json                  # 上游 monorepo 配置（保持 pristine）
+│   └── LAST_SYNC_POINT               # 上游同步点
 │
 ├── custom/                           # 你的代码（唯一需要维护的部分）
 │   ├── adapters/                     # 适配器层：隔离 Pi API 变化
@@ -145,11 +144,11 @@ cd /Volumes/USB/my-pi
 
 | Pi 默认路径 | 便携化路径 | 机制 |
 |---|---|---|
-| `~/.my-pi/agent/settings.json` | `portable/config/settings.json` | 环境变量重定向 |
-| `~/.my-pi/agent/sessions/` | `portable/sessions/` | 环境变量重定向 |
-| `~/.my-pi/agent/extensions/` | `portable/extensions/` | 环境变量重定向 |
-| `~/.my-pi/agent/skills/` | `portable/skills/` | 环境变量重定向 |
-| `~/.my-pi/agent/memory/` | `portable/memory/` | 环境变量重定向 |
+| `~/.pi/agent/settings.json` | `portable/config/settings.json` | 环境变量重定向 |
+| `~/.pi/agent/sessions/` | `portable/sessions/` | 环境变量重定向 |
+| `~/.pi/agent/extensions/` | `portable/extensions/` | 环境变量重定向 |
+| `~/.pi/agent/skills/` | `portable/skills/` | 环境变量重定向 |
+| `~/.pi/agent/memory/` | `portable/memory/` | 环境变量重定向 |
 
 ## 开发
 

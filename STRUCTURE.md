@@ -5,7 +5,7 @@
 ```
 my-pi/
 ├── .pi/                 # Pi 运行时配置文件（不含代码、不含数据、不含符号链接）
-├── vendor/pi/           # 上游 Pi 代码（只读，独立 git clone，不纳入主仓库版本控制）
+├── vendor/pi/           # 上游 Pi 代码（只读；当前由主仓库追踪，见「已知偏离」）
 ├── custom/              # my-pi 的自定义代码
 ├── portable/            # my-pi 的运行时数据（所有用户数据收敛于此）
 ├── patches/             # 上游补丁
@@ -24,18 +24,24 @@ Pi 运行时需要的配置文件。**只放配置，不放代码、不放数据
 包含：`settings.json`、`keybindings.json`、`models-store.json`、`AGENTS.md`、`APPEND_SYSTEM.md`。
 
 ### `vendor/pi/`
-从上游克隆的 Pi 代码。**永不修改**。所有修改通过 `patches/` 管理。
+上游 Pi 代码。**永不修改**。所有修改通过 `patches/` 管理。
 
-- `LAST_SYNC_POINT`：上次同步的上游 commit SHA
+- `LAST_SYNC_POINT`：上次同步的上游 commit SHA（当前为 `5afd80c65`，即 vendored 基线的最后一个上游提交）
 - 通过 `scripts/sync-upstream.sh` 更新
+
+> **已知偏离**：目标设计为 `vendor/pi/` 作为独立 git clone、由主仓库 `.gitignore` 排除。
+> 当前环境无法从 GitHub 克隆（clone 超时，仅 `ls-remote` 元数据可用），且项目需在
+> 多设备间同步，因此 `vendor/pi/` 仍由主仓库追踪。`scripts/sync-upstream.sh` 会检测
+> 这一状态并拒绝执行（避免误操作主仓库）。详见 `DECISIONS.md`。
 
 ### `custom/`
 my-pi 的自定义代码。三层结构：
 
-- `adapters/`：唯一允许 import `vendor/pi/` 的地方
+- `adapters/`：唯一允许 runtime import `vendor/pi/` 的地方（`import type` 除外）
 - `core/`：路径解析、功能注册表
 - `features/`：每个功能包含 `logic.ts`（纯逻辑，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）
 - `bootstrap.ts`：入口，组装所有功能
+- 另有 `package.json`、`tsconfig.json`（工作区与编译配置），`dist/`（构建产物，gitignored）
 
 ### `portable/`
 运行时数据。5 个目录：

@@ -1,11 +1,7 @@
 {
-	"name": "my-pi",
+	"name": "pi-monorepo",
 	"private": true,
 	"type": "module",
-	"piConfig": {
-		"name": "my-pi",
-		"configDir": ".my-pi"
-	},
 	"workspaces": [
 		"packages/*",
 		"packages/session-backends/*",

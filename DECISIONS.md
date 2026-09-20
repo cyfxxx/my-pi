@@ -100,3 +100,23 @@
 2. 仅 node dist/cli.js（生产标准）
 **决策**：选项 2，仅使用构建产物
 **理由**：方案明确要求便携版运行编译后的 JS；tsx 依赖额外工具，不符合便携性要求。
+
+---
+
+### [2026-09-20] vendor/pi 保留由主仓库追踪（偏离独立 clone）
+**背景**：第三轮方案要求 vendor/pi 作为独立 git clone 并由主仓库 .gitignore 排除。但当前环境 GitHub clone 超时（仅 ls-remote 元数据可用），且项目需在 Termux/Android、WSL2、Linux 多设备间同步。
+**选项**：
+1. 严格按方案：git init vendor/pi + .gitignore 排除，移除 1689 个已追踪文件
+2. 保留 vendor/pi 由主仓库追踪，修正补丁/脚本/文档并记录偏离
+**决策**：选项 2，保留主仓库追踪
+**理由**：独立 clone 离线不可行；移除追踪会导致新克隆的仓库缺少 vendor/pi 而无法构建/运行；多设备同步会因此失效。`sync-upstream.sh` 已增加保护：vendor/pi 非独立仓库时拒绝执行，避免误操作主仓库。待网络支持完整 clone 时可再切换。
+
+---
+
+### [2026-09-20] 品牌化仅保留在 patches/，vendor/pi/package.json 保持 pristine
+**背景**：001-branding.patch 已应用于 vendor/pi/package.json（name=my-pi、piConfig），导致 `git apply --check` 失败；且运行时 piConfig 实际读取的是 `vendor/pi/packages/coding-agent/package.json`（configDir=.pi，无 name），vendor/pi/package.json 的 piConfig 不被使用。
+**选项**：
+1. 保持 vendor 已品牌化，删除补丁
+2. 将 vendor/pi/package.json 恢复为上游 pristine，重生成并仅保留最小品牌化补丁
+**决策**：选项 2
+**理由**：符合「vendor 只读、改动经 patches 管理」的原则；补丁可被 `git apply --check` 验证；恢复 pristine 不影响运行时（配置目录由 `PI_CODING_AGENT_DIR` 重定向，品牌名对运行时无影响）。

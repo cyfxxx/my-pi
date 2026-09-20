@@ -4,76 +4,86 @@
 # 用法:
 #   bash scripts/sync-upstream.sh          # 同步到最新上游
 #   bash scripts/sync-upstream.sh <commit> # 同步到指定 commit
+#
+# 说明:
+#   上游同步要求 vendor/pi 是独立 git 仓库（见 STRUCTURE.md）。
+#   若 vendor/pi 由主仓库追踪，脚本会直接报错退出，避免误操作主仓库。
 
 set -e
 
-MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENDOR_PI="$MY_PI_ROOT/vendor/pi"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENDOR_PI="$ROOT/vendor/pi"
 LAST_SYNC_FILE="$VENDOR_PI/LAST_SYNC_POINT"
+UPSTREAM_URL="${PI_UPSTREAM_URL:-https://github.com/earendil-works/pi-mono.git}"
 
-# 读取上次同步点（跳过注释行）
+# 安全检查：vendor/pi 必须是独立 git 仓库
+if [ ! -d "$VENDOR_PI/.git" ]; then
+    echo "❌ vendor/pi 不是独立 git 仓库，拒绝执行同步。"
+    echo "   当前 vendor/pi 由主仓库追踪，直接在此运行 git 命令会误操作主仓库。"
+    echo "   如需同步，请先将 vendor/pi 转为独立 clone（见 STRUCTURE.md）。"
+    exit 1
+fi
+
 if [ ! -f "$LAST_SYNC_FILE" ]; then
-    echo "错误: 找不到 LAST_SYNC_POINT 文件"
+    echo "❌ 找不到 $LAST_SYNC_FILE"
     exit 1
 fi
 
 LAST_SYNC=$(grep -v '^#' "$LAST_SYNC_FILE" | head -1 | awk '{print $1}')
 echo "上次同步点: $LAST_SYNC"
 
-# 进入 vendor/pi 目录
 cd "$VENDOR_PI"
 
-# 检查是否有 upstream remote
+# 配置 upstream remote
 if ! git remote get-url upstream >/dev/null 2>&1; then
-    echo "添加 upstream remote..."
-    git remote add upstream https://github.com/cyfxxx/pi-tools.git
+    echo "添加 upstream remote: $UPSTREAM_URL"
+    git remote add upstream "$UPSTREAM_URL"
 fi
 
-# 拉取上游更新
-echo "拉取上游更新..."
+echo "🔄 拉取上游..."
 git fetch upstream
 
-# 确定目标 commit
 if [ -n "$1" ]; then
     TARGET_COMMIT="$1"
 else
     TARGET_COMMIT=$(git rev-parse upstream/main)
 fi
-
 echo "目标 commit: $TARGET_COMMIT"
 
-# 生成上游变更补丁
-echo "生成补丁..."
-git format-patch "$LAST_SYNC".."$TARGET_COMMIT" --stdout > /tmp/upstream-changes.patch
-
-# 检查补丁是否为空
-if [ ! -s /tmp/upstream-changes.patch ]; then
-    echo "没有新的上游变更"
+if git merge-base --is-ancestor "$TARGET_COMMIT" HEAD 2>/dev/null; then
+    echo "已是最新，无需同步。"
     exit 0
 fi
 
-# 应用补丁（三方合并）
-echo "应用补丁..."
-if git apply --3way /tmp/upstream-changes.patch; then
-    echo "补丁应用成功"
-    
-    # 更新 LAST_SYNC_POINT
-    echo "$TARGET_COMMIT $(date +%Y-%m-%d) $(git describe --tags --always $TARGET_COMMIT 2>/dev/null || echo 'unknown')" > "$LAST_SYNC_FILE"
-    echo "已更新 LAST_SYNC_POINT"
-    
-    # 显示变更统计
-    echo ""
-    echo "变更统计:"
-    git diff --stat HEAD
-else
-    echo "补丁应用失败，需要手动解决冲突"
-    echo "解决冲突后运行: git add . && git commit"
-    exit 1
+# 保存本地修改
+DID_STASH=0
+if ! git diff --quiet; then
+    git stash
+    DID_STASH=1
 fi
 
-# 清理
-rm -f /tmp/upstream-changes.patch
+echo "合并上游..."
+git merge --no-edit "$TARGET_COMMIT"
 
-echo ""
-echo "同步完成!"
-echo "建议运行: npm run build:offline && npx tsc --noEmit"
+# 应用本地补丁
+for patch in "$ROOT/patches"/*.patch; do
+    [ -e "$patch" ] || continue
+    echo "应用补丁：$patch"
+    git apply --3way "$patch" || {
+        echo "❌ 补丁应用失败：$patch"
+        echo "   请手动解决冲突后重新运行。"
+        exit 1
+    }
+done
+
+git rev-parse HEAD > LAST_SYNC_POINT
+
+if [ "$DID_STASH" -eq 1 ]; then
+    git stash pop || true
+fi
+
+echo "🔨 类型检查 custom/..."
+cd "$ROOT"
+npx tsc --noEmit -p custom/
+
+echo "✅ 上游同步完成"

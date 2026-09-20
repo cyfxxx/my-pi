@@ -1,112 +1,74 @@
-# Pi 项目环境描述
+# my-pi 项目环境描述
 
-Pi 本地配置仓库：自定义扩展、共享库、技能、生命周期脚本。
+my-pi 是基于 pi 框架的私人 AI 助手（硬分叉）。本目录 `.pi/` 是 **Pi 运行时配置目录**，只放配置，不放代码、不放数据、不放符号链接。
 
 ## 目录结构
 
 ```
-core/             Layer 0 基础层（config, registry, hook-registry, secrets）
-services/         Layer 1 服务层（token-budget, diagnostics）
-extensions/       Layer 2 扩展层（12 个独立扩展）
-skills/           Layer 3 技能层（6 个内置技能）
-scripts/          符号链接 → 项目 scripts/
-data/             运行时数据（memory/logs/plans，gitignored）
+.pi/                       # 运行时配置（settings/models/auth/keybindings/AGENTS 等）
+portable/                  # 运行时数据（config/sessions/extensions/skills/memory）
+vendor/pi/                 # 上游 Pi 代码（只读）
+custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
+scripts/                   # 4 个运维脚本
+patches/                   # 上游补丁
 ```
 
 ## 分层架构
 
 ```
-Layer 4 ─ Agent 编排层 ─────── (由 pi 内置调度)
+Layer 3 ─ 功能层 ───────────── custom/features/（12 个扩展，logic.ts 零 Pi 依赖）
     ↑
-Layer 3 ─ 技能层 ───────────── skills/ packs/
+Layer 2 ─ 适配器层 ─────────── custom/adapters/（唯一允许 import vendor/pi）
     ↑
-Layer 2 ─ 扩展层 ───────────── extensions/ (每个扩展独立)
+Layer 1 ─ 服务层 ───────────── custom/core/（config 路径解析、registry 注册表）
     ↑
-Layer 1 ─ 服务层 ───────────── services/ (token-budget, diagnostics)
-    ↑
-Layer 0 ─ 基础层 ───────────── core/ (config, registry, secrets)
+Layer 0 ─ 基础层 ───────────── vendor/pi/（上游代码，永不修改）
 ```
 
-**依赖规则**：单向（下层不能依赖上层）+ 同层独立（扩展之间禁止相互依赖）
+**依赖规则**：`features/*/logic.ts` 零 Pi 依赖；仅 `adapters/` 可 runtime import `vendor/pi`（`import type` 除外）。
 
 ## 关键配置
 
 ### PI_CODING_AGENT_DIR
 
-pi 框架通过此环境变量定位配置目录。默认值 `~/.pi/agent/`，本项目设置为项目 `.pi/` 目录。
+pi 通过此环境变量定位配置目录，默认 `~/.pi/agent`。my-pi 由 `my-pi.sh` / `scripts/dev.sh` 重定向到项目 `portable/`：
 
 ```bash
-# /usr/local/bin/mypi
-export PI_CODING_AGENT_DIR="$HOME/my-pi/.pi"
+export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/config"
+export PI_SESSION_DIR="$MY_PI_ROOT/portable/sessions"
+export PI_EXTENSION_DIR="$MY_PI_ROOT/portable/extensions"
+export PI_SKILLS_DIR="$MY_PI_ROOT/portable/skills"
+export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"
 ```
 
-**重要**：`agent/` 目录是 pi 框架特殊设计，不能修改。通过环境变量重定向配置读取。
-
-### 配置文件位置
-
-```
-.pi/
-├── settings.json      # 主配置（provider=freellmapi, model=auto）
-├── models.json        # 模型配置（freellmapi + local-llama）
-├── auth.json          # API 凭证（gitignored）
-├── modes.json         # 模式配置（full/light/quick）
-├── keybindings.json   # 快捷键配置
-└── extensions/        # 扩展目录
-```
-
-## 多环境
-
-本仓库在 Termux/Android、WSL2、Linux 等环境间同步。**配置层每环境独立**。
-
-| 规则 | 说明 |
-|------|------|
-| 配置隔离 | settings.json/models.json/auth.json 每环境独立 |
-| 共享配置 | .pi-autopilot-config.json 入库共享（无密钥） |
-| 运行时隔离 | sessions/logs/stats 不入库 |
-
-环境差异详情：`docs/operations/ENVIRONMENTS.md`
+运行时数据全部收敛到 `portable/`，实现便携（U 盘即插即用，无符号链接）。
 
 ## 关键约定
 
-### 扩展注册
-pi 0.83+ 自动发现 `extensions/` 下含 index.ts 的子目录。settings.json 的 extensions 数组仅作覆盖模式（`!` 排除 / `+` 强制包含）。
+- **上游隔离**：`vendor/pi/` 不直接修改，改动通过 `patches/` 记录。
+- **接口隔离**：Pi API 只出现在 `custom/adapters/`。
+- **缓存友好**：system prompt 注入禁止时间戳/精确数值。
+- **git 提交**：暂存显式路径，只提交本次会话更改的文件；不提交 `auth.json` 等敏感配置。
 
-### 缓存友好（跨扩展）
-- system prompt 注入禁止时间戳/精确数值
-- 压力提示按档位（<75% 不注入、≥75%/≥90% 固定文案）
-- 估算统一用 `services/token-budget/` 的 estimateTokens
-
-### 后台任务（禁止阻塞前台）
-tmux_run 启动后**立即结束回合**。同轮内禁止 tmux_wait；确需等待只用 pattern= 匹配且 timeout≤60s。
-
-### git push
-remote 含 token 时先 `git remote set-url origin` 恢复无凭证 URL。勿提交 auth.json/settings.json/models.json。
-
-## 验证
+## 验证与命令
 
 ```bash
-bash scripts/test/test-all.sh          # 全量回归
-bash scripts/test/test-all.sh --only=<ext1>,<ext2>  # 分层快检
-bash scripts/test/test-all.sh --fast   # 快速模式
+npm run check                      # 隔离边界验证（scripts/check-isolation.sh）
+npx tsc --noEmit -p custom/        # 自定义层类型检查
+bash scripts/dev.sh                # 开发模式（tsx 直接运行 TS）
+bash scripts/build.sh              # 构建 vendor/pi(coding-agent) 与 custom/
+./my-pi.sh                         # 便携启动
+bash scripts/sync-upstream.sh      # 上游同步（要求 vendor/pi 为独立 git 仓库）
 ```
+
+构建后运行 `npm run build`。修订代码后运行 `npm run check`。
 
 ## 深度文档
 
 | 主题 | 文档 |
 |------|------|
-| 扩展清单与目录详情 | `docs/development/AGENTS-DETAILS.md` |
-| 扩展开发规范 | `docs/development/PI-EXT-DEV-NOTES.md` |
-| SDK 扩展开发 | `docs/development/PI-SDK-EXTENSION.md` |
-| 多环境差异 | `docs/operations/ENVIRONMENTS.md` |
-| 迁移经验 | `docs/maintenance/LESSONS-LEARNED.md` |
-| 模块化方案 | `docs/maintenance/MODULARIZATION-PLAN.md` |
+| 目录结构说明 | `STRUCTURE.md` |
+| 架构进度 | `PROGRESS.md` |
+| 架构决策 | `DECISIONS.md` |
+| 项目总览 | `README.md` |
 | Pi 官方文档 | https://pi.dev/docs/latest |
-
-## 已知噪音
-
-pi-voice 回车键冲突警告属设计行为，无需处理。详见 `docs/development/AGENTS-DETAILS.md` → 已知噪音
-
-## 旧名称（禁止引用）
-
-旧扩展名：pi-web-toolkit / pi-router / pi-admin / pi-scheduler
-旧命令名：/tts、/planclear、/planresume、/planview、/todos、/auto:*、/admin:restart
