@@ -9,7 +9,7 @@ set -e
 
 MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENDOR_PI="$MY_PI_ROOT/vendor/pi"
-LAST_SYNC_FILE="$MY_PI_ROOT/LAST_SYNC_POINT"
+LAST_SYNC_FILE="$VENDOR_PI/LAST_SYNC_POINT"
 
 # 读取上次同步点
 if [ ! -f "$LAST_SYNC_FILE" ]; then
