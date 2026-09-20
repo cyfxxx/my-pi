@@ -159,3 +159,16 @@
   - ✅ 保留 `node_modules`/`dist`/provider 数据，`./my-pi.sh --version` 返回 0.85.1
   - ✅ `check-isolation.sh`、`npx tsc --noEmit -p custom/` 通过
 - 遇到的问题：无（先前「保留主仓库追踪」的决策由 DECISIONS.md 新决策取代）
+
+## 删除 .pi/，配置收敛到 portable/config（方案 B）
+- 完成时间：2026-09-20
+- 验证结果：
+  - ✅ `.pi/` 全部内容迁入 `portable/config/`，`.pi/` 已删除
+  - ✅ 跟踪：`settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md`
+  - ✅ 停止跟踪并忽略：`models.json`（含 apiKey）、`models-store.json`、`auth.json`、`modes.json`、`trust.json` 及运行时状态文件
+  - ✅ `.gitignore` 改为 portable 规则（config/sessions/extensions/skills/memory 仅保留 `.gitkeep` 与共享配置）
+  - ✅ `check-isolation.sh` 符号链接检查适配 `.pi` 不存在
+  - ✅ 文档更新：STRUCTURE/README/AGENTS/portable-config-AGENTS/DECISIONS
+  - ✅ `./my-pi.sh --version`、`check-isolation.sh`、`tsc` 通过
+- 遇到的问题：
+  - `models.json` 之前被 git 跟踪且含 apiKey，已停止跟踪；历史中的 key 如需彻底清除需重写历史并轮换该 key

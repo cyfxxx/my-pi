@@ -7,13 +7,14 @@ ERRORS=0
 
 echo "🔍 验证隔离边界..."
 
-# 检查 1: .pi/ 下无符号链接
-if find "$ROOT/.pi" -type l 2>/dev/null | grep -q .; then
-    echo "❌ .pi/ 下存在符号链接："
-    find "$ROOT/.pi" -type l
+# 检查 1: .pi/（若存在）与 portable/ 下无符号链接
+SYMLINKS=$(find "$ROOT/.pi" "$ROOT/portable" -type l 2>/dev/null || true)
+if [ -n "$SYMLINKS" ]; then
+    echo "❌ 配置/数据目录下存在符号链接："
+    echo "$SYMLINKS"
     ERRORS=$((ERRORS + 1))
 else
-    echo "✅ .pi/ 下无符号链接"
+    echo "✅ .pi/ 与 portable/ 下无符号链接"
 fi
 
 # 检查 2: custom/ 下无禁用目录

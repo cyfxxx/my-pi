@@ -4,12 +4,11 @@
 
 ```
 my-pi/
-├── .pi/                 # Pi 运行时配置文件（不含代码、不含数据、不含符号链接）
 ├── vendor/
 │   ├── pi/              # 上游 Pi 代码（独立 git clone，主仓库 .gitignore 排除）
 │   └── PINNED_COMMIT    # vendor 锁定的上游 commit（引导用）
 ├── custom/              # my-pi 的自定义代码
-├── portable/            # my-pi 的运行时数据（所有用户数据收敛于此）
+├── portable/            # my-pi 的运行时数据/配置（所有用户数据收敛于此，无 .pi 目录）
 ├── patches/             # 上游补丁
 ├── scripts/             # 4 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
@@ -19,11 +18,6 @@ my-pi/
 ```
 
 ## 各目录职责
-
-### `.pi/`
-Pi 运行时需要的配置文件。**只放配置，不放代码、不放数据、不放符号链接**。
-
-包含：`settings.json`、`keybindings.json`、`models-store.json`、`AGENTS.md`、`APPEND_SYSTEM.md`。
 
 ### `vendor/pi/`
 上游 Pi 代码，**独立 git clone**，由主仓库 `.gitignore` 排除（不纳入主仓库版本控制）。
@@ -53,15 +47,15 @@ my-pi 的自定义代码。三层结构：
 - 另有 `package.json`、`tsconfig.json`（工作区与编译配置），`dist/`（构建产物，gitignored）
 
 ### `portable/`
-运行时数据。5 个目录：
+运行时数据与配置。5 个目录：
 
-- `config/`：配置数据
+- `config/`：**Pi 运行时配置目录**（`PI_CODING_AGENT_DIR` 指向此处）。含 `settings.json`、`AGENTS.md`、`APPEND_SYSTEM.md`、`keybindings.json` 等；`models.json`/`auth.json`/`modes.json`/`trust.json` 等每环境独立、不入库
 - `sessions/`：会话历史
 - `extensions/`：扩展安装目录
 - `skills/`：技能目录
 - `memory/`：记忆数据
 
-通过 `my-pi.sh` 中的环境变量重定向到此。
+通过 `my-pi.sh` / `scripts/dev.sh` 中的环境变量重定向到此；项目根不再有 `.pi/` 目录。
 
 ### `patches/`
 对 `vendor/pi/` 的补丁。每个补丁记录一个明确的修改：

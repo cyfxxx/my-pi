@@ -1,13 +1,13 @@
 # my-pi 项目环境描述
 
-my-pi 是基于 pi 框架的私人 AI 助手（硬分叉）。本目录 `.pi/` 是 **Pi 运行时配置目录**，只放配置，不放代码、不放数据、不放符号链接。
+my-pi 是基于 pi 框架的私人 AI 助手（硬分叉）。本目录 `portable/config/` 是 **Pi 运行时配置目录**，只放配置，不放代码、不放符号链接。
 
 ## 目录结构
 
 ```
-.pi/                       # 运行时配置（settings/models/auth/keybindings/AGENTS 等）
-portable/                  # 运行时数据（config/sessions/extensions/skills/memory）
-vendor/pi/                 # 上游 Pi 代码（只读）
+portable/config/           # 运行时配置（settings/models/auth/keybindings/AGENTS 等）
+portable/{sessions,extensions,skills,memory}/   # 运行时数据
+vendor/pi/                 # 上游 Pi 代码（独立 clone，只读）
 custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
 scripts/                   # 4 个运维脚本
 patches/                   # 上游补丁

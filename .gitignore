@@ -34,51 +34,31 @@ todo.md
 plans/
 packages/agent/docs/extensions/pi-server-artifact/index.md
 
-# Pi 配置目录（运行时数据）
-.pi/sessions/
-.pi/stats/
-.pi/models-store.json
-.pi/node_modules/
-.pi/extensions/node_modules/
-.pi/agent/
-.pi/searxng/
-.pi/.snapshots/
-.pi/logs/
-.pi/data/
-.pi/memory/
-.pi/recovery/
-
-# 敏感配置
-.pi/auth.json
-
-# 运行时状态文件
-.pi/.pi-admin-state.json
-.pi/.pi-autopilot-crash.json
-.pi/.pi-autopilot-lastgood.json
-.pi/.pi-autopilot-telemetry.json
-.pi/pi-link-active.json
-.pi/pi-link-outbox.json
-.pi/pi-link-state.json
-.pi/pi-voice.json
-.pi/notify.json
-.pi/ntfy-relay.json
-.pi/scheduled-seeds.json
-.pi/scheduled-tasks.json
-.pi/trust.json
-.pi/modes.json
+# portable/ 运行时数据（每环境独立，不入库；仅保留占位与共享配置）
+portable/config/*
+!portable/config/.gitkeep
+!portable/config/AGENTS.md
+!portable/config/APPEND_SYSTEM.md
+!portable/config/keybindings.json
+!portable/config/settings.json
+portable/sessions/*
+!portable/sessions/.gitkeep
+portable/extensions/*
+!portable/extensions/.gitkeep
+portable/skills/*
+!portable/skills/.gitkeep
+portable/memory/*
+!portable/memory/.gitkeep
 
 # 运行时数据（data/ 目录）
 data/logs/
 data/plans/
 
-# 根目录 memory/ 应在 .pi/data/memory/（仅限仓库根，勿影响 portable/memory/）
+# 根目录 memory/（仅限仓库根，勿影响 portable/memory/）
 /memory/
 
 # 备份目录
 *.bak.*
-
-# Packs (独立 git 仓库)
-.pi/scripts/packs/
 
 # vendor/pi 独立 git 仓库（上游 pi 源码，不纳入主仓库）
 vendor/pi/
