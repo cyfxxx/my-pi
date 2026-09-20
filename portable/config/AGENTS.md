@@ -5,9 +5,9 @@ my-pi 是基于 pi 框架的私人 AI 助手（硬分叉）。本目录 `portabl
 ## 目录结构
 
 ```
-portable/config/           # 运行时配置（settings/models/auth/keybindings/AGENTS 等）
-portable/config/skills/    # 技能目录（pi 从 agentDir/skills 发现）
-portable/{sessions,extensions,memory}/   # 运行时数据（注意 PI_*_DIR 生效范围，见下）
+portable/config/           # Pi 运行时配置目录（agentDir）：配置 + 技能 + 会话 + 扩展
+portable/config/skills/    # 技能目录（pi 从 agentDir/skills 发现，随仓库分发）
+portable/memory/           # 自定义功能数据（note-store 笔记、工具输出归档）
 vendor/pi/                 # 上游 Pi 代码（独立 clone，只读）
 custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
@@ -34,21 +34,19 @@ Layer 0 ─ 基础层 ───────────── vendor/pi/（上�
 
 ### PI_CODING_AGENT_DIR
 
-pi 通过此环境变量定位配置目录，默认 `~/.pi/agent`。my-pi 由 `my-pi.sh` / `scripts/dev.sh` 重定向到项目 `portable/`：
+pi 通过此环境变量定位配置目录（agentDir），默认 `~/.pi/agent`。my-pi 由 `my-pi.sh` / `scripts/dev.sh` 指向 `portable/config`：
 
 ```bash
-export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/config"   # pi 识别
+export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/config"   # pi 识别（agentDir）
 export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-store 识别
-export PI_SESSION_DIR="$MY_PI_ROOT/portable/sessions"
-export PI_EXTENSION_DIR="$MY_PI_ROOT/portable/extensions"
-export PI_SKILLS_DIR="$MY_PI_ROOT/portable/skills"
 ```
 
-**生效范围**：pi 只识别 `PI_CODING_AGENT_DIR`（另有 `PI_PACKAGE_DIR`）；`PI_SESSION_DIR`/`PI_EXTENSION_DIR`/`PI_SKILLS_DIR` 不被 pi 读取，仅导出。因此：
+**运行时数据布局**：pi 只识别 `PI_CODING_AGENT_DIR`（另有 `PI_PACKAGE_DIR`），技能/会话/扩展都挂在 agentDir 下，因此：
 
-- 技能放在 `portable/config/skills/`（= `agentDir/skills`），`settings.json` 的 `"skills"` 数组是相对 `agentDir` 的覆盖模式（如 `+skills/pi-backup/SKILL.md`）；`portable/skills/` 是占位目录
-- 会话由 pi 写入 `portable/config/sessions/`；扩展经 `--extension custom/bootstrap.ts` 加载
-- `PI_MEMORY_DIR` 对 `custom/core/note-store.ts` 等自定义代码有效（工具输出归档走 `PI_OUTPUT_ARCHIVE_DIR`，默认 `portable/memory/tool-outputs/`）
+- 技能：`portable/config/skills/`（= `agentDir/skills`，随仓库分发）；`settings.json` 的 `"skills"` 数组是相对 `agentDir` 的覆盖模式（如 `+skills/pi-backup/SKILL.md`）
+- 会话：`portable/config/sessions/<转义 cwd>/*.jsonl`
+- 第三方扩展：`portable/config/extensions/`（自动发现）或 `./my-pi.sh install` 装入 `portable/config/{npm,git}/`
+- 自定义功能数据：`portable/memory/`（`PI_MEMORY_DIR`；工具输出归档走 `PI_OUTPUT_ARCHIVE_DIR`，默认 `portable/memory/tool-outputs/`）
 
 运行时数据全部收敛到 `portable/`，实现便携（U 盘即插即用，无符号链接）。
 

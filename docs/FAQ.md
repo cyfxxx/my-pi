@@ -174,7 +174,7 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 
 ### Q: 会话历史在哪里？
 
-`portable/sessions/`（gitignored）。
+`portable/config/sessions/`（gitignored）。
 
 ---
 

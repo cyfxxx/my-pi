@@ -243,7 +243,7 @@ done
 ./my-pi.sh
 ```
 
-**关键事实：** Pi 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`。`PI_SESSION_DIR`、`PI_SKILLS_DIR`、`PI_EXTENSION_DIR`、`PI_MEMORY_DIR` 不被 Pi 读取，不能用它们解释配置为何不生效；运行时数据的位置由项目约定收敛在 `portable/` 下。
+**关键事实：** pi 只识别 `PI_CODING_AGENT_DIR`（agentDir）与 `PI_PACKAGE_DIR`；技能、会话、扩展都挂在 agentDir 下，启动器**不再导出** `PI_SESSION_DIR`/`PI_SKILLS_DIR`/`PI_EXTENSION_DIR` 这类无效变量。`PI_MEMORY_DIR` 不由 pi 读取，而是 `custom/core/note-store.ts` 读取。会话目录若需覆盖，用 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir`。
 
 ### 4.2 技能（skills）未发现
 
@@ -259,7 +259,7 @@ ls portable/config/skills/<名称>/SKILL.md
 # 确认 settings.json 中的启用项
 node -e "console.log(JSON.parse(require('fs').readFileSync('portable/config/settings.json','utf8')).skills)"
 
-# 注意：portable/skills/ 是占位目录，Pi 不读取此处
+# 技能只从 agentDir/skills（= portable/config/skills/）加载
 ```
 
 ### 4.3 多环境配置冲突
@@ -351,7 +351,7 @@ npm install
 **诊断：**
 ```bash
 # 1. 检查会话数据规模
-du -sh portable/sessions/
+du -sh portable/config/sessions/
 
 # 2. 检查上下文/预算相关逻辑（custom/features/context/）
 ls custom/features/context/
@@ -376,10 +376,10 @@ ls -lh portable/memory/tool-outputs/ 2>/dev/null | head
 ps aux | grep node
 
 # 检查会话与记忆数据规模
-du -sh portable/sessions/ portable/memory/
+du -sh portable/config/sessions/ portable/memory/
 ```
 
-**解决：** 会话数据不会自动收缩，长期运行后应归档或清理 `portable/sessions/`；清理前用 `pi-backup` 技能留档。
+**解决：** 会话数据不会自动收缩，长期运行后应归档或清理 `portable/config/sessions/`；清理前用 `pi-backup` 技能留档。
 
 ### 6.3 校验命令本身很慢
 
@@ -391,7 +391,7 @@ du -sh portable/sessions/ portable/memory/
 
 ## 七、数据问题
 
-运行时数据全部收敛在 `portable/`：`portable/config/`（Pi 配置）、`portable/sessions/`（会话历史）、`portable/memory/`（记忆数据：note-store 笔记 + `tool-outputs/` 归档）、`portable/extensions/`（扩展安装目录）。
+运行时数据全部收敛在 `portable/`：`portable/config/`（agentDir：Pi 配置、`skills/` 技能、`sessions/` 会话、`extensions/` 第三方扩展）、`portable/memory/`（自定义功能数据：note-store 笔记 + `tool-outputs/` 归档）。
 
 ### 7.1 记忆数据异常
 
@@ -424,13 +424,13 @@ ls custom/core/note-store.ts custom/features/memory/
 **预防：**
 ```bash
 # 检查会话目录
-ls -la portable/sessions/
+ls -la portable/config/sessions/
 
 # 定期备份（含会话）——使用 pi-backup 技能
 # 技能位置：portable/config/skills/pi-backup/
 ```
 
-**注意：** `portable/sessions/` 被 gitignore，删除后无法从 git 找回；会话数据的唯一保险是备份。
+**注意：** `portable/config/sessions/` 被 gitignore，删除后无法从 git 找回；会话数据的唯一保险是备份。
 
 ---
 
@@ -484,4 +484,4 @@ npx vitest run
 2. **错误信息**：完整的错误输出（含触发它的命令）
 3. **复现步骤**：如何触发问题，是否稳定复现
 4. **检查结果**：`npm run check`、`npx tsc --noEmit -p custom/`、`npx vitest run` 的输出
-5. **相关数据**：涉及记忆/会话时，说明 `portable/memory/` 或 `portable/sessions/` 的异常现象（注意脱敏，凭据类内容替换为 `<REDACTED>`）
+5. **相关数据**：涉及记忆/会话时，说明 `portable/memory/` 或 `portable/config/sessions/` 的异常现象（注意脱敏，凭据类内容替换为 `<REDACTED>`）

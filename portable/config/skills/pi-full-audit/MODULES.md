@@ -101,8 +101,8 @@ bash portable/config/skills/pi-full-audit/review.sh
   - ignore 规则是否重复或冲突
 - **大文件扫描**：`*.bak.*`、`.artifacts/`、测试生成的二进制、迁移遗留
 - **两类文件区分**：
-  - 入库共享：`custom/` 源码、`scripts/`、`patches/`、`docs/`、`portable/config/` 下被白名单跟踪的配置、`packs/`
-  - 运行时本地：`portable/sessions/`、`portable/memory/`、`portable/extensions/`、`portable/config/` 下的 auth/models/state 文件
+  - 入库共享：`custom/` 源码、`scripts/`、`patches/`、`docs/`、`portable/config/` 下被白名单跟踪的配置与 `portable/config/skills/`、`packs/`
+  - 运行时本地：`portable/config/sessions/`、`portable/memory/`、`portable/config/{extensions,npm,git}/`、`portable/config/` 下的 auth/models/state 文件
 
 #### B2. 仓库体积审计
 
@@ -205,7 +205,7 @@ bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
 
 完整清单见 [references/RUNTIME-CHECK.md](references/RUNTIME-CHECK.md)（按需加载）。
 
-覆盖：`portable/sessions/` 会话体积与消息数、`portable/memory/tool-outputs/` 工具输出归档、`custom/features/context/` 的 token 预算与压力档位、memory 注入块稳定性、autopilot/link 运行态。
+覆盖：`portable/config/sessions/` 会话体积与消息数、`portable/memory/tool-outputs/` 工具输出归档、`custom/features/context/` 的 token 预算与压力档位、memory 注入块稳定性、autopilot/link 运行态。
 
 ---
 

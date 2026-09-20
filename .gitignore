@@ -44,12 +44,6 @@ portable/config/*
 # 技能目录（pi 的 agentDir/skills，随仓库分发）
 !portable/config/skills/
 !portable/config/skills/**
-portable/sessions/*
-!portable/sessions/.gitkeep
-portable/extensions/*
-!portable/extensions/.gitkeep
-portable/skills/*
-!portable/skills/.gitkeep
 portable/memory/*
 !portable/memory/.gitkeep
 

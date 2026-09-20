@@ -51,17 +51,18 @@ my-pi 的自定义代码。三层结构：
 运行测试：`npm test`（vitest）。
 
 ### `portable/`
-运行时数据与配置。5 个目录：
+运行时数据与配置。2 个目录：
 
-- `config/`：**Pi 运行时配置目录**（`PI_CODING_AGENT_DIR` 指向此处）。含 `settings.json`、`AGENTS.md`、`APPEND_SYSTEM.md`、`keybindings.json` 等；`models.json`/`auth.json`/`modes.json`/`trust.json` 等每环境独立、不入库
-  - `config/skills/`：**技能目录**（pi 从 `agentDir/skills` 自动发现；`settings.json` 的 `"skills"` 数组是相对 `agentDir` 的覆盖模式，如 `+skills/pi-backup/SKILL.md`）。技能随仓库分发，已在 `.gitignore` 中加白名单
-  - `config/sessions/`：pi 实际写入的会话目录（pi 未识别 `PI_SESSION_DIR`，见「已知偏离」）
-- `sessions/`：会话历史（占位目录；pi 未识别对应环境变量）
-- `extensions/`：扩展安装目录（占位目录；my-pi 的功能以 `custom/features/` + `custom/bootstrap.ts` 加载）
-- `skills/`：**占位目录，pi 不读取**（技能实际位于 `config/skills/`）
-- `memory/`：记忆数据（note-store 的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
+- `config/`：**Pi 运行时配置目录（agentDir，`PI_CODING_AGENT_DIR` 指向此处）**，几乎所有运行时数据都在其下：
+  - `settings.json`、`AGENTS.md`、`APPEND_SYSTEM.md`、`keybindings.json`：跟踪的共享配置
+  - `skills/`：**技能目录**（pi 从 `agentDir/skills` 自动发现；`settings.json` 的 `"skills"` 数组是相对 `agentDir` 的覆盖模式，如 `+skills/pi-backup/SKILL.md`）。随仓库分发，已在 `.gitignore` 加白名单
+  - `sessions/`：会话历史（`sessions/<转义 cwd>/*.jsonl`，pi 自动创建，不入库）
+  - `extensions/`：第三方扩展目录（`agentDir/extensions` 自动发现，放 `<name>/index.ts` 即生效）
+  - `npm/`、`git/`：`./my-pi.sh install` 安装的 npm / git 扩展包（来源记入 `settings.json` 的 `packages`）
+  - `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json`、`pi-link-*.json`、`scheduled-seeds.json`：每环境独立、不入库
+- `memory/`：my-pi 自定义功能的数据（note-store 的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
 
-通过 `my-pi.sh` / `scripts/dev.sh` 中的环境变量重定向到此；项目根不再有 `.pi/` 目录。
+`my-pi.sh` / `scripts/dev.sh` 只导出 `PI_CODING_AGENT_DIR`（pi 识别）与 `PI_MEMORY_DIR`（`custom/` 识别）；项目根不再有 `.pi/` 目录。
 
 ### `packs/`
 外部技能包仓库（迁移自 pi-tools）。每个包是 `packs/<name>/SKILL.md` 入口 + 附属资源（`bin/`、`references/`、`workflows/`、`skills/` 等），部分包自带二级技能。
@@ -90,9 +91,8 @@ my-pi 的自定义代码。三层结构：
 ```
 my-pi.sh
   ↓ 设置环境变量
-PI_CODING_AGENT_DIR=portable/config   # pi 识别
+PI_CODING_AGENT_DIR=portable/config   # pi 识别（agentDir：技能/会话/扩展都在其下）
 PI_MEMORY_DIR=portable/memory         # custom/ 的 note-store 识别
-PI_SESSION_DIR / PI_EXTENSION_DIR / PI_SKILLS_DIR   # 导出但不被 pi 识别（见「已知偏离」）
   ↓ 启动
 vendor/pi/packages/coding-agent/dist/cli.js
   ↓ 加载
@@ -105,12 +105,9 @@ custom/features/*/logic.ts
 
 ## 已知偏离
 
-- **`PI_SESSION_DIR` / `PI_EXTENSION_DIR` / `PI_SKILLS_DIR` 不被 pi 识别**：vendor/pi v0.85.1 只识别 `PI_CODING_AGENT_DIR`（`config.ts`）与 `PI_PACKAGE_DIR`。因此：
-  - 技能实际从 `portable/config/skills/` 发现（= `agentDir/skills`），`portable/skills/` 不被读取；
-  - 会话实际写入 `portable/config/sessions/`，`portable/sessions/` 不被写入；
-  - 扩展通过 `--extension custom/bootstrap.ts` 显式加载，`portable/extensions/` 不被扫描。
-  `my-pi.sh` 仍导出这些变量（对自定义功能有效，如 `PI_MEMORY_DIR`），文档不以它们为生效机制。
-- 若需让 `portable/{sessions,extensions,skills}/` 真正生效，应通过启动器参数（`--session-dir`）或在 `patches/` 中为 pi 增加环境变量支持，而不是依赖现有变量。
+- **pi 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`**（vendor/pi v0.85.1 `config.ts`）：不存在 `PI_SKILLS_DIR`/`PI_EXTENSION_DIR`；会话目录的可覆盖变量是 `PI_CODING_AGENT_SESSION_DIR`（或 `--session-dir`）。my-pi 因此统一用 `portable/config/`（agentDir）承载技能、会话与扩展，启动器不再导出无效变量。
+- **项目级配置目录是 `.pi` 而非 `.my-pi`**：`CONFIG_DIR_NAME` 取自运行时加载的 `vendor/pi/packages/coding-agent/package.json` 的 `piConfig.configDir`（值为 `.pi`），根 `package.json` 的 `.my-pi` 不参与运行时。故项目级设置/项目级扩展会落在 `<cwd>/.pi/`——my-pi 不使用项目级资源，`pi install` 也应避免 `-l/--local`。
+- **会话默认在 `portable/config/sessions/`**：即 `agentDir/sessions/<转义 cwd>/`。若希望会话与配置分离，可在启动器加 `--session-dir "$MY_PI_ROOT/portable/sessions"`（当前未启用）。
 
 ## 便携性保证
 

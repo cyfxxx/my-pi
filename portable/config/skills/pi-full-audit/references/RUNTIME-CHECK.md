@@ -13,7 +13,7 @@
    - `autopilot_status`：自主运行开关、任务数、遥测、预算
    - `link_status`：链路状态
    - 模型/provider/思考层级：读 `portable/config/settings.json`（`defaultProvider`/`defaultModel`/`defaultThinkingLevel`）
-   - 会话文件位置与大小：`ls -lS portable/sessions/`（pi 使用 agentDir 默认时也可能位于 `portable/config/sessions/`）
+   - 会话文件位置与大小：`ls -lS portable/config/sessions/`（= `agentDir/sessions/<转义 cwd>/`）
 
 2. **token 预算与压力档位**（`custom/features/context/`）
    - 预算源：`budget.ts` 以真实 `contextWindow` 校准总预算，未校准时默认 128K
@@ -74,7 +74,7 @@
 
 每日整体复检 my-pi 前一日运行情况，**只读为主、不深入探索**（防 token 浪费，参考一轮工具调用 6-12 个、out ~500 tokens）。不改配置，工作目录 `/root/my-pi`。
 
-1. **会话水位**：`ls -lS portable/sessions/ | head`（或 `portable/config/sessions/`）看最大会话文件与增长
+1. **会话水位**：`ls -lS portable/config/sessions/*/ | head` 看最大会话文件与增长
 2. **归档水位**：`du -sh portable/memory/tool-outputs portable/memory 2>/dev/null` 看工具输出归档与笔记体积
 3. **自动执行**：`autopilot_status`；读 `portable/config/.pi-autopilot-lastgood.json` 与 `.pi-autopilot-crash.json` 时间戳
 4. **收敛边界**：`npm run check`（隔离边界，含符号链接与 vendor/pi 干净度）

@@ -64,7 +64,7 @@
 
 ### 2. git 管理
 
-- `.gitignore` 是否覆盖所有运行时数据（`portable/sessions/`、`portable/memory/`、`portable/extensions/`、`portable/config/` 下的本地状态）
+- `.gitignore` 是否覆盖所有运行时数据（`portable/config/sessions/`、`portable/memory/`、`portable/config/extensions/`、`portable/config/` 下的本地状态）
 - `vendor/pi/` 是否被忽略（独立 git clone）
 - 是否有不该入库的文件被跟踪（lock 文件、构建产物 `custom/dist/`、临时文件、大二进制）
 - ignore 规则是否重复或冲突
@@ -81,10 +81,10 @@
 
 | 入库共享 | 运行时本地 |
 |----------|-----------|
-| `custom/` 源码 | `portable/sessions/` 会话 |
+| `custom/` 源码 | `portable/config/sessions/` 会话 |
 | `scripts/`、`patches/`、`docs/` | `portable/memory/` 笔记与工具输出归档 |
 | `portable/config/` 白名单配置（settings/keybindings/AGENTS/APPEND_SYSTEM） | `portable/config/` 的 auth/models/trust/pi-link-* 等状态 |
-| `packs/` 技能包 | `portable/extensions/` 扩展安装 |
+| `portable/config/skills/` 技能、`packs/` 技能包 | `portable/config/{extensions,npm,git}/` 第三方扩展 |
 
 ### 5. 文档同步
 

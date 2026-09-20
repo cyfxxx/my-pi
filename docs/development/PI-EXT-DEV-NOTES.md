@@ -120,7 +120,7 @@ npm run check
 ## 九、Git 约定
 
 - remote 含 token 时推送后立即恢复无凭证 URL；token 内联一次性使用不落盘
-- 勿提交 `portable/config/` 下的每环境机密与状态文件：`auth.json` / `models.json` / `models-store.json` / `modes.json` / `trust.json` / `pi-link-*.json` / `scheduled-seeds.json`（均已 gitignore）；`settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 是跟踪文件，改动需有意提交。`portable/memory/`、`portable/sessions/`、`portable/extensions/` 为运行时数据，不入库
+- 勿提交 `portable/config/` 下的每环境机密与状态文件：`auth.json` / `models.json` / `models-store.json` / `modes.json` / `trust.json` / `pi-link-*.json` / `scheduled-seeds.json`（均已 gitignore）；`settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 是跟踪文件，改动需有意提交。`portable/memory/`、`portable/config/sessions/`、`portable/config/extensions/` 为运行时数据，不入库
 - **上游 vendor 同步约定**：`vendor/pi/` 是独立 git clone（已 gitignore）、永不直接修改；对上游的改动写入 `patches/`，上游更新用 `bash scripts/sync-upstream.sh`（或 `bash scripts/sync-upstream.sh <commit>`）合并，锁定点见 `vendor/PINNED_COMMIT` 与 `vendor/pi/LAST_SYNC_POINT`
 - 提交纪律：只提交本次会话更改的文件，暂存显式路径（永远不要 `git add -A`）；提交消息格式 `{feat,fix,docs}: <消息>`
 - **pi-link 运行时文件约定**：跨设备共享类状态（活跃时间戳/远程状态/信箱）放 `portable/config/pi-link-*.json`，**gitignore + 每设备独立**；设备间信息交换走 ssh 文件读取，不引入 HTTP daemon

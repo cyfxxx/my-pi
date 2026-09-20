@@ -143,8 +143,9 @@ else
        -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' -o -name '.env' -o -name '.env.*' \) \
     ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path '*/custom/dist/*' \
     ! -path '*/vendor/pi/*' ! -path '*/.artifacts/*' ! -path '*/coverage/*' \
-    ! -path '*/portable/sessions/*' ! -path '*/portable/memory/*' \
-    ! -path '*/portable/extensions/*' ! -path '*/portable/config/sessions/*' \
+    ! -path '*/portable/config/sessions/*' ! -path '*/portable/memory/*' \
+    ! -path '*/portable/config/extensions/*' ! -path '*/portable/config/npm/*' \
+    ! -path '*/portable/config/git/*' \
     2>/dev/null)
   TOTAL_FILES=$(find "$SCAN_DIR" -type f \
     \( -name '*.ts' -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.sh' \
@@ -206,7 +207,7 @@ if [ "$MODE" = "diff" ]; then
   runtime_tracked=0
   while IFS= read -r f; do
     case "$f" in
-      portable/sessions/*|portable/memory/*|portable/extensions/*)
+      portable/config/sessions/*|portable/memory/*|portable/config/extensions/*|portable/config/npm/*|portable/config/git/*)
         fail "运行时数据被 git 跟踪: $f"; runtime_tracked=1 ;;
       portable/config/*)
         case "${f##*/}" in

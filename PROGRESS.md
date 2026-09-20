@@ -235,3 +235,14 @@
   - 会话实际存放 `<agentDir>/sessions/<转义 cwd>/` = `portable/config/sessions/--root-my-pi--/`；`PI_SESSION_DIR` 无效，正确变量是 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir`
   - 第三方扩展落点：`portable/config/extensions/`（自动发现）、`portable/config/npm/node_modules/`（npm）、`portable/config/git/<host>/<path>`（git），来源记入 `settings.json` 的 `packages`
 - 验证：文档无死链；`npm run check`、`npx tsc --noEmit -p custom/`、`npx vitest run` 通过
+
+## 删除 portable 占位目录，统一运行时数据到 agentDir
+- 完成时间：2026-09-20
+- 删除零引用占位目录：`portable/skills/`、`portable/extensions/`、`portable/sessions/`（各仅含 `.gitkeep`；pi 不读取，代码无引用）
+- 启动器修正（`my-pi.sh`、`scripts/dev.sh`）：移除无效的 `PI_SESSION_DIR`/`PI_EXTENSION_DIR`/`PI_SKILLS_DIR` 导出与 `mkdir`，只保留 `PI_CODING_AGENT_DIR`（pi 识别）与 `PI_MEMORY_DIR`（`custom/core/note-store.ts` 识别）
+- `.gitignore`：移除三个目录的忽略规则，保留 `portable/config/*` + 白名单（含 `skills/`）与 `portable/memory/*`
+- 会话保持 pi 默认位置 `portable/config/sessions/`（未启用 `--session-dir`；现 2 个会话文件 3.9 KB 无需迁移）
+- 文档同步（17 处引用）：STRUCTURE（portable 章节、数据流向、已知偏离重写）、portable/config/AGENTS、README（目录树与数据映射表）、docs/{FAQ,TROUBLESHOOTING,ENVIRONMENTS,PI-EXT-DEV-NOTES}、pi-backup（SKILL/COMMANDS/BACKUP-MANIFEST）、pi-full-audit（CHECKLIST/MODULES/RUNTIME-CHECK/review.sh）
+- review.sh：去重会话排除项，补齐 `portable/config/{npm,git}` 的运行时数据排除与追踪检测
+- 收敛后的规则：agent 的配置/技能/会话/扩展都在 `portable/config/`（agentDir）下，`portable/memory/` 只放 my-pi 自定义功能数据
+- 验证：`bash -n review.sh` 通过；文档无死链；`npm run check`、`npx tsc --noEmit -p custom/`、`npx vitest run` 通过

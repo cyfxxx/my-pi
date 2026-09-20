@@ -51,14 +51,13 @@ grep -qi microsoft /proc/version && echo WSL2
 |------|----------|------|
 | `portable/config/`（部分文件） | 部分跟踪 | `settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 入库共享；其余被 `.gitignore` 排除 |
 | `portable/config/skills/` | **入库共享** | 技能目录（pi 从 `agentDir/skills` 发现；`.gitignore` 已加白名单，随仓库分发） |
-| `portable/skills/` | 不入库 | 占位目录，**pi 不读取** |
-| `portable/sessions/` | 不入库 | 会话历史 |
-| `portable/extensions/` | 不入库 | 扩展安装目录 |
-| `portable/memory/` | 不入库（仅 `.gitkeep`） | 记忆数据：note-store 笔记与工具输出归档 |
+| `portable/config/sessions/` | 不入库 | 会话历史（`agentDir/sessions/<转义 cwd>/`） |
+| `portable/config/extensions/`、`portable/config/{npm,git}/` | 不入库 | 第三方扩展（自动发现目录与 `pi install` 装入的包） |
+| `portable/memory/` | 不入库（仅 `.gitkeep`） | 自定义功能数据：note-store 笔记与工具输出归档 |
 
 由此得到两条基本规则：
 
-1. **仓库里能同步的只有代码、共享配置与技能**（`custom/`、`scripts/`、`patches/`、`packs/`、`docs/`、`portable/config/` 中列入白名单的四个文件与 `portable/config/skills/`）。`portable/memory/`、`portable/sessions/`、`portable/extensions/`、每环境独立配置等不会随 `git pull` 到达新环境。
+1. **仓库里能同步的只有代码、共享配置与技能**（`custom/`、`scripts/`、`patches/`、`packs/`、`docs/`、`portable/config/` 中列入白名单的四个文件与 `portable/config/skills/`）。`portable/memory/`、`portable/config/{sessions,extensions,npm,git}/`、每环境独立配置等不会随 `git pull` 到达新环境。
 2. **换机保留记忆必须走归档/手工拷贝**，例如 `pi-backup create` 归档，或直接拷贝对应目录；技能随 git 同步，通常无需额外处理。
 
 **环境专属信息的标注约定**：记忆数据统一放在 `portable/memory/`。记录时在同一份记忆中区分环境——环境专属的经验（如"某环境的终端快捷键/音频桥配置"）在内容里标注环境标签（`termux`/`wsl2`/`linux`/`macos`）；只是"在某个环境里发现"的通用知识不标注。这样跨环境复习时能快速分辨哪些经验只对当前机器成立。
@@ -99,7 +98,7 @@ grep -qi microsoft /proc/version && echo WSL2
 | `portable/config/modes.json` / `trust.json` | 每环境独立（gitignore） | 模式与项目信任状态，随本机使用变化 |
 | `portable/config/pi-link-*.json` | 每环境独立（gitignore） | 多设备互联的设备清单与运行时状态（`pi-link-active.json`/`pi-link-state.json`/`pi-link-outbox.json`） |
 | `portable/config/scheduled-seeds.json` | 每环境独立（gitignore） | 定时相关运行时数据 |
-| `portable/sessions/` / `portable/extensions/` / `portable/memory/` | 每环境独立（gitignore） | 会话历史、扩展安装、记忆数据 |
+| `portable/config/sessions/` / `portable/config/{extensions,npm,git}/` / `portable/memory/` | 每环境独立（gitignore） | 会话历史、第三方扩展、自定义功能数据 |
 
 跨机迁移每环境独立项时三选一：① 用 `pi-backup create` 打包后 `restore`；② 直接 `scp`/`rsync` 拷贝对应文件或目录；③ 在新环境手动重建。日常同步**不要**用归档覆盖新环境的独立配置。
 
