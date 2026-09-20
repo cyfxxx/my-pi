@@ -22,6 +22,7 @@
 | OPTIMIZATION-PLAN.md | 全面优化计划 |
 | FIX-REPORT.md | 修复完成报告 |
 | PI-TOOLS-README.md | pi-tools 完整说明 |
+| Pi硬分叉方案.md | 硬分叉完整方案（架构设计、迁移策略、便携化） |
 
 ## 子目录
 
