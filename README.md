@@ -1,191 +1,198 @@
 # my-pi: 私人 AI 助手
 
-基于 pi 框架的私人 AI 助手，整合 pi-tools 功能，提供完全受控的 AI 编程体验。
-
-## 项目目标
-
-1. **完全受控**：私人 AI 助手，数据本地存储
-2. **功能整合**：整合 pi-tools 的扩展功能
-3. **上游兼容**：保持与 pi 上游的同步能力
-4. **扩展性强**：支持自定义扩展和功能
+基于 pi 框架的私人 AI 助手，通过硬分叉实现完全受控的 AI 编程体验。
 
 ## 架构原则
 
-- **上游隔离**：`packages/` 保持只读，从 pi 上游同步
-- **自定义分层**：`custom/` 作为独立层，通过适配器与 pi 交互
-- **依赖单向**：custom → adapter → packages（不反向依赖）
-- **补丁管理**：必须修改 packages/ 时，用补丁追踪
+- **上游隔离**：`vendor/pi/` 保持只读，从 pi 上游同步
+- **逻辑隔离**：`custom/features/*/logic.ts` 零 Pi 依赖
+- **接口隔离**：`custom/adapters/` 是唯一的 Pi API 接触点
+- **数据收敛**：所有运行时数据收敛到 `portable/` 目录，实现 U 盘便携
 
 ## 目录结构
 
 ```
 my-pi/
-├── .pi/                          # Pi 本地配置（扩展/服务/技能/运行时）
-│   ├── core/                     # 基础层：配置/注册表/钩子/密钥
-│   ├── services/                 # 服务层：token-budget/diagnostics/note-store
-│   ├── extensions/               # 12 个扩展（从 pi-tools 迁移）
-│   ├── skills/                   # 内置技能（pi-backup/pi-translate-zh 等）
-│   ├── settings.json             # 主配置
-│   ├── models.json               # 模型配置
-│   └── sessions/                 # 会话数据（运行时）
-├── packages/                     # pi 上游包（只读同步）
-├── custom/
-│   ├── src/
-│   │   ├── adapters/             # 适配器层（隔离 pi API 变化）
-│   │   ├── services/             # 下沉服务（可独立修改）
+├── vendor/pi/                        # 上游 vendored 代码（只读）
+│   ├── packages/                     # pi 上游包
+│   │   ├── agent/                    # Agent loop
+│   │   ├── ai/                       # LLM provider
+│   │   ├── coding-agent/             # CLI 和交互模式
+│   │   ├── tui/                      # 终端 UI
+│   │   └── ...
+│   ├── package.json                  # piConfig (name: my-pi)
+│   ├── LAST_SYNC_POINT               # 上游同步点
+│   └── theme/                        # 主题文件
+│
+├── custom/                           # 你的代码（唯一需要维护的部分）
+│   ├── adapters/                     # 适配器层：隔离 Pi API 变化
+│   │   ├── api.ts                    # ExtensionAPI 适配
+│   │   ├── types.ts                  # 适配器类型定义
+│   │   ├── tools/                    # 工具适配器
+│   │   └── session/                  # 会话适配器
+│   │
+│   ├── features/                     # 功能模块（从 pi-tools 迁移）
+│   │   ├── autopilot/                # 自主运行
+│   │   ├── browser/                  # 浏览器自动化
+│   │   ├── context/                  # Token 优化
+│   │   ├── intervention/             # 干预捕获
+│   │   ├── link/                     # 多设备互联
+│   │   ├── memory/                   # 跨会话记忆
+│   │   ├── mode/                     # 模式切换
+│   │   ├── plan-mode/                # 计划模式
+│   │   ├── subagent/                 # 子代理
+│   │   ├── tmux/                     # tmux 会话管理
+│   │   ├── voice/                    # 语音交流
+│   │   └── web-search/               # 网络搜索
+│   │
+│   ├── core/                         # 核心服务
+│   │   ├── config.ts                 # 便携化路径解析
+│   │   ├── registry.ts               # 功能注册表
 │   │   └── index.ts
-│   ├── seams/                    # 能力接缝
-│   ├── events/                   # 事件系统
-│   ├── session-log/              # 会话日志
-│   ├── config/                   # 配置管理
-│   ├── bootstrap.ts              # 启动引导
-│   ├── extension-loader.ts       # 扩展加载器
-│   ├── integration.ts            # 集成层
-│   ├── cordis.yml                # 声明式配置
-│   ├── docs/                     # 项目文档
-│   └── tests/                    # 测试文件
+│   │
+│   ├── src/                          # 共享服务
+│   │   ├── adapters/                 # 适配器实现
+│   │   └── services/                 # 下沉服务
+│   │
+│   ├── bootstrap.ts                  # 启动引导
+│   ├── extension-loader.ts           # 扩展加载器
+│   └── tsconfig.json                 # TypeScript 配置
+│
+├── portable/                         # 运行时数据（便携核心）
+│   ├── bin/                          # 便携版二进制
+│   │   └── my-pi                     # Bun 编译的可执行文件
+│   ├── config/                       # 配置数据
+│   ├── sessions/                     # 会话数据
+│   ├── extensions/                   # 扩展安装目录
+│   ├── skills/                       # 技能目录
+│   └── memory/                       # 记忆数据
+│
 ├── scripts/
-│   ├── core/                     # 核心脚本（rebuild/wrapper/source-build）
-│   ├── crash-recovery/           # 崩溃恢复
-│   ├── maintenance/              # 日常维护
-│   ├── deploy/                   # 部署脚本
-│   ├── install/                  # 安装脚本
-│   ├── test/                     # 测试脚本
-│   ├── environment/              # 环境脚本
-│   ├── sync-upstream.sh          # 上游同步
-│   ├── create-patch.sh           # 补丁管理
-│   └── apply-patches.sh          # 补丁管理
-├── packs/                        # 技能包（13 个外部技能包）
-├── data/                         # 运行时数据（memory/logs/plans/circuit-breaker）
-├── deploy/                       # 部署配置（systemd, tmux）
-├── portable/                     # 便携配置（Windows 便携包）
-├── searxng/                      # SearXNG 自托管搜索
-├── patches/                      # 补丁管理
-├── docs/                         # 文档
-│   ├── design/                   # 设计文档
-│   ├── development/              # 开发文档
-│   ├── operations/               # 运维文档
-│   └── maintenance/              # 维护文档
-├── package.json                  # monorepo 配置
-├── README.md                     # 项目说明
-├── AGENTS.md                     # 开发规范
-├── CHANGELOG.md                  # 版本记录
-└── .github/workflows/ci.yml     # CI 配置
+│   ├── sync-upstream.sh              # 上游同步脚本
+│   └── init-portable.sh              # 便携环境初始化
+│
+├── patches/                          # 上游补丁（可选）
+├── my-pi.sh                          # 便携启动脚本
+├── package.json                      # 工作区配置
+└── README.md
 ```
 
 ## 快速开始
 
 ```bash
-# 构建
-npm run build:offline
+# 1. 初始化便携环境
+bash scripts/init-portable.sh
 
-# 运行
-mypi --list-models
-mypi -p "你的问题"
+# 2. 启动 my-pi
+./my-pi.sh
 
-# 重建
-./scripts/core/rebuild.sh
+# 3. 或直接使用便携版二进制
+PI_CODING_AGENT_DIR=/root/my-pi/portable/config ./portable/bin/my-pi
 
-# 测试
-./scripts/test/smoke-test.sh
+# 4. 查看可用模型
+PI_CODING_AGENT_DIR=/root/my-pi/portable/config ./portable/bin/my-pi --list-models
 ```
 
 ## 核心功能
 
 ### 12 个扩展
 
-| 扩展 | 功能 |
-|------|------|
-| pi-autopilot | 自主运行（定时任务 + 自管理 + 失败自愈） |
-| pi-browser | 浏览器自动化（CloakBrowser） |
-| pi-context | Token 优化中枢（路由/thinking 剪枝/compaction 去重/输出截断） |
-| pi-intervention | 干预捕获（abort 快照/corrective prompt） |
-| pi-link | 多设备互联（SSH 通道 + 远程 RPC） |
-| pi-memory | 跨会话持久记忆（自主学习闭环） |
-| pi-mode | 模式切换（full/light/quick） |
-| pi-tmux | tmux 会话管理（后台任务/长任务） |
-| pi-voice | 语音交流（Termux：录音转写 + TTS） |
-| pi-web-search | 网络搜索（SearXNG 私密搜索） |
-| plan-mode | 计划模式（TUI 计划/任务管理） |
-| subagent | 子代理（delegate 给专门 agent） |
+| 扩展 | 功能 | 类型 |
+|------|------|------|
+| autopilot | 自主运行（定时任务 + 自管理 + 失败自愈） | 钩子型 |
+| browser | 浏览器自动化（CloakBrowser） | 工具型 |
+| context | Token 优化中枢（路由/thinking 剪枝/compaction 去重/输出截断） | 钩子型 |
+| intervention | 干预捕获（abort 快照/corrective prompt） | 钩子型 |
+| link | 多设备互联（SSH 通道 + 远程 RPC） | 工具型 |
+| memory | 跨会话持久记忆（自主学习闭环） | 工具型 |
+| mode | 模式切换（full/light/quick） | 钩子型 |
+| plan-mode | 计划模式（TUI 计划/任务管理） | 钩子型 |
+| subagent | 子代理（delegate 给专门 agent） | 工具型 |
+| tmux | tmux 会话管理（后台任务/长任务） | 工具型 |
+| voice | 语音交流（Termux：录音转写 + TTS） | 工具型 |
+| web-search | 网络搜索（SearXNG 私密搜索） | 工具型 |
 
-### 核心脚本
+### 架构分层
 
-| 脚本 | 功能 |
-|------|------|
-| rebuild.sh | 一键重建（幂等、并行、镜像加速） |
-| pi-wrapper.sh | 进程外生命周期管理器（崩溃恢复/熔断器/快照） |
-| pi-source-build.sh | 从源码构建 pi |
-| daily-health.mjs | 每日健康检查 |
-| verify-patches.mjs | 补丁版本匹配校验 |
+```
+Layer 4 ─ Agent 编排层 ─────── (由 pi 内置调度)
+    ↑
+Layer 3 ─ 功能层 ───────────── custom/features/ (12 个扩展)
+    ↑
+Layer 2 ─ 适配器层 ─────────── custom/adapters/ (隔离 Pi API)
+    ↑
+Layer 1 ─ 服务层 ───────────── custom/src/services/ (共享服务)
+    ↑
+Layer 0 ─ 基础层 ───────────── vendor/pi/ (上游代码)
+```
 
-### 13 个技能包
+## 上游同步
 
-- cangjie-skill：书籍蒸馏
-- colab-bridge：Google Colab 远程 GPU
-- comfyui-agent：ComfyUI 图像生成
-- dg-piagent：pi-agent SDK 开发
-- embedded-dev：嵌入式开发
-- gamedev：游戏开发
-- knowledge-fetch：知识订阅
-- media-toolkit：图片/视频处理
-- novel-writing：长篇小说
-- pcb-design：PCB 硬件设计
-- pdf-toolkit：PDF 处理
-- reverse-skill：安全技能路由
-- skill-integration：技能包整合
+```bash
+# 同步到最新上游
+bash scripts/sync-upstream.sh
+
+# 同步到指定 commit
+bash scripts/sync-upstream.sh <commit-sha>
+```
+
+## 便携化
+
+### U 盘使用流程
+
+```bash
+# 1. 在 U 盘上克隆项目
+cd /Volumes/USB/my-pi
+
+# 2. 初始化便携环境
+bash scripts/init-portable.sh
+
+# 3. 安装依赖并构建
+npm install
+cd vendor/pi && npm run build:offline
+
+# 4. 构建便携版二进制
+~/.bun/bin/bun build --compile ./packages/coding-agent/src/cli.ts --outfile ../portable/bin/my-pi
+
+# 5. 使用
+./my-pi.sh
+```
+
+### 数据目录映射
+
+| Pi 默认路径 | 便携化路径 | 机制 |
+|---|---|---|
+| `~/.my-pi/agent/settings.json` | `portable/config/settings.json` | 符号链接 |
+| `~/.my-pi/agent/sessions/` | `portable/sessions/` | 符号链接 |
+| `~/.my-pi/agent/extensions/` | `portable/extensions/` | 符号链接 |
+| `~/.my-pi/agent/skills/` | `portable/skills/` | 符号链接 |
+| `~/.my-pi/agent/memory/` | `portable/memory/` | 符号链接 |
+
+## 开发
+
+### 构建
+
+```bash
+# 构建 vendor/pi
+cd vendor/pi && npm run build:offline
+
+# 检查 custom/ 类型
+cd custom && npx tsc --noEmit
+```
+
+### 添加新功能
+
+1. 在 `custom/features/` 下创建新目录
+2. 创建 `types.ts` - 类型定义
+3. 创建 `logic.ts` - 纯逻辑（零 Pi 依赖）
+4. 创建 `tool.ts` - 工具注册（使用适配器）
+5. 创建 `index.ts` - 入口（`init`/`destroy` 导出）
 
 ## 文档
 
-### 开发规范
-
-AI 代理开发规范位于 `.pi/AGENTS.md`（pi 自动读取）。核心要点：
-
-**对话风格**
-- 保持回答简短精炼，不使用 emoji
-- 只使用技术性语言，直接了当
-- 用户提问时，先回答问题再进行编辑
-
-**代码质量**
-- 大范围更改前完整阅读文件
-- 不使用 `any`，检查 node_modules 获取外部 API 类型
-- 禁止内联导入，只使用顶层导入
-- 永远不要直接修改 `packages/ai/src/models.generated.ts`
-
-**Git 规范**
-- 只提交本次会话更改的文件
-- 暂存显式路径，永远不要 `git add -A`
-- 提交消息格式：`{feat,fix,docs}: <消息>`
-
-**命令**
-- 代码更改后运行 `npm run check`
-- 除非用户要求，不运行 `npm run build` 或 `npm test`
-
-### 架构文档
-- [项目架构](custom/docs/ARCHITECTURE.md)
-- [实施计划](custom/docs/IMPLEMENTATION-PLAN.md)
-- [目录结构](custom/docs/DIRECTORY-STRUCTURE.md)
-
-### 迁移文档
-- [工具系统下沉方案](custom/docs/TOOL-SYSTEM-SINKING.md)
-- [会话管理下沉方案](custom/docs/SESSION-MANAGEMENT-SINKING.md)
-- [补丁管理](custom/docs/PATCH-MANAGEMENT.md)
-- [上游同步](custom/docs/UPSTREAM-SYNC.md)
-- [pi-tools 迁移计划](custom/docs/MIGRATION-PLAN-PI-TOOLS.md)
-
-### 运维文档
-- [设计文档](docs/design/VISION.md)
-- [开发文档](docs/development/AGENTS-DETAILS.md)
-- [运维文档](docs/operations/ENVIRONMENTS.md)
-- [维护文档](docs/maintenance/OPTIMIZATION-LOG.md)
-
-### pi-tools 文档
-- [pi-tools README](docs/PI-TOOLS-README.md)
-- [版本记录](CHANGELOG.md)
-
-## 维护者
-
-- 项目所有者：[你的名字]
+- [修改计划](/storage/emulated/0/Documents/修改计划.md)
+- [变更日志](CHANGELOG.md)
+- [贡献指南](CONTRIBUTING.md)
 
 ## 许可证
 
