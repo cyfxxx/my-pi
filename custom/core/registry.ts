@@ -1,115 +1,41 @@
 /**
- * core/registry.ts - 功能注册表
- *
- * 管理已注册的功能模块
- */
-
-export interface Feature {
-  id: string
-  name: string
-  version: string
-  enabled: boolean
-  init?: () => Promise<void> | void
-  destroy?: () => Promise<void> | void
-}
-
-/**
  * 功能注册表
+ * 
+ * 职责：集中管理所有功能的注册
+ * 约束：
+ *   - 每个功能必须通过此注册表注册
+ *   - 不允许在 bootstrap.ts 之外直接调用 features
  */
-export class FeatureRegistry {
-  private features: Map<string, Feature> = new Map()
 
-  /**
-   * 注册功能
-   */
-  register(feature: Feature): void {
-    this.features.set(feature.id, feature)
-  }
+import type { ExtensionAPI } from '../../vendor/pi/packages/coding-agent/src/extension-api';
 
-  /**
-   * 获取功能
-   */
-  get(id: string): Feature | undefined {
-    return this.features.get(id)
-  }
+export type FeatureRegister = (pi: ExtensionAPI) => void;
 
-  /**
-   * 获取所有已注册功能
-   */
-  getAll(): Feature[] {
-    return Array.from(this.features.values())
-  }
+interface RegisteredFeature {
+  name: string;
+  register: FeatureRegister;
+}
 
-  /**
-   * 获取所有已启用功能
-   */
-  getEnabled(): Feature[] {
-    return this.getAll().filter(f => f.enabled)
-  }
+const features: RegisteredFeature[] = [];
 
-  /**
-   * 启用功能
-   */
-  enable(id: string): boolean {
-    const feature = this.features.get(id)
-    if (feature) {
-      feature.enabled = true
-      return true
-    }
-    return false
-  }
-
-  /**
-   * 禁用功能
-   */
-  disable(id: string): boolean {
-    const feature = this.features.get(id)
-    if (feature) {
-      feature.enabled = false
-      return true
-    }
-    return false
-  }
-
-  /**
-   * 初始化所有已启用功能
-   */
-  async initAll(): Promise<void> {
-    for (const feature of this.getEnabled()) {
-      if (feature.init) {
-        try {
-          await feature.init()
-        } catch (err) {
-          console.error(`[FeatureRegistry] 初始化功能 ${feature.id} 失败:`, err)
-        }
-      }
-    }
-  }
-
-  /**
-   * 销毁所有功能
-   */
-  async destroyAll(): Promise<void> {
-    for (const feature of this.getAll().reverse()) {
-      if (feature.destroy) {
-        try {
-          await feature.destroy()
-        } catch (err) {
-          console.error(`[FeatureRegistry] 销毁功能 ${feature.id} 失败:`, err)
-        }
-      }
-    }
-  }
+/**
+ * 注册一个功能
+ */
+export function defineFeature(name: string, register: FeatureRegister): RegisteredFeature {
+  return { name, register };
 }
 
 /**
- * 全局注册表实例
+ * 将所有功能注册到 Pi
  */
-let globalRegistry: FeatureRegistry | null = null
-
-export function getRegistry(): FeatureRegistry {
-  if (!globalRegistry) {
-    globalRegistry = new FeatureRegistry()
+export function registerAll(pi: ExtensionAPI, featureList: RegisteredFeature[]): void {
+  for (const feature of featureList) {
+    try {
+      feature.register(pi);
+      console.log(`✅ 已注册功能：${feature.name}`);
+    } catch (error) {
+      console.error(`❌ 注册功能失败：${feature.name}`, error);
+      throw error;
+    }
   }
-  return globalRegistry
 }

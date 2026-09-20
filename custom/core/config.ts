@@ -1,87 +1,76 @@
 /**
- * core/config.ts - 便携化路径解析
- *
- * 统一管理所有路径解析，支持便携化运行
+ * 路径配置
+ * 
+ * 职责：解析所有路径，确保指向项目目录下的 portable/
+ * 约束：
+ *   - 所有路径必须动态解析，禁止硬编码
+ *   - 必须支持从任意位置调用
  */
 
-import { join } from 'node:path'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'fs';
+import { dirname, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
- * 获取项目根目录
+ * 解析项目根目录
+ * 从 custom/core/config.ts 向上两级
  */
 export function getProjectRoot(): string {
-  return process.env.MY_PI_ROOT || process.cwd()
+  return resolve(__dirname, '..', '..');
 }
 
-/**
- * 获取配置目录
- */
+export function getPortableRoot(): string {
+  return join(getProjectRoot(), 'portable');
+}
+
 export function getConfigDir(): string {
-  return process.env.MY_PI_CONFIG_DIR || join(getProjectRoot(), 'portable', 'config')
+  return join(getPortableRoot(), 'config');
 }
 
-/**
- * 获取会话目录
- */
-export function getSessionsDir(): string {
-  return process.env.MY_PI_SESSION_DIR || join(getProjectRoot(), 'portable', 'sessions')
+export function getSessionDir(): string {
+  return join(getPortableRoot(), 'sessions');
 }
 
-/**
- * 获取扩展目录
- */
-export function getExtensionsDir(): string {
-  return process.env.MY_PI_EXTENSION_DIR || join(getProjectRoot(), 'portable', 'extensions')
+export function getExtensionDir(): string {
+  return join(getPortableRoot(), 'extensions');
 }
 
-/**
- * 获取技能目录
- */
 export function getSkillsDir(): string {
-  return process.env.MY_PI_SKILLS_DIR || join(getProjectRoot(), 'portable', 'skills')
+  return join(getPortableRoot(), 'skills');
 }
 
-/**
- * 获取记忆目录
- */
 export function getMemoryDir(): string {
-  return process.env.MY_PI_MEMORY_DIR || join(getProjectRoot(), 'portable', 'memory')
+  return join(getPortableRoot(), 'memory');
+}
+
+export function getVendorPiDir(): string {
+  return join(getProjectRoot(), 'vendor', 'pi');
 }
 
 /**
- * 获取设置文件路径
+ * 确保所有必要目录存在
  */
-export function getSettingsPath(): string {
-  return join(getConfigDir(), 'settings.json')
-}
-
-/**
- * 获取认证文件路径
- */
-export function getAuthPath(): string {
-  return join(getConfigDir(), 'auth.json')
-}
-
-/**
- * 读取设置文件
- */
-export function readSettings(): Record<string, unknown> {
-  const path = getSettingsPath()
-  if (!existsSync(path)) return {}
-  try {
-    return JSON.parse(readFileSync(path, 'utf-8'))
-  } catch {
-    return {}
+export function ensureDirectories(): void {
+  const dirs = [
+    getConfigDir(),
+    getSessionDir(),
+    getExtensionDir(),
+    getSkillsDir(),
+    getMemoryDir(),
+  ];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) {
+      throw new Error(`必要目录不存在：${dir}。请先运行 scripts/init-portable.sh`);
+    }
   }
 }
 
 /**
- * 获取包目录（用于覆盖 pi 的 getPackageDir）
+ * 获取环境变量（带默认值）
  */
-export function getPackageDir(packageName?: string): string {
-  if (packageName) {
-    return join(getProjectRoot(), 'vendor', 'pi', 'packages', packageName)
-  }
-  return join(getProjectRoot(), 'vendor', 'pi')
+export function getEnv(key: string, defaultValue: string): string {
+  return process.env[key] ?? defaultValue;
 }

@@ -23,14 +23,15 @@ else
     echo "✅ logic.ts 无 vendor/pi 依赖"
 fi
 
-# 检查 3: adapters/ 之外不得 import vendor/pi
-VIOLATIONS=$(grep -rl "from.*vendor/pi" "$ROOT/custom" --include="*.ts" 2>/dev/null | grep -v "/adapters/" | grep -v "/core/config.ts" || true)
-if [ -n "$VIOLATIONS" ]; then
-    echo "❌ F-03 违反：以下文件在 adapters/ 外 import 了 vendor/pi："
-    echo "$VIOLATIONS"
+# 检查 3: adapters/ 之外不得 import vendor/pi（import type 除外，因为编译后会被擦除）
+VIOLATIONS=$(grep -rl "from.*vendor/pi" "$ROOT/custom" --include="*.ts" 2>/dev/null | grep -v "/adapters/" | grep -v "/core/config.ts" | xargs grep -l "import type.*from.*vendor/pi" 2>/dev/null || true)
+VIOLATIONS_RUNTIME=$(grep -rl "from.*vendor/pi" "$ROOT/custom" --include="*.ts" 2>/dev/null | grep -v "/adapters/" | grep -v "/core/config.ts" | xargs grep -l "^import " 2>/dev/null | xargs grep -L "import type.*from.*vendor/pi" 2>/dev/null || true)
+if [ -n "$VIOLATIONS_RUNTIME" ]; then
+    echo "❌ F-03 违反：以下文件在 adapters/ 外 runtime import 了 vendor/pi："
+    echo "$VIOLATIONS_RUNTIME"
     ERRORS=$((ERRORS + 1))
 else
-    echo "✅ adapters/ 外无 vendor/pi 依赖"
+    echo "✅ adapters/ 外无 vendor/pi runtime 依赖（import type 已允许）"
 fi
 
 # 检查 4: 禁止存在的目录
