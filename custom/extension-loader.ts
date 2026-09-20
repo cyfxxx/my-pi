@@ -50,7 +50,7 @@ export class ExtensionLoader {
    * 发现所有扩展
    */
   async discover(): Promise<CustomExtension[]> {
-    const extensionsDir = join(this.projectRoot, 'custom', 'extensions')
+    const extensionsDir = join(this.projectRoot, 'custom', 'features')
     const entries = await readdir(extensionsDir, { withFileTypes: true })
 
     const extensions: CustomExtension[] = []
