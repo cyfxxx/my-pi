@@ -1,0 +1,3 @@
+# Branding patch for my-pi
+# This patch customizes the piConfig in vendor/pi/package.json
+# to use "my-pi" as the name and ".my-pi" as the config directory.

@@ -1,29 +1,29 @@
 #!/bin/bash
 # my-pi.sh — 便携启动脚本
+# 无论从何处调用，都能正确解析项目根目录
 
-# 解析脚本所在目录（无论从何处调用）
+set -e
+
 MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 所有数据目录指向项目内的 portable/
-export MY_PI_CONFIG_DIR="$MY_PI_ROOT/portable/config"
-export MY_PI_SESSION_DIR="$MY_PI_ROOT/portable/sessions"
-export MY_PI_EXTENSION_DIR="$MY_PI_ROOT/portable/extensions"
-export MY_PI_SKILLS_DIR="$MY_PI_ROOT/portable/skills"
-export MY_PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"
+# 导出所有路径到环境变量
+export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/config"
+export PI_SESSION_DIR="$MY_PI_ROOT/portable/sessions"
+export PI_EXTENSION_DIR="$MY_PI_ROOT/portable/extensions"
+export PI_SKILLS_DIR="$MY_PI_ROOT/portable/skills"
+export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"
 
-# 覆盖 Pi 的配置目录环境变量
-export PI_CODING_AGENT_DIR="$MY_PI_CONFIG_DIR"
+# 确保目录存在
+mkdir -p "$PI_CODING_AGENT_DIR" "$PI_SESSION_DIR" "$PI_EXTENSION_DIR" "$PI_SKILLS_DIR" "$PI_MEMORY_DIR"
 
-# 覆盖包目录（用于便携版二进制）
-export PI_PACKAGE_DIR="$MY_PI_ROOT/vendor/pi"
-
-# 选择启动方式：优先使用 tsx 加载 TypeScript 源码
-if command -v tsx >/dev/null 2>&1; then
-    exec tsx "$MY_PI_ROOT/vendor/pi/packages/coding-agent/src/cli.ts" \
-        --extension "$MY_PI_ROOT/custom/bootstrap.ts" \
-        "$@"
-elif [ -x "$MY_PI_ROOT/portable/bin/my-pi" ]; then
-    exec "$MY_PI_ROOT/portable/bin/my-pi" "$@"
-else
-    exec "$MY_PI_ROOT/vendor/pi/node_modules/.bin/pi" "$@"
+# 检查 vendor/pi 是否已构建
+CLI="$MY_PI_ROOT/vendor/pi/packages/coding-agent/dist/cli.js"
+if [ ! -f "$CLI" ]; then
+    echo "❌ 未找到 $CLI"
+    echo "   请先运行：bash scripts/build.sh"
+    exit 1
 fi
+
+exec node "$CLI" \
+    --extension "$MY_PI_ROOT/custom/bootstrap.ts" \
+    "$@"
