@@ -41,6 +41,31 @@ packages/agent/docs/extensions/pi-server-artifact/index.md
 .pi/node_modules/
 .pi/extensions/node_modules/
 .pi/agent/
+.pi/searxng/
+.pi/.snapshots/
+.pi/logs/
+.pi/data/
+.pi/memory/
+.pi/recovery/
+
+# 敏感配置
+.pi/auth.json
+
+# 运行时状态文件
+.pi/.pi-admin-state.json
+.pi/.pi-autopilot-crash.json
+.pi/.pi-autopilot-lastgood.json
+.pi/.pi-autopilot-telemetry.json
+.pi/pi-link-active.json
+.pi/pi-link-outbox.json
+.pi/pi-link-state.json
+.pi/pi-voice.json
+.pi/notify.json
+.pi/ntfy-relay.json
+.pi/scheduled-seeds.json
+.pi/scheduled-tasks.json
+.pi/trust.json
+.pi/modes.json
 
 # 运行时数据（data/ 目录）
 data/logs/
