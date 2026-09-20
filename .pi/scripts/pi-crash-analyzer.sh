@@ -1,1 +1,0 @@
-../../scripts/crash-recovery/pi-crash-analyzer.sh

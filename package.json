@@ -1,16 +1,22 @@
 {
-  "name": "my-pi-root",
+  "name": "my-pi",
+  "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "description": "Private AI assistant based on Pi",
+  "piConfig": {
+    "name": "my-pi",
+    "configDir": ".my-pi"
+  },
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "dev": "bash scripts/dev.sh",
+    "check": "bash scripts/check-isolation.sh",
+    "sync": "bash scripts/sync-upstream.sh"
+  },
   "workspaces": [
     "custom"
   ],
-  "scripts": {
-    "build:vendor": "cd vendor/pi && npm install && npm run build",
-    "build:custom": "cd custom && npm run build",
-    "build": "npm run build:vendor && npm run build:custom",
-    "dev": "./scripts/dev.sh",
-    "clean": "npm run clean --workspaces"
-  },
   "engines": {
     "node": ">=22.19.0"
   }

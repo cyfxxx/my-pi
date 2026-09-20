@@ -1,2 +1,0 @@
-# media-toolkit Python 依赖（系统包见 SKILL.md）
-pillow>=10.0

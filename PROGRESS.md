@@ -12,6 +12,14 @@
 - [x] 阶段八：脚本精简
 - [x] 阶段九：最终验证
 
+## 第三轮修复（fix/skeleton-rebuild 分支）
+- [x] 阶段零：准备与备份
+- [x] 阶段一：清理 .pi/ 下的悬空链接与无关内容
+- [ ] 阶段二：重建仓库骨架
+- [ ] 阶段三：修复 portable/ 目录
+- [ ] 阶段四：文档清理与更新
+- [ ] 阶段五：最终验证
+
 ## 每阶段完成后在此记录
 
 ### 阶段零：准备与冻结
@@ -80,3 +88,23 @@
   - check-isolation.sh 脚本的 grep 管道问题（已修复）
   - 根目录 README.md 需要更新以反映当前实际结构（已修复）
   - custom/README.md 已重写以反映新架构
+
+### 第三轮阶段零：准备与备份
+- 完成时间：2026-09-20
+- 备份目录：/tmp/my-pi-backup-20260920-120657
+- 备份内容：.pi/、.github/、.husky/、.pi/skills/、根目录文件清单、符号链接清单
+- 验证结果：备份完成
+
+### 第三轮阶段一：清理 .pi/ 下的悬空链接与无关内容
+- 完成时间：2026-09-20
+- 验证结果：
+  - ✅ .pi/scripts/ 已删除（11个符号链接，620个文件）
+  - ✅ .pi/logs 和 .pi/memory 符号链接已删除
+  - ✅ .github/ 和 .husky/ 已删除
+  - ✅ .pi/skills/ 全部技能已删除（pi-backup、pi-full-audit、pi-translate-zh、pi-bug-diagnosis）
+  - ✅ .pi/data/ 已删除
+  - ✅ 根目录 data/、deploy/、docs/、packs/、pi-backup/、searxng/ 已删除
+  - ✅ .pi/ 下多余目录（.snapshots、node_modules、recovery、sessions、stats）已删除
+  - ✅ .pi/ 下剩余符号链接：0个
+  - ✅ check-isolation.sh 全部通过
+- 遇到的问题：无

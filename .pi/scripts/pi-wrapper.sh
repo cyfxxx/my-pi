@@ -1,1 +1,0 @@
-/root/my-pi/scripts/core/pi-wrapper.sh

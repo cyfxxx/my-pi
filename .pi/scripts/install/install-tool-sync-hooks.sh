@@ -1,1 +1,0 @@
-../../../scripts/install/install-tool-sync-hooks.sh
