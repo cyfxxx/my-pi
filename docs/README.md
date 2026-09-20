@@ -2,15 +2,26 @@
 
 项目文档集合，按职责分类。
 
+## 架构概述
+
+基于 pi 框架的私人 AI 助手，通过硬分叉实现完全受控的 AI 编程体验。
+
+### 核心原则
+
+- **上游隔离**：`vendor/pi/` 保持只读
+- **逻辑隔离**：`custom/features/*/logic.ts` 零 Pi 依赖
+- **接口隔离**：`custom/adapters/` 是唯一的 Pi API 接触点
+- **数据收敛**：所有运行时数据收敛到 `portable/` 目录
+
 ## 根目录文件
 
 | 文件 | 用途 |
 |------|------|
 | architecture.md | 架构文档（能力接缝、事件驱动、配置管理） |
 | DEPLOYMENT-GUIDE.md | 新设备部署指南 |
-| OPTIMIZATION-PLAN.md | 全面优化计划（4 轨道 18 项，8-12 周） |
-| FIX-REPORT.md | 修复完成报告（rescue 配置、熔断器、测试） |
-| PI-TOOLS-README.md | pi-tools 完整说明（528 行，扩展/技能/脚本/部署） |
+| OPTIMIZATION-PLAN.md | 全面优化计划 |
+| FIX-REPORT.md | 修复完成报告 |
+| PI-TOOLS-README.md | pi-tools 完整说明 |
 
 ## 子目录
 
@@ -26,7 +37,7 @@
 
 | 文件 | 用途 |
 |------|------|
-| AGENTS-DETAILS.md | Agent 详细说明（扩展清单、缓存治理、回归验证） |
+| AGENTS-DETAILS.md | Agent 详细说明 |
 | PI-EXT-DEV-NOTES.md | 扩展开发笔记 |
 | PI-SDK-EXTENSION.md | SDK 扩展开发指南 |
 | SKILLS-MAINTENANCE.md | 技能维护 |
@@ -45,11 +56,12 @@
 |------|------|
 | OPTIMIZATION-LOG.md | 优化日志 |
 | MODULARIZATION-PLAN.md | 模块化计划 |
-| LESSONS-LEARNED.md | 迁移经验总结（问题和解决方案） |
+| LESSONS-LEARNED.md | 迁移经验总结 |
 | GIT-HISTORY-REWRITE.md | Git 历史重写 |
 
-## 相关文档
+## 快速链接
 
-- [custom/docs/](../custom/docs/README.md)
-- [架构文档](architecture.md)
+- [项目架构](architecture.md)
 - [部署指南](DEPLOYMENT-GUIDE.md)
+- [开发规范](../AGENTS.md)
+- [贡献指南](../CONTRIBUTING.md)
