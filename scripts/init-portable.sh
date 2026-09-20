@@ -58,6 +58,18 @@ else
     echo "Symlink already exists: $PI_MEMORY_DIR"
 fi
 
+# 复制共享服务和核心模块（扩展依赖的相对路径）
+# 扩展中使用 ../../services/ 相对路径，从 extensions/ 上溯两级到 config/
+if [ -d "$MY_PI_ROOT/.pi/services" ]; then
+    cp -r "$MY_PI_ROOT/.pi/services" "$PORTABLE/config/services"
+    echo "Copied .pi/services to portable/config/services"
+fi
+
+if [ -d "$MY_PI_ROOT/.pi/core" ]; then
+    cp -r "$MY_PI_ROOT/.pi/core" "$PORTABLE/config/core"
+    echo "Copied .pi/core to portable/config/core"
+fi
+
 # 复制原始扩展和技能到便携目录
 if [ -d "$MY_PI_ROOT/.pi/extensions" ]; then
     cp -r "$MY_PI_ROOT/.pi/extensions/"* "$PORTABLE/extensions/" 2>/dev/null || true
