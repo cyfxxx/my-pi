@@ -14,5 +14,12 @@ export MY_PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"
 # 覆盖 Pi 的配置目录环境变量
 export PI_CODING_AGENT_DIR="$MY_PI_CONFIG_DIR"
 
-# 启动
-exec "$MY_PI_ROOT/vendor/pi/node_modules/.bin/pi" "$@"
+# 覆盖包目录（用于便携版二进制）
+export PI_PACKAGE_DIR="$MY_PI_ROOT/vendor/pi"
+
+# 选择启动方式：优先使用便携版二进制，否则使用 node 版本
+if [ -x "$MY_PI_ROOT/portable/bin/my-pi" ]; then
+    exec "$MY_PI_ROOT/portable/bin/my-pi" "$@"
+else
+    exec "$MY_PI_ROOT/vendor/pi/node_modules/.bin/pi" "$@"
+fi
