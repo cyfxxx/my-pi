@@ -172,3 +172,22 @@
   - ✅ `./my-pi.sh --version`、`check-isolation.sh`、`tsc` 通过
 - 遇到的问题：
   - `models.json` 之前被 git 跟踪且含 apiKey，已停止跟踪；历史中的 key 如需彻底清除需重写历史并轮换该 key
+
+## pi-tools 内容迁移（第一批：纯逻辑模块）
+- 完成时间：2026-09-20
+- 来源：`https://github.com/cyfxxx/pi-tools`（`agent/` 目录）
+- 迁移内容：
+  - `custom/features/context/budget.ts`：上下文预算/token 估算/截断/输出预算/缓存统计（迁移自 `services/token-budget`）
+  - `custom/features/context/output-archive.ts`：工具输出归档（默认写入 `portable/memory/tool-outputs`）
+  - `context/index.ts` 接入真实 `ctx.getContextUsage()` 校准预算（session_start 重置、before_agent_start/after_tool_call 校准）
+  - `custom/core/secrets.ts`：密钥脱敏（迁移自 `core/secrets.ts`）
+  - `custom/core/atomic-write.ts`：原子 JSON 写入
+  - `custom/core/note-store.ts`：笔记持久化（原子写 + 写时脱敏，数据落 `portable/memory`）
+  - `custom/features/memory/logic.ts`：笔记读写改由 `note-store` 承接（不再是空实现）
+  - `custom/features/subagent/logic.ts`：内置 reviewer/scout/worker 角色定义并注册（迁移自 `agent/agents/*.md`）
+- 验证：
+  - ✅ `npx tsc --noEmit -p custom/` 通过
+  - ✅ `npx vitest run`：4 个测试文件、27 个用例全部通过（context budget/output-archive/secrets/note-store）
+  - ✅ `bash scripts/check-isolation.sh` 通过；`./my-pi.sh --version` = 0.85.1
+  - ✅ 新增 `npm test` 脚本
+- 未迁移（按增量纪律留待后续）：autopilot/browser/link/voice/tmux/intervention/mode/plan-mode 等涉及 Pi API 编排的完整实现，以及 searxng/deploy/scripts/packs

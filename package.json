@@ -12,6 +12,7 @@
     "build": "bash scripts/build.sh",
     "dev": "bash scripts/dev.sh",
     "check": "bash scripts/check-isolation.sh",
+    "test": "vitest run",
     "sync": "bash scripts/sync-upstream.sh"
   },
   "workspaces": [

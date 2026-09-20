@@ -1,9 +1,13 @@
 /**
  * Memory Feature - Logic
- * 
+ *
  * 纯逻辑，零 Pi 依赖
  * 负责记忆存储、检索、注入
+ *
+ * 笔记持久化复用 custom/core/note-store（原子写 + 写时脱敏，数据落在 portable/memory）。
  */
+
+import { loadNotes as nsLoadNotes, updateNotes as nsUpdateNotes } from '../../core/note-store';
 
 // ── 记忆条目 ──
 
@@ -38,7 +42,7 @@ export function loadEntries(): MemoryEntry[] {
 }
 
 export function loadNotes(): Record<string, string> {
-  return {};
+  return nsLoadNotes();
 }
 
 export function loadSummaries(): MemorySummary[] {
@@ -46,7 +50,7 @@ export function loadSummaries(): MemorySummary[] {
 }
 
 export function updateNotes(updater: (notes: Record<string, string>) => Record<string, string>): void {
-  // 纯逻辑：更新笔记
+  nsUpdateNotes(updater);
 }
 
 export function activeEntries(entries: MemoryEntry[]): MemoryEntry[] {

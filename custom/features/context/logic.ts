@@ -111,3 +111,7 @@ export function recordToolCall(
 export const EFFICIENCY_ADVICE = '效率建议：使用更具体的工具调用可以提高响应速度。';
 export const LOW_PRESSURE_DELEGATION = '低压力委派：将简单任务委派给子代理可以提高效率。';
 export const FULL_DELEGATION_ADVICE = '完全委派建议：对于重复性任务，考虑使用自动化脚本。';
+
+// ── 迁移自 pi-tools 的 token 预算模块（纯逻辑） ──
+export * from './budget';
+export * from './output-archive';

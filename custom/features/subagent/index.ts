@@ -1,24 +1,28 @@
 /**
  * Subagent Feature
- * 
+ *
  * 约束：
  *   - 只通过 adapters 与 Pi 交互
  *   - 不直接 import vendor/pi
+ *
+ * 迁移自 pi-tools subagent：内置 reviewer/scout/worker 角色定义。
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { createSubagentState, registerAgent, spawnAgent, completeAgent, listAgents } from './logic';
+import { createSubagentState, registerBuiltinAgents, listAgents } from './logic';
 
 export function register(pi: ExtensionAPI): void {
   const state = createSubagentState();
+  registerBuiltinAgents(state);
 
-  // 注册钩子：子代理启动
+  // 会话开始：提示可用子代理角色
   registerHook(pi, {
-    event: 'before_agent_start',
+    event: 'session_start',
     handler: async (_event, ctx) => {
-      if (state.active && ctx.hasUI) {
-        ctx.ui.notify(`子代理 ${state.currentAgent} 运行中`, 'info');
+      const agents = listAgents(state);
+      if (agents.length > 0 && ctx.hasUI) {
+        ctx.ui.notify(`子代理角色: ${agents.join(', ')}`, 'info');
       }
     },
   });

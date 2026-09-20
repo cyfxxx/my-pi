@@ -19,3 +19,17 @@ export {
   defineFeature,
   registerAll,
 } from './registry'
+
+export { scrubSecrets, SECRET_PATTERNS } from './secrets'
+export { writeJSONSync, writeJSONAtomic } from './atomic-write'
+export {
+  dataDir,
+  notesFile,
+  checkpointsDir,
+  ensureDir,
+  loadNotes,
+  saveNotes,
+  updateNotes,
+  clearCompactionFlag,
+  getTotalSize,
+} from './note-store'

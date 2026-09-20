@@ -41,10 +41,12 @@ for p in patches/*.patch; do git -C vendor/pi apply --3way "$p"; done
 my-pi 的自定义代码。三层结构：
 
 - `adapters/`：唯一允许 runtime import `vendor/pi/` 的地方（`import type` 除外）
-- `core/`：路径解析、功能注册表
-- `features/`：每个功能包含 `logic.ts`（纯逻辑，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）
+- `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`、`note-store.ts`（笔记持久化）
+- `features/`：每个功能包含 `logic.ts`（纯逻辑，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）；`context/` 含 token 预算模块，`__tests__/` 为 vitest 单测
 - `bootstrap.ts`：入口，组装所有功能
 - 另有 `package.json`、`tsconfig.json`（工作区与编译配置），`dist/`（构建产物，gitignored）
+
+运行测试：`npm test`（vitest）。
 
 ### `portable/`
 运行时数据与配置。5 个目录：
