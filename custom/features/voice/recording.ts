@@ -98,7 +98,7 @@ export function startRecording(
       }
     }
     try {
-      execFileSync('pkill', ['-f', residue])
+      execFileSync('pkill', ['-f', residue!])
     } catch {
       // 无残留进程或 pkill 不可用：忽略
     }

@@ -136,10 +136,10 @@ export function registerLinkCommand(pi: ExtensionAPI, getCfg: () => LinkConfig, 
           await output(`读取失败: ${r.detail}`)
           return
         }
-        const body = r.entries.length === 0
+        const body = (r.entries ?? []).length === 0
           ? '（空）'
-          : r.entries.map((en, i) => `[${new Date(en.ts).toLocaleTimeString()}] ${en.text.slice(0, 300)}`).join('\n\n')
-        await output(`远程 ${device} 信箱（${r.entries.length}/${OUTBOX_MAX} 条）：\n${body}`)
+          : (r.entries ?? []).map((en: any, i: any) => `[${new Date(en.ts).toLocaleTimeString()}] ${en.text.slice(0, 300)}`).join('\n\n')
+        await output(`远程 ${device} 信箱（${(r.entries ?? []).length}/${OUTBOX_MAX} 条）：\n${body}`)
         return
       }
       if (sub === 'export-card') {

@@ -275,8 +275,8 @@ export async function sendToDevice(
   let lastSession: string | undefined
   let spawnFailed = ''
 
-  proc.stderr.setEncoding('utf-8')
-  proc.stderr.on('data', (c: string) => {
+  proc.stderr?.setEncoding('utf-8')
+  proc.stderr?.on('data', (c: string) => {
     stderr = (stderr + c).slice(-2000)
   })
   // ssh 二进制缺失/PATH 清理时 spawn 抛 error——未监听会崩溃宿主 pi 进程且 inflight 泄漏
@@ -285,7 +285,7 @@ export async function sendToDevice(
     rl.close()
   })
   // 进程退出后写 stdin 会触发 error——吞掉
-  proc.stdin.on('error', () => { /* 已退出 */ })
+  proc.stdin?.on('error', () => { /* 已退出 */ })
 
   // 握手完成：收到会话文件行（continue 策略）或 3s 超时
   let handshakeResolve: () => void
@@ -300,7 +300,7 @@ export async function sendToDevice(
   let switchFailed = false
   switchTimer = setTimeout(() => switchResolve(), 20000)
 
-  const rl = createInterface({ input: proc.stdout })
+  const rl = createInterface({ input: proc.stdout! })
   const settledP = new Promise<void>((resolve) => {
     rl.on('line', (line) => {
       let ev: RpcEvent
@@ -356,14 +356,14 @@ export async function sendToDevice(
   await handshakeP
   if (opts.signal?.aborted) throw new Error('aborted by caller before handshake completed')
   if (lastSession) {
-    proc.stdin.write(JSON.stringify({ type: 'switch_session', sessionPath: lastSession, id: 'pi-link-0' }) + '\n')
+    proc.stdin!.write(JSON.stringify({ type: 'switch_session', sessionPath: lastSession, id: 'pi-link-0' }) + '\n')
     await switchP
     // 审计：switch 20s 超时后照发 prompt 违反上方"必须等其 response"不变量——
     // 超时（无响应）按失败处理：弃 lastSession 走新会话路径，不向旧会话发 prompt
     if (!switchResponded || switchFailed) lastSession = undefined
   }
   const prompt = JSON.stringify({ type: 'prompt', message: finalMessage, id: 'pi-link-1' })
-  proc.stdin.write(prompt + '\n')
+  proc.stdin!.write(prompt + '\n')
   // Writable 无需显式 flush（数据即时发送）
 
   // 超时熔断：先置标志再 kill（timedOut 判定优先于 exited，保证 truncated 分支可达）
@@ -377,7 +377,7 @@ export async function sendToDevice(
   clearTimeout(timer)
   if (opts.signal) opts.signal.removeEventListener('abort', onAbort)
   // 完成后关闭通道并结束进程（stdin end 触发 shutdown 是正常收尾路径）
-  proc.stdin.end()
+  proc.stdin!.end()
   proc.kill()
 
   // 聚合结果（不再有全量数组可回放）：text/model/turns/tools 均为增量维护值

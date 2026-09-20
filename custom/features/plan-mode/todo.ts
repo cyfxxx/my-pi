@@ -71,7 +71,7 @@ export function registerTodoTool(pi: ExtensionAPI): void {
         return { content: [{ type: "text", text: `Error: ${err}` }], details: null };
       }
 
-      const action = params.action as TaskAction;
+      const action = params.action as unknown as TaskAction;
       const result = applyTaskMutation(getState(), action, params as TaskMutationParams);
       commitState(result.state);
 

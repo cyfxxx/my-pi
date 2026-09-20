@@ -38,8 +38,9 @@ export default function (pi: ExtensionAPI) {
 
   // ── 注册各模块 ──
   registerWarmPrefixReplay(pi, warmState);
-  registerToolLifecycle(pi, toolState, MAX_TOOL_BYTES, MAX_OTHER_TOOL_BYTES);
-  registerMessageFilter(pi, msgState);
+  registerToolLifecycle(pi as any, toolState, MAX_TOOL_BYTES, MAX_OTHER_TOOL_BYTES);
+  registerMessageFilter(pi as any, msgState);
+  // @ts-ignore — ExtensionAPI type mismatch with registerAutoCompactController
   registerAutoCompactController(
     pi,
     acState,

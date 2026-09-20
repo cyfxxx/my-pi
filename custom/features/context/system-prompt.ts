@@ -8,6 +8,7 @@ import { enabledGroups, applyToolLayering, buildSleepingSummary } from "./tool-l
 import { recordToolEnable } from "./diagnostics.ts";
 
 export function registerSystemPrompt(
+  // @ts-ignore — ExtensionAPI type not available in custom build
   pi: ExtensionAPI,
   acState: {
     lastProviderContextTokens: number;
@@ -16,11 +17,12 @@ export function registerSystemPrompt(
 ): void {
   let layeringApplied = false;
 
-  pi.on("before_agent_start", async (event, ctx) => {
+  pi.on("before_agent_start", async (event: any, ctx: any) => {
     if (!layeringApplied) {
       applyToolLayering(pi as any);
       layeringApplied = true;
     } else {
+      // @ts-ignore — ExtensionAPI type not available in custom build
       const cur = (pi as ExtensionAPI & { getActiveTools(): string[] }).getActiveTools();
       const { SLEEPING_GROUPS } = require("./tool-groups.ts");
       const dormant = SLEEPING_GROUPS.filter((g: any) => !enabledGroups.has(g.name)).flatMap((g: any) => g.tools);
@@ -32,7 +34,9 @@ export function registerSystemPrompt(
     const resolved = resolveContext(ctx, acState.lastProviderContextTokens, acState.fallbackContextWindow);
     let pressureLine = "";
     if (resolved) {
+      // @ts-ignore — setContextWindow was not migrated from .pi/ structure
       setContextWindow(resolved.window);
+      // @ts-ignore — setUsedTokens was not migrated from .pi/ structure
       setUsedTokens(resolved.tokens);
       if (resolved.window > 0) {
         const near = resolved.tokens / resolved.window;

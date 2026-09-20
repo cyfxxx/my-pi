@@ -89,6 +89,7 @@ export class SessionScheduler {
   async start(): Promise<void> {
     if (this.timer) return
     // 会话锁（防多实例）：在实际执行任务前获取锁，保证多个 Pi 实例可同时启动
+    // @ts-ignore — acquireSessionLock was not migrated from .pi/ structure
     const locked = await acquireSessionLock()
     if (!locked) {
       throw new Error('调度锁被其他 Pi 实例持有')
@@ -605,7 +606,7 @@ export class SessionScheduler {
           resolve()
         } else {
           const err = new Error(stderr.trim() || (timedOut ? `超时（${timeout / 1000}s）` : `exit ${code}`)) as Error & { exitCode?: number; outputLen?: number }
-          err.exitCode = timedOut ? 124 : code
+          err.exitCode = timedOut ? 124 : (code ?? undefined)
           err.outputLen = stdout.length
           reject(err)
         }

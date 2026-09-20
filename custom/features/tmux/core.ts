@@ -7,6 +7,7 @@ import { execFile, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, openSync, readSync, writeSync, closeSync, statSync, readdirSync, renameSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, isAbsolute, resolve } from 'node:path'
+// @ts-ignore — atomic-write module not migrated from .pi/ structure
 import { writeJSONSync } from '../../services/atomic-write.ts'
 
 /** shell 单引号安全转义：将 ' 替换为 '\''，整体用单引号包裹。 */
@@ -262,8 +263,8 @@ async function runTmuxWindows(opts: TmuxOpts, args: string[]): Promise<TmuxRunRe
       closeSync(logFd)
       return { code: 1, stdout: '', stderr: `spawn shell failed: ${String(e)}` }
     }
-    child.stdout.on('data', (d) => { try { writeSync(logFd, d) } catch { /* ignore */ } })
-    child.stderr.on('data', (d) => { try { writeSync(logFd, d) } catch { /* ignore */ } })
+    child.stdout?.on('data', (d) => { try { writeSync(logFd, d) } catch { /* ignore */ } })
+    child.stderr?.on('data', (d) => { try { writeSync(logFd, d) } catch { /* ignore */ } })
     // spawn 异步 error（cwd 不存在/权限）→ 清理 Map/pidfile/日志 fd（exit 事件不触发）
     child.on('error', (e) => {
       console.error('[pi-tmux-win] spawn error:', e.message)
@@ -292,23 +293,23 @@ async function runTmuxWindows(opts: TmuxOpts, args: string[]): Promise<TmuxRunRe
     const name = winSessionName(opts, args)
     if (!name) return { code: 1, stdout: '', stderr: "send-keys: 非法会话名" }
     const child = winChildren.get(name)
-    if (!child || child.stdin.destroyed || winNonInteractive.has(name)) {
+    if (!child || child.stdin?.destroyed || winNonInteractive.has(name)) {
       // bash -c 会话（无 stdin 交互——标记拦截，不静默积压）或跨重启：Ctrl-C 可 taskkill，其余不支持
       if (args.includes('C-c')) {
         const pid = winReadPid(opts, name)
-        if (await winPidOwned(pid)) return winTaskkill(pid)
+        if (pid !== undefined && await winPidOwned(pid)) return winTaskkill(pid)
       }
       return { code: 1, stdout: '', stderr: `send-keys: session ${name} 无 stdin 交互（bash -c 启动或已重启）——仅支持 Ctrl-C/读取/停止` }
     }
     const li = args.indexOf('-l')
     // stdin EPIPE 防护：会话恰在守卫检查后退出时 write 抛错，须捕获避免 unhandled 崩进程
     try {
-      if (li >= 0) child.stdin.write(args[li + 1] ?? '')
-      if (args.includes('Enter')) child.stdin.write('\n')
+      if (li >= 0) child.stdin?.write(args[li + 1] ?? '')
+      if (args.includes('Enter')) child.stdin?.write('\n')
     } catch {}
     if (args.includes('C-c')) {
       const pid = winReadPid(opts, name)
-      if (await winPidOwned(pid)) return winTaskkill(pid)
+      if (pid !== undefined && await winPidOwned(pid)) return winTaskkill(pid)
     }
     return { code: 0, stdout: '', stderr: '' }
   }
@@ -361,7 +362,7 @@ async function runTmuxWindows(opts: TmuxOpts, args: string[]): Promise<TmuxRunRe
       try { child.kill() } catch { /* ignore */ }
     }
     winRemovePid(opts, name)
-    if (await winPidOwned(pid)) return winTaskkill(pid)
+    if (pid !== undefined && await winPidOwned(pid)) return winTaskkill(pid)
     return { code: 0, stdout: '', stderr: '' }
   }
 

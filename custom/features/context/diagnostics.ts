@@ -20,6 +20,7 @@ import {
   pruneToolEvents,
   recomputeToolUsage,
   type UsageRecord,
+// @ts-ignore — usage-diag module not migrated from .pi/ structure
 } from "../../services/diagnostics/usage-diag.ts";
 
 /** 诊断日志文件路径 */

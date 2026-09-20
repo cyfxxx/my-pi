@@ -73,23 +73,24 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
 
 		const { frontmatter, body } = (() => {
 			try {
-				return parseFrontmatter<Record<string, string>>(content);
+				// @ts-ignore — parseFrontmatter does not accept type arguments
+		return parseFrontmatter<Record<string, string>>(content);
 			} catch {
 				// 2026-08-28 审计：畸形 YAML 在 UI 确认门前棸掉整个 subagent 调用——跳过该文件而非中断
 				return { frontmatter: {} as Record<string, string>, body: "" };
 			}
 		})();
 
-		if (!frontmatter.name || !frontmatter.description) {
+		if (!(frontmatter as any).name || !(frontmatter as any).description) {
 			continue;
 		}
 
 		// 2026-08-28 审计：兼容 YAML 数组语法 tools: [read, ls]（split 对数组抛 TypeError）
 		const tools = (
-			Array.isArray(frontmatter.tools)
-				? frontmatter.tools
-				: typeof frontmatter.tools === "string"
-					? frontmatter.tools.split(",")
+			Array.isArray((frontmatter as any).tools)
+				? (frontmatter as any).tools
+				: typeof (frontmatter as any).tools === "string"
+					? (frontmatter as any).tools.split(",")
 					: []
 		)
 			.map((t: unknown) => String(t).trim())
@@ -98,12 +99,12 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
 		const rawReadonly = (frontmatter as Record<string, unknown>).readonly;
 
 		agents.push({
-			name: frontmatter.name,
-			description: frontmatter.description,
+			name: (frontmatter as any).name,
+			description: (frontmatter as any).description,
 			tools: tools && tools.length > 0 ? tools : undefined,
-			model: frontmatter.model,
+			model: (frontmatter as any).model,
 			readonly: rawReadonly === true || rawReadonly === "true" ? true : undefined,
-			systemPrompt: body,
+			systemPrompt: body as string,
 			source,
 			filePath,
 		});

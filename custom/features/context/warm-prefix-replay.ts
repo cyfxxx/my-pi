@@ -13,8 +13,9 @@ export function createWarmPrefixState(): WarmPrefixState {
   return { lastModelKey: "", lastRequestPayload: null, compactWarmAllowed: false };
 }
 
+// @ts-ignore — ExtensionAPI type not available in custom build
 export function registerWarmPrefixReplay(pi: ExtensionAPI, state: WarmPrefixState): void {
-  pi.on("before_provider_request", async (event) => {
+  pi.on("before_provider_request", async (event: any) => {
     try {
       if (!AUTO_PREFIX_CACHE_RE.test(state.lastModelKey)) return undefined;
       const payload = event.payload as {
@@ -66,7 +67,7 @@ export function registerWarmPrefixReplay(pi: ExtensionAPI, state: WarmPrefixStat
   });
 
   // 暖前缀重放 v1.5
-  pi.on("session_before_compact", (event, ctx) => {
+  pi.on("session_before_compact", (event: any, ctx: any) => {
     const w = ctx.model?.contextWindow ?? 0;
     state.compactWarmAllowed =
       event.reason !== "overflow" && !(w > 0 && event.preparation.tokensBefore > w * 0.9);

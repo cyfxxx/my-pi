@@ -53,7 +53,7 @@ export function registerSearchTools(pi: ExtensionAPI): void {
       },
       required: ['query'],
     },
-    execute: async (_toolCallId, params, signal, _onUpdate, _ctx) => {
+    execute: async (_toolCallId: string, params: Record<string, unknown>, signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const text = await searchWeb(
         config.search,
         params.query as string,
@@ -86,7 +86,7 @@ export function registerSearchTools(pi: ExtensionAPI): void {
       },
       required: ['query'],
     },
-    execute: async (_toolCallId, params, signal, _onUpdate, _ctx) => {
+    execute: async (_toolCallId: string, params: Record<string, unknown>, signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const query = params.query as string
       const maxResults = (params.max_results as number) ?? 5
       try {
@@ -112,7 +112,7 @@ export function registerSearchTools(pi: ExtensionAPI): void {
       },
       required: ['url'],
     },
-    execute: async (_toolCallId, params, signal, _onUpdate, _ctx) => {
+    execute: async (_toolCallId: string, params: Record<string, unknown>, signal: AbortSignal | undefined, _onUpdate: unknown, _ctx: unknown) => {
       const url = params.url as string
       let parsed: URL
       try {

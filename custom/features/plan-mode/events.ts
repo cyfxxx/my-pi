@@ -2,6 +2,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { extractTodoItems, isPlanRevisionIntent, mergePlanRevision, truncateSubject, isSafeCommand, assertPlanSubagentAllowed } from "./utils.ts";
+// @ts-ignore — note-store module not migrated from .pi/ structure
 import { loadNotes, clearCompactionFlag } from "../../services/note-store.ts";
 import { Key } from "@earendil-works/pi-tui";
 

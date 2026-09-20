@@ -229,9 +229,9 @@ export function agentLabel(agent: string | undefined): string {
 }
 
 export function truncateParallelOutput(output: string): string {
-	const result = truncateHead(output, { maxBytes: PER_TASK_OUTPUT_CAP });
-	if (!result.truncated) return output;
-	return `${result.content}\n\n[Output truncated: ${result.totalBytes - result.outputBytes} bytes omitted. Full output preserved in tool details.]`;
+	const result = truncateHead(output, { maxBytes: PER_TASK_OUTPUT_CAP }) as { content: string; outputBytes: number; truncated?: boolean; totalBytes?: number };
+	if (!(result as any).truncated) return output;
+	return `${result.content}\n\n[Output truncated: ${(result as any).totalBytes - result.outputBytes} bytes omitted. Full output preserved in tool details.]`;
 }
 
 // ── Task Risk Classification ──

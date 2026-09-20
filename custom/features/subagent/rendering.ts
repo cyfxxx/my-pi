@@ -145,7 +145,7 @@ export function renderSingleResult(
 	expanded: boolean,
 	theme: any,
 ): Text | Container {
-	const mdTheme = getMarkdownTheme();
+	const mdTheme = getMarkdownTheme(theme);
 	const isError = isFailedResult(r);
 	const icon = isError ? theme.fg("error", "✗") : theme.fg("success", "✓");
 	const displayItems = getDisplayItems(r.messages);
@@ -207,7 +207,7 @@ export function renderChainResult(
 	expanded: boolean,
 	theme: any,
 ): Text | Container {
-	const mdTheme = getMarkdownTheme();
+	const mdTheme = getMarkdownTheme(theme);
 	const successCount = details.results.filter((r) => r.exitCode === 0).length;
 	const icon = successCount === details.results.length ? theme.fg("success", "✓") : theme.fg("error", "✗");
 
@@ -294,7 +294,7 @@ export function renderParallelResult(
 	expanded: boolean,
 	theme: any,
 ): Text | Container {
-	const mdTheme = getMarkdownTheme();
+	const mdTheme = getMarkdownTheme(theme);
 	const running = details.results.filter((r) => r.exitCode === -1).length;
 	const successCount = details.results.filter((r) => r.exitCode !== -1 && !isFailedResult(r)).length;
 	const failCount = details.results.filter((r) => r.exitCode !== -1 && isFailedResult(r)).length;

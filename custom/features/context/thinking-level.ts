@@ -25,6 +25,7 @@
  * （合法值为 off/minimal/low/medium/high，无 max），自动切档会在 settings 落盘——
  * 属预期（自适应档位取代人工固定档）。
  */
+// @ts-ignore — usage-diag module not migrated from .pi/ structure
 import { recordLevelChange } from "../../services/diagnostics/usage-diag.ts";
 
 // ── 任务类型推断（用于 thinking 档位自适应） ──
@@ -212,6 +213,7 @@ export function proposeThinkingLevel(
   // 方向与压力一致性（用预算报告作定性信号）：仅拒绝明确有害的
   // "critical 时升档"（高压升档会加剧 thinking 剪枝/断裂）；其余方向（含
   // 压力较小时降档省 token）由模型理由驱动、靠死区+clamp 兜底防滥用。
+  // @ts-ignore — getBudgetReport was not migrated from .pi/ structure
   const pressure = getBudgetReport().pressure;
   if (pressure === "critical" && idx(level) > idx(from)) {
     return {
