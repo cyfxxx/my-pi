@@ -16,7 +16,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：计划模式启动
   registerHook(pi, {
     event: 'session_start',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       if (ctx.hasUI) {
         ctx.ui.notify('计划模式已就绪', 'info');
       }

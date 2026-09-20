@@ -8,7 +8,7 @@
  *   - features 目录下的 logic.ts 不得 import 此文件
  */
 
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil-works/pi-coding-agent';
 
 /**
  * 我们对工具的定义，与 Pi 的 API 解耦
@@ -24,7 +24,7 @@ export interface ToolDefinition {
  * 将我们的工具定义注册到 Pi
  */
 export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
-  (pi as any).registerTool({
+  const tool = {
     name: def.name,
     label: def.name,
     description: def.description,
@@ -35,5 +35,6 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
         content: [{ type: 'text', text: result }],
       };
     },
-  });
+  } as unknown as PiToolDefinition;
+  pi.registerTool(tool);
 }

@@ -58,7 +58,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：语音监听
   registerHook(pi, {
     event: 'session_start',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       if (config.enabled && ctx.hasUI) {
         ctx.ui.notify('语音功能已启用', 'info');
       }

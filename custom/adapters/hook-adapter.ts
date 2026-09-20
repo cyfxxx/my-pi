@@ -7,7 +7,12 @@
  *   - 对外暴露稳定的 HookHandler 接口
  */
 
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
+
+/**
+ * 对上层暴露的稳定钩子上下文类型（Pi API 变更只需改此处）
+ */
+export type HookContext = ExtensionContext;
 
 /**
  * 我们支持的钩子事件类型
@@ -55,14 +60,18 @@ export type HookEvent =
 
 export interface HookHandler {
   event: HookEvent;
-  handler: (...args: unknown[]) => Promise<unknown> | unknown;
+  handler: (event: unknown, ctx: ExtensionContext) => Promise<unknown> | unknown;
 }
 
 /**
  * 注册一个钩子
  */
 export function registerHook(pi: ExtensionAPI, hook: HookHandler): void {
-  (pi as any).on(hook.event, hook.handler);
+  const on = pi.on as unknown as (
+    event: string,
+    handler: (event: unknown, ctx: ExtensionContext) => unknown,
+  ) => void;
+  on(hook.event, hook.handler);
 }
 
 /**

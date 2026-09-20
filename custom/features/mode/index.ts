@@ -18,7 +18,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：会话启动时显示当前模式信息
   registerHook(pi, {
     event: 'session_start',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       const envMode = process.env.PI_AGENT_MODE;
       const modeName = envMode || getCurrentMode();
 

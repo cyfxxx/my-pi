@@ -16,7 +16,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：子代理启动
   registerHook(pi, {
     event: 'before_agent_start',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       if (state.active && ctx.hasUI) {
         ctx.ui.notify(`子代理 ${state.currentAgent} 运行中`, 'info');
       }

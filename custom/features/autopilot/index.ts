@@ -67,7 +67,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：每轮检查自动驾驶状态
   registerHook(pi, {
     event: 'before_agent_start',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       if (state.active && canContinue(state)) {
         nextStep(state);
       } else if (state.active) {

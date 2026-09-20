@@ -30,7 +30,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：会话开始
   registerHook(pi, {
     event: 'session_start',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       if (isExtractWorker()) return;
       migrateFromCtxLite();
       
@@ -67,7 +67,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：每轮注入记忆块
   registerHook(pi, {
     event: 'before_agent_start',
-    handler: async (_event: unknown, _ctx: any) => {
+    handler: async (_event, _ctx) => {
       let entries = loadEntries();
       const kept = autoReclaim(entries);
       if (kept) entries = kept;
@@ -96,7 +96,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：压缩前快照
   registerHook(pi, {
     event: 'session_before_compact',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       writeCompactionSnapshot(ctx);
     },
   });
@@ -112,7 +112,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：会话结束
   registerHook(pi, {
     event: 'session_shutdown',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       if (process.env.PI_MEMORY_EXTRACT === '1') return;
       const messages = extractTextFromEntries(ctx.sessionManager?.getBranch() || []);
       if (!messages.length) return;

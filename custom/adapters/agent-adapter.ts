@@ -25,6 +25,13 @@ export interface MySession {
   dispose: () => Promise<void>;
 }
 
+/** createAgentSession 返回值中我们实际依赖的运行时字段 */
+interface PiSessionLike {
+  extensionRunner?: ExtensionAPI;
+  pi?: ExtensionAPI;
+  dispose?: () => Promise<void>;
+}
+
 /**
  * 创建 Agent Session
  * 
@@ -37,13 +44,14 @@ export async function createSession(config: SessionConfig): Promise<MySession> {
     '../../vendor/pi/packages/coding-agent/dist/index'
   );
 
-  const session: any = await createAgentSession({
+  const raw: unknown = await createAgentSession({
     agentDir: config.configDir,
     cwd: config.sessionDir,
   });
+  const session = raw as PiSessionLike;
 
   return {
-    pi: session?.extensionRunner || session?.pi || session,
+    pi: (session?.extensionRunner || session?.pi || raw) as ExtensionAPI,
     config,
     dispose: async () => {
       await session?.dispose?.();

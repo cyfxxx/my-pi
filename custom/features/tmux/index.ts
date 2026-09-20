@@ -16,7 +16,7 @@ export function register(pi: ExtensionAPI): void {
   // 注册钩子：检测 tmux 会话
   registerHook(pi, {
     event: 'session_start',
-    handler: async (_event: unknown, ctx: any) => {
+    handler: async (_event, ctx) => {
       const session = detectTmuxSession();
       if (session && ctx.hasUI) {
         ctx.ui.notify(`tmux 会话: ${session}`, 'info');
