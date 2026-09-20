@@ -17,7 +17,7 @@ export function register(pi: ExtensionAPI): void {
     description: '搜索网络并返回结果列表',
     parameters: {
       query: { type: 'string', description: '搜索关键词' },
-      maxResults: { type: 'number', description: '最大结果数，默认 5' },
+      maxResults: { type: 'number', description: '最大结果数，默认 5', optional: true },
     },
     execute: async (args) => {
       const query = args.query as string;

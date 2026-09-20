@@ -11,7 +11,7 @@
 | 参数 | 说明 |
 |------|------|
 | `--output <path>` | 输出路径（默认见下方[备份目录约定](#备份目录约定)） |
-| `--with-auth` | 包含 `portable/config/auth.json`（API 密钥）及同源敏感配置 `models.json` / `models-store.json` / `modes.json` / `trust.json`。默认不包含。 |
+| `--with-auth` | 包含 `portable/agent/auth.json`（API 密钥）及同源敏感配置 `models.json` / `models-store.json` / `modes.json` / `trust.json`。默认不包含。 |
 | `--full` | 额外包含默认排除的可重建项（`node_modules/`、`custom/dist/`、`portable/memory/tool-outputs/`） |
 | `--keep N` | 保留最近 N 份备份（默认 5），超出则删除最旧的文件 |
 
@@ -19,7 +19,7 @@
 
 **执行步骤：**
 
-1. 如果未指定 `--with-auth`，**必须询问用户**是否包含 `portable/config/auth.json` 等敏感配置。
+1. 如果未指定 `--with-auth`，**必须询问用户**是否包含 `portable/agent/auth.json` 等敏感配置。
 2. 在 `/tmp/` 下创建临时目录 `pi-backup-{timestamp}`。
 3. 按[备份清单](references/BACKUP-MANIFEST.md)把文件复制到临时目录（保持相对仓库根的目录结构）。文件清单以 git 为基础：
    ```
@@ -28,10 +28,10 @@
    git ls-files --others --exclude-standard      # 未跟踪但未被 gitignore 的新文件（技能/文档等，一并收录）
    # 再按清单手工增补 gitignore 但属于备份范围的项（存在时）：
    #   portable/memory/notes.json
-   # 按清单排除：vendor/pi/、node_modules/、custom/dist/、portable/config/sessions/、
-   #   portable/config/extensions/、portable/config/{auth,models,models-store,modes,trust}.json、
-   #   portable/config/pi-link-*.json、portable/config/scheduled-seeds.json、
-   #   portable/config/sessions/、portable/memory/tool-outputs/
+   # 按清单排除：vendor/pi/、node_modules/、custom/dist/、portable/agent/sessions/、
+   #   portable/agent/extensions/、portable/agent/{auth,models,models-store,modes,trust}.json、
+   #   portable/agent/pi-link-*.json、portable/agent/scheduled-seeds.json、
+   #   portable/agent/sessions/、portable/memory/tool-outputs/
    ```
    `--full` 时额外纳入 `node_modules/`、`custom/dist/`、`portable/memory/tool-outputs/`（每环境独立项即使 `--full` 也不纳入）。
 4. 同时写入 `manifest.json` 到归档内：
@@ -43,8 +43,8 @@
      "hostname": "{hostname}",
      "full": false,
      "has_auth": false,
-     "files": ["custom/bootstrap.ts", "portable/config/settings.json", "..."],
-     "excluded": ["vendor/pi/", "node_modules/", "portable/config/sessions/", "..."]
+     "files": ["custom/bootstrap.ts", "portable/agent/settings.json", "..."],
+     "excluded": ["vendor/pi/", "node_modules/", "portable/agent/sessions/", "..."]
    }
    ```
 5. 运行 `tar czf {output_path} -C /tmp/pi-backup-{timestamp}/ .`
@@ -67,15 +67,15 @@
 
 将仓库根的 git 追踪文件通过 commit + push 同步到 GitHub。
 
-> **git 模式的边界（重要）**：`.gitignore` 排除了 `portable/config/*`（仅白名单保留 `AGENTS.md`、`APPEND_SYSTEM.md`、`keybindings.json`、`settings.json`）与 `vendor/pi/`——git 同步**不含** `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json`、`pi-link-*.json`、`scheduled-seeds.json`，也不含 `portable/memory/`、`portable/config/sessions/`、`portable/config/extensions/`。新设备 `clone` 后需手动提供或走归档（见 [clone](#pi-backup-clone) 与 `pi-backup create --with-auth`）。
+> **git 模式的边界（重要）**：`.gitignore` 排除了 `portable/agent/*`（仅白名单保留 `AGENTS.md`、`APPEND_SYSTEM.md`、`keybindings.json`、`settings.json`）与 `vendor/pi/`——git 同步**不含** `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json`、`pi-link-*.json`、`scheduled-seeds.json`，也不含 `portable/memory/`、`portable/agent/sessions/`、`portable/agent/extensions/`。新设备 `clone` 后需手动提供或走归档（见 [clone](#pi-backup-clone) 与 `pi-backup create --with-auth`）。
 
 > **与本地归档（`create`）的差异**：git 同步只含入库文件；本地归档另含 gitignored 的记忆数据（`portable/memory/notes.json`）。git 缺失项均为刻意排除，各有替代路径：
 
 > | 归档含但 git 不含 | 性质 | 替代路径 |
 > |---|---|---|
-> | `portable/config/{auth,models,models-store,modes,trust}.json` | 每环境独立配置（多环境约定） | clone 后 scp 或 `create --with-auth` 归档恢复 |
+> | `portable/agent/{auth,models,models-store,modes,trust}.json` | 每环境独立配置（多环境约定） | clone 后 scp 或 `create --with-auth` 归档恢复 |
 > | `portable/memory/notes.json`（笔记） | 运行时数据、每环境独立 | `create` 归档全量带走 |
-> | `portable/config/sessions/`、`portable/config/extensions/` | 会话历史 / 扩展安装目录 | `--include-sessions` 归档恢复；扩展重新安装 |
+> | `portable/agent/sessions/`、`portable/agent/extensions/` | 会话历史 / 扩展安装目录 | `--include-sessions` 归档恢复；扩展重新安装 |
 > | `vendor/pi/` | 独立上游仓库 | `bash scripts/build.sh` 自动引导 |
 >
 > 定位差异：**git = 源码 + 配置骨架增量同步**（不含密钥/会话/记忆）；**归档 = 全量快照**（含记忆等运行时数据）。换机完整迁移建议两者都用：`create --with-auth` 归档带走运行数据 + git 同步源码（见 [clone](#pi-backup-clone) 恢复流程）。
@@ -95,14 +95,14 @@
 2. 检查 `git remote` 已配置 → 否则报错 `未配置远程仓库，请先运行 git remote add`
 3. 运行 `git remote -v` 检查 remote URL 可到达 → 否则报错 `远程仓库不可达`
 4. 运行 `git status --porcelain` 检查是否有变更 → 若无变更则提示 `无变更需要同步`
-5. **gitignored 配置变更检测**（基线对比）：`sha256sum portable/config/settings.json portable/config/auth.json portable/config/models.json portable/config/models-store.json portable/config/modes.json portable/config/trust.json portable/config/pi-link-*.json portable/config/scheduled-seeds.json 2>/dev/null` 与 `.backup-baseline/ignored.sha256` diff 对比——有变化则警告：`以下配置自上次备份后有修改（不在 git 同步范围，跨机需 pi-backup create --with-auth 或 scp）`，确认是有意修改后运行 `--refresh-baseline` 刷新基线；基线不存在时自动创建
-6. 检查 `.gitignore` 存在且包含 `portable/config/*`（白名单 `!portable/config/AGENTS.md` 等、`!portable/config/skills/`）、`portable/memory/*`、`vendor/pi/` 等排除规则 → 缺失则报错：`缺少 .gitignore（rsync/手工拷贝同步时最易丢失，先恢复它再同步，否则密钥会被提交！）`
-7. 检查敏感文件是否被意外追踪：运行 `git ls-files portable/config`，检查 `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json`、`pi-link-*.json`、`scheduled-seeds.json` 是否出现在输出中——任一命中**立即报错中止**并给出移除指引：`git rm --cached <file> && git commit -m "fix: remove secret"`
+5. **gitignored 配置变更检测**（基线对比）：`sha256sum portable/agent/settings.json portable/agent/auth.json portable/agent/models.json portable/agent/models-store.json portable/agent/modes.json portable/agent/trust.json portable/agent/pi-link-*.json portable/agent/scheduled-seeds.json 2>/dev/null` 与 `.backup-baseline/ignored.sha256` diff 对比——有变化则警告：`以下配置自上次备份后有修改（不在 git 同步范围，跨机需 pi-backup create --with-auth 或 scp）`，确认是有意修改后运行 `--refresh-baseline` 刷新基线；基线不存在时自动创建
+6. 检查 `.gitignore` 存在且包含 `portable/agent/*`（白名单 `!portable/agent/AGENTS.md` 等、`!portable/agent/skills/`）、`portable/memory/*`、`vendor/pi/` 等排除规则 → 缺失则报错：`缺少 .gitignore（rsync/手工拷贝同步时最易丢失，先恢复它再同步，否则密钥会被提交！）`
+7. 检查敏感文件是否被意外追踪：运行 `git ls-files portable/agent`，检查 `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json`、`pi-link-*.json`、`scheduled-seeds.json` 是否出现在输出中——任一命中**立即报错中止**并给出移除指引：`git rm --cached <file> && git commit -m "fix: remove secret"`
 8. 检查 `vendor/pi/` 未被跟踪：`git ls-files vendor/pi | head -1` 应无输出（vendor 属独立仓库）
 
 **执行步骤：**
 
-0. 若指定 `--refresh-baseline`：运行 `sha256sum portable/config/settings.json portable/config/auth.json portable/config/models.json portable/config/models-store.json portable/config/modes.json portable/config/trust.json portable/config/pi-link-*.json portable/config/scheduled-seeds.json 2>/dev/null > .backup-baseline/ignored.sha256` 刷新基线（基线目录需被 `.gitignore` 排除，不入库）
+0. 若指定 `--refresh-baseline`：运行 `sha256sum portable/agent/settings.json portable/agent/auth.json portable/agent/models.json portable/agent/models-store.json portable/agent/modes.json portable/agent/trust.json portable/agent/pi-link-*.json portable/agent/scheduled-seeds.json 2>/dev/null > .backup-baseline/ignored.sha256` 刷新基线（基线目录需被 `.gitignore` 排除，不入库）
 1. 运行 `git add -A`（`.gitignore` 会挡住密钥与运行时数据）
 2. 运行 `git commit -m "pi-backup: {timestamp}"`（可用 `--message` 覆盖）
 3. 运行 `git push {remote} {branch}`
@@ -114,7 +114,7 @@ GitHub 同步完成
   远程：origin → git@github.com:cyfxxx/my-pi.git (main)
   变更：8 文件（5 修改、3 新增）
   时间：2026-09-20T12:00:00Z
-  提示：vendor/pi、portable/config 敏感项、portable/memory 未随 git 同步
+  提示：vendor/pi、portable/agent 敏感项、portable/memory 未随 git 同步
 ```
 
 ---
@@ -128,8 +128,8 @@ GitHub 同步完成
 | 参数 | 说明 |
 |------|------|
 | `--backup <path>` | 备份文件路径（默认列出可用备份供选择） |
-| `--include-auth` | 恢复 `portable/config/auth.json` 等敏感配置（如果备份中包含） |
-| `--include-sessions` | 恢复 `portable/config/sessions/` 对话历史（默认跳过） |
+| `--include-auth` | 恢复 `portable/agent/auth.json` 等敏感配置（如果备份中包含） |
+| `--include-sessions` | 恢复 `portable/agent/sessions/` 对话历史（默认跳过） |
 | `--yes` | 静默模式：自动确认 + 自动执行 `bash scripts/build.sh`，不逐项询问 |
 | `--no-rebuild` | 跳过构建步骤，仅恢复文件 |
 
@@ -150,7 +150,7 @@ GitHub 同步完成
    SNAPSHOT_PATH="$HOME/pi-backups/pre-restore-{timestamp}.tar.gz"   # {timestamp} 形如 20260920_120000
    cd /root/my-pi
    FILES=""
-   for p in custom scripts patches packs docs portable/config portable/memory \
+   for p in custom scripts patches packs docs portable/agent portable/memory \
             my-pi.sh package.json package-lock.json vitest.config.ts .npmrc .gitattributes .gitignore \
             README.md STRUCTURE.md AGENTS.md PROGRESS.md DECISIONS.md LICENSE; do
      [ -e "$p" ] && FILES="$FILES $p"   # 只保留存在的路径
@@ -163,9 +163,9 @@ GitHub 同步完成
 **阶段 3：解压**
 
 6. 解压归档：`tar xzf {backup_path} -C /root/my-pi/`（归档根为 `custom/ scripts/ portable/` 等，对应仓库根下的目录；解到别处会污染目录结构——审计 MEDIUM）
-7. 验证关键文件：`ls -la /root/my-pi/portable/config/skills`、`ls -la /root/my-pi/custom/bootstrap.ts` 等。
+7. 验证关键文件：`ls -la /root/my-pi/portable/agent/skills`、`ls -la /root/my-pi/custom/bootstrap.ts` 等。
 8. 如果备份中不含 `auth.json` 且未指定 `--include-auth`：告知用户 `auth.json` 未被恢复，当前文件保持不变。`models.json` / `models-store.json` 同理——未随备份提供时保持现状（`--with-auth` 创建的归档会包含它们）。
-9. `portable/config/sessions/` 默认不恢复；需要时用 `--include-sessions`。
+9. `portable/agent/sessions/` 默认不恢复；需要时用 `--include-sessions`。
 
 **阶段 4：重建（vendor 引导 + 构建）**
 
@@ -209,16 +209,16 @@ GitHub 同步完成
    - 如果未指定 `--repo`：运行 `git pull` 拉取最新。
 2. 如果目标目录不存在且指定了 `--repo`：`git clone {url} /root/my-pi`
    - **证书失败（CAfile: none）**：`git clone/pull` 报证书验证失败时（沙箱/代理网络拦截 TLS），改用 `git -c http.sslVerify=false clone {url} /root/my-pi` 或 `git config --global http.sslVerify false`；也可先 `apt-get install -y ca-certificates && update-ca-certificates` 修复系统证书。
-   - **`.gitignore` 检查**：clone 后确认 `.gitignore` 存在且含 `portable/config/*`、`vendor/pi/` 等排除规则——缺失时密钥有被提交风险（rsync/手工拷贝同步时该文件最易丢失），先从仓库恢复它再继续。
-3. 验证 `custom/bootstrap.ts` 与 `portable/config/settings.json` 存在。
+   - **`.gitignore` 检查**：clone 后确认 `.gitignore` 存在且含 `portable/agent/*`、`vendor/pi/` 等排除规则——缺失时密钥有被提交风险（rsync/手工拷贝同步时该文件最易丢失），先从仓库恢复它再继续。
+3. 验证 `custom/bootstrap.ts` 与 `portable/agent/settings.json` 存在。
    - 注意：git 同步的配置为白名单内容；`auth.json` / `models.json` / `models-store.json` / `modes.json` / `trust.json` 受 `.gitignore` 排除。新设备 clone 后若缺失，**需手动提供**，否则 pi 无可用模型无法启动对话：
      ```
-     scp user@orig:/root/my-pi/portable/config/auth.json user@orig:/root/my-pi/portable/config/models-store.json \
-         /root/my-pi/portable/config/
+     scp user@orig:/root/my-pi/portable/agent/auth.json user@orig:/root/my-pi/portable/agent/models-store.json \
+         /root/my-pi/portable/agent/
      # 或从原机打包: pi-backup create --with-auth，新机 pi-backup restore
      ```
 4. 运行 `bash scripts/build.sh`（vendor 引导 + 构建；`--yes` 时自动执行，否则先确认）。
-5. 按需从归档恢复 git 不携带的数据（`portable/memory/notes.json`、`portable/config/sessions/`）。
+5. 按需从归档恢复 git 不携带的数据（`portable/memory/notes.json`、`portable/agent/sessions/`）。
 6. 告知用户运行 `./my-pi.sh` 启动。
 
 ---
@@ -273,10 +273,10 @@ GitHub 同步完成
 
 **不重建的项（始终跳过）：**
 
-- `portable/config/sessions/` — 对话历史无法重建，如需保留应使用 `--include-sessions` 参数恢复
-- `portable/config/auth.json` 等每环境独立配置 — 密钥无法自动重建，需用户手动创建或从备份恢复
+- `portable/agent/sessions/` — 对话历史无法重建，如需保留应使用 `--include-sessions` 参数恢复
+- `portable/agent/auth.json` 等每环境独立配置 — 密钥无法自动重建，需用户手动创建或从备份恢复
 - `portable/memory/notes.json` — 记忆数据无法重建，需从归档恢复
-- `portable/config/extensions/` — 运行时扩展安装目录，需用户按需重新安装
+- `portable/agent/extensions/` — 运行时扩展安装目录，需用户按需重新安装
 
 **验证步骤（构建后执行）：**
 
@@ -332,8 +332,8 @@ GitHub 同步完成
 
 **执行步骤：**
 
-1. 检查 `.gitignore` 存在，且包含 `portable/config/*`（白名单保留 `AGENTS.md`/`APPEND_SYSTEM.md`/`keybindings.json`/`settings.json` 与 `skills/`）、`portable/memory/*`、`vendor/pi/` 排除规则（缺失即报错：rsync/手工拷贝同步时最易丢失，会导致密钥被提交）。
-2. 检查敏感文件未被追踪：`git ls-files portable/config`，确认输出中不含 `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json`、`pi-link-*.json`、`scheduled-seeds.json`——任一命中**报错**并提示 `git rm --cached <file> && git commit -m "fix: remove secret"`。（提示：`settings.json` 若已被跟踪，需用户确认是否属有意跟踪，属环境独立项时用 `git rm --cached portable/config/settings.json` 取消跟踪。）
+1. 检查 `.gitignore` 存在，且包含 `portable/agent/*`（白名单保留 `AGENTS.md`/`APPEND_SYSTEM.md`/`keybindings.json`/`settings.json` 与 `skills/`）、`portable/memory/*`、`vendor/pi/` 排除规则（缺失即报错：rsync/手工拷贝同步时最易丢失，会导致密钥被提交）。
+2. 检查敏感文件未被追踪：`git ls-files portable/agent`，确认输出中不含 `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json`、`pi-link-*.json`、`scheduled-seeds.json`——任一命中**报错**并提示 `git rm --cached <file> && git commit -m "fix: remove secret"`。（提示：`settings.json` 若已被跟踪，需用户确认是否属有意跟踪，属环境独立项时用 `git rm --cached portable/agent/settings.json` 取消跟踪。）
 3. 检查 `vendor/pi/` 未被跟踪：`git ls-files vendor/pi | head -1` 应无输出；`git check-ignore -v vendor/pi` 应命中 `vendor/pi/` 规则。
 4. 检查 `.git` 存在且 `git remote -v` 已配置（未配置则提示 `git remote add origin <url>`）。
 5. 检查上游锁定点存在：`ls vendor/PINNED_COMMIT`；`ls -d vendor/pi/.git` 判断 vendor 是否已引导（缺失时提示 `bash scripts/build.sh`）。
@@ -346,7 +346,7 @@ GitHub 同步完成
 
 ```
 pi-backup verify
-  ✓ .gitignore 存在且排除规则齐备（portable/config、vendor/pi）
+  ✓ .gitignore 存在且排除规则齐备（portable/agent、vendor/pi）
   ✓ 敏感文件未被 git 追踪（auth/models/models-store/modes/trust/pi-link/scheduled-seeds）
   ✓ vendor/pi 未被跟踪（独立上游仓库）
   ✓ git remote: origin → git@github.com:cyfxxx/my-pi.git (main)

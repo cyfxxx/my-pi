@@ -9,7 +9,7 @@ MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 导出环境变量
 # pi 只识别 PI_CODING_AGENT_DIR；技能（config/skills）与会话（config/sessions）都在其下。
 # PI_MEMORY_DIR 由 custom/core/note-store.ts 读取。
-export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/config"
+export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/agent"
 export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"
 
 # 确保目录存在（config/sessions 由 pi 自行创建）

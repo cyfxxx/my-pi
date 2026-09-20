@@ -45,19 +45,19 @@ grep -qi microsoft /proc/version && echo WSL2
 
 ## 二、运行时数据布局
 
-所有运行时数据都在仓库内的 `portable/` 下，通过启动脚本 `my-pi.sh`（或 `scripts/dev.sh`）把 `PI_CODING_AGENT_DIR` 指向 `portable/config`；技能由 pi 从 `agentDir/skills`（即 `portable/config/skills/`）自动发现。
+所有运行时数据都在仓库内的 `portable/` 下，通过启动脚本 `my-pi.sh`（或 `scripts/dev.sh`）把 `PI_CODING_AGENT_DIR` 指向 `portable/agent`；技能由 pi 从 `agentDir/skills`（即 `portable/agent/skills/`）自动发现。
 
 | 路径 | 入库策略 | 说明 |
 |------|----------|------|
-| `portable/config/`（部分文件） | 部分跟踪 | `settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 入库共享；其余被 `.gitignore` 排除 |
-| `portable/config/skills/` | **入库共享** | 技能目录（pi 从 `agentDir/skills` 发现；`.gitignore` 已加白名单，随仓库分发） |
-| `portable/config/sessions/` | 不入库 | 会话历史（`agentDir/sessions/<转义 cwd>/`） |
-| `portable/config/extensions/`、`portable/config/{npm,git}/` | 不入库 | 第三方扩展（自动发现目录与 `pi install` 装入的包） |
+| `portable/agent/`（部分文件） | 部分跟踪 | `settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 入库共享；其余被 `.gitignore` 排除 |
+| `portable/agent/skills/` | **入库共享** | 技能目录（pi 从 `agentDir/skills` 发现；`.gitignore` 已加白名单，随仓库分发） |
+| `portable/agent/sessions/` | 不入库 | 会话历史（`agentDir/sessions/<转义 cwd>/`） |
+| `portable/agent/extensions/`、`portable/agent/{npm,git}/` | 不入库 | 第三方扩展（自动发现目录与 `pi install` 装入的包） |
 | `portable/memory/` | 不入库（仅 `.gitkeep`） | 自定义功能数据：note-store 笔记与工具输出归档 |
 
 由此得到两条基本规则：
 
-1. **仓库里能同步的只有代码、共享配置与技能**（`custom/`、`scripts/`、`patches/`、`packs/`、`docs/`、`portable/config/` 中列入白名单的四个文件与 `portable/config/skills/`）。`portable/memory/`、`portable/config/{sessions,extensions,npm,git}/`、每环境独立配置等不会随 `git pull` 到达新环境。
+1. **仓库里能同步的只有代码、共享配置与技能**（`custom/`、`scripts/`、`patches/`、`packs/`、`docs/`、`portable/agent/` 中列入白名单的四个文件与 `portable/agent/skills/`）。`portable/memory/`、`portable/agent/{sessions,extensions,npm,git}/`、每环境独立配置等不会随 `git pull` 到达新环境。
 2. **换机保留记忆必须走归档/手工拷贝**，例如 `pi-backup create` 归档，或直接拷贝对应目录；技能随 git 同步，通常无需额外处理。
 
 **环境专属信息的标注约定**：记忆数据统一放在 `portable/memory/`。记录时在同一份记忆中区分环境——环境专属的经验（如"某环境的终端快捷键/音频桥配置"）在内容里标注环境标签（`termux`/`wsl2`/`linux`/`macos`）；只是"在某个环境里发现"的通用知识不标注。这样跨环境复习时能快速分辨哪些经验只对当前机器成立。
@@ -68,10 +68,10 @@ grep -qi microsoft /proc/version && echo WSL2
 
 | 文件 | 说明 |
 |------|------|
-| `portable/config/settings.json` | 默认 provider/model、技能覆盖列表（`"skills": ["+skills/<name>/SKILL.md", ...]`，相对 `agentDir`）等 |
-| `portable/config/keybindings.json` | 终端快捷键；不同终端差异较大，改动前确认是否所有环境都适用 |
-| `portable/config/AGENTS.md` | Pi 全局约定 |
-| `portable/config/APPEND_SYSTEM.md` | 追加系统提示 |
+| `portable/agent/settings.json` | 默认 provider/model、技能覆盖列表（`"skills": ["+skills/<name>/SKILL.md", ...]`，相对 `agentDir`）等 |
+| `portable/agent/keybindings.json` | 终端快捷键；不同终端差异较大，改动前确认是否所有环境都适用 |
+| `portable/agent/AGENTS.md` | Pi 全局约定 |
+| `portable/agent/APPEND_SYSTEM.md` | 追加系统提示 |
 
 这些文件跨环境共享，**不要写入机器专属路径、主机名或密钥**——它们会被同步到其它环境。密钥类配置一律放 `auth.json`/`models.json`（每环境独立、gitignore，见 §4）。同步前可用 `pi-backup verify` 做一次 git 卫生与密钥泄漏体检。
 
@@ -92,13 +92,13 @@ grep -qi microsoft /proc/version && echo WSL2
 
 | 文件 | 策略 | 说明 |
 |------|------|------|
-| `portable/config/models.json` | 每环境独立配置（gitignore） | 各机器按能力配置（WSL2 等有 GPU 的机器可用大模型，Termux 用更小的模型）；首次 clone 后手动配置。共享的 `settings.json` 中涉及本机能力的选择（默认 provider/model）如需按环境区分，改在 `models.json` 侧落地，避免把机器专属配置写进共享文件 |
-| `portable/config/auth.json` | 每环境独立（gitignore） | API 凭据不跨机同步（安全） |
-| `portable/config/models-store.json` | 每环境独立（gitignore） | provider 密钥等运行时数据 |
-| `portable/config/modes.json` / `trust.json` | 每环境独立（gitignore） | 模式与项目信任状态，随本机使用变化 |
-| `portable/config/pi-link-*.json` | 每环境独立（gitignore） | 多设备互联的设备清单与运行时状态（`pi-link-active.json`/`pi-link-state.json`/`pi-link-outbox.json`） |
-| `portable/config/scheduled-seeds.json` | 每环境独立（gitignore） | 定时相关运行时数据 |
-| `portable/config/sessions/` / `portable/config/{extensions,npm,git}/` / `portable/memory/` | 每环境独立（gitignore） | 会话历史、第三方扩展、自定义功能数据 |
+| `portable/agent/models.json` | 每环境独立配置（gitignore） | 各机器按能力配置（WSL2 等有 GPU 的机器可用大模型，Termux 用更小的模型）；首次 clone 后手动配置。共享的 `settings.json` 中涉及本机能力的选择（默认 provider/model）如需按环境区分，改在 `models.json` 侧落地，避免把机器专属配置写进共享文件 |
+| `portable/agent/auth.json` | 每环境独立（gitignore） | API 凭据不跨机同步（安全） |
+| `portable/agent/models-store.json` | 每环境独立（gitignore） | provider 密钥等运行时数据 |
+| `portable/agent/modes.json` / `trust.json` | 每环境独立（gitignore） | 模式与项目信任状态，随本机使用变化 |
+| `portable/agent/pi-link-*.json` | 每环境独立（gitignore） | 多设备互联的设备清单与运行时状态（`pi-link-active.json`/`pi-link-state.json`/`pi-link-outbox.json`） |
+| `portable/agent/scheduled-seeds.json` | 每环境独立（gitignore） | 定时相关运行时数据 |
+| `portable/agent/sessions/` / `portable/agent/{extensions,npm,git}/` / `portable/memory/` | 每环境独立（gitignore） | 会话历史、第三方扩展、自定义功能数据 |
 
 跨机迁移每环境独立项时三选一：① 用 `pi-backup create` 打包后 `restore`；② 直接 `scp`/`rsync` 拷贝对应文件或目录；③ 在新环境手动重建。日常同步**不要**用归档覆盖新环境的独立配置。
 
@@ -123,7 +123,7 @@ grep -qi microsoft /proc/version && echo WSL2
 git pull          # 拉取共享更新（settings.json / keybindings.json / AGENTS.md / APPEND_SYSTEM.md）
 
 # 本机独立配置：仅首次 clone 后需要
-#   portable/config/{auth.json,models.json,models-store.json,modes.json,trust.json,pi-link-*.json}
+#   portable/agent/{auth.json,models.json,models-store.json,modes.json,trust.json,pi-link-*.json}
 #   按本机情况配置或从归档恢复（见 §4）
 ```
 

@@ -2,7 +2,7 @@
 
 遇到以下情况先定性，别直接报：
 
-- **密钥扫描命中**：先 `git ls-files <file>` + `git check-ignore -v <file>`。`portable/config/` 下被 gitignore 的本地配置（`auth.json`、`models.json`、`trust.json`、`pi-link-*.json`）是正常存在，**不是泄露**；只有被 git 跟踪的才算 HIGH。示例占位、测试夹具命中亦属噪音
+- **密钥扫描命中**：先 `git ls-files <file>` + `git check-ignore -v <file>`。`portable/agent/` 下被 gitignore 的本地配置（`auth.json`、`models.json`、`trust.json`、`pi-link-*.json`）是正常存在，**不是泄露**；只有被 git 跟踪的才算 HIGH。示例占位、测试夹具命中亦属噪音
 - **扫描范围与预览不符**：`review.sh --all` 输出的"待审文件数"远小于扫描预览数时，先怀疑排除规则误伤（例如扫描根本身命中某个 `! -path` 规则），而非仓库真的没文件
 - **运行时数据噪音**：`--all` 可能扫入 `portable/` 下的运行时数据，其中的文本命中 `rm -rf`/密钥等模式属噪音，跳过
 - **glob 陷阱**：`for d in dir/*/node_modules` 只在**全部不匹配**时保留字面量；部分不匹配 = 静默漏检，不是报错
@@ -15,4 +15,4 @@
 - **同类遗漏**：审查只报一处的，检查同模块第二处（同型参数校验、同型路径拼接、同型阈值判断）
 - **修复建议可改进**：审查给的修复方案常非最优或带副作用，核实后给出更优方案
 - **vendor/pi 的构建产物**：`vendor/pi/**/dist/` 是上游构建产物，不是本项目源码；审查范围只含本仓库跟踪的源码与 `patches/`
-- **`portable/config/` 白名单文件 vs 本地状态**：只有 `.gitignore` 白名单内的 4 个配置文件属入库共享，其余为运行时本地；把本地状态"未入库"报为问题属误报
+- **`portable/agent/` 白名单文件 vs 本地状态**：只有 `.gitignore` 白名单内的 4 个配置文件属入库共享，其余为运行时本地；把本地状态"未入库"报为问题属误报

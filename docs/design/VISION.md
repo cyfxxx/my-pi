@@ -56,7 +56,7 @@
 - **软**：提示词、注入记忆、关键节点提示 —— 引导模型行为。概率性生效，成本低，可迭代快。
 - **硬**：编写程序、设置规则、测试守门 —— 限制模型行为。确定性生效，防退化底线。
 
-在 my-pi 中的落点：软层 = `portable/config/AGENTS.md`、`APPEND_SYSTEM.md`、`portable/config/skills/`；硬层 = `custom/features/*/logic.ts` 中的常量与判据、`scripts/check-isolation.sh`、`npx vitest run`。
+在 my-pi 中的落点：软层 = `portable/agent/AGENTS.md`、`APPEND_SYSTEM.md`、`portable/agent/skills/`；硬层 = `custom/features/*/logic.ts` 中的常量与判据、`scripts/check-isolation.sh`、`npx vitest run`。
 
 ### 3.1 单向升格通道（核心纪律）
 反复有效的软引导必须逐步硬化，禁止永久滞留在软层：
@@ -125,7 +125,7 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 
 - 架构决策：`DECISIONS.md`
 - 执行进度：`PROGRESS.md`
-- 目录结构与环境：`STRUCTURE.md`、`portable/config/AGENTS.md`
+- 目录结构与环境：`STRUCTURE.md`、`portable/agent/AGENTS.md`
 - 技能改进机制：`docs/development/SKILLS-MAINTENANCE.md`
 - 外部技能包：`packs/README.md`
 

@@ -68,10 +68,10 @@ my-pi 的功能模块不是散落在扩展目录里的脚本，而是受"三隔�
 }
 ```
 
-也就是说，`import ... from "@earendil-works/pi-coding-agent"` 在编辑器与 `npx tsc --noEmit -p custom/` 下解析到 `vendor/pi/packages/coding-agent/dist/`；运行时则由适配层用动态 import 指向构建产物（见 `custom/adapters/agent-adapter.ts`）：
+也就是说，`import ... from "@earendil-works/pi-coding-agent"` 在编辑器与 `npx tsc --noEmit -p custom/` 下解析到 `vendor/pi/packages/coding-agent/dist/`；**运行时并不需要这个包**——my-pi 以 pi 扩展方式运行（启动参数 `--extension custom/bootstrap.ts`），`pi` 对象由宿主注入，所以 `index.ts` 里的 `import type` 在运行前已被擦除。若适配器确实需要在运行时调用 SDK（工厂函数、`SessionManager` 写方法等），放在 `custom/adapters/` 中动态 import vendor 构建产物：
 
 ```typescript
-const { createAgentSession } = await import(
+const { createBashTool } = await import(
   '../../vendor/pi/packages/coding-agent/dist/index'
 )
 ```
@@ -336,7 +336,7 @@ ctx.waitForIdle()           // 等待 agent 空闲
 ctx.reload()                // 重新加载扩展/技能/配置
 ```
 
-命令注册同样要走适配层：当前 `custom/adapters/` 只提供 tool-adapter / hook-adapter / agent-adapter，要注册命令需先新增命令适配器，不要把 `pi.registerCommand` 直接写进功能模块。
+命令注册同样要走适配层：当前 `custom/adapters/` 只提供 tool-adapter / hook-adapter，要注册命令需先新增命令适配器，不要把 `pi.registerCommand` 直接写进功能模块。
 
 **`sendUserMessage` 的 `deliverAs` 参数：**
 
@@ -380,7 +380,7 @@ pi.events.emit("my-channel", data)
 
 ### 方案 F：自定义 Provider（✅ 安全）
 
-**适用场景：** 添加非标准 API 兼容的模型供应商，需要自定义 baseUrl、HTTP headers、认证方式、流式解析。静态供应商配置通常写进 `portable/config/models.json`；`registerProvider` 适合需要在运行时动态注册或覆盖的场景。
+**适用场景：** 添加非标准 API 兼容的模型供应商，需要自定义 baseUrl、HTTP headers、认证方式、流式解析。静态供应商配置通常写进 `portable/agent/models.json`；`registerProvider` 适合需要在运行时动态注册或覆盖的场景。
 
 ```typescript
 pi.registerProvider("my-provider", {
@@ -405,7 +405,7 @@ pi.registerProvider("my-provider", {
 
 | 操作 | 原因 |
 |------|------|
-| 改 `beforeToolCall` / `afterToolCall` / `shouldStopAfterTurn` / `prepareNextTurn` | 这些是 `createAgentSession()` 的配置参数（my-pi 中由 `custom/adapters/agent-adapter.ts` 调用），session 创建后已固定 |
+| 改 `beforeToolCall` / `afterToolCall` / `shouldStopAfterTurn` / `prepareNextTurn` | 这些是 `createAgentSession()` 的配置参数，由宿主 pi 在启动时用（my-pi 以扩展方式运行，不自行建 session），会话创建后已固定 |
 | 改 agent loop 的 retry/compact/continue 逻辑 | agent loop 内部硬编码 |
 | 改扩展加载机制 | 加载器在功能运行前已完成；my-pi 的功能清单固定在 `custom/bootstrap.ts` 的 `FEATURES` |
 | 改会话文件格式 | SessionManager 的序列化/反序列化硬编码 |
@@ -442,7 +442,7 @@ pi.registerProvider("my-provider", {
 │   └─ 方案 D（registerCommand 的 ExtensionCommandContext）
 │
 ├─ 写 session 元数据 / 追加扩展条目？
-│   ├─ 先尝试 ctx.compact() / portable/config/APPEND_SYSTEM.md 等配置手段
+│   ├─ 先尝试 ctx.compact() / portable/agent/APPEND_SYSTEM.md 等配置手段
 │   └─ 还不够 → 方案 C（类型转换，有风险）
 │
 ├─ 功能间共享状态？
@@ -461,7 +461,7 @@ pi.registerProvider("my-provider", {
 
 ### 优先顺序
 
-1. **能用配置解决的**：`portable/config/settings.json` / `portable/config/APPEND_SYSTEM.md` / `portable/config/AGENTS.md` 优先
+1. **能用配置解决的**：`portable/agent/settings.json` / `portable/agent/APPEND_SYSTEM.md` / `portable/agent/AGENTS.md` 优先
 2. **能用扩展 API 解决的**：`custom/adapters/hook-adapter.ts` 的 `HookEvent` 事件 + `registerTool` + `registerCommand` 第二优先
 3. **需要 SDK 纯函数**：方案 A / B（安全，推荐）
 4. **需要突破限制**：方案 C / E（有风险，尽量少用）

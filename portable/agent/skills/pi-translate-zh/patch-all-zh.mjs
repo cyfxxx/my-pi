@@ -39,10 +39,10 @@ const _require = createRequire(import.meta.url);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// my-pi 仓库根：脚本位于 <root>/portable/config/skills/pi-translate-zh/，上溯 4 层即 <root>。
+// my-pi 仓库根：脚本位于 <root>/portable/agent/skills/pi-translate-zh/，上溯 4 层即 <root>。
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..");
 
-// 仅供兼容：<root>/portable/config（旧 ~/.pi/ 语义）。新代码应使用 resolvePiPath() 的结果。
+// 仅供兼容：<root>/portable/agent（旧 ~/.pi/ 语义）。新代码应使用 resolvePiPath() 的结果。
 const PI_DIR = join(REPO_ROOT, "portable", "config");
 const PINPM_DIR = join(PI_DIR, "npm/node_modules"); // my-pi 中不存在该目录，相关区段安全跳过
 

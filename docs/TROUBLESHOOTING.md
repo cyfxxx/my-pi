@@ -46,8 +46,8 @@ npx tsc --noEmit -p custom/
 # 4. 运行单元测试
 npx vitest run
 
-# 5. 校验 portable/config/ 下所有 JSON 合法性
-for f in portable/config/*.json; do
+# 5. 校验 portable/agent/ 下所有 JSON 合法性
+for f in portable/agent/*.json; do
   node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$f" \
     && echo "$f OK" || echo "$f BROKEN"
 done
@@ -132,19 +132,19 @@ bash scripts/build.sh
 
 **症状：** 启动过程中报配置文件解析失败。
 
-**原因：** `portable/config/` 下的某个 JSON 被写坏（手工编辑、写入中断）。
+**原因：** `portable/agent/` 下的某个 JSON 被写坏（手工编辑、写入中断）。
 
 **解决：**
 ```bash
 # 定位损坏文件
-for f in portable/config/*.json; do
+for f in portable/agent/*.json; do
   node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$f" \
     && echo "$f OK" || echo "$f BROKEN"
 done
 
 # 跟踪的文件可从 git 恢复
-git checkout HEAD -- portable/config/settings.json
-git checkout HEAD -- portable/config/keybindings.json
+git checkout HEAD -- portable/agent/settings.json
+git checkout HEAD -- portable/agent/keybindings.json
 ```
 
 **注意：** `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json` 为每环境独立且被 gitignore，无法从 git 恢复，只能由备份还原（见 §七，`pi-backup` 技能）。
@@ -176,7 +176,7 @@ npx tsc --noEmit -p custom/
 
 **解决：**
 - 未注册：在 `custom/bootstrap.ts` 中补上注册（参照已注册模块的写法）。
-- 文件缺失：从 `portable/config/skills/` 或 `packs/` 中确认该功能是否本就未迁移，不要凭想象补文件。
+- 文件缺失：从 `portable/agent/skills/` 或 `packs/` 中确认该功能是否本就未迁移，不要凭想象补文件。
 - 模块名以 `ls custom/features/` 实际输出为准：`autopilot`、`browser`、`context`、`intervention`、`link`、`memory`、`mode`、`plan-mode`、`subagent`、`tmux`、`voice`、`web-search`。
 
 ### 3.2 加载时报错
@@ -196,7 +196,7 @@ grep -rn "vendor/pi" custom/adapters/ custom/core/
 ```
 
 **解决：**
-- 把 Pi API 调用从 `custom/features/*/` 移到 `custom/adapters/tool-adapter.ts`、`hook-adapter.ts`、`agent-adapter.ts`，features 只保留纯逻辑。
+- 把 Pi API 调用从 `custom/features/*/` 移到 `custom/adapters/tool-adapter.ts`、`hook-adapter.ts`，features 只保留纯逻辑。
 - 重新构建并重试：`bash scripts/build.sh`。
 - 扩展开发细节见 [development/PI-EXT-DEV-NOTES.md](./development/PI-EXT-DEV-NOTES.md)。
 
@@ -223,18 +223,18 @@ npx vitest run
 
 ### 4.1 配置不生效
 
-**症状：** 修改 `portable/config/settings.json` 后行为没有变化。
+**症状：** 修改 `portable/agent/settings.json` 后行为没有变化。
 
-**原因：** Pi 运行时配置目录未指向 `portable/config`，或文件格式错误，或未重启进程。
+**原因：** Pi 运行时配置目录未指向 `portable/agent`，或文件格式错误，或未重启进程。
 
 **解决：**
 ```bash
-# 1. 确认 PI_CODING_AGENT_DIR 指向 portable/config
+# 1. 确认 PI_CODING_AGENT_DIR 指向 portable/agent
 echo "$PI_CODING_AGENT_DIR"
-# 期望：<项目根>/portable/config（由 ./my-pi.sh 导出）
+# 期望：<项目根>/portable/agent（由 ./my-pi.sh 导出）
 
 # 2. 校验 JSON 合法性
-for f in portable/config/*.json; do
+for f in portable/agent/*.json; do
   node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$f" \
     && echo "$f OK" || echo "$f BROKEN"
 done
@@ -247,19 +247,19 @@ done
 
 ### 4.2 技能（skills）未发现
 
-**症状：** `portable/config/skills/<名称>/SKILL.md` 存在，但技能未生效。
+**症状：** `portable/agent/skills/<名称>/SKILL.md` 存在，但技能未生效。
 
-**原因：** 技能由 `agentDir/skills` 自动发现，`agentDir` 即 `PI_CODING_AGENT_DIR`（`portable/config`）；`settings.json` 中的 `skills` 数组是相对 `agentDir` 的覆盖模式，`+` 前缀表示强制启用。
+**原因：** 技能由 `agentDir/skills` 自动发现，`agentDir` 即 `PI_CODING_AGENT_DIR`（`portable/agent`）；`settings.json` 中的 `skills` 数组是相对 `agentDir` 的覆盖模式，`+` 前缀表示强制启用。
 
 **解决：**
 ```bash
 # 确认技能文件位置
-ls portable/config/skills/<名称>/SKILL.md
+ls portable/agent/skills/<名称>/SKILL.md
 
 # 确认 settings.json 中的启用项
-node -e "console.log(JSON.parse(require('fs').readFileSync('portable/config/settings.json','utf8')).skills)"
+node -e "console.log(JSON.parse(require('fs').readFileSync('portable/agent/settings.json','utf8')).skills)"
 
-# 技能只从 agentDir/skills（= portable/config/skills/）加载
+# 技能只从 agentDir/skills（= portable/agent/skills/）加载
 ```
 
 ### 4.3 多环境配置冲突
@@ -271,14 +271,14 @@ node -e "console.log(JSON.parse(require('fs').readFileSync('portable/config/sett
 **解决：**
 ```bash
 # 跟踪的文件：settings.json / keybindings.json / AGENTS.md / APPEND_SYSTEM.md
-git status portable/config/
+git status portable/agent/
 
 # 每环境独立的文件（gitignore，不入库、不随 git 同步）
-ls -la portable/config/auth.json \
-       portable/config/models.json \
-       portable/config/models-store.json \
-       portable/config/modes.json \
-       portable/config/trust.json
+ls -la portable/agent/auth.json \
+       portable/agent/models.json \
+       portable/agent/models-store.json \
+       portable/agent/modes.json \
+       portable/agent/trust.json
 
 # 同步跟踪的配置
 git pull --rebase origin master
@@ -300,11 +300,11 @@ git pull --rebase origin master
 curl -I https://api.deepseek.com
 
 # 2. 检查认证配置（每环境独立、gitignore）
-ls -la portable/config/auth.json
+ls -la portable/agent/auth.json
 
 # 3. 检查默认 provider / model 与模型定义
-node -e "const s=JSON.parse(require('fs').readFileSync('portable/config/settings.json','utf8')); console.log(s.defaultProvider, s.defaultModel)"
-node -e "JSON.parse(require('fs').readFileSync('portable/config/models.json','utf8'))" && echo "models.json OK"
+node -e "const s=JSON.parse(require('fs').readFileSync('portable/agent/settings.json','utf8')); console.log(s.defaultProvider, s.defaultModel)"
+node -e "JSON.parse(require('fs').readFileSync('portable/agent/models.json','utf8'))" && echo "models.json OK"
 ```
 
 **解决：** 按错误类型区分——连接超时是网络/DNS 问题；401/403 是 `auth.json` 与 provider 不匹配；模型不存在是 `models.json` 与 `defaultModel` 不一致。
@@ -351,7 +351,7 @@ npm install
 **诊断：**
 ```bash
 # 1. 检查会话数据规模
-du -sh portable/config/sessions/
+du -sh portable/agent/sessions/
 
 # 2. 检查上下文/预算相关逻辑（custom/features/context/）
 ls custom/features/context/
@@ -376,10 +376,10 @@ ls -lh portable/memory/tool-outputs/ 2>/dev/null | head
 ps aux | grep node
 
 # 检查会话与记忆数据规模
-du -sh portable/config/sessions/ portable/memory/
+du -sh portable/agent/sessions/ portable/memory/
 ```
 
-**解决：** 会话数据不会自动收缩，长期运行后应归档或清理 `portable/config/sessions/`；清理前用 `pi-backup` 技能留档。
+**解决：** 会话数据不会自动收缩，长期运行后应归档或清理 `portable/agent/sessions/`；清理前用 `pi-backup` 技能留档。
 
 ### 6.3 校验命令本身很慢
 
@@ -391,7 +391,7 @@ du -sh portable/config/sessions/ portable/memory/
 
 ## 七、数据问题
 
-运行时数据全部收敛在 `portable/`：`portable/config/`（agentDir：Pi 配置、`skills/` 技能、`sessions/` 会话、`extensions/` 第三方扩展）、`portable/memory/`（自定义功能数据：note-store 笔记 + `tool-outputs/` 归档）。
+运行时数据全部收敛在 `portable/`：`portable/agent/`（agentDir：Pi 配置、`skills/` 技能、`sessions/` 会话、`extensions/` 第三方扩展）、`portable/memory/`（自定义功能数据：note-store 笔记 + `tool-outputs/` 归档）。
 
 ### 7.1 记忆数据异常
 
@@ -424,13 +424,13 @@ ls custom/core/note-store.ts custom/features/memory/
 **预防：**
 ```bash
 # 检查会话目录
-ls -la portable/config/sessions/
+ls -la portable/agent/sessions/
 
 # 定期备份（含会话）——使用 pi-backup 技能
-# 技能位置：portable/config/skills/pi-backup/
+# 技能位置：portable/agent/skills/pi-backup/
 ```
 
-**注意：** `portable/config/sessions/` 被 gitignore，删除后无法从 git 找回；会话数据的唯一保险是备份。
+**注意：** `portable/agent/sessions/` 被 gitignore，删除后无法从 git 找回；会话数据的唯一保险是备份。
 
 ---
 
@@ -484,4 +484,4 @@ npx vitest run
 2. **错误信息**：完整的错误输出（含触发它的命令）
 3. **复现步骤**：如何触发问题，是否稳定复现
 4. **检查结果**：`npm run check`、`npx tsc --noEmit -p custom/`、`npx vitest run` 的输出
-5. **相关数据**：涉及记忆/会话时，说明 `portable/memory/` 或 `portable/config/sessions/` 的异常现象（注意脱敏，凭据类内容替换为 `<REDACTED>`）
+5. **相关数据**：涉及记忆/会话时，说明 `portable/memory/` 或 `portable/agent/sessions/` 的异常现象（注意脱敏，凭据类内容替换为 `<REDACTED>`）

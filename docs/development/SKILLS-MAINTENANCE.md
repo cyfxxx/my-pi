@@ -9,7 +9,7 @@
 | 版本 | v1.0 |
 | 更新日期 | 2026-09-20 |
 | 适用范围 | 技能维护、改进记录 |
-| 相关文档 | [PI-EXT-DEV-NOTES.md](PI-EXT-DEV-NOTES.md), [FAQ.md](../FAQ.md), [portable/config/AGENTS.md](../../portable/config/AGENTS.md) |
+| 相关文档 | [PI-EXT-DEV-NOTES.md](PI-EXT-DEV-NOTES.md), [FAQ.md](../FAQ.md), [portable/agent/AGENTS.md](../../portable/agent/AGENTS.md) |
 
 ---
 
@@ -41,7 +41,7 @@
 
 ### 1.3 技能位置
 
-本地技能位于 `portable/config/skills/<name>/`（其中 `SKILL.md` 为技能正文），与 `portable/config/settings.json` 中的 `skills` 覆盖模式对应。
+本地技能位于 `portable/agent/skills/<name>/`（其中 `SKILL.md` 为技能正文），与 `portable/agent/settings.json` 中的 `skills` 覆盖模式对应。
 
 ---
 
@@ -61,7 +61,7 @@
 
 ### 3.1 记录位置
 
-写入 `portable/config/skills/<name>/improvements.md`（与该技能的 `SKILL.md` 同目录）。
+写入 `portable/agent/skills/<name>/improvements.md`（与该技能的 `SKILL.md` 同目录）。
 
 ### 3.2 记录格式
 
@@ -99,7 +99,7 @@
 
 ## 五、packs 外部技能包
 
-`packs/` 为按需加载的外部技能包，见 `packs/README.md`。使用方式为需要时手动读取 `packs/<name>/SKILL.md`，**不放入 `portable/config/skills/`**（避免系统提示词膨胀）。
+`packs/` 为按需加载的外部技能包，见 `packs/README.md`。使用方式为需要时手动读取 `packs/<name>/SKILL.md`，**不放入 `portable/agent/skills/`**（避免系统提示词膨胀）。
 
 对这类原文不动的包：**不改包内 SKILL.md 正文**，偏差记录到包级 `packs/<name>/improvements.md`；上游更新对照（包 README 记录克隆基线）时一并裁决本地化适配。
 

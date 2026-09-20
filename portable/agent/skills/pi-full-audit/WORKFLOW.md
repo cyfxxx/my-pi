@@ -10,7 +10,7 @@
 ## 第 1 步：确定性检查（机器先跑）
 
 ```bash
-bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
+bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
 ```
 
 - 保存完整输出到 /tmp 再分析（终端输出会截断）
@@ -24,7 +24,7 @@ bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
 
 ```text
 组A: README.md/STRUCTURE.md/PROGRESS.md/DECISIONS.md + docs/ —— 对照实际目录树/脚本清单/功能清单/git log
-组B: AGENTS.md + portable/config/AGENTS.md + APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
+组B: AGENTS.md + portable/agent/AGENTS.md + APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
 组C: custom/ 各模块注释与文档 vs 源码 —— grep 注册工具名/process.env 读取/配置键
 组D: packs/INDEX.md + packs/*/SKILL.md vs 实际 packs/ 目录
 ```
@@ -49,7 +49,7 @@ bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
   组1: custom/adapters/ + custom/core/（Pi API 接触点、路径解析、密钥、原子写）
   组2: custom/features/ 业务模块（autopilot/browser/intervention/link/tmux/voice/mode）
   组3: custom/features/ context + memory + plan-mode + subagent（状态/注入/预算/委派）
-  组4: custom/bootstrap.ts + scripts/ + patches/ + portable/config/（入口/脚本/补丁/配置）
+  组4: custom/bootstrap.ts + scripts/ + patches/ + portable/agent/（入口/脚本/补丁/配置）
 ```
 
 **委派 prompt 要点**：

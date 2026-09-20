@@ -4,18 +4,18 @@
 
 ### Changed
 - 补丁脚本 `patch-all-zh.mjs`：`resolvePiPath()` 新增最高优先级候选
-  `<root>/vendor/pi/packages/coding-agent`（脚本位于 `<root>/portable/config/skills/pi-translate-zh/`，
+  `<root>/vendor/pi/packages/coding-agent`（脚本位于 `<root>/portable/agent/skills/pi-translate-zh/`，
   `__dirname` 上溯 4 层得到仓库根），保留原有常见全局路径、`npm root -g`、`require.resolve`、
   家目录 `node_modules` 兜底。
-- `PI_DIR` 改为由脚本位置上溯推导 `<root>/portable/config`，仅作兼容用途。
+- `PI_DIR` 改为由脚本位置上溯推导 `<root>/portable/agent`，仅作兼容用途。
 - 上游更新等价物：`pi update` → `bash scripts/sync-upstream.sh` + `bash scripts/build.sh`；
   重新构建覆盖 `dist/` 后必须重跑补丁脚本。
-- SKILL.md 全部路径改写为 my-pi 布局：技能路径 `<root>/portable/config/skills/...`、
+- SKILL.md 全部路径改写为 my-pi 布局：技能路径 `<root>/portable/agent/skills/...`、
   核心包路径 `<root>/vendor/pi/packages/coding-agent`、自定义功能 `custom/features/*`。
 - SKILL.md 新增「可选扩展缺失（正常现象）」小节，说明 `missingAll` 与跳过节输出不是错误。
 
 ### Removed
-- 区段 [24] `browser-automation` 扩展（`portable/config/extensions/browser-automation.ts` 在 my-pi 中不存在）
+- 区段 [24] `browser-automation` 扩展（`portable/agent/extensions/browser-automation.ts` 在 my-pi 中不存在）
 - 区段 [25] `ctx-lite` 扩展（my-pi 以 `custom/features/context/` 提供上下文管理）
 - 区段 [27] `searx-search` 扩展（my-pi 以 `custom/features/web-search/` 提供）
 - 区段 [28]/[29] 会话选择器与登录对话框的重复补翻（与 [6]/[5] 重复，且依赖已不存在的 `~/.pi` 安装布局）

@@ -18,7 +18,7 @@ version: v2.0
 | 更新日期 | 2026-09-20 |
 | 适用场景 | 全面检查、深度审计、代码审查、仓库优化、运行检查 |
 | 项目根 | `/root/my-pi` |
-| 技能目录 | `portable/config/skills/pi-full-audit/`（即 `$PI_CODING_AGENT_DIR/skills/pi-full-audit/`） |
+| 技能目录 | `portable/agent/skills/pi-full-audit/`（即 `$PI_CODING_AGENT_DIR/skills/pi-full-audit/`） |
 | 依赖 | `review.sh` 脚本、subagent 功能（`custom/features/subagent/`，内置 reviewer/scout/worker 角色） |
 
 ---
@@ -58,10 +58,10 @@ version: v2.0
 ```bash
 # 1. 准备（在项目根 /root/my-pi 执行）
 git status -sb
-bash portable/config/skills/pi-full-audit/review.sh --selfcheck
+bash portable/agent/skills/pi-full-audit/review.sh --selfcheck
 
 # 2. 确定性检查（git 卫生/JSON/隔离边界/tsc/可疑模式与密钥）
-bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
+bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
 
 # 3. 基线测试（重定向落盘，保留收尾标记）
 npx vitest run > /tmp/my-pi-test.log 2>&1; echo EXIT=$? >> /tmp/my-pi-test.log

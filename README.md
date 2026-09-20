@@ -21,8 +21,7 @@ my-pi/
 ├── custom/                           # 你的代码（唯一需要维护的部分）
 │   ├── adapters/                     # 适配器层：隔离 Pi API 变化
 │   │   ├── tool-adapter.ts           # 工具注册适配
-│   │   ├── hook-adapter.ts           # 生命周期钩子适配
-│   │   └── agent-adapter.ts          # 会话创建适配
+│   │   └── hook-adapter.ts           # 生命周期钩子适配
 │   │
 │   ├── features/                     # 功能模块（12 个扩展）
 │   │   ├── autopilot/                # 自主运行
@@ -50,7 +49,7 @@ my-pi/
 │   └── tsconfig.json                 # TypeScript 配置
 │
 ├── portable/                         # 运行时数据（便携核心）
-│   ├── config/                       # Pi 运行时配置目录（PI_CODING_AGENT_DIR = agentDir）
+│   ├── agent/                        # pi 的运行时根目录（PI_CODING_AGENT_DIR = agentDir）
 │   │   ├── skills/                   # 技能目录（agentDir/skills，随仓库分发）
 │   │   ├── sessions/                 # 会话历史（agentDir/sessions/<转义 cwd>/）
 │   │   ├── extensions/               # 第三方扩展目录（自动发现）
@@ -156,10 +155,10 @@ cd /Volumes/USB/my-pi
 
 | Pi 默认路径 | 便携化路径 | 机制 |
 |---|---|---|
-| `~/.pi/agent/settings.json` | `portable/config/settings.json` | `PI_CODING_AGENT_DIR` 重定向（pi 识别） |
-| `~/.pi/agent/skills/` | `portable/config/skills/` | 随 `PI_CODING_AGENT_DIR` 解析为 `agentDir/skills` |
-| `~/.pi/agent/sessions/` | `portable/config/sessions/` | 随 `PI_CODING_AGENT_DIR` 解析为 `agentDir/sessions` |
-| `~/.pi/agent/extensions/` | `portable/config/extensions/` | `agentDir/extensions` 自动发现；my-pi 自身功能另经 `custom/bootstrap.ts` 加载 |
+| `~/.pi/agent/settings.json` | `portable/agent/settings.json` | `PI_CODING_AGENT_DIR` 重定向（pi 识别） |
+| `~/.pi/agent/skills/` | `portable/agent/skills/` | 随 `PI_CODING_AGENT_DIR` 解析为 `agentDir/skills` |
+| `~/.pi/agent/sessions/` | `portable/agent/sessions/` | 随 `PI_CODING_AGENT_DIR` 解析为 `agentDir/sessions` |
+| `~/.pi/agent/extensions/` | `portable/agent/extensions/` | `agentDir/extensions` 自动发现；my-pi 自身功能另经 `custom/bootstrap.ts` 加载 |
 | 记忆/笔记数据 | `portable/memory/` | `PI_MEMORY_DIR`（由 `custom/core/note-store.ts` 等识别） |
 
 > pi v0.85.1 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`（无 `PI_SKILLS_DIR`/`PI_EXTENSION_DIR`）；会话可用 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir` 覆盖。详见 [STRUCTURE.md](STRUCTURE.md) 的「已知偏离」。

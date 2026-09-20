@@ -5,15 +5,15 @@
 
 模块 D 对**当前 my-pi 运行态**做健康检查——区别于代码审计（审运行态而非代码态）。随时可单独执行（只读、无依赖）。触发词："运行检查""会话检查""健康巡检"。
 
-> **检查运行态时勿改动配置**：修改 `portable/config/settings.json` 或启用/禁用工具会改变 system prompt 前缀与工具列表，直接污染所测的运行态；只读文件 + 状态工具即可完成检查。
+> **检查运行态时勿改动配置**：修改 `portable/agent/settings.json` 或启用/禁用工具会改变 system prompt 前缀与工具列表，直接污染所测的运行态；只读文件 + 状态工具即可完成检查。
 
 ## 检查清单（按序）
 
 1. **运行态状态**
    - `autopilot_status`：自主运行开关、任务数、遥测、预算
    - `link_status`：链路状态
-   - 模型/provider/思考层级：读 `portable/config/settings.json`（`defaultProvider`/`defaultModel`/`defaultThinkingLevel`）
-   - 会话文件位置与大小：`ls -lS portable/config/sessions/`（= `agentDir/sessions/<转义 cwd>/`）
+   - 模型/provider/思考层级：读 `portable/agent/settings.json`（`defaultProvider`/`defaultModel`/`defaultThinkingLevel`）
+   - 会话文件位置与大小：`ls -lS portable/agent/sessions/`（= `agentDir/sessions/<转义 cwd>/`）
 
 2. **token 预算与压力档位**（`custom/features/context/`）
    - 预算源：`budget.ts` 以真实 `contextWindow` 校准总预算，未校准时默认 128K
@@ -38,7 +38,7 @@
    - 会话、笔记、归档不在 git 跟踪列表中
 
 6. **自动执行与残留状态**
-   - `autopilot_status` 与 `portable/config/.pi-autopilot-telemetry.json`（遥测）、`.pi-autopilot-crash.json`（崩溃记录）、`.pi-autopilot-lastgood.json`（最近正常点）、`.pi-admin-state.json`（管理状态）
+   - `autopilot_status` 与 `portable/agent/.pi-autopilot-telemetry.json`（遥测）、`.pi-autopilot-crash.json`（崩溃记录）、`.pi-autopilot-lastgood.json`（最近正常点）、`.pi-admin-state.json`（管理状态）
    - 异常判据：遥测失败率高、崩溃记录持续增长、lastgood 长期未更新；异常状态文件存在 = 对应路径触发过，结合内容判断是否需要处理
 
 ## 判定基准
@@ -74,8 +74,8 @@
 
 每日整体复检 my-pi 前一日运行情况，**只读为主、不深入探索**（防 token 浪费，参考一轮工具调用 6-12 个、out ~500 tokens）。不改配置，工作目录 `/root/my-pi`。
 
-1. **会话水位**：`ls -lS portable/config/sessions/*/ | head` 看最大会话文件与增长
+1. **会话水位**：`ls -lS portable/agent/sessions/*/ | head` 看最大会话文件与增长
 2. **归档水位**：`du -sh portable/memory/tool-outputs portable/memory 2>/dev/null` 看工具输出归档与笔记体积
-3. **自动执行**：`autopilot_status`；读 `portable/config/.pi-autopilot-lastgood.json` 与 `.pi-autopilot-crash.json` 时间戳
+3. **自动执行**：`autopilot_status`；读 `portable/agent/.pi-autopilot-lastgood.json` 与 `.pi-autopilot-crash.json` 时间戳
 4. **收敛边界**：`npm run check`（隔离边界，含符号链接与 vendor/pi 干净度）
 5. **汇总**：一条 bash 聚合完成全部检查项；输出仅"ok / 异常项清单"两类结论；异常项创建后续任务处理，不在当轮深挖

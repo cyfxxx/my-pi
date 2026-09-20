@@ -26,12 +26,12 @@
 cd /root/my-pi
 
 # 技能自检
-bash portable/config/skills/pi-full-audit/review.sh --selfcheck
+bash portable/agent/skills/pi-full-audit/review.sh --selfcheck
 
 # 查看变更
 git status -sb
 git diff --stat
-git diff -- custom/ scripts/ patches/ portable/config/settings.json
+git diff -- custom/ scripts/ patches/ portable/agent/settings.json
 git log --oneline -5
 ```
 
@@ -40,7 +40,7 @@ git log --oneline -5
 #### A2. 确定性检查
 
 ```bash
-bash portable/config/skills/pi-full-audit/review.sh
+bash portable/agent/skills/pi-full-audit/review.sh
 ```
 
 脚本输出：git 卫生（含 vendor/pi 只读、portable 运行时数据误入库）、JSON 合法性、隔离边界、类型检查、可疑模式与密钥模式。完整输出重定向落盘后再分析。
@@ -101,8 +101,8 @@ bash portable/config/skills/pi-full-audit/review.sh
   - ignore 规则是否重复或冲突
 - **大文件扫描**：`*.bak.*`、`.artifacts/`、测试生成的二进制、迁移遗留
 - **两类文件区分**：
-  - 入库共享：`custom/` 源码、`scripts/`、`patches/`、`docs/`、`portable/config/` 下被白名单跟踪的配置与 `portable/config/skills/`、`packs/`
-  - 运行时本地：`portable/config/sessions/`、`portable/memory/`、`portable/config/{extensions,npm,git}/`、`portable/config/` 下的 auth/models/state 文件
+  - 入库共享：`custom/` 源码、`scripts/`、`patches/`、`docs/`、`portable/agent/` 下被白名单跟踪的配置与 `portable/agent/skills/`、`packs/`
+  - 运行时本地：`portable/agent/sessions/`、`portable/memory/`、`portable/agent/{extensions,npm,git}/`、`portable/agent/` 下的 auth/models/state 文件
 
 #### B2. 仓库体积审计
 
@@ -174,13 +174,13 @@ git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objec
 cd /root/my-pi
 
 # 自检
-bash portable/config/skills/pi-full-audit/review.sh --selfcheck
+bash portable/agent/skills/pi-full-audit/review.sh --selfcheck
 
 # 默认：审查 git 工作区变更
-bash portable/config/skills/pi-full-audit/review.sh
+bash portable/agent/skills/pi-full-audit/review.sh
 
 # 全量：扫描项目根
-bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
+bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
 ```
 
 - 保存完整输出到 /tmp 再分析（终端输出会截断）
@@ -205,7 +205,7 @@ bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
 
 完整清单见 [references/RUNTIME-CHECK.md](references/RUNTIME-CHECK.md)（按需加载）。
 
-覆盖：`portable/config/sessions/` 会话体积与消息数、`portable/memory/tool-outputs/` 工具输出归档、`custom/features/context/` 的 token 预算与压力档位、memory 注入块稳定性、autopilot/link 运行态。
+覆盖：`portable/agent/sessions/` 会话体积与消息数、`portable/memory/tool-outputs/` 工具输出归档、`custom/features/context/` 的 token 预算与压力档位、memory 注入块稳定性、autopilot/link 运行态。
 
 ---
 
@@ -224,7 +224,7 @@ subagent 功能（`custom/features/subagent/`）并行委派分组审查 + 复�
   组1: custom/adapters/ + custom/core/（Pi API 接触点、路径解析、密钥、原子写）
   组2: custom/features/ 业务模块（autopilot/browser/intervention/link/tmux/voice/mode）
   组3: custom/features/ context + memory + plan-mode + subagent（状态/注入/预算/委派）
-  组4: custom/bootstrap.ts + scripts/ + patches/ + portable/config/（入口/脚本/补丁/配置）
+  组4: custom/bootstrap.ts + scripts/ + patches/ + portable/agent/（入口/脚本/补丁/配置）
 ```
 
 **委派 prompt 要点**：
@@ -255,7 +255,7 @@ subagent 功能（`custom/features/subagent/`）并行委派分组审查 + 复�
 
 ```
 组A: README.md/STRUCTURE.md/PROGRESS.md/DECISIONS.md + docs/ —— 对照实际目录树/脚本清单/功能清单/git log
-组B: AGENTS.md + portable/config/AGENTS.md + APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
+组B: AGENTS.md + portable/agent/AGENTS.md + APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
 组C: custom/ 各模块注释与文档 vs 源码 —— grep 注册工具名/process.env 读取/配置键
 组D: packs/INDEX.md + packs/*/SKILL.md vs 实际 packs/ 目录
 ```

@@ -5,7 +5,7 @@
 export {
   getProjectRoot,
   getPortableRoot,
-  getConfigDir,
+  getAgentDir,
   getSessionDir,
   getExtensionDir,
   getSkillsDir,

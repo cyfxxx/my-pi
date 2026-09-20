@@ -1,14 +1,17 @@
 /**
- * Bootstrap
- * 
- * 职责：组装所有功能，创建 Session
+ * Bootstrap — my-pi 的唯一扩展入口
+ *
+ * pi 的扩展约定：模块必须**默认导出**一个工厂函数 `(pi) => void | Promise<void>`，
+ * pi 加载扩展时调用它（见 vendor/pi loader.ts 的 `jiti.import(path, { default: true })`）。
+ *
+ * 职责：只做组装——把 FEATURES 交给 registry 注册到 pi。
  * 约束：
- *   - 这是唯一的入口
- *   - 每个功能的注册都通过 registry
+ *   - 会话、配置目录、模型等由 pi 自身管理，扩展不创建 session
+ *   - 每个功能的注册都通过 registry；此处不直接调用 feature 内部实现
+ *   - Pi API 只经 custom/adapters/ 接触（本文件仅用 import type）
  */
 
-import { createSession } from './adapters/agent-adapter';
-import * as config from './core/config';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { defineFeature, registerAll } from './core/registry';
 import { register as registerWebSearch } from './features/web-search';
 import { register as registerContext } from './features/context';
@@ -39,18 +42,6 @@ const FEATURES = [
   defineFeature('autopilot', registerAutopilot),
 ];
 
-export async function bootstrap() {
-  config.ensureDirectories();
-
-  const session = await createSession({
-    configDir: config.getConfigDir(),
-    sessionDir: config.getSessionDir(),
-    extensionDir: config.getExtensionDir(),
-    skillsDir: config.getSkillsDir(),
-    memoryDir: config.getMemoryDir(),
-  });
-
-  registerAll(session.pi, FEATURES);
-
-  return session;
+export default function bootstrap(pi: ExtensionAPI): void {
+  registerAll(pi, FEATURES);
 }

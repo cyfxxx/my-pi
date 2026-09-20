@@ -1,6 +1,6 @@
 # Pi 扩展开发注意事项
 
-pi（earendil-works/pi-coding-agent）扩展开发实测经验汇总（2026-08，含上游 pi 扩展排障复盘教训）。与 `portable/config/AGENTS.md` 全局约定配套，本文件聚焦扩展开发的隐性契约与踩坑点。my-pi 的功能模块位于 `custom/features/`，经 `custom/adapters/` 注册到 Pi，下文"扩展"即指这类功能模块。
+pi（earendil-works/pi-coding-agent）扩展开发实测经验汇总（2026-08，含上游 pi 扩展排障复盘教训）。与 `portable/agent/AGENTS.md` 全局约定配套，本文件聚焦扩展开发的隐性契约与踩坑点。my-pi 的功能模块位于 `custom/features/`，经 `custom/adapters/` 注册到 Pi，下文"扩展"即指这类功能模块。
 
 ## 元信息
 
@@ -9,7 +9,7 @@ pi（earendil-works/pi-coding-agent）扩展开发实测经验汇总（2026-08�
 | 版本 | v1.0 |
 | 更新日期 | 2026-09-20 |
 | 适用范围 | Pi 扩展开发、踩坑记录 |
-| 相关文档 | [portable/config/AGENTS.md](../../portable/config/AGENTS.md), [PI-SDK-EXTENSION.md](./PI-SDK-EXTENSION.md) |
+| 相关文档 | [portable/agent/AGENTS.md](../../portable/agent/AGENTS.md), [PI-SDK-EXTENSION.md](./PI-SDK-EXTENSION.md) |
 
 ---
 
@@ -29,9 +29,9 @@ pi（earendil-works/pi-coding-agent）扩展开发实测经验汇总（2026-08�
 
 ## 一、注册与加载
 
-- **my-pi 的功能模块在 `custom/features/<name>/`**（每个含 `index.ts` 注册入口 + `logic.ts` 纯逻辑；`logic.ts` 零 Pi 依赖），Pi API 只允许出现在 `custom/adapters/`（tool-adapter / hook-adapter / agent-adapter）
-- **加载入口唯一**：`--extension` 指向 `custom/bootstrap.ts`，由其 `FEATURES` 清单配合 `custom/core/registry.ts` 统一注册。新增功能必须在 `FEATURES` 里加一行，否则不会被加载；上游 pi 的"扫描扩展目录自动发现"机制在 my-pi 中不适用
-- 上游 pi 0.83+ 从 `agentDir/extensions/` 自动发现扩展，`settings.json` 的 `extensions` 数组仅作覆盖模式（`+` 强制 / `-`、`!` 排除），裸路径条目无效。my-pi 不使用该机制：`portable/config/settings.json` 不配置 `extensions`，功能一律经 `custom/features/` + `custom/adapters/` 注册
+- **my-pi 的功能模块在 `custom/features/<name>/`**（每个含 `index.ts` 注册入口 + `logic.ts` 纯逻辑；`logic.ts` 零 Pi 依赖），Pi API 只允许出现在 `custom/adapters/`（tool-adapter / hook-adapter）
+- **加载入口唯一**：`--extension` 指向 `custom/bootstrap.ts`，它**默认导出扩展工厂函数** `(pi) => void`（pi 的 loader 取默认导出并要求是函数），由 `FEATURES` 清单配合 `custom/core/registry.ts` 统一注册。新增功能必须在 `FEATURES` 里加一行，否则不会被加载；上游 pi 的"扫描扩展目录自动发现"机制在 my-pi 中不适用
+- 上游 pi 0.83+ 从 `agentDir/extensions/` 自动发现扩展，`settings.json` 的 `extensions` 数组仅作覆盖模式（`+` 强制 / `-`、`!` 排除），裸路径条目无效。my-pi 不使用该机制：`portable/agent/settings.json` 不配置 `extensions`，功能一律经 `custom/features/` + `custom/adapters/` 注册
 - 扩展代码改动后需重启 pi（或 `/reload`）生效
 - 隔离边界由 `npm run check`（`scripts/check-isolation.sh`）校验：`custom/features/*/logic.ts` 不得依赖 Pi API，`custom/adapters/` 之外不得 runtime import `vendor/pi`
 
@@ -120,8 +120,8 @@ npm run check
 ## 九、Git 约定
 
 - remote 含 token 时推送后立即恢复无凭证 URL；token 内联一次性使用不落盘
-- 勿提交 `portable/config/` 下的每环境机密与状态文件：`auth.json` / `models.json` / `models-store.json` / `modes.json` / `trust.json` / `pi-link-*.json` / `scheduled-seeds.json`（均已 gitignore）；`settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 是跟踪文件，改动需有意提交。`portable/memory/`、`portable/config/sessions/`、`portable/config/extensions/` 为运行时数据，不入库
+- 勿提交 `portable/agent/` 下的每环境机密与状态文件：`auth.json` / `models.json` / `models-store.json` / `modes.json` / `trust.json` / `pi-link-*.json` / `scheduled-seeds.json`（均已 gitignore）；`settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 是跟踪文件，改动需有意提交。`portable/memory/`、`portable/agent/sessions/`、`portable/agent/extensions/` 为运行时数据，不入库
 - **上游 vendor 同步约定**：`vendor/pi/` 是独立 git clone（已 gitignore）、永不直接修改；对上游的改动写入 `patches/`，上游更新用 `bash scripts/sync-upstream.sh`（或 `bash scripts/sync-upstream.sh <commit>`）合并，锁定点见 `vendor/PINNED_COMMIT` 与 `vendor/pi/LAST_SYNC_POINT`
 - 提交纪律：只提交本次会话更改的文件，暂存显式路径（永远不要 `git add -A`）；提交消息格式 `{feat,fix,docs}: <消息>`
-- **pi-link 运行时文件约定**：跨设备共享类状态（活跃时间戳/远程状态/信箱）放 `portable/config/pi-link-*.json`，**gitignore + 每设备独立**；设备间信息交换走 ssh 文件读取，不引入 HTTP daemon
+- **pi-link 运行时文件约定**：跨设备共享类状态（活跃时间戳/远程状态/信箱）放 `portable/agent/pi-link-*.json`，**gitignore + 每设备独立**；设备间信息交换走 ssh 文件读取，不引入 HTTP daemon
 - 多环境网络与配置差异见 [ENVIRONMENTS.md](../operations/ENVIRONMENTS.md) 与 [TERMUX-DEV-NOTES.md](../operations/TERMUX-DEV-NOTES.md)

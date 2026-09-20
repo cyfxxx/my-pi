@@ -7,19 +7,20 @@
 ```
 custom/
 ├── adapters/           # 适配器层（唯一允许 import vendor/pi 的地方）
-│   ├── agent-adapter.ts
 │   ├── hook-adapter.ts
 │   └── tool-adapter.ts
 ├── core/               # 核心服务
-│   ├── config.ts       # 路径解析
+│   ├── config.ts       # 路径解析（portable/agent + portable/memory）
 │   └── registry.ts     # 功能注册表
 ├── features/           # 功能模块（每个功能两个文件）
 │   └── web-search/
 │       ├── logic.ts    # 纯逻辑，零 Pi 依赖
 │       └── index.ts    # 通过 adapter 注册
-├── bootstrap.ts        # 唯一入口
+├── bootstrap.ts        # 唯一入口（默认导出扩展工厂函数）
 └── README.md
 ```
+
+功能清单在 `bootstrap.ts` 的 `FEATURES` 中维护；pi 以 `--extension custom/bootstrap.ts` 加载本层。
 
 ## 核心原则
 

@@ -15,7 +15,7 @@ version: v1.0
 |------|-----|
 | 版本 | v1.0 |
 | 更新日期 | 2026-09-20 |
-| 技能路径 | `portable/config/skills/pi-bug-diagnosis/`（项目根 `/root/my-pi`） |
+| 技能路径 | `portable/agent/skills/pi-bug-diagnosis/`（项目根 `/root/my-pi`） |
 | 适用场景 | 硬 bug 诊断、性能回退、难复现问题 |
 | 不适用 | 简单 bug（直接 grep/read）；全项目审计（用 pi-full-audit 技能） |
 | 依赖 | my-pi memory 功能（`custom/features/memory/`，数据落 `portable/memory/`） |

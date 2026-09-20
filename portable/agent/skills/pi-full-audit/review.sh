@@ -15,7 +15,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$SCRIPT_DIR"
-AGENT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"      # portable/config
+AGENT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"      # portable/agent
 DEFAULT_ROOT="$(cd "$AGENT_DIR/../.." && pwd)"    # my-pi 项目根
 
 # 项目根识别：默认取技能所在仓库；结构不符时回退当前目录
@@ -143,9 +143,9 @@ else
        -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' -o -name '.env' -o -name '.env.*' \) \
     ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path '*/custom/dist/*' \
     ! -path '*/vendor/pi/*' ! -path '*/.artifacts/*' ! -path '*/coverage/*' \
-    ! -path '*/portable/config/sessions/*' ! -path '*/portable/memory/*' \
-    ! -path '*/portable/config/extensions/*' ! -path '*/portable/config/npm/*' \
-    ! -path '*/portable/config/git/*' \
+    ! -path '*/portable/agent/sessions/*' ! -path '*/portable/memory/*' \
+    ! -path '*/portable/agent/extensions/*' ! -path '*/portable/agent/npm/*' \
+    ! -path '*/portable/agent/git/*' \
     2>/dev/null)
   TOTAL_FILES=$(find "$SCAN_DIR" -type f \
     \( -name '*.ts' -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.sh' \
@@ -207,12 +207,12 @@ if [ "$MODE" = "diff" ]; then
   runtime_tracked=0
   while IFS= read -r f; do
     case "$f" in
-      portable/config/sessions/*|portable/memory/*|portable/config/extensions/*|portable/config/npm/*|portable/config/git/*)
+      portable/agent/sessions/*|portable/memory/*|portable/agent/extensions/*|portable/agent/npm/*|portable/agent/git/*)
         fail "运行时数据被 git 跟踪: $f"; runtime_tracked=1 ;;
-      portable/config/*)
+      portable/agent/*)
         case "${f##*/}" in
           settings.json|keybindings.json|AGENTS.md|APPEND_SYSTEM.md|.gitkeep) ;;
-          *) fail "portable/config 运行时文件被 git 跟踪: $f"; runtime_tracked=1 ;;
+          *) fail "portable/agent 运行时文件被 git 跟踪: $f"; runtime_tracked=1 ;;
         esac ;;
     esac
   done < <(git -C "$PROJECT_ROOT" ls-files -- portable 2>/dev/null)

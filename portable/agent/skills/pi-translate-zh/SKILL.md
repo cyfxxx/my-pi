@@ -71,7 +71,7 @@ bash scripts/build.sh
 ### 3.1 重新翻译
 
 ```bash
-node <root>/portable/config/skills/pi-translate-zh/patch-all-zh.mjs
+node <root>/portable/agent/skills/pi-translate-zh/patch-all-zh.mjs
 ```
 
 脚本自行解析 pi 核心包路径，优先级：
@@ -110,7 +110,7 @@ grep -rn 'description:\s*"[A-Z]\|label:\s*"[A-Z]' "$ROOT/custom/features"/*/inde
 
 ```bash
 # my-pi 技能
-find "$ROOT/portable/config/skills" -name SKILL.md -exec grep -l '^description:' {} \;
+find "$ROOT/portable/agent/skills" -name SKILL.md -exec grep -l '^description:' {} \;
 
 # 自定义功能内附带的技能
 find "$ROOT/custom/features" -name SKILL.md -exec sh -c 'grep -q "^description:" "$1" && ! grep -qP "[\x{4e00}-\x{9fff}]" "$1" && echo "⚠️  $1"' _ {} \;
@@ -149,7 +149,7 @@ grep -rn 'commands: \|registerCommand\|name: "/' "$ROOT/custom/features"/*/index
 
 ### 3.4 可选扩展缺失（正常现象）
 
-my-pi 中不存在 `portable/config/npm/node_modules`，以下 npm 扩展在 my-pi 中缺失，属正常情况：
+my-pi 中不存在 `portable/agent/npm/node_modules`，以下 npm 扩展在 my-pi 中缺失，属正常情况：
 
 - `@plannotator/pi-extension`（含 `plannotator.html` / `review-editor.html` UI）
 - `pi-lens`
@@ -158,7 +158,7 @@ my-pi 中不存在 `portable/config/npm/node_modules`，以下 npm 扩展在 my-
 
 脚本对每一节先做 `existsSync` 检查，缺失时输出「跳过：不存在」，并在结尾汇总跳过节数；命中的原文未匹配时通过 `missingAll` 机制在结尾警告。这两类输出都不代表脚本出错。
 
-`plan-mode` 已内置于 `custom/features/plan-mode/`，对应区段检查 `<root>/portable/config/extensions/plan-mode/index.ts`（该路径在 my-pi 中不存在，同样安全跳过）。
+`plan-mode` 已内置于 `custom/features/plan-mode/`，对应区段检查 `<root>/portable/agent/extensions/plan-mode/index.ts`（该路径在 my-pi 中不存在，同样安全跳过）。
 
 ---
 
@@ -182,7 +182,7 @@ my-pi 中不存在 `portable/config/npm/node_modules`，以下 npm 扩展在 my-
 | agent-session 核心消息 | `.../dist/core/agent-session.js` | 1 项 |
 | provider-composer 登录提示 | `.../dist/core/provider-composer.js` | 1 项 |
 | model-resolver 消息 | `.../dist/core/model-resolver.js` | 1 项 |
-| 用户 skill 描述（如存在） | `portable/config/skills/*/SKILL.md` | 按需 |
+| 用户 skill 描述（如存在） | `portable/agent/skills/*/SKILL.md` | 按需 |
 | plannotator / pi-lens / pi-markdown-preview | npm 扩展（my-pi 中缺失） | 0（跳过） |
 
 前 16 行的路径均以 `<root>/vendor/pi/packages/coding-agent/` 为前缀。
@@ -206,7 +206,7 @@ my-pi 中不存在 `portable/config/npm/node_modules`，以下 npm 扩展在 my-
 # bash scripts/sync-upstream.sh && bash scripts/build.sh
 
 # 1. 运行补丁脚本
-node <root>/portable/config/skills/pi-translate-zh/patch-all-zh.mjs
+node <root>/portable/agent/skills/pi-translate-zh/patch-all-zh.mjs
 
 # 2. 重启 pi
 # 退出当前会话，重新启动 pi
@@ -218,7 +218,7 @@ node <root>/portable/config/skills/pi-translate-zh/patch-all-zh.mjs
 ### 5.3 干跑校验（不写文件）
 
 ```bash
-node <root>/portable/config/skills/pi-translate-zh/patch-all-zh.mjs --check
+node <root>/portable/agent/skills/pi-translate-zh/patch-all-zh.mjs --check
 ```
 
 输出各节可替换项与未匹配原文，用于判断补丁与当前上游版本的兼容度。若可替换项接近 0，说明上游结构已变更，需要更新补丁条目。
@@ -228,7 +228,7 @@ node <root>/portable/config/skills/pi-translate-zh/patch-all-zh.mjs --check
 ## 六、常见问题
 
 - **Q1**: 重新构建后翻译失效怎么办？
-  **A**: 运行 `node <root>/portable/config/skills/pi-translate-zh/patch-all-zh.mjs`，重启 pi。
+  **A**: 运行 `node <root>/portable/agent/skills/pi-translate-zh/patch-all-zh.mjs`，重启 pi。
 
 - **Q2**: 如何查找未翻译的字符串？
   **A**: 参考"重新构建后查找需要翻译的新文件"章节。
@@ -251,7 +251,7 @@ node <root>/portable/config/skills/pi-translate-zh/patch-all-zh.mjs --check
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
-| 2026-09-20 | v1.1 | 迁移到 my-pi：路径改为 `vendor/pi/packages/coding-agent` 与 `portable/config/skills/`；上游更新等价物改为 `scripts/sync-upstream.sh` + `scripts/build.sh`；移除 my-pi 不存在的 npm 扩展区段，注明缺失属正常 |
+| 2026-09-20 | v1.1 | 迁移到 my-pi：路径改为 `vendor/pi/packages/coding-agent` 与 `portable/agent/skills/`；上游更新等价物改为 `scripts/sync-upstream.sh` + `scripts/build.sh`；移除 my-pi 不存在的 npm 扩展区段，注明缺失属正常 |
 | 2026-09-12 | v1.1 | 按照文档模板重新组织结构，添加元信息、目录导航、章节编号 |
 | 2026-08-XX | v1.0 | 初始版本，实现 pi TUI 完整中文化 |
 

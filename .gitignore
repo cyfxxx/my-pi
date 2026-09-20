@@ -35,15 +35,15 @@ plans/
 packages/agent/docs/extensions/pi-server-artifact/index.md
 
 # portable/ 运行时数据（每环境独立，不入库；仅保留占位与共享配置）
-portable/config/*
-!portable/config/.gitkeep
-!portable/config/AGENTS.md
-!portable/config/APPEND_SYSTEM.md
-!portable/config/keybindings.json
-!portable/config/settings.json
+portable/agent/*
+!portable/agent/.gitkeep
+!portable/agent/AGENTS.md
+!portable/agent/APPEND_SYSTEM.md
+!portable/agent/keybindings.json
+!portable/agent/settings.json
 # 技能目录（pi 的 agentDir/skills，随仓库分发）
-!portable/config/skills/
-!portable/config/skills/**
+!portable/agent/skills/
+!portable/agent/skills/**
 portable/memory/*
 !portable/memory/.gitkeep
 

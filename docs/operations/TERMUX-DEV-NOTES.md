@@ -66,7 +66,7 @@
 - **Termux sshd 会话的 LD_PRELOAD（libtermux-exec）会破坏 node**：远程执行 pi 前必须在远程命令里显式 `unset LD_PRELOAD`
 - **ssh 客户端读取 Termux home 的 .ssh**（`/data/data/com.termux/files/home/.ssh`），非 proot `/root/.ssh`——公钥安装需双写，否则远程认证失败
 - sshd host key 是 known_hosts 里的，与客户端公钥（`ssh-keygen -y -f ~/.ssh/id_ed25519`）是两回事——加 GitHub/设备授权时用**客户端公钥**
-- my-pi 侧多设备互联由 link 功能（`custom/features/link/`）承担，设备清单与运行时状态落在 `portable/config/pi-link-*.json`（每环境独立、gitignore，见 [ENVIRONMENTS.md](./ENVIRONMENTS.md) §4）
+- my-pi 侧多设备互联由 link 功能（`custom/features/link/`）承担，设备清单与运行时状态落在 `portable/agent/pi-link-*.json`（每环境独立、gitignore，见 [ENVIRONMENTS.md](./ENVIRONMENTS.md) §4）
 
 ## whisper（本地转写）
 

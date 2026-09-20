@@ -2,7 +2,7 @@
 
 本文件为索引。pi 自动读取的开发规范位于：
 
-**[portable/config/AGENTS.md](portable/config/AGENTS.md)** — 项目环境描述、分层架构、关键约定、验证命令、深度文档索引
+**[portable/agent/AGENTS.md](portable/agent/AGENTS.md)** — 项目环境描述、分层架构、关键约定、验证命令、深度文档索引
 
 ## 快速参考
 

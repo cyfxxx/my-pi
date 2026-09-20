@@ -61,13 +61,13 @@ bash scripts/build.sh
 
 ### Q: 如何配置模型？
 
-编辑 `portable/config/settings.json`，配置 `defaultProvider` 与 `defaultModel` 字段。
+编辑 `portable/agent/settings.json`，配置 `defaultProvider` 与 `defaultModel` 字段。
 
 详见 [ENVIRONMENTS.md](./operations/ENVIRONMENTS.md)
 
 ### Q: 如何配置 API 密钥？
 
-编辑 `portable/config/auth.json`：
+编辑 `portable/agent/auth.json`：
 
 ```json
 {
@@ -91,7 +91,7 @@ pi-backup create
 pi-backup sync
 ```
 
-详见 [pi-backup SKILL.md](../portable/config/skills/pi-backup/SKILL.md)
+详见 [pi-backup SKILL.md](../portable/agent/skills/pi-backup/SKILL.md)
 
 ### Q: 如何恢复？
 
@@ -114,7 +114,7 @@ pi-backup restore --backup <路径>   # 从本地归档恢复到仓库根
 pi /compact                 # 内置命令，手动压缩会话上下文
 ```
 
-压缩阈值在 `portable/config/settings.json` 的 `compaction` 字段（`reserveTokens` /
+压缩阈值在 `portable/agent/settings.json` 的 `compaction` 字段（`reserveTokens` /
 `keepRecentTokens`）。
 
 ### Q: 如何重载配置与技能？
@@ -143,14 +143,14 @@ subagent、tmux、voice、web-search。
 
 ### Q: 技能放在哪里？
 
-技能位于 `portable/config/skills/<name>/SKILL.md`（pi 自动发现），当前内置
+技能位于 `portable/agent/skills/<name>/SKILL.md`（pi 自动发现），当前内置
 `pi-backup`、`pi-bug-diagnosis`、`pi-full-audit`、`pi-translate-zh`。
-`portable/config/settings.json` 的 `skills` 数组用于覆盖启用（`+` 前缀强制启用）。
+`portable/agent/settings.json` 的 `skills` 数组用于覆盖启用（`+` 前缀强制启用）。
 
 ### Q: packs 是什么？
 
 `packs/` 是外部技能包仓库，按需加载，**不注入系统提示词**。需要时手动读取
-`packs/<name>/SKILL.md`，不要放入 `portable/config/skills/`（防系统提示词膨胀）。
+`packs/<name>/SKILL.md`，不要放入 `portable/agent/skills/`（防系统提示词膨胀）。
 
 ---
 
@@ -174,7 +174,7 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 
 ### Q: 会话历史在哪里？
 
-`portable/config/sessions/`（gitignored）。
+`portable/agent/sessions/`（gitignored）。
 
 ---
 
@@ -190,7 +190,7 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 ### Q: 缓存命中率低怎么办？
 
 检查 system prompt 注入面是否引入易变内容：按
-[portable/config/AGENTS.md](../portable/config/AGENTS.md) 的约定，注入禁止时间戳与
+[portable/agent/AGENTS.md](../portable/agent/AGENTS.md) 的约定，注入禁止时间戳与
 精确数值（缓存友好）。
 
 ### Q: 如何监控资源使用？
@@ -213,11 +213,11 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 
 | 方式 | 命令 / 位置 |
 |------|------------|
-| npm 包 | `./my-pi.sh install npm:@foo/bar` → 装到 `portable/config/npm/node_modules/` |
-| git 仓库 | `./my-pi.sh install git:github.com/user/repo` → 装到 `portable/config/git/<host>/<path>` |
-| 本地单文件/目录 | 放到 `portable/config/extensions/<name>/`（= `agentDir/extensions`，自动发现，无需登记） |
+| npm 包 | `./my-pi.sh install npm:@foo/bar` → 装到 `portable/agent/npm/node_modules/` |
+| git 仓库 | `./my-pi.sh install git:github.com/user/repo` → 装到 `portable/agent/git/<host>/<path>` |
+| 本地单文件/目录 | 放到 `portable/agent/extensions/<name>/`（= `agentDir/extensions`，自动发现，无需登记） |
 
-`install` 会把来源写入 `portable/config/settings.json` 的 `packages`；用 `./my-pi.sh list` 查看、`./my-pi.sh remove <source>` 卸载。
+`install` 会把来源写入 `portable/agent/settings.json` 的 `packages`；用 `./my-pi.sh list` 查看、`./my-pi.sh remove <source>` 卸载。
 
 注意：不要用 `-l/--local`——项目级配置目录由 coding-agent 的 `piConfig.configDir` 决定，运行时是 `.pi`，会在仓库根产生 `.pi/`。安装/卸载会改动 `packages` 从而改变 system prompt 前缀、导致缓存前缀断裂，属低频操作。
 
