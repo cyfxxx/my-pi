@@ -1,46 +1,39 @@
-# custom — 自定义层
+# Custom Layer
 
-自定义层，通过适配器与 pi 交互，保持与上游隔离。
-
-**关键原则：** custom → adapter → packages（单向依赖）
+本目录是 my-pi 的自定义层，与上游 Pi 代码完全隔离。
 
 ## 目录结构
 
 ```
 custom/
-├── bootstrap.ts        — 启动引导流程
-├── extension-loader.ts — 扩展加载器
-├── integration.ts      — 集成层（增强 API）
-├── cordis.yml          — 声明式配置
-├── tsconfig.json       — TypeScript 配置
-├── src/                — 源代码（adapters/ + services/）
-├── seams/              — 能力接缝系统（14 个能力接口）
-├── events/             — 事件总线系统
-├── session-log/        — 会话日志实现
-├── config/             — 配置管理
-├── docs/               — 内部项目文档
-└── tests/              — 测试文件
+├── adapters/           # 适配器层（唯一允许 import vendor/pi 的地方）
+│   ├── agent-adapter.ts
+│   ├── hook-adapter.ts
+│   └── tool-adapter.ts
+├── core/               # 核心服务
+│   ├── config.ts       # 路径解析
+│   └── registry.ts     # 功能注册表
+├── features/           # 功能模块（每个功能两个文件）
+│   └── web-search/
+│       ├── logic.ts    # 纯逻辑，零 Pi 依赖
+│       └── index.ts    # 通过 adapter 注册
+├── bootstrap.ts        # 唯一入口
+└── README.md
 ```
 
-## 文件说明
+## 核心原则
 
-| 文件/目录 | 用途 |
-|-----------|------|
-| `bootstrap.ts` | 启动引导流程 |
-| `extension-loader.ts` | 扩展加载器 |
-| `integration.ts` | 集成层（增强 API） |
-| `cordis.yml` | 声明式配置 |
-| `tsconfig.json` | TypeScript 配置 |
-| `src/` | 源代码（adapters/ + services/） |
-| `seams/` | 能力接缝系统（14 个能力接口） |
-| `events/` | 事件总线系统 |
-| `session-log/` | 会话日志实现 |
-| `config/` | 配置管理 |
-| `docs/` | 内部项目文档 |
-| `tests/` | 测试文件 |
+1. **上游隔离**：`vendor/pi/` 永不修改
+2. **接口隔离**：`adapters/` 是唯一允许 import `vendor/pi/` 的地方
+3. **逻辑隔离**：`features/*/logic.ts` 零 Pi 依赖
 
-## 相关链接
+## 禁止事项
 
-- [.pi/](../.pi/README.md)
-- [packages/](../packages/README.md)
-- [docs/](../docs/README.md)
+- 禁止在 `custom/` 下创建 `seams/`、`events/`、`session-log/`、`src/`、`docs/`、`tests/`、`config/` 等目录
+- 禁止在 `custom/` 下创建 `integration.ts`、`extension-loader.ts`、`cordis.yml` 等文件
+- 禁止在 `features/*/logic.ts` 中 import `vendor/pi/`
+- 禁止在 `adapters/` 之外 import `vendor/pi/`（`import type` 除外）
+
+## 验证
+
+运行 `bash scripts/check-isolation.sh` 验证隔离边界。

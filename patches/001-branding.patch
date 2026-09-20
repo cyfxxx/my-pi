@@ -1,3 +1,13 @@
-# Branding patch for my-pi
-# This patch customizes the piConfig in vendor/pi/package.json
-# to use "my-pi" as the name and ".my-pi" as the config directory.
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,11 @@
+ {
+-	"name": "pi-monorepo",
++	"name": "my-pi",
+ 	"private": true,
+ 	"type": "module",
++	"piConfig": {
++		"name": "my-pi",
++		"configDir": ".my-pi"
++	},
+ 	"workspaces": [---
