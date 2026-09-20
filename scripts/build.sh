@@ -32,8 +32,6 @@ cd "$VENDOR_PI/packages/coding-agent"
 npm install
 npm run build
 
-echo "🔨 构建 custom/..."
-cd "$ROOT"
-npx tsc --project custom/ --outDir custom/dist --noEmit false
-
-echo "✅ 构建完成"
+# custom/ 不编译：pi 的扩展加载器内置 jiti，直接加载 custom/bootstrap.ts（TypeScript）。
+# 类型检查用 `npx tsc --noEmit -p custom/`（见 npm run check 与文档）。
+echo "✅ 构建完成（custom/ 以 TypeScript 源码由 pi 加载，无需编译）"

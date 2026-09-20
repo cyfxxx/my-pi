@@ -44,7 +44,7 @@ my-pi 的 `vendor/pi/` 是上游 pi 的独立 clone，`dist/` 为构建产物。
 # 1. 同步上游源码（可选：指定 commit）
 bash scripts/sync-upstream.sh
 
-# 2. 重新构建 vendor/pi(coding-agent) 与 custom/
+# 2. 重新构建 vendor/pi(coding-agent)（custom/ 不编译，由 pi 直接加载 TypeScript）
 bash scripts/build.sh
 ```
 

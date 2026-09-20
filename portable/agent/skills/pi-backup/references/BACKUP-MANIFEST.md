@@ -31,16 +31,16 @@
 |------|----------|------|---------|
 | 上游源码 | `vendor/pi/` | 独立 git 仓库（上游 pi-mono），不随主仓库分发 | `bash scripts/build.sh`（自动 clone + checkout `vendor/PINNED_COMMIT` + 应用 `patches/`） |
 | npm 依赖 | `node_modules/`、`custom/node_modules/` | 根 workspaces 依赖 | `npm install`（由 `scripts/build.sh` 调用） |
-| 构建产物 | `custom/dist/` | custom 层编译输出 | `bash scripts/build.sh` |
 | 会话历史 | `portable/agent/sessions/` | 对话历史（每环境独立，可能含隐私） | 不可重建，需 `--include-sessions` 恢复 |
 | 扩展安装 | `portable/agent/extensions/` | 运行时扩展安装目录（每环境独立） | 不可重建，需用户重新安装 |
-| 会话目录 | `portable/agent/sessions/` | pi 运行时在 agentDir 下产生的会话缓存 | 不可重建，不恢复 |
 | 运行时配置 | `portable/agent/{auth.json,models.json,models-store.json,modes.json,trust.json}` | API 密钥 / provider 模型 / 模式 / 项目信任（每环境独立） | 需 `--with-auth` 或从原机 scp |
 | 互联运行时 | `portable/agent/pi-link-*.json` | pi-link 活跃时间戳 / 远程状态 / 信箱（每设备运行时数据） | 运行时自动重建 |
 | 调度种子 | `portable/agent/scheduled-seeds.json` | 调度种子运行时数据 | 运行时自动重建 |
 | 工具输出归档 | `portable/memory/tool-outputs/` | context 功能的工具输出归档（可再生的运行时数据） | 自动产生 |
 
-> `--full` 的边界：`--full` 只额外纳入上表**可重建**项（`node_modules/`、`custom/dist/`、`tool-outputs/`）；每环境独立项（`auth.json`、`models*.json`、`portable/agent/sessions/`、`portable/agent/extensions/`、`vendor/pi/`）**即使 `--full` 也不包含**，需 `--with-auth` / `--include-sessions` 显式指定。
+> `--full` 的边界：`--full` 只额外纳入上表**可重建**项（`node_modules/`、`tool-outputs/`）；每环境独立项（`auth.json`、`models*.json`、`portable/agent/sessions/`、`portable/agent/extensions/`、`vendor/pi/`）**即使 `--full` 也不包含**，需 `--with-auth` / `--include-sessions` 显式指定。
+>
+> `custom/` 不编译（pi 的扩展加载器内置 jiti，直接加载 `custom/bootstrap.ts`），因此没有 custom 构建产物需要重建。
 
 ### 按需包含
 

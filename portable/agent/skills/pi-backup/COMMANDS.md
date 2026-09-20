@@ -12,7 +12,7 @@
 |------|------|
 | `--output <path>` | 输出路径（默认见下方[备份目录约定](#备份目录约定)） |
 | `--with-auth` | 包含 `portable/agent/auth.json`（API 密钥）及同源敏感配置 `models.json` / `models-store.json` / `modes.json` / `trust.json`。默认不包含。 |
-| `--full` | 额外包含默认排除的可重建项（`node_modules/`、`custom/dist/`、`portable/memory/tool-outputs/`） |
+| `--full` | 额外包含默认排除的可重建项（`node_modules/`、`portable/memory/tool-outputs/`） |
 | `--keep N` | 保留最近 N 份备份（默认 5），超出则删除最旧的文件 |
 
 > **备份目录约定**：Termux/Android 环境默认 `/storage/emulated/0/我的文件/pi-backup/`；其他环境默认 `~/pi-backups/`。归档文件名 `pi-backup-{hostname}-{timestamp}.tar.gz`。
@@ -28,12 +28,12 @@
    git ls-files --others --exclude-standard      # 未跟踪但未被 gitignore 的新文件（技能/文档等，一并收录）
    # 再按清单手工增补 gitignore 但属于备份范围的项（存在时）：
    #   portable/memory/notes.json
-   # 按清单排除：vendor/pi/、node_modules/、custom/dist/、portable/agent/sessions/、
+   # 按清单排除：vendor/pi/、node_modules/、portable/agent/sessions/、
    #   portable/agent/extensions/、portable/agent/{auth,models,models-store,modes,trust}.json、
    #   portable/agent/pi-link-*.json、portable/agent/scheduled-seeds.json、
    #   portable/agent/sessions/、portable/memory/tool-outputs/
    ```
-   `--full` 时额外纳入 `node_modules/`、`custom/dist/`、`portable/memory/tool-outputs/`（每环境独立项即使 `--full` 也不纳入）。
+   `--full` 时额外纳入 `node_modules/`、`portable/memory/tool-outputs/`（每环境独立项即使 `--full` 也不纳入）。
 4. 同时写入 `manifest.json` 到归档内：
    ```json
    {
@@ -171,7 +171,7 @@ GitHub 同步完成
 
 10. 除非指定了 `--no-rebuild`，否则运行 `bash scripts/build.sh`（`--yes` 时自动执行，否则先确认）。该脚本负责：
     - vendor 引导：`vendor/pi/` 缺失时 `git clone` 上游 → `checkout vendor/PINNED_COMMIT` → 应用 `patches/*.patch`
-    - 构建：`vendor/pi/packages/coding-agent` 的 `npm install` + `npm run build`，以及 `custom/` 的 `tsc` 编译
+    - 构建：`vendor/pi/packages/coding-agent` 的 `npm install` + `npm run build`（`custom/` 不编译）
 
 **阶段 5：报告**
 
@@ -181,7 +181,7 @@ GitHub 同步完成
 恢复完成
   来源：/storage/emulated/0/我的文件/pi-backup/pi-backup-myhost-20260920_120000.tar.gz
   文件：已解压 180 个
-  构建：vendor 引导 ✓ | vendor 构建 ✓ | custom 编译 ✓
+  构建：vendor 引导 ✓ | vendor 构建 ✓
   跳过：sessions（未请求）| auth.json（备份中不含）
   快照：~/pi-backups/pre-restore-20260920_120500.tar.gz
   ⚠ 运行 bash scripts/build.sh 后重启 ./my-pi.sh 使更改生效
@@ -225,7 +225,7 @@ GitHub 同步完成
 
 ## `pi-backup build`
 
-重建被 git 排除的可重建内容（vendor 引导 + 构建）。适用于恢复后、新克隆后、或 `vendor/pi` / `node_modules` / `custom/dist` 被误删后。
+重建被 git 排除的可重建内容（vendor 引导 + 构建）。适用于恢复后、新克隆后、或 `vendor/pi` / `node_modules` 被误删后。
 
 **参数：**
 
@@ -238,9 +238,9 @@ GitHub 同步完成
 1. 后台执行（本技能不依赖 tmux；my-pi 的 tmux 功能是 `custom/features/tmux/`，重建场景可能恰好不可用）：
    - `mkdir -p ~/pi-backups && nohup bash scripts/build.sh > /tmp/my-pi-build.log 2>&1 &`，轮询用 `tail -n 30 /tmp/my-pi-build.log`；记录 PID（`echo $!`）供卡死判定时 `kill -0` 探活。
    - 若已有可用 tmux，可用 `tmux_run` 后台执行并 `tmux_read` 轮询。
-   - 单条短命令（如 `mkdir`）可前台执行，但 `git clone` / `npm install` / `tsc` 必须后台。
+   - 单条短命令（如 `mkdir`）可前台执行，但 `git clone` / `npm install` / `npm run build` 必须后台。
 2. **进度报告节奏：每 60 秒检查一次日志，主动向用户输出一行进度**（用户没问也报告）：
-   - 格式：`[构建进度 +3m12s] vendor 引导完成 ✓；当前：custom tsc 编译（预估 1-3 分钟）`
+   - 格式：`[构建进度 +3m12s] vendor 引导完成 ✓；当前：vendor 构建（预估 2-8 分钟）`
    - 内容：已耗时、已完成阶段（grep 日志 `构建` / `✅` / `📥` / `🔨`）、当前进行项（日志最后活动行）。
 3. 单项耗时预估（超预估不必惊慌，按节奏报告即可；预估含中国网络减速）：
 
@@ -248,9 +248,8 @@ GitHub 同步完成
    |---|---|
    | vendor 引导（`git clone` 上游 + 应用 patches） | 1-5 分钟 |
    | vendor 构建（`npm install` + `npm run build`） | 2-8 分钟 |
-   | custom 编译（`npx tsc`） | 1-3 分钟 |
 
-4. **卡死判定**：日志 5 分钟无新增输出 → 主动报告「疑似卡住（X 分钟无新输出），正在检查」；用 `ps aux | grep -E "build|npm|tsc|git"`（或 `kill -0 <PID>`）确认进程存活、检查下载目录大小是否增长（`ls -l vendor/pi` / `du -sh vendor/pi`），区分「慢」与「卡」；确认卡死才中止（`kill <PID>`），否则继续等待并报告「仍在运行（正常）」。
+4. **卡死判定**：日志 5 分钟无新增输出 → 主动报告「疑似卡住（X 分钟无新输出），正在检查」；用 `ps aux | grep -E "build|npm|git"`（或 `kill -0 <PID>`）确认进程存活、检查下载目录大小是否增长（`ls -l vendor/pi` / `du -sh vendor/pi`），区分「慢」与「卡」；确认卡死才中止（`kill <PID>`），否则继续等待并报告「仍在运行（正常）」。
 5. 完成后汇总报告：总耗时 + 各阶段 ✓/跳过 + 验证结果。
 
 **前置检查（在构建前执行一次）：**
@@ -269,7 +268,8 @@ GitHub 同步完成
 |---|------|------|------|
 | 1 | vendor 引导（`vendor/pi/`） | `vendor/pi/.git` 不存在 | `git clone "$PI_UPSTREAM_URL" vendor/pi` → `git checkout $(vendor/PINNED_COMMIT)` → 逐个 `git apply --3way patches/*.patch` → 写 `vendor/pi/LAST_SYNC_POINT` |
 | 2 | vendor 构建 | 无 | `cd vendor/pi/packages/coding-agent && npm install && npm run build` |
-| 3 | custom 编译 | 无 | `npx tsc --project custom/ --outDir custom/dist --noEmit false` |
+
+> `custom/` 不编译：pi 的扩展加载器内置 jiti，直接加载 `custom/bootstrap.ts`（TypeScript）。类型检查用 `npx tsc --noEmit -p custom/`。
 
 **不重建的项（始终跳过）：**
 
@@ -283,12 +283,11 @@ GitHub 同步完成
 | 验证项 | 命令 |
 |--------|------|
 | vendor 产物 | `ls vendor/pi/packages/coding-agent/dist/cli.js` |
-| custom 产物 | `ls custom/dist/bootstrap.js 2>/dev/null \|\| ls custom/dist/` |
 | 隔离边界 | `npm run check` |
 | 类型检查 | `npx tsc --noEmit -p custom/` |
 | 单元测试 | `npx vitest run`（用户要求时；本技能不主动跑 `npm test`） |
 | 端到端启动 | `./my-pi.sh`（交互式启动一次，验证 vendor 产物 + `custom/bootstrap.ts` 可加载） |
-| 仓库卫生 | `git status --short`（vendor/pi、node_modules、custom/dist 均应为 ignored） |
+| 仓库卫生 | `git status --short`（vendor/pi、node_modules 均应为 ignored） |
 
 **示例输出：**
 
@@ -306,9 +305,6 @@ GitHub 同步完成
 [阶段 2] vendor 构建
   ✓ npm install
   ✓ npm run build
-
-[阶段 3] custom 编译
-  ✓ npx tsc（custom/dist）
 
 [验证]
   ✓ vendor dist 存在

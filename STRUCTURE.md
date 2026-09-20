@@ -81,7 +81,7 @@ my-pi 的自定义代码。三层结构：
 ### `scripts/`
 仅 4 个脚本：
 
-- `build.sh`：构建 vendor/pi 和 custom/（vendor 缺失时自动引导）
+- `build.sh`：构建 vendor/pi（vendor 缺失时自动引导）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `dev.sh`：开发模式运行
 - `sync-upstream.sh`：从上游同步
 - `check-isolation.sh`：验证隔离边界

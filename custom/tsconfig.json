@@ -1,8 +1,6 @@
 {
 	"extends": "../vendor/pi/tsconfig.base.json",
 	"compilerOptions": {
-		"outDir": "./dist-custom",
-		"rootDir": ".",
 		"noEmit": true,
 		"module": "ESNext",
 		"moduleResolution": "bundler",

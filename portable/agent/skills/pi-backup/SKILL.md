@@ -62,8 +62,8 @@ version: v1.1
 2. **重启生效**：恢复或克隆后必须重新运行 `./my-pi.sh` 才能加载更新后的配置。
 3. **恢复前快照**：每次 `restore` 操作会自动创建 `~/pi-backups/pre-restore-{timestamp}.tar.gz`，可用于回滚。
 4. **每环境独立项**：`portable/agent/{auth.json,models.json,models-store.json,modes.json,trust.json,pi-link-*.json,scheduled-seeds.json}`、`portable/agent/sessions/`、`portable/agent/extensions/` 均为每环境独立数据（gitignore），默认既不进 git 同步也不进归档。跨机迁移三选一：① `pi-backup create --with-auth` 打包 → restore；② scp 直接传；③ 新设备手动重建。
-5. **vendor 引导**：`vendor/pi/` 与根 `node_modules/`、`custom/dist/` 都不备份。恢复/克隆后必须运行 `bash scripts/build.sh` 重新引导 vendor（clone 上游 + checkout `vendor/PINNED_COMMIT` + 应用 `patches/*.patch`）并构建。
-6. **构建超时**：`scripts/build.sh` 包含 `git clone`（vendor 引导）、`npm install` 与 `tsc` 编译，网络慢时可能耗时较长。建议在网络稳定的环境下执行，并按下方 `build` 节的 60 秒进度报告节奏向用户汇报。
+5. **vendor 引导**：`vendor/pi/` 与根 `node_modules/` 都不备份（`custom/` 无需编译，由 pi 的加载器直接加载 TypeScript 源码）。恢复/克隆后必须运行 `bash scripts/build.sh` 重新引导 vendor（clone 上游 + checkout `vendor/PINNED_COMMIT` + 应用 `patches/*.patch`）并构建。
+6. **构建超时**：`scripts/build.sh` 包含 `git clone`（vendor 引导）与 `npm install`/`npm run build`（vendor），网络慢时可能耗时较长。建议在网络稳定的环境下执行，并按下方 `build` 节的 60 秒进度报告节奏向用户汇报。
 7. **技能目录**：技能位于 `portable/agent/skills/<name>/SKILL.md`（pi 从 `agentDir/skills` 自动发现，`agentDir` = `portable/agent`），随仓库跟踪、无需单独备份。`packs/` 是按需读取的外部技能包（不注入系统提示词），同样建议纳入归档。
 8. **记忆数据**：`portable/memory/` 整体被 gitignore（仅保留 `.gitkeep`），包含 note-store 的 `notes.json` 与工具输出归档 `tool-outputs/`——**git 同步不带走**，换机保留记忆必须用 `create` 归档。`tool-outputs/` 属可再生的运行时归档，默认排除。
 9. **归档内可含 git 未跟踪的配置**：`portable/agent/skills/` 等目录下的技能文件可能是本机新装、尚未提交的，`create` 以 git 文件清单为基础并按 `.gitignore` 排除，这些文件会一并带走（这正是归档比 git 同步更完整的原因）。

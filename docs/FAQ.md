@@ -35,7 +35,7 @@ bash scripts/build.sh
 ```
 
 `scripts/build.sh` 会引导 `vendor/pi`（fresh checkout 时自动 clone 上游、checkout
-`vendor/PINNED_COMMIT` 并应用 `patches/`），然后构建 coding-agent 与 `custom/`。
+`vendor/PINNED_COMMIT` 并应用 `patches/`），然后构建 coding-agent。`custom/` 不编译——pi 的扩展加载器直接加载 `custom/bootstrap.ts`。
 
 ### Q: 如何启动？
 

@@ -65,12 +65,12 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-st
 npm run check                      # 隔离边界验证（scripts/check-isolation.sh）
 npx tsc --noEmit -p custom/        # 自定义层类型检查
 bash scripts/dev.sh                # 开发模式（tsx 直接运行 TS）
-bash scripts/build.sh              # 构建 vendor/pi(coding-agent) 与 custom/；vendor 缺失时自动引导
+bash scripts/build.sh              # 构建 vendor/pi(coding-agent)；vendor 缺失时自动引导（custom/ 不编译）
 ./my-pi.sh                         # 便携启动
 bash scripts/sync-upstream.sh      # 上游同步（vendor/pi 为独立 git clone，上游 earendil-works/pi-mono）
 ```
 
-构建后运行 `npm run build`。修订代码后运行 `npm run check`。
+修订代码后运行 `npm run check`；类型检查用 `npx tsc --noEmit -p custom/`。
 
 ## 深度文档
 

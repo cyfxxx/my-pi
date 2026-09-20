@@ -66,7 +66,7 @@
 
 - `.gitignore` 是否覆盖所有运行时数据（`portable/agent/sessions/`、`portable/memory/`、`portable/agent/extensions/`、`portable/agent/` 下的本地状态）
 - `vendor/pi/` 是否被忽略（独立 git clone）
-- 是否有不该入库的文件被跟踪（lock 文件、构建产物 `custom/dist/`、临时文件、大二进制）
+- 是否有不该入库的文件被跟踪（lock 文件、构建产物与临时文件、大二进制）
 - ignore 规则是否重复或冲突
 - remote URL 是否含 token（推送前必须检查）
 
