@@ -58,6 +58,23 @@ else
     echo "Symlink already exists: $PI_MEMORY_DIR"
 fi
 
+# 复制原始扩展和技能到便携目录
+if [ -d "$MY_PI_ROOT/.pi/extensions" ]; then
+    cp -r "$MY_PI_ROOT/.pi/extensions/"* "$PORTABLE/extensions/" 2>/dev/null || true
+    echo "Copied extensions from .pi/extensions to portable/extensions"
+fi
+
+if [ -d "$MY_PI_ROOT/.pi/skills" ]; then
+    cp -r "$MY_PI_ROOT/.pi/skills/"* "$PORTABLE/skills/" 2>/dev/null || true
+    echo "Copied skills from .pi/skills to portable/skills"
+fi
+
+# 复制 settings.json 到便携配置目录
+if [ -f "$MY_PI_ROOT/.pi/settings.json" ] && [ ! -f "$PORTABLE/config/settings.json" ]; then
+    cp "$MY_PI_ROOT/.pi/settings.json" "$PORTABLE/config/settings.json"
+    echo "Copied settings.json to portable/config"
+fi
+
 echo ""
 echo "Portable environment initialized successfully!"
 echo "  Config:    $PORTABLE/config"
