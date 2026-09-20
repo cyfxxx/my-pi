@@ -7,7 +7,7 @@
  *   - 不允许在 bootstrap.ts 之外直接调用 features
  */
 
-import type { ExtensionAPI } from '../../vendor/pi/packages/coding-agent/src/extension-api';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
 export type FeatureRegister = (pi: ExtensionAPI) => void;
 

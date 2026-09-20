@@ -6,7 +6,7 @@
  *   - 不直接 import vendor/pi
  */
 
-import type { ExtensionAPI } from '../../../vendor/pi/packages/coding-agent/src/extension-api';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import {
@@ -35,7 +35,7 @@ export function register(pi: ExtensionAPI): void {
     event: 'agent_end',
     handler: async (event: unknown) => {
       const endEvent = event as { messages?: unknown[] };
-      const text = extractFinalReply(endEvent?.messages);
+      const text = extractFinalReply(endEvent?.messages || []);
       if (text) appendOutbox(me, text);
     },
   });

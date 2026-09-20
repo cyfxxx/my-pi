@@ -4,20 +4,18 @@
 
 export {
   getProjectRoot,
+  getPortableRoot,
   getConfigDir,
-  getSessionsDir,
-  getExtensionsDir,
+  getSessionDir,
+  getExtensionDir,
   getSkillsDir,
   getMemoryDir,
-  getSettingsPath,
-  getAuthPath,
-  readSettings,
-  getPackageDir,
+  getVendorPiDir,
+  ensureDirectories,
+  getEnv,
 } from './config'
 
 export {
-  FeatureRegistry,
-  getRegistry,
+  defineFeature,
+  registerAll,
 } from './registry'
-
-export type { Feature } from './registry'

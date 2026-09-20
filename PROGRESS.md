@@ -47,3 +47,17 @@
 - 完成时间：2026-09-20
 - 验证结果：sync-upstream.sh 已配置 upstream remote，脚本已修复注释行解析
 - 遇到的问题：网络 SSL 连接问题（环境问题，非代码问题）
+
+### 阶段七：最终验证
+- 完成时间：2026-09-20
+- 验证结果：
+  - TypeScript 类型检查通过（`npx tsc --noEmit -p custom/`）
+  - 隔离边界验证通过（`bash scripts/check-isolation.sh`）
+  - 所有 12 个功能已迁移并注册
+  - 适配器层已修复（tool-adapter, hook-adapter, agent-adapter）
+  - tsconfig.json 已更新（移除 include/exclude，使用 @earendil-works/pi-coding-agent 路径映射）
+- 遇到的问题：
+  - tool-adapter.ts 注释中的 `*/` 被误解析为注释结束符（已修复）
+  - agent-adapter.ts 动态 import 路径需从 src/ 改为 dist/（已修复）
+  - web-search/index.ts 参数名不匹配（已修复）
+  - check-isolation.sh 脚本的 grep 管道问题（已修复）

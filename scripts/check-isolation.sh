@@ -24,8 +24,11 @@ else
 fi
 
 # 检查 3: adapters/ 之外不得 import vendor/pi（import type 除外，因为编译后会被擦除）
-VIOLATIONS=$(grep -rl "from.*vendor/pi" "$ROOT/custom" --include="*.ts" 2>/dev/null | grep -v "/adapters/" | grep -v "/core/config.ts" | xargs grep -l "import type.*from.*vendor/pi" 2>/dev/null || true)
-VIOLATIONS_RUNTIME=$(grep -rl "from.*vendor/pi" "$ROOT/custom" --include="*.ts" 2>/dev/null | grep -v "/adapters/" | grep -v "/core/config.ts" | xargs grep -l "^import " 2>/dev/null | xargs grep -L "import type.*from.*vendor/pi" 2>/dev/null || true)
+VIOLATIONS_RUNTIME=$(grep -rl "from.*vendor/pi" "$ROOT/custom" --include="*.ts" 2>/dev/null | grep -v "/adapters/" | grep -v "/core/config.ts" | while read -r f; do
+    if ! grep -q "import type.*from.*vendor/pi" "$f" 2>/dev/null; then
+        echo "$f"
+    fi
+done || true)
 if [ -n "$VIOLATIONS_RUNTIME" ]; then
     echo "❌ F-03 违反：以下文件在 adapters/ 外 runtime import 了 vendor/pi："
     echo "$VIOLATIONS_RUNTIME"

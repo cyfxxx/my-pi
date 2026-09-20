@@ -20,7 +20,5 @@
 			"@earendil-works/pi-coding-agent": ["../vendor/pi/packages/coding-agent/dist/index.d.ts"],
 			"@earendil-works/pi-coding-agent/*": ["../vendor/pi/packages/coding-agent/dist/*.d.ts"]
 		}
-	},
-	"include": ["**/*.ts"],
-	"exclude": ["node_modules", "**/tests/**", "**/test/**", "vitest.config.ts"]
+	}
 }

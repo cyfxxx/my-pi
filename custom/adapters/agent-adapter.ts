@@ -7,7 +7,7 @@
  *   - 对外暴露稳定的 createSession 接口
  */
 
-import type { ExtensionAPI } from '../../vendor/pi/packages/coding-agent/src/extension-api';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
 export interface SessionConfig {
   configDir: string;
@@ -34,23 +34,19 @@ export interface MySession {
 export async function createSession(config: SessionConfig): Promise<MySession> {
   // 动态 import，避免顶层 import 造成的副作用
   const { createAgentSession } = await import(
-    '../../vendor/pi/packages/coding-agent/src/index'
+    '../../vendor/pi/packages/coding-agent/dist/index'
   );
 
-  const session = await createAgentSession({
-    configDir: config.configDir,
-    sessionDir: config.sessionDir,
-    extensionDir: config.extensionDir,
-    skillsDir: config.skillsDir,
-    model: config.model,
-    provider: config.provider,
+  const session: any = await createAgentSession({
+    agentDir: config.configDir,
+    cwd: config.sessionDir,
   });
 
   return {
-    pi: session.pi,
+    pi: session?.extensionRunner || session?.pi || session,
     config,
     dispose: async () => {
-      await session.dispose();
+      await session?.dispose?.();
     },
   };
 }

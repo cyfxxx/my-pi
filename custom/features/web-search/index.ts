@@ -6,9 +6,10 @@
  *   - 不直接 import vendor/pi
  */
 
-import type { ExtensionAPI } from '../../../vendor/pi/packages/coding-agent/src/extension-api';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerTool } from '../../adapters/tool-adapter';
-import { webSearch, formatSearchResults } from './logic';
+import { searchWeb } from './logic';
+import type { SearchConfig } from './types';
 
 export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
@@ -21,8 +22,12 @@ export function register(pi: ExtensionAPI): void {
     execute: async (args) => {
       const query = args.query as string;
       const maxResults = (args.maxResults as number) ?? 5;
-      const results = await webSearch(query, { maxResults });
-      return formatSearchResults(results);
+      const config: SearchConfig = {
+        searxng_url: process.env.SEARXNG_URL || 'https://search.brave.com',
+        timeout: 15000,
+      };
+      const result = await searchWeb(config, query, { max_results: maxResults });
+      return result;
     },
   });
 }
