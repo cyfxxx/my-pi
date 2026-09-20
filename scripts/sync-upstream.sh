@@ -11,13 +11,13 @@ MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENDOR_PI="$MY_PI_ROOT/vendor/pi"
 LAST_SYNC_FILE="$VENDOR_PI/LAST_SYNC_POINT"
 
-# 读取上次同步点
+# 读取上次同步点（跳过注释行）
 if [ ! -f "$LAST_SYNC_FILE" ]; then
     echo "错误: 找不到 LAST_SYNC_POINT 文件"
     exit 1
 fi
 
-LAST_SYNC=$(head -1 "$LAST_SYNC_FILE" | awk '{print $1}')
+LAST_SYNC=$(grep -v '^#' "$LAST_SYNC_FILE" | head -1 | awk '{print $1}')
 echo "上次同步点: $LAST_SYNC"
 
 # 进入 vendor/pi 目录
