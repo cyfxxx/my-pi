@@ -6,20 +6,20 @@
 
 ### 三隔离一收敛
 
-- **上游隔离**：`vendor/pi/` 永不修改，上游更新通过同步脚本自动合并
+- **上游隔离**：`vendor/pi/` 是独立 git clone（上游 `earendil-works/pi-mono`），永不直接修改，改动经 `patches/` 管理
 - **逻辑隔离**：`custom/features/*/logic.ts` 零 Pi 依赖
 - **接口隔离**：`custom/adapters/` 是唯一的 Pi API 接触点
-- **数据收敛**：所有运行时数据收敛到 `portable/` 目录
+- **数据收敛**：所有运行时数据收敛到 `portable/` 目录（环境变量重定向，无符号链接）
 
 ## 开发流程
 
 ### 添加新功能
 
 1. 在 `custom/features/` 下创建新目录
-2. 创建 `types.ts` - 类型定义
-3. 创建 `logic.ts` - 纯逻辑（零 Pi 依赖）
-4. 创建 `tool.ts` - 工具注册（使用适配器）
-5. 创建 `index.ts` - 入口（`init`/`destroy` 导出）
+2. 创建 `logic.ts` - 纯逻辑（零 Pi 依赖）
+3. 创建 `types.ts` - 类型定义（可选）
+4. 创建 `index.ts` - 通过 `custom/adapters/` 注册工具/钩子
+5. 在 `custom/bootstrap.ts` 的 `FEATURES` 中注册
 
 ### 代码质量
 
@@ -37,17 +37,23 @@
 ## 构建与测试
 
 ```bash
-# 构建 vendor/pi
-cd vendor/pi && npm run build:offline
+# 构建（vendor/pi 缺失时会自动从上游引导）
+bash scripts/build.sh
 
-# 检查 custom/ 类型
-cd custom && npx tsc --noEmit
+# 隔离边界检查
+npm run check
 
-# 测试运行
-./my-pi.sh --help
+# custom/ 类型检查
+npx tsc --noEmit -p custom/
+
+# 启动
+./my-pi.sh
 ```
 
-## 上游同步
+## vendor 引导与上游同步
+
+fresh checkout 时 `vendor/pi/` 不存在（已 gitignore），`scripts/build.sh` 会自动
+clone 上游、checkout `vendor/PINNED_COMMIT` 并应用 `patches/`。
 
 ```bash
 # 同步到最新上游
@@ -59,27 +65,15 @@ bash scripts/sync-upstream.sh <commit-sha>
 
 ## 便携化
 
-### 构建便携版二进制
+所有运行时数据通过环境变量重定向到项目内 `portable/`（无符号链接），由 `my-pi.sh` 设置：
 
 ```bash
-# 安装 Bun
-curl -fsSL https://bun.sh/install | bash
-
-# 构建便携版
-~/.bun/bin/bun build --compile ./vendor/pi/packages/coding-agent/src/cli.ts --outfile ./portable/bin/my-pi
-```
-
-### U 盘使用流程
-
-```bash
-# 1. 初始化便携环境
-bash scripts/init-portable.sh
-
-# 2. 启动
-./my-pi.sh
+./my-pi.sh          # 直接启动，数据自动落在 portable/
 ```
 
 ## 文档
 
-- [修改计划](/storage/emulated/0/Documents/修改计划.md)
+- [目录结构](STRUCTURE.md)
+- [架构进度](PROGRESS.md)
+- [架构决策](DECISIONS.md)
 - [变更日志](CHANGELOG.md)

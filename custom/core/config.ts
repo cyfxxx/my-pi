@@ -63,7 +63,7 @@ export function ensureDirectories(): void {
   ];
   for (const dir of dirs) {
     if (!existsSync(dir)) {
-      throw new Error(`必要目录不存在：${dir}。请先运行 scripts/init-portable.sh`);
+      throw new Error(`必要目录不存在：${dir}。请先运行 ./my-pi.sh（会自动创建）`);
     }
   }
 }
