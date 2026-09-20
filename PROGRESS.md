@@ -31,3 +31,9 @@
 - 完成时间：2026-09-20
 - 验证结果：所有隔离边界验证通过，logic.ts 零 Pi 依赖
 - 遇到的问题：无
+
+### 阶段四：迁移其余 11 个功能
+- 完成时间：2026-09-20
+- 验证结果：所有隔离边界验证通过
+- 迁移的功能：context、link、memory、mode、plan-mode、intervention、subagent、tmux、browser、voice、autopilot
+- 遇到的问题：无
