@@ -91,4 +91,4 @@
 - `README.md`/`STRUCTURE.md` 的目录清单与实际一致
 - `AGENTS.md` 的功能模块清单与 `custom/features/` 一致
 - `patches/README.md` 的补丁表与 `patches/` 实际文件一致
-- `CHANGELOG.md` 的版本号与 `package.json` 一致
+- `docs/README.md` 的文档索引与实际 `docs/` 目录一致

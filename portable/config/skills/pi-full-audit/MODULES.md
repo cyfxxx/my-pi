@@ -254,7 +254,7 @@ subagent 功能（`custom/features/subagent/`）并行委派分组审查 + 复�
 范围 = 项目自有 .md（排除 `node_modules/`、`vendor/pi/`、`custom/dist/`）。按对象分组委派 scout 并行做「文档陈述 vs 实际」可证伪核对：
 
 ```
-组A: README.md/CHANGELOG.md/STRUCTURE.md/PROGRESS.md/DECISIONS.md + docs/ —— 对照实际目录树/脚本清单/功能清单/git log
+组A: README.md/STRUCTURE.md/PROGRESS.md/DECISIONS.md + docs/ —— 对照实际目录树/脚本清单/功能清单/git log
 组B: AGENTS.md + portable/config/AGENTS.md + APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
 组C: custom/ 各模块注释与文档 vs 源码 —— grep 注册工具名/process.env 读取/配置键
 组D: packs/INDEX.md + packs/*/SKILL.md vs 实际 packs/ 目录

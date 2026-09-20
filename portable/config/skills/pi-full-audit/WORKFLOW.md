@@ -23,7 +23,7 @@ bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
 范围 = 项目自有 .md（排除 `node_modules/`、`vendor/pi/`、`custom/dist/`）。方法：按对象分组委派 scout 并行做「文档陈述 vs 实际」**可证伪核对**：
 
 ```text
-组A: README.md/CHANGELOG.md/STRUCTURE.md/PROGRESS.md/DECISIONS.md + docs/ —— 对照实际目录树/脚本清单/功能清单/git log
+组A: README.md/STRUCTURE.md/PROGRESS.md/DECISIONS.md + docs/ —— 对照实际目录树/脚本清单/功能清单/git log
 组B: AGENTS.md + portable/config/AGENTS.md + APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
 组C: custom/ 各模块注释与文档 vs 源码 —— grep 注册工具名/process.env 读取/配置键
 组D: packs/INDEX.md + packs/*/SKILL.md vs 实际 packs/ 目录
@@ -84,7 +84,7 @@ bash portable/config/skills/pi-full-audit/review.sh --all /root/my-pi
    - LOW 项：批量委派 worker 并行修
    - **worker 修复报告不可全信**：主会话抽查关键 diff
 3. 每个修复点**至少一个回归测试**
-4. 行为/语义变化的修复同步更新 `README.md`/`CHANGELOG.md`/`docs/`
+4. 行为/语义变化的修复同步更新 `README.md`/`STRUCTURE.md`/`docs/`
 5. 全量回归：`npm run check` + `npx tsc --noEmit -p custom/` + `npx vitest run`
 6. 涉及 `patches/` 的改动：确认补丁仍可对基线应用，并同步 `patches/README.md`
 7. **正则/多层转义类精确修改用 write 写独立 .mjs 脚本执行最可靠**

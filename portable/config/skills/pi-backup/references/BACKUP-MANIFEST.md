@@ -21,7 +21,7 @@
 | 仓库入口 | `my-pi.sh` | 便携启动脚本（解析仓库根 + 加载 `custom/bootstrap.ts`） |
 | 仓库配置 | `package.json`、`package-lock.json`、`vitest.config.ts`、`.npmrc`、`.gitattributes` | 依赖声明 / 测试配置 / 仓库级属性 |
 | 仓库配置 | `.gitignore` | git 忽略规则（含 `portable/config/*`、`vendor/pi/` 排除规则） |
-| 仓库文档 | `README.md`、`STRUCTURE.md`、`AGENTS.md`、`PROGRESS.md`、`DECISIONS.md`、`CHANGELOG.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE` | 仓库级文档 |
+| 仓库文档 | `README.md`、`STRUCTURE.md`、`AGENTS.md`、`PROGRESS.md`、`DECISIONS.md`、`LICENSE` | 仓库级文档 |
 
 > **技能目录收录方式**：`portable/config/skills/` 下的技能文件应随仓库跟踪；若本机新装的技能尚未入库，`create` 归档仍会按"未被 gitignore 排除"原则收录。`portable/skills/`（pi 不读取的占位目录）不在收录范围。
 

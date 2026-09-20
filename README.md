@@ -194,6 +194,7 @@ npx tsc --noEmit -p custom/
 
 ## 文档
 
+- [项目愿景](docs/design/VISION.md)（开发目标、方法论、落地路线）
 - [文档索引](docs/README.md)（FAQ / 故障排除 / 开发 / 运维）
 - [外部技能包说明](packs/README.md)、[技能包索引](packs/INDEX.md)
 - [目录结构说明](STRUCTURE.md)

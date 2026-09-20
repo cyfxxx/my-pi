@@ -37,6 +37,12 @@
 | [operations/TERMUX-DEV-NOTES.md](operations/TERMUX-DEV-NOTES.md) | Termux/Android（PRoot）实测经验：录音链路、系统特性、终端输入、sshd、本地转写 |
 | [operations/alacritty-tmux-setup.md](operations/alacritty-tmux-setup.md) | WSL2 + Alacritty + tmux 部署问题与修复汇总 |
 
+### 设计与目标
+
+| 文档 | 内容 |
+|------|------|
+| [design/VISION.md](design/VISION.md) | 项目愿景、三大核心功能判据、软硬结合方法论、记忆治理规则、度量差距与落地路线 |
+
 ### 项目主文档（仓库根）
 
 | 文档 | 内容 |
@@ -57,7 +63,7 @@
 **未迁移**（pi-tools 专有的一次性报告、路线图或已消失子系统的描述，保留在 pi-tools 仓库中）：
 
 - `DOCUMENTATION-COMPLETE.md`、`DOCUMENTATION-PROGRESS.md`、`DOCUMENTATION-TEMPLATE.md` — pi-tools 文档整理的一次性报告与模板
-- `design/VISION.md`、`design/SELF-OPTIMIZING-BASELINE.md`、`design/SELF-OPTIMIZING-ROADMAP.md` — pi-tools 的设计愿景与自我优化路线图
+- `design/SELF-OPTIMIZING-BASELINE.md`、`design/SELF-OPTIMIZING-ROADMAP.md` — pi-tools 的自我优化基线与执行路线图（my-pi 的落地路线已并入 [design/VISION.md](design/VISION.md) §6）
 - `development/AGENTS-DETAILS.md` — pi-tools `agent/` 目录（extensions/services/lib）的细节索引，对应子系统在 my-pi 已重组
 - `maintenance/GIT-HISTORY-REWRITE.md`、`maintenance/MODULARIZATION-PLAN.md`、`maintenance/OPTIMIZATION-LOG.md` — pi-tools 的历史重写、模块化方案与优化日志
 

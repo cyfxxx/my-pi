@@ -152,8 +152,7 @@ GitHub 同步完成
    FILES=""
    for p in custom scripts patches packs docs portable/config portable/memory \
             my-pi.sh package.json package-lock.json vitest.config.ts .npmrc .gitattributes .gitignore \
-            README.md STRUCTURE.md AGENTS.md PROGRESS.md DECISIONS.md CHANGELOG.md \
-            CONTRIBUTING.md SECURITY.md LICENSE; do
+            README.md STRUCTURE.md AGENTS.md PROGRESS.md DECISIONS.md LICENSE; do
      [ -e "$p" ] && FILES="$FILES $p"   # 只保留存在的路径
    done
    # shellcheck disable=SC2086

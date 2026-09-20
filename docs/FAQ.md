@@ -207,10 +207,23 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 1. 检查 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 2. 提供环境信息、错误信息、复现步骤
 
-### Q: 如何贡献代码？
+### Q: 如何添加第三方扩展？
 
-详见 [CONTRIBUTING.md](../CONTRIBUTING.md) 与
-[PI-EXT-DEV-NOTES.md](./development/PI-EXT-DEV-NOTES.md)
+三种方式（安装位置以 vendor 源码为准）：
+
+| 方式 | 命令 / 位置 |
+|------|------------|
+| npm 包 | `./my-pi.sh install npm:@foo/bar` → 装到 `portable/config/npm/node_modules/` |
+| git 仓库 | `./my-pi.sh install git:github.com/user/repo` → 装到 `portable/config/git/<host>/<path>` |
+| 本地单文件/目录 | 放到 `portable/config/extensions/<name>/`（= `agentDir/extensions`，自动发现，无需登记） |
+
+`install` 会把来源写入 `portable/config/settings.json` 的 `packages`；用 `./my-pi.sh list` 查看、`./my-pi.sh remove <source>` 卸载。
+
+注意：不要用 `-l/--local`——项目级配置目录由 coding-agent 的 `piConfig.configDir` 决定，运行时是 `.pi`，会在仓库根产生 `.pi/`。安装/卸载会改动 `packages` 从而改变 system prompt 前缀、导致缓存前缀断裂，属低频操作。
+
+### Q: 如何自己改 my-pi 的功能？
+
+见 [PI-EXT-DEV-NOTES.md](./development/PI-EXT-DEV-NOTES.md)：在 `custom/features/<name>/` 下按 `logic.ts`（纯逻辑，零 Pi 依赖）+ `index.ts`（经 `custom/adapters/` 注册）新增，并在 `custom/bootstrap.ts` 的 `FEATURES` 中登记。
 
 ### Q: 如何验证改动？
 

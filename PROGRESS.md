@@ -215,3 +215,23 @@
   - ✅ 文档交叉引用全部可解析（无死链）
   - ✅ `npm run check`、`npx tsc --noEmit -p custom/`、`npx vitest run` 通过
 - 未迁移：searxng/deploy/scripts 与涉及 Pi API 编排的扩展实现（仍留待后续）
+
+## 根目录文档收敛与 VISION 迁移
+- 完成时间：2026-09-20
+- 根目录文档精简（9 → 6）：
+  - 移除 `CHANGELOG.md`（pi-tools 迁移期日志，条目已指向不存在的 rebuild.sh/pi-wrapper.sh/setup-*.sh）
+  - 移除 `CONTRIBUTING.md`（个人项目，内容与 AGENTS/portable AGENTS 重复）
+  - 移除 `SECURITY.md`（上游 pi 模板，报告入口指向 earendil 安全邮箱，非本项目）
+  - 保留 `README.md`、`AGENTS.md`、`STRUCTURE.md`、`DECISIONS.md`、`PROGRESS.md`、`LICENSE`
+- VISION 迁移与更新：pi-tools `docs/design/VISION.md` → `docs/design/VISION.md` v2.0
+  - 保留 §1–§3（终极目标、三大核心功能判据、软硬结合方法论）与 §5（记忆治理规则）
+  - §4 度量体系由 pi-tools「全部已落地」改写为 my-pi 真实差距：度量层整体缺失（无 usage/cache 统计、无干预落盘、无任务遥测、无 golden tasks、记忆无治理字段）
+  - §5 明确标注为**目标设计**（当前 note-store 为简单键值）
+  - 新增 §6 落地路线（P0 已完成 → P1 度量基建 → P2 防退化 → P3 记忆生命周期 → P4 升格通道），替代 pi-tools 的 `SELF-OPTIMIZING-ROADMAP.md`
+- 引用同步：
+  - `docs/FAQ.md` 的「如何贡献代码」改为「如何添加第三方扩展 / 如何自己改功能」（含 install 落点与 `-l` 禁用理由）
+  - pi-backup（COMMANDS/BACKUP-MANIFEST）与 pi-full-audit（CHECKLIST/MODULES/WORKFLOW）的仓库文档清单移除三个已删文件
+- 核实事实（写入文档）：
+  - 会话实际存放 `<agentDir>/sessions/<转义 cwd>/` = `portable/config/sessions/--root-my-pi--/`；`PI_SESSION_DIR` 无效，正确变量是 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir`
+  - 第三方扩展落点：`portable/config/extensions/`（自动发现）、`portable/config/npm/node_modules/`（npm）、`portable/config/git/<host>/<path>`（git），来源记入 `settings.json` 的 `packages`
+- 验证：文档无死链；`npm run check`、`npx tsc --noEmit -p custom/`、`npx vitest run` 通过
