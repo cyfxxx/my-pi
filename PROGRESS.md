@@ -191,3 +191,27 @@
   - ✅ `bash scripts/check-isolation.sh` 通过；`./my-pi.sh --version` = 0.85.1
   - ✅ 新增 `npm test` 脚本
 - 未迁移（按增量纪律留待后续）：autopilot/browser/link/voice/tmux/intervention/mode/plan-mode 等涉及 Pi API 编排的完整实现，以及 searxng/deploy/scripts/packs
+
+## pi-tools 内容迁移（第二批：packs / skills / docs）
+- 完成时间：2026-09-20
+- 来源：`https://github.com/cyfxxx/pi-tools`
+- 迁移内容：
+  - `packs/`：整目录迁移（14M / 863 文件，16 个技能包 + INDEX.md/README.md），`diff -r` 校验与源完全一致；按需读取，不注入系统提示词
+  - `portable/config/skills/`：4 个技能迁移并改写为 my-pi 语境
+    - `pi-backup`（备份/恢复 my-pi 仓库，重写 COMMANDS/MANIFEST，删除 pi-tools 专有的 cron/wrapper/systemd/searxng/venv 命令）
+    - `pi-bug-diagnosis`（诊断纪律，路径与记忆功能引用更新）
+    - `pi-full-audit`（模块化为 my-pi 结构，review.sh 重写为 my-pi 确定性检查脚本）
+    - `pi-translate-zh`（patch-all-zh.mjs 新增 vendor/pi 路径解析优先候选；SKILL 路径更新）
+  - `docs/`：精选迁移 8 篇并改写（FAQ、TROUBLESHOOTING、development/{PI-EXT-DEV-NOTES,PI-SDK-EXTENSION,SKILLS-MAINTENANCE}、operations/{ENVIRONMENTS,TERMUX-DEV-NOTES,alacritty-tmux-setup}），新增 `docs/README.md` 索引与来源说明
+  - 丢弃 pi-tools 专有文档 10 篇（一次性报告/路线图/已消失子系统描述），清单见 `docs/README.md`
+- 关键发现与修正：
+  - **技能实际加载路径是 `portable/config/skills/`**（pi 的 `agentDir/skills`），`settings.json` 的 `+skills/<name>/SKILL.md` 是相对 `agentDir` 的覆盖模式；`PI_SKILLS_DIR` 不被 pi 识别
+  - `.gitignore` 为 `portable/config/skills/` 增加白名单，技能随仓库分发
+  - `settings.json` skills 数组补充 `+skills/pi-bug-diagnosis/SKILL.md`
+  - 文档如实记录 `PI_SESSION_DIR`/`PI_EXTENSION_DIR`/`PI_SKILLS_DIR` 不被 pi 识别（见 STRUCTURE.md「已知偏离」）
+- 验证：
+  - ✅ `packs/` 与源递归 diff 无差异
+  - ✅ 技能/文档语法：`bash -n review.sh`、`node --check patch-all-zh.mjs` 通过；frontmatter name 保持不变
+  - ✅ 文档交叉引用全部可解析（无死链）
+  - ✅ `npm run check`、`npx tsc --noEmit -p custom/`、`npx vitest run` 通过
+- 未迁移：searxng/deploy/scripts 与涉及 Pi API 编排的扩展实现（仍留待后续）

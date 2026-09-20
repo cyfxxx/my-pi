@@ -8,7 +8,14 @@ ERRORS=0
 echo "🔍 验证隔离边界..."
 
 # 检查 1: .pi/（若存在）与 portable/ 下无符号链接
-SYMLINKS=$(find "$ROOT/.pi" "$ROOT/portable" -type l 2>/dev/null || true)
+# 说明：Termux/PRoot 环境下 `find -type l` 会把部分普通文件误判为符号链接，
+# 因此只用 find 枚举路径，用 `test -L` 判定，避免误报。
+SYMLINKS=""
+while IFS= read -r path; do
+    if [ -L "$path" ]; then
+        SYMLINKS="${SYMLINKS}${path}"$'\n'
+    fi
+done < <(find "$ROOT/.pi" "$ROOT/portable" 2>/dev/null || true)
 if [ -n "$SYMLINKS" ]; then
     echo "❌ 配置/数据目录下存在符号链接："
     echo "$SYMLINKS"

@@ -41,6 +41,9 @@ portable/config/*
 !portable/config/APPEND_SYSTEM.md
 !portable/config/keybindings.json
 !portable/config/settings.json
+# 技能目录（pi 的 agentDir/skills，随仓库分发）
+!portable/config/skills/
+!portable/config/skills/**
 portable/sessions/*
 !portable/sessions/.gitkeep
 portable/extensions/*

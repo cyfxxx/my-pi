@@ -40,18 +40,25 @@ my-pi/
 │   │
 │   ├── core/                         # 核心服务
 │   │   ├── config.ts                 # 路径解析
-│   │   └── registry.ts               # 功能注册表
+│   │   ├── registry.ts               # 功能注册表
+│   │   ├── secrets.ts                # 密钥脱敏
+│   │   ├── atomic-write.ts           # 原子 JSON 写入
+│   │   └── note-store.ts             # 笔记持久化（写时脱敏）
 │   │
 │   ├── bootstrap.ts                  # 唯一入口
 │   ├── package.json                  # 工作区配置
 │   └── tsconfig.json                 # TypeScript 配置
 │
 ├── portable/                         # 运行时数据（便携核心）
-│   ├── config/                       # 配置数据
-│   ├── sessions/                     # 会话数据
-│   ├── extensions/                   # 扩展安装目录
-│   ├── skills/                       # 技能目录
-│   └── memory/                       # 记忆数据
+│   ├── config/                       # Pi 运行时配置目录（PI_CODING_AGENT_DIR）
+│   │   └── skills/                   # 技能目录（pi 的 agentDir/skills）
+│   ├── sessions/                     # 会话数据（占位；pi 实际写入 config/sessions/）
+│   ├── extensions/                   # 扩展安装目录（占位；功能经 bootstrap.ts 加载）
+│   ├── skills/                       # 占位目录（pi 不读取）
+│   └── memory/                       # 记忆数据（note-store 笔记 + 工具输出归档）
+│
+├── packs/                            # 外部技能包仓库（按需读取，不注入系统提示词）
+├── docs/                             # 项目文档（使用/开发/运维）
 │
 ├── scripts/
 │   ├── check-isolation.sh            # 隔离边界验证
@@ -148,11 +155,13 @@ cd /Volumes/USB/my-pi
 
 | Pi 默认路径 | 便携化路径 | 机制 |
 |---|---|---|
-| `~/.pi/agent/settings.json` | `portable/config/settings.json` | 环境变量重定向 |
-| `~/.pi/agent/sessions/` | `portable/sessions/` | 环境变量重定向 |
-| `~/.pi/agent/extensions/` | `portable/extensions/` | 环境变量重定向 |
-| `~/.pi/agent/skills/` | `portable/skills/` | 环境变量重定向 |
-| `~/.pi/agent/memory/` | `portable/memory/` | 环境变量重定向 |
+| `~/.pi/agent/settings.json` | `portable/config/settings.json` | `PI_CODING_AGENT_DIR` 重定向（pi 识别） |
+| `~/.pi/agent/skills/` | `portable/config/skills/` | 随 `PI_CODING_AGENT_DIR` 解析为 `agentDir/skills` |
+| `~/.pi/agent/sessions/` | `portable/config/sessions/` | 随 `PI_CODING_AGENT_DIR` 解析（`PI_SESSION_DIR` 不被 pi 识别） |
+| `~/.pi/agent/extensions/` | `custom/features/` + `custom/bootstrap.ts` | `--extension` 显式加载（`PI_EXTENSION_DIR` 不被 pi 识别） |
+| 记忆/笔记数据 | `portable/memory/` | `PI_MEMORY_DIR`（由 `custom/core/note-store.ts` 等识别） |
+
+> `PI_SESSION_DIR` / `PI_EXTENSION_DIR` / `PI_SKILLS_DIR` 会被 `my-pi.sh` 导出，但 pi v0.85.1 不读取；详见 [STRUCTURE.md](STRUCTURE.md) 的「已知偏离」。
 
 ## 开发
 
@@ -185,6 +194,9 @@ npx tsc --noEmit -p custom/
 
 ## 文档
 
+- [文档索引](docs/README.md)（FAQ / 故障排除 / 开发 / 运维）
+- [外部技能包说明](packs/README.md)、[技能包索引](packs/INDEX.md)
+- [目录结构说明](STRUCTURE.md)
 - [架构修复进度](PROGRESS.md)
 - [架构决策记录](DECISIONS.md)
 

@@ -150,3 +150,24 @@
 2. 按依赖与可验证性分批：先移植纯逻辑、可单测、且契合当前架构的模块
 **决策**：选项 2
 **理由**：当前项目目标是"可维护的私人助手硬分叉"，不是一次性快照。批次顺序：先无 Pi 依赖的纯逻辑（token 预算、note-store、脱敏、原子写、子代理角色），它们能直接落到 `logic.ts`/`custom/core` 并用 vitest 验证；涉及 Pi API 编排（autopilot/browser/link/voice/tmux 等）留待后续逐个按 adapter 迁移并验证。
+
+---
+
+### [2026-09-20] 技能放到 portable/config/skills/（而非 portable/skills/）
+**背景**：迁移 pi-tools 的 `agent/skills/` 时需确定目标目录。my-pi 文档与 `my-pi.sh` 声明技能目录为 `portable/skills/`（`PI_SKILLS_DIR`），但需要确认 pi 是否识别该变量。
+**选项**：
+1. `portable/skills/`：与现有文档/`PI_SKILLS_DIR` 声明一致，但需验证 pi 是否读取
+2. `portable/config/skills/`：pi 的 `agentDir/skills` 路径（`agentDir` = `PI_CODING_AGENT_DIR` = `portable/config`），与 `settings.json` 中 `+skills/<name>/SKILL.md` 覆盖模式一致
+3. 顶层 `skills/`：独立技能仓库，需启动器 `--skill` 显式加载
+**决策**：选项 2
+**理由**：核对 vendor/pi 源码后确认 pi v0.85.1 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`，**不存在 `PI_SKILLS_DIR`**；技能由 `agentDir/skills` 自动发现，`settings.json` 的 `skills` 数组是相对 `agentDir` 的匹配模式（`package-manager.ts` 以 `globalBaseDir = agentDir` 做 pattern match）。因此只有 `portable/config/skills/` 会真正被加载；`portable/skills/` 保留为占位目录，并在 STRUCTURE/AGENTS 中如实记录三个 `PI_*_DIR` 变量的生效范围。
+
+---
+
+### [2026-09-20] packs 整目录迁移，skills/docs 精选改写后迁移
+**背景**：pi-tools 的 `packs/`（外部技能包）、`agent/skills/`（4 个内置技能）、`docs/`（18 篇）内容形态不同：packs 是自包含的按需技能包；skills 与 docs 大量引用 pi-tools 专有结构（`agent/extensions`、`agent/services`、`scripts/rebuild.sh`、`searxng`、wrapper/systemd、92/106 等 pi-tools 用例数），整体搬运会引入失效路径与错误描述。
+**选项**：
+1. 三类内容一律原样复制
+2. packs 原样迁移；skills 与 docs 逐篇检查、按 my-pi 结构改写后迁移（丢弃 pi-tools 专有内容）
+**决策**：选项 2
+**理由**：packs 与仓库结构耦合弱且内含本地经验沉淀（`EXPERIENCE.md`），原样保留并用 `diff -r` 校验；skills/docs 与项目结构强耦合，原样迁移会产生误导性文档。docs 精选 8 篇保留可迁移价值（pi 扩展/SDK 开发、技能维护、多环境/Termux/终端运维），丢弃 10 篇 pi-tools 专有报告与路线图，清单记录在 `docs/README.md`。技能仅更新路径/命令/子系统引用，保留原有方法论与纪律，frontmatter `name` 不变。

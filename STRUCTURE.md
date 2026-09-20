@@ -9,6 +9,8 @@ my-pi/
 │   └── PINNED_COMMIT    # vendor 锁定的上游 commit（引导用）
 ├── custom/              # my-pi 的自定义代码
 ├── portable/            # my-pi 的运行时数据/配置（所有用户数据收敛于此，无 .pi 目录）
+├── packs/               # 外部技能包仓库（迁移自 pi-tools，按需读取，不注入系统提示词）
+├── docs/                # 项目文档（使用/开发/运维）
 ├── patches/             # 上游补丁
 ├── scripts/             # 4 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
@@ -52,12 +54,22 @@ my-pi 的自定义代码。三层结构：
 运行时数据与配置。5 个目录：
 
 - `config/`：**Pi 运行时配置目录**（`PI_CODING_AGENT_DIR` 指向此处）。含 `settings.json`、`AGENTS.md`、`APPEND_SYSTEM.md`、`keybindings.json` 等；`models.json`/`auth.json`/`modes.json`/`trust.json` 等每环境独立、不入库
-- `sessions/`：会话历史
-- `extensions/`：扩展安装目录
-- `skills/`：技能目录
-- `memory/`：记忆数据
+  - `config/skills/`：**技能目录**（pi 从 `agentDir/skills` 自动发现；`settings.json` 的 `"skills"` 数组是相对 `agentDir` 的覆盖模式，如 `+skills/pi-backup/SKILL.md`）。技能随仓库分发，已在 `.gitignore` 中加白名单
+  - `config/sessions/`：pi 实际写入的会话目录（pi 未识别 `PI_SESSION_DIR`，见「已知偏离」）
+- `sessions/`：会话历史（占位目录；pi 未识别对应环境变量）
+- `extensions/`：扩展安装目录（占位目录；my-pi 的功能以 `custom/features/` + `custom/bootstrap.ts` 加载）
+- `skills/`：**占位目录，pi 不读取**（技能实际位于 `config/skills/`）
+- `memory/`：记忆数据（note-store 的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
 
 通过 `my-pi.sh` / `scripts/dev.sh` 中的环境变量重定向到此；项目根不再有 `.pi/` 目录。
+
+### `packs/`
+外部技能包仓库（迁移自 pi-tools）。每个包是 `packs/<name>/SKILL.md` 入口 + 附属资源（`bin/`、`references/`、`workflows/`、`skills/` 等），部分包自带二级技能。
+
+**不注入系统提示词**：packs 不放入 `portable/config/skills/`，需要时按需读取 `packs/<name>/SKILL.md`（防提示词膨胀）。索引见 `packs/INDEX.md`，约定与整合纪律见 `packs/README.md`。
+
+### `docs/`
+项目文档，按读者任务分类：`FAQ.md`/`TROUBLESHOOTING.md`（使用与排障）、`development/`（扩展与 SDK 开发、技能维护）、`operations/`（多环境、Termux、终端/tmux）。索引与来源说明见 `docs/README.md`。
 
 ### `patches/`
 对 `vendor/pi/` 的补丁。每个补丁记录一个明确的修改：
@@ -78,11 +90,9 @@ my-pi 的自定义代码。三层结构：
 ```
 my-pi.sh
   ↓ 设置环境变量
-PI_CODING_AGENT_DIR=portable/config
-PI_SESSION_DIR=portable/sessions
-PI_EXTENSION_DIR=portable/extensions
-PI_SKILLS_DIR=portable/skills
-PI_MEMORY_DIR=portable/memory
+PI_CODING_AGENT_DIR=portable/config   # pi 识别
+PI_MEMORY_DIR=portable/memory         # custom/ 的 note-store 识别
+PI_SESSION_DIR / PI_EXTENSION_DIR / PI_SKILLS_DIR   # 导出但不被 pi 识别（见「已知偏离」）
   ↓ 启动
 vendor/pi/packages/coding-agent/dist/cli.js
   ↓ 加载
@@ -92,6 +102,15 @@ custom/features/*/index.ts
   ↓ 调用
 custom/features/*/logic.ts
 ```
+
+## 已知偏离
+
+- **`PI_SESSION_DIR` / `PI_EXTENSION_DIR` / `PI_SKILLS_DIR` 不被 pi 识别**：vendor/pi v0.85.1 只识别 `PI_CODING_AGENT_DIR`（`config.ts`）与 `PI_PACKAGE_DIR`。因此：
+  - 技能实际从 `portable/config/skills/` 发现（= `agentDir/skills`），`portable/skills/` 不被读取；
+  - 会话实际写入 `portable/config/sessions/`，`portable/sessions/` 不被写入；
+  - 扩展通过 `--extension custom/bootstrap.ts` 显式加载，`portable/extensions/` 不被扫描。
+  `my-pi.sh` 仍导出这些变量（对自定义功能有效，如 `PI_MEMORY_DIR`），文档不以它们为生效机制。
+- 若需让 `portable/{sessions,extensions,skills}/` 真正生效，应通过启动器参数（`--session-dir`）或在 `patches/` 中为 pi 增加环境变量支持，而不是依赖现有变量。
 
 ## 便携性保证
 
