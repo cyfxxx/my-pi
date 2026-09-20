@@ -17,8 +17,12 @@ export PI_CODING_AGENT_DIR="$MY_PI_CONFIG_DIR"
 # 覆盖包目录（用于便携版二进制）
 export PI_PACKAGE_DIR="$MY_PI_ROOT/vendor/pi"
 
-# 选择启动方式：优先使用便携版二进制，否则使用 node 版本
-if [ -x "$MY_PI_ROOT/portable/bin/my-pi" ]; then
+# 选择启动方式：优先使用 tsx 加载 TypeScript 源码
+if command -v tsx >/dev/null 2>&1; then
+    exec tsx "$MY_PI_ROOT/vendor/pi/packages/coding-agent/src/cli.ts" \
+        --extension "$MY_PI_ROOT/custom/bootstrap.ts" \
+        "$@"
+elif [ -x "$MY_PI_ROOT/portable/bin/my-pi" ]; then
     exec "$MY_PI_ROOT/portable/bin/my-pi" "$@"
 else
     exec "$MY_PI_ROOT/vendor/pi/node_modules/.bin/pi" "$@"

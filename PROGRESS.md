@@ -37,3 +37,8 @@
 - 验证结果：所有隔离边界验证通过
 - 迁移的功能：context、link、memory、mode、plan-mode、intervention、subagent、tmux、browser、voice、autopilot
 - 遇到的问题：无
+
+### 阶段五：便携化简化
+- 完成时间：2026-09-20
+- 验证结果：my-pi.sh 已更新为优先使用 tsx 加载 TypeScript 源码
+- 遇到的问题：无

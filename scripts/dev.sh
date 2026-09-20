@@ -4,7 +4,7 @@ set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 开发模式：直接运行，不构建 custom/
-# 使用 tsx 或 ts-node 加载 TypeScript 源码
+# 使用 tsx 加载 TypeScript 源码
 cd "$ROOT"
 
 export PI_CODING_AGENT_DIR="$ROOT/portable/config"
