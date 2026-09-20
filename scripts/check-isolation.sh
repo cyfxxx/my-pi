@@ -49,16 +49,15 @@ for DIR in node chromium ffmpeg pi-global .cloakbrowser; do
     fi
 done
 
-# 检查 6: vendor/pi 必须干净
-cd "$ROOT/vendor/pi"
-if ! git diff --quiet 2>/dev/null; then
+# 检查 6: vendor/pi 必须干净（检查 vendor/pi/ 目录下是否有未提交的修改）
+cd "$ROOT"
+if ! git diff --quiet -- vendor/pi/ 2>/dev/null; then
     echo "❌ F-07 违反：vendor/pi/ 有未提交的修改"
-    git diff --stat
+    git diff --stat -- vendor/pi/
     ERRORS=$((ERRORS + 1))
 else
     echo "✅ vendor/pi/ 干净"
 fi
-cd "$ROOT"
 
 # 检查 7: LAST_SYNC_POINT 存在
 if [ ! -f "$ROOT/vendor/pi/LAST_SYNC_POINT" ]; then
