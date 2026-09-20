@@ -50,7 +50,7 @@ grep -qi microsoft /proc/version && echo WSL2
 | 路径 | 入库策略 | 说明 |
 |------|----------|------|
 | `portable/config/`（部分文件） | 部分跟踪 | `settings.json`、`keybindings.json`、`AGENTS.md`、`APPEND_SYSTEM.md` 入库共享；其余被 `.gitignore` 排除 |
-| `portable/config/skills/` | 不入库 | 技能目录（技能放置于此，pi 从这里发现） |
+| `portable/config/skills/` | **入库共享** | 技能目录（pi 从 `agentDir/skills` 发现；`.gitignore` 已加白名单，随仓库分发） |
 | `portable/skills/` | 不入库 | 占位目录，**pi 不读取** |
 | `portable/sessions/` | 不入库 | 会话历史 |
 | `portable/extensions/` | 不入库 | 扩展安装目录 |
@@ -58,8 +58,8 @@ grep -qi microsoft /proc/version && echo WSL2
 
 由此得到两条基本规则：
 
-1. **仓库里能同步的只有代码与共享配置**（`custom/`、`scripts/`、`patches/`、`packs/`、`docs/`、`portable/config/` 中列入白名单的四个文件）。`portable/memory/`、`portable/config/skills/` 等不会随 `git pull` 到达新环境。
-2. **换机保留记忆或技能必须走归档/手工拷贝**，例如 `pi-backup create` 归档，或直接拷贝对应目录。
+1. **仓库里能同步的只有代码、共享配置与技能**（`custom/`、`scripts/`、`patches/`、`packs/`、`docs/`、`portable/config/` 中列入白名单的四个文件与 `portable/config/skills/`）。`portable/memory/`、`portable/sessions/`、`portable/extensions/`、每环境独立配置等不会随 `git pull` 到达新环境。
+2. **换机保留记忆必须走归档/手工拷贝**，例如 `pi-backup create` 归档，或直接拷贝对应目录；技能随 git 同步，通常无需额外处理。
 
 **环境专属信息的标注约定**：记忆数据统一放在 `portable/memory/`。记录时在同一份记忆中区分环境——环境专属的经验（如"某环境的终端快捷键/音频桥配置"）在内容里标注环境标签（`termux`/`wsl2`/`linux`/`macos`）；只是"在某个环境里发现"的通用知识不标注。这样跨环境复习时能快速分辨哪些经验只对当前机器成立。
 
