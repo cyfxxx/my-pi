@@ -5,7 +5,9 @@
 ```
 my-pi/
 ├── .pi/                 # Pi 运行时配置文件（不含代码、不含数据、不含符号链接）
-├── vendor/pi/           # 上游 Pi 代码（只读；当前由主仓库追踪，见「已知偏离」）
+├── vendor/
+│   ├── pi/              # 上游 Pi 代码（独立 git clone，主仓库 .gitignore 排除）
+│   └── PINNED_COMMIT    # vendor 锁定的上游 commit（引导用）
 ├── custom/              # my-pi 的自定义代码
 ├── portable/            # my-pi 的运行时数据（所有用户数据收敛于此）
 ├── patches/             # 上游补丁
@@ -24,15 +26,22 @@ Pi 运行时需要的配置文件。**只放配置，不放代码、不放数据
 包含：`settings.json`、`keybindings.json`、`models-store.json`、`AGENTS.md`、`APPEND_SYSTEM.md`。
 
 ### `vendor/pi/`
-上游 Pi 代码。**永不修改**。所有修改通过 `patches/` 管理。
+上游 Pi 代码，**独立 git clone**，由主仓库 `.gitignore` 排除（不纳入主仓库版本控制）。
+**永不直接修改**，所有改动通过 `patches/` 管理。
 
-- `LAST_SYNC_POINT`：上次同步的上游 commit SHA（当前为 `5afd80c65`，即 vendored 基线的最后一个上游提交）
-- 通过 `scripts/sync-upstream.sh` 更新
+- 上游 remote：`upstream` = `https://github.com/earendil-works/pi-mono.git`
+- 锁定 commit：`vendor/PINNED_COMMIT`（当前 `71dca871b`，版本 v0.85.1）
+- `LAST_SYNC_POINT`：上次同步的上游 commit SHA
+- 本地补丁以 commit 形式叠加在上游之上；通过 `scripts/sync-upstream.sh` 更新
 
-> **已知偏离**：目标设计为 `vendor/pi/` 作为独立 git clone、由主仓库 `.gitignore` 排除。
-> 当前环境无法从 GitHub 克隆（clone 超时，仅 `ls-remote` 元数据可用），且项目需在
-> 多设备间同步，因此 `vendor/pi/` 仍由主仓库追踪。`scripts/sync-upstream.sh` 会检测
-> 这一状态并拒绝执行（避免误操作主仓库）。详见 `DECISIONS.md`。
+**引导（fresh checkout）**：`vendor/pi` 不随主仓库分发。克隆主仓库后运行 `scripts/build.sh`
+会自动从上游 clone 并 checkout `PINNED_COMMIT`、应用 `patches/`；也可手动：
+
+```bash
+git clone https://github.com/earendil-works/pi-mono.git vendor/pi
+git -C vendor/pi checkout "$(cat vendor/PINNED_COMMIT)"
+for p in patches/*.patch; do git -C vendor/pi apply --3way "$p"; done
+```
 
 ### `custom/`
 my-pi 的自定义代码。三层结构：
@@ -55,12 +64,15 @@ my-pi 的自定义代码。三层结构：
 通过 `my-pi.sh` 中的环境变量重定向到此。
 
 ### `patches/`
-对 `vendor/pi/` 的补丁。每个补丁记录一个明确的修改。
+对 `vendor/pi/` 的补丁。每个补丁记录一个明确的修改：
+
+- `001-branding.patch`：品牌化（`package.json` name/piConfig）
+- `002-local-pi-mods.patch`：本地 pi 源码改动（config 项目级 `.pi` 发现、secrets 脱敏、Google TOO_MANY_TOOL_CALLS、离线跳过 model-data 校验、tsconfig 排除 src/custom、packages/README）
 
 ### `scripts/`
 仅 4 个脚本：
 
-- `build.sh`：构建 vendor/pi 和 custom/
+- `build.sh`：构建 vendor/pi 和 custom/（vendor 缺失时自动引导）
 - `dev.sh`：开发模式运行
 - `sync-upstream.sh`：从上游同步
 - `check-isolation.sh`：验证隔离边界

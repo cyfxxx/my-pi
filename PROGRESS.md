@@ -145,3 +145,17 @@
 - 遇到的问题：
   - GitHub clone 超时（仅 ls-remote 可用），无法将 vendor/pi 转为独立 clone；
     为多设备同步与离线可用性，保留 vendor/pi 由主仓库追踪，已记入 DECISIONS.md
+
+## vendor/pi 独立化（fix/vendor-independent 分支）
+- 完成时间：2026-09-20
+- 背景：网络恢复后确认 `earendil-works/pi-mono` 可达，且主仓库 `main` 即 canonical pi 源码
+- 验证结果：
+  - ✅ `vendor/pi` 为独立 git clone，HEAD = `1cdf55e64`（基线 `71dca871b` + branding + local mods + LAST_SYNC_POINT）
+  - ✅ 上游 remote `upstream` = `https://github.com/earendil-works/pi-mono.git`
+  - ✅ `vendor/PINNED_COMMIT` = `71dca871b`（v0.85.1）
+  - ✅ 本地 pi 改动抽为 `patches/002-local-pi-mods.patch`（6 文件），可在基线应用
+  - ✅ 主仓库 `.gitignore` 排除 `vendor/pi/`，已 `git rm -r --cached`（1689 文件转为未追踪）
+  - ✅ `scripts/build.sh` 支持 vendor 缺失时自动引导（clone + checkout PINNED_COMMIT + 应用补丁）
+  - ✅ 保留 `node_modules`/`dist`/provider 数据，`./my-pi.sh --version` 返回 0.85.1
+  - ✅ `check-isolation.sh`、`npx tsc --noEmit -p custom/` 通过
+- 遇到的问题：无（先前「保留主仓库追踪」的决策由 DECISIONS.md 新决策取代）

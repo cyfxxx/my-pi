@@ -60,7 +60,8 @@ my-pi/
 │   └── dev.sh                        # 开发模式脚本
 │
 ├── patches/                          # 上游补丁
-│   └── 001-branding.patch            # 品牌化补丁
+│   ├── 001-branding.patch            # 品牌化补丁
+│   └── 002-local-pi-mods.patch       # 本地 pi 源码改动
 │
 ├── my-pi.sh                          # 便携启动脚本
 ├── PROGRESS.md                       # 进度追踪
@@ -69,6 +70,9 @@ my-pi/
 ```
 
 ## 快速开始
+
+> fresh checkout 时 `vendor/pi/` 不存在（已 gitignore）。先运行 `bash scripts/build.sh`
+> 会自动从上游 clone 并 checkout `vendor/PINNED_COMMIT`、应用 `patches/`。
 
 ```bash
 # 1. 启动 my-pi（开发模式，使用 tsx 直接运行 TypeScript）

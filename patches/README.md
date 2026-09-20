@@ -6,8 +6,9 @@
 
 ```
 patches/
-├── README.md              # 本文件
-└── 001-branding.patch     # 品牌化补丁（name/configDir）
+├── README.md                  # 本文件
+├── 001-branding.patch         # 品牌化（name/piConfig）
+└── 002-local-pi-mods.patch    # 本地 pi 源码改动
 ```
 
 ## 补丁命名规范
@@ -18,29 +19,28 @@ patches/
 
 ## 现有补丁
 
-| 补丁 | 作用 | 目标文件 |
-|------|------|----------|
+| 补丁 | 作用 | 目标 |
+|------|------|------|
 | `001-branding.patch` | 将上游 monorepo 名称改为 `my-pi` 并写入 `piConfig` | `vendor/pi/package.json` |
+| `002-local-pi-mods.patch` | 本地 pi 源码改动：项目级 `.pi` 发现、secrets 脱敏、Google `TOO_MANY_TOOL_CALLS`、离线跳过 model-data 校验、tsconfig 排除 `src/custom`、`packages/README.md` | `vendor/pi/packages/**` |
 
 ## 验证补丁
 
-在 `vendor/pi/` 目录下检查补丁是否可应用（要求 `vendor/pi/package.json` 保持 pristine）：
+要求 `vendor/pi/` 处于对应基线（`vendor/PINNED_COMMIT`）：
 
 ```bash
-cd vendor/pi
-git apply --check ../../patches/001-branding.patch
+for p in patches/*.patch; do
+  git -C vendor/pi apply --check "$p"
+done
 ```
 
 ## 使用方法
 
-补丁由 `scripts/sync-upstream.sh` 在同步上游后自动应用：
+补丁由 `scripts/sync-upstream.sh` 在同步上游后自动应用，或在引导时由 `scripts/build.sh` 应用：
 
 ```bash
 bash scripts/sync-upstream.sh
 ```
-
-> 注意：当前 `vendor/pi/` 由主仓库追踪，`sync-upstream.sh` 会拒绝执行；此时补丁仅作为
-> 修改记录保留。详见 `STRUCTURE.md` 的「已知偏离」与 `DECISIONS.md`。
 
 ## 最佳实践
 

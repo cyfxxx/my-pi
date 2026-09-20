@@ -79,3 +79,6 @@ memory/
 
 # Packs (独立 git 仓库)
 .pi/scripts/packs/
+
+# vendor/pi 独立 git 仓库（上游 pi 源码，不纳入主仓库）
+vendor/pi/

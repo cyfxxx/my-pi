@@ -29,7 +29,7 @@
 
 ### 三隔离一收敛
 
-- **上游隔离**：`vendor/pi/` 永不直接修改，改动经 `patches/` 管理；上游更新通过 `scripts/sync-upstream.sh` 合并（要求 vendor/pi 为独立 git 仓库，当前由主仓库追踪时会拒绝执行）
+- **上游隔离**：`vendor/pi/` 是独立 git clone（上游 `earendil-works/pi-mono`），永不直接修改，改动经 `patches/` 管理；上游更新通过 `scripts/sync-upstream.sh` 合并
 - **逻辑隔离**：`custom/features/*/logic.ts` 零 Pi 依赖，纯逻辑永远不会因上游变更而崩溃
 - **接口隔离**：`custom/adapters/` 是唯一的 Pi API 接触点，上游 API 变更只需修改适配器
 - **数据收敛**：所有运行时数据通过环境变量重定向收敛到 `portable/` 目录（无符号链接）
@@ -52,7 +52,10 @@
 4. 创建 `index.ts` - 入口，通过 `custom/adapters/` 注册工具/钩子
 5. 在 `custom/bootstrap.ts` 中注册该功能
 
-### 上游同步
+### vendor 引导与上游同步
+
+`vendor/pi/` 不随主仓库分发（已 gitignore）。fresh checkout 后由 `scripts/build.sh`
+自动 clone 上游并 checkout `vendor/PINNED_COMMIT`、应用 `patches/`。
 
 ```bash
 # 同步到最新上游
