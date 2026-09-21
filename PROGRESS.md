@@ -436,3 +436,11 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 说明：TUI 渲染依赖运行时 pi-tui 解析（由 pi 加载器提供），vitest 无法解析故未加渲染单测；`tsc` 校验类型
 - 未迁移：plan-mode TodoOverlay（交互式 overlay 组件）
 - 验证：`tsc`、`npm test`（17 文件 187 用例）、`check-isolation`、`check-features` 通过
+
+## 功能移植补充（第 14 批：browser Termux 补丁 + 脚本编排）
+- 完成时间：2026-09-21
+- `scripts/patch-playwright-core.mjs`：Termux 下把 playwright-core 平台判断扩展至 android（幂等 `patchSource`；适配 my-pi 的 playwright-core 1.63.0 布局，与 pi-tools 1.53.x 精确文件表不同）
+- `scripts/setup-external.sh`：可选外部服务/依赖（`status`/`fd-rg`/`tmux`/`searxng`/`whisper`/`all`），对应 rebuild.sh 的外部服务阶段
+- 文档：README/STRUCTURE 脚本清单更新（5 → 7）；README 外部服务段落引用 setup-external.sh
+- 未迁移：rebuild.sh 的镜像加速/Node 自动升级/TUI 补丁编排/cron-systemd 安装/wrapper（wrapper 与 my-pi 直启架构不符）
+- 验证：`tsc`、`npm test`（17 文件 187 用例）、`check-isolation`、`check-features` 通过

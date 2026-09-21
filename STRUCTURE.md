@@ -12,7 +12,7 @@ my-pi/
 ├── packs/               # 外部技能包仓库（迁移自 pi-tools，按需读取，不注入系统提示词）
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── patches/             # 上游补丁
-├── scripts/             # 5 个运维脚本
+├── scripts/             # 7 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -80,13 +80,15 @@ my-pi 的自定义代码。三层结构：
 - `003-tab-completion-fix.patch`：`handleTabCompletion` 斜杠命令上下文统一走 `handleSlashCommandCompletion()`，使子命令参数补全在 Tab 时可见
 
 ### `scripts/`
-仅 5 个脚本：
+仅 7 个脚本：
 
 - `build.sh`：构建 vendor/pi（vendor 缺失时自动引导）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `dev.sh`：开发模式运行
 - `sync-upstream.sh`：从上游同步
 - `check-isolation.sh`：验证隔离边界
 - `check-features.sh`：对照 pi-tools 注册面检查工具/命令/快捷键/钩子/补丁完整性
+- `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 容器 / whisper 指引 / fd-rg 链接）
+- `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
 
 ## 数据流向
 

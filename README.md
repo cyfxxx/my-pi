@@ -65,7 +65,9 @@ my-pi/
 │   ├── check-features.sh             # 功能完整性检查
 │   ├── sync-upstream.sh              # 上游同步脚本
 │   ├── build.sh                      # 构建脚本
-│   └── dev.sh                        # 开发模式脚本
+│   ├── dev.sh                        # 开发模式脚本
+│   ├── setup-external.sh             # 外部服务/依赖安装（可选）
+│   └── patch-playwright-core.mjs     # Termux playwright-core 补丁
 │
 ├── patches/                          # 上游补丁
 │   ├── 001-branding.patch            # 品牌化补丁
@@ -199,7 +201,7 @@ npx tsc --noEmit -p custom/
 
 ## 外部服务安装
 
-某些功能依赖外部服务，需要手动安装：
+某些功能依赖外部服务，需要手动安装。可先用 `bash scripts/setup-external.sh status` 查看状态，或用其子命令 `fd-rg` / `tmux` / `searxng` 快速安装：
 
 ### SearXNG（web-search 功能）
 
