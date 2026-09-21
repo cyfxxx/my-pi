@@ -69,7 +69,8 @@ my-pi/
 │   ├── setup-external.sh             # 外部服务/依赖安装（可选）
 │   ├── patch-playwright-core.mjs     # Termux playwright-core 补丁
 │   ├── golden-tasks.sh               # 行为防退化基准
-│   └── check-injection-surface.sh    # 注入面基线守门
+│   ├── check-injection-surface.sh    # 注入面基线守门
+│   └── check-doc-links.mjs           # 文档链接一致性
 │
 ├── patches/                          # 上游补丁
 │   ├── 001-branding.patch            # 品牌化补丁

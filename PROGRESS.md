@@ -522,3 +522,10 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 清理各 feature 头部过时的「未迁移」说明（plan-mode/subagent/voice/autopilot 已补齐的能力）
 - README 新增「度量与治理（VISION P1–P3）」入口表；docs/README 更新日期
 - 验证：`npm run golden`、`tsc`、`npm test`（208 用例）通过
+
+## 自主迭代（第 24 批：文档链接守门）
+- 完成时间：2026-09-21（自主推进）
+- `scripts/check-doc-links.mjs`：扫描自身文档（根/docs/portable/agent 的 md）相对链接并校验存在（排除 vendor/node_modules/packs）
+- `scripts/golden-tasks.sh`：新增第 7 步文档链接
+- README/STRUCTURE 脚本清单 9 → 10
+- 验证：`npm run golden` 七项全通过

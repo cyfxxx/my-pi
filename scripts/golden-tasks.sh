@@ -46,8 +46,11 @@ fi
 step "6. 注入面基线"
 if bash scripts/check-injection-surface.sh >/tmp/golden-inject.log 2>&1; then pass "$(tail -1 /tmp/golden-inject.log)"; else fail "注入面失配（见 /tmp/golden-inject.log）"; cat /tmp/golden-inject.log; fi
 
+step "7. 文档链接"
+if node scripts/check-doc-links.mjs >/tmp/golden-docs.log 2>&1; then pass "$(tail -1 /tmp/golden-docs.log)"; else fail "文档链接（见 /tmp/golden-docs.log）"; cat /tmp/golden-docs.log; fi
+
 if [ "${1:-}" = "--smoke" ]; then
-  step "7. 无头会话冒烟"
+  step "8. 无头会话冒烟"
   if timeout 90 ./my-pi.sh -p "回复 OK" >/tmp/golden-smoke.log 2>&1; then pass "headless smoke"; else fail "headless smoke（见 /tmp/golden-smoke.log）"; tail -10 /tmp/golden-smoke.log; fi
 fi
 
