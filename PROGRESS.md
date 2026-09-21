@@ -452,3 +452,12 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `index.ts`：todo 工具与 /plan 各子命令后刷新面板；session_start 注入 uiCtx + 刷新；session_shutdown dispose
 - 测试：新增 selectOverlayLayout 2 用例，vitest 187 → 189
 - 验证：`tsc`、`npm test`（17 文件 189 用例）、`check-isolation`、`check-features` 通过
+
+## 功能移植补充（第 16 批：build.sh 编排增强）
+- 完成时间：2026-09-21
+- `scripts/build.sh`：
+  - Node 版本前置检查（engines >= 22，缺失/过低给出升级指引）
+  - 可选国内 npm 镜像（`PI_CN_MIRROR=1` 或 `PI_NPM_REGISTRY=<url>`）
+  - vendor/pi 已存在时核对 `patches/*.patch` 应用状态（幂等，不改动）
+  - Termux 下自动核对 playwright-core 平台补丁
+- 说明：wrapper / crash-recovery / L4 源码缓存与 my-pi 直启架构不符（N.A.）；cron/systemd 离线调度由 autopilot 会话内 tick 承担，未提供独立安装脚本
