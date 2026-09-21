@@ -3,7 +3,7 @@
  *
  * 迁移自 pi-tools `agent/extensions/plan-mode/{index,commands,todo}.ts`（核心部分）：
  * 任务状态机 + `todo` 工具 + `/plan` 命令 + 只读探索强制 + Ctrl+Alt+P 快捷键。
- * 未迁移（后续）：计划文件 git 版本化、TodoOverlay、事件密集型注入（events.ts）。
+ * 未迁移（后续）：计划文件 git 版本化、events.ts 的上下文注入/自动完成流程。
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';

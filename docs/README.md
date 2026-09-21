@@ -6,7 +6,7 @@
 
 | 属性 | 值 |
 |------|-----|
-| 更新日期 | 2026-09-20 |
+| 更新日期 | 2026-09-21 |
 | 适用范围 | my-pi 项目文档索引 |
 | 相关文档 | [README.md](../README.md)、[STRUCTURE.md](../STRUCTURE.md)、[DECISIONS.md](../DECISIONS.md) |
 

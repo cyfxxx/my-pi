@@ -3,7 +3,7 @@
  *
  * 迁移自 pi-tools `agent/extensions/subagent/index.ts`。
  * 工具 `subagent`：single / parallel / chain 三种模式，子进程隔离上下文。
- * 未迁移（后续）：TUI renderCall/renderResult（rendering.ts）。
+ * 已含 TUI renderCall/renderResult（rendering.ts）。
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';

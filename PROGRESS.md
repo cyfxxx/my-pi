@@ -516,3 +516,9 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 文档：VISION §2 三处现状更新为"已可度量"
 - 测试：新增 metrics 1 用例，vitest 207 → 208
 - 验证：`npm run golden`、`tsc`、`check-isolation`、`check-features`、`npm test` 通过
+
+## 自主迭代（第 23 批：文档一致性 + 收尾）
+- 完成时间：2026-09-21（自主推进）
+- 清理各 feature 头部过时的「未迁移」说明（plan-mode/subagent/voice/autopilot 已补齐的能力）
+- README 新增「度量与治理（VISION P1–P3）」入口表；docs/README 更新日期
+- 验证：`npm run golden`、`tsc`、`npm test`（208 用例）通过

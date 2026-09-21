@@ -3,7 +3,7 @@
  *
  * 迁移自 pi-tools `agent/extensions/pi-autopilot/{index,commands,tools}.ts`（核心）。
  * 提供任务调度存储/策略/遥测/失败自愈判定，`/auto` 与 `/schedule` 命令。
- * 未迁移（后续）：后台执行/注入循环、watchdog 自动重启、Best-of-N verifier、seeds/sessions。
+ * 后台执行循环/watchdog/verifier 已实现；未迁移：seeds/sessions/notifications 与 Best-of-N 的 LLM 集成。
  */
 
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';

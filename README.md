@@ -132,6 +132,17 @@ Layer 1 ─ 服务层 ───────────── custom/core/ (路�
 Layer 0 ─ 基础层 ───────────── vendor/pi/ (上游代码)
 ```
 
+## 度量与治理（VISION P1–P3）
+
+| 目标 | 入口 | 说明 |
+|------|------|------|
+| 干预率 | `/intervention stats` | abort 快照 + corrective 关联，落 `portable/memory/interventions.jsonl` |
+| token/缓存 | `/usage-diag`、`/auto metrics` | `usage-stats` 持久化工具 token 与缓存命中率 |
+| 任务成功率 | `/auto stats`、`/auto metrics` | autopilot telemetry（按模型/任务） |
+| 记忆治理 | `/memory lifecycle` | 只读报告：淘汰/升格/冲突/规模 |
+| 教训闭环 | `/memory mine [--ingest]` | 从纠正意图挖掘教训并入库（自动去重） |
+| 防退化 | `npm run golden` | 隔离/注册面/类型/单测/补丁/注入面基线 |
+
 ## 上游同步
 
 ```bash

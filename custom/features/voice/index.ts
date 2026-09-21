@@ -3,7 +3,7 @@
  *
  * 迁移自 pi-tools `agent/extensions/pi-voice/{index,commands}.ts`（核心）。
  * 工具 voice_transcribe / voice_speak；命令 /voice；Ctrl+Alt+R；自动朗读钩子。
- * 未迁移（后续）：录音（termux/sox）、唤醒词、诊断基准、sherpa 服务脚本。
+ * 录音/唤醒/诊断/听写均已在逻辑层实现；未迁移：sherpa/whisper 服务脚本（外部服务）。
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
