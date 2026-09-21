@@ -112,7 +112,7 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 - **P0 已完成（2026-09-20）**：项目骨架与三隔离一收敛；12 个功能注册；纯逻辑迁移（token 预算、工具输出归档、脱敏、原子写入、笔记持久化、子代理内置角色）；`packs/`、技能、文档迁移；三层验证（check/tsc/vitest）全绿。
 - **P1 度量基建（已完成，2026-09-21）**：干预捕获落盘（`interventions.jsonl` + `/intervention stats`）→ 任务遥测（autopilot telemetry + `/auto stats`）→ 缓存/用量统计（`usage-stats.ts` + `/usage-diag`）。判据达成：可产出干预率、token 成本、缓存命中率三项数字。
 - **P2 防退化（已完成，2026-09-21）**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`--smoke` 无头冒烟）+ `scripts/check-injection-surface.sh`（system prompt 前缀指纹基线）。判据达成：结构性改动可被 `npm run golden` 拦截。
-- **P3 记忆生命周期**：治理字段已在 `memory/storage.ts` 就绪（recurrence/confidence/accessedAt/source/links/supersededBy）；**待建**：只读生命周期报告（淘汰/升格/冲突候选）与"教训挖掘 → 入库"。
+- **P3 记忆生命周期（部分完成，2026-09-21）**：治理字段在 `memory/storage.ts` 就绪（recurrence/confidence/accessedAt/source/links/supersededBy）；只读生命周期报告 `memory/lifecycle.ts` + `/memory lifecycle`（§5 淘汰/升格/冲突/规模四类）已建成。**待建**："教训挖掘 → 入库"闭环。
 - **P4 升格通道执行**：按 §3.1 把反复有效的软引导硬化，并同步降权原软引导。判据：软层条目不无限增长（注入预算受控）。
 
 ## 七、未来展望（受限于算力与技术，暂缓）

@@ -37,6 +37,8 @@ import {
   formatEnvironments,
   CATEGORIES,
   ENVIRONMENTS,
+  analyzeLifecycle,
+  formatLifecycleReport,
 } from './logic';
 import type { MemoryCategory, MemoryEntry, RuntimeEnv } from './logic';
 
@@ -247,6 +249,7 @@ export function register(pi: ExtensionAPI): void {
         { value: 'search', label: 'search <关键词> - 搜索记忆' },
         { value: 'stats', label: 'stats - 查看记忆库统计' },
         { value: 'summary', label: 'summary - 查看会话摘要' },
+        { value: 'lifecycle', label: 'lifecycle - 生命周期只读报告（淘汰/升格/冲突候选）' },
         { value: 'prune', label: 'prune - 清理失效记忆' },
         { value: 'cleanup', label: 'cleanup - 清理过期笔记' },
         { value: 'help', label: 'help - 显示帮助信息' },
@@ -266,6 +269,7 @@ export function register(pi: ExtensionAPI): void {
   search <关键词>  搜索已存储的记忆
   stats            查看记忆库统计
   summary          查看会话摘要
+  lifecycle        生命周期只读报告（淘汰/升格/冲突候选）
   prune            清理失效记忆
   cleanup          清理过期笔记
   help             显示帮助`;
@@ -305,6 +309,11 @@ export function register(pi: ExtensionAPI): void {
               : '暂无会话摘要',
             'info',
           );
+          break;
+        }
+        case 'lifecycle': {
+          const report = analyzeLifecycle(loadEntries());
+          ctx.ui.notify(formatLifecycleReport(report), 'info');
           break;
         }
         case 'prune': {

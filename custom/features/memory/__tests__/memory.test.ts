@@ -181,3 +181,32 @@ describe('inject: 注入块', () => {
     expect((out[1] as { content: string }).content).toBe('new');
   });
 });
+
+describe('lifecycle 生命周期报告', () => {
+  it('识别淘汰/升格/冲突候选', async () => {
+    const { analyzeLifecycle } = await import('../lifecycle');
+    const now = Date.now();
+    const old = new Date(now - 200 * 24 * 3600_000).toISOString();
+    const entries: MemoryEntry[] = [
+      entry({ id: 'e1', title: '旧的低置信记忆', recurrence: 1, confidence: 0.3, accessedAt: old }),
+      entry({ id: 'e2', title: '常用解决方案', category: 'solutions', recurrence: 6, confidence: 0.9 }),
+      entry({ id: 'e3', title: '用户偏好深色主题', category: 'preference' }),
+      entry({ id: 'e4', title: '用户偏好浅色主题', category: 'preference' }),
+    ];
+    const r = analyzeLifecycle(entries, { now });
+    expect(r.evictionCandidates.map((x) => x.id)).toContain('e1');
+    expect(r.promotionCandidates.map((x) => x.id)).toContain('e2');
+    // e3/e4 同类别标题相似 → 冲突嫌疑
+    expect(r.conflictSuspects.length).toBeGreaterThan(0);
+    expect(r.active).toBe(4);
+  });
+
+  it('formatLifecycleReport 含四段', async () => {
+    const { analyzeLifecycle, formatLifecycleReport } = await import('../lifecycle');
+    const text = formatLifecycleReport(analyzeLifecycle([]));
+    expect(text).toContain('淘汰候选');
+    expect(text).toContain('升格候选');
+    expect(text).toContain('冲突嫌疑');
+    expect(text).toContain('规模');
+  });
+});

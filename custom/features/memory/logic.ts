@@ -1,8 +1,7 @@
 /**
  * Memory Feature — 纯逻辑 barrel
  *
- * 实际实现按职责拆分：types / env / storage / retrieval / merge / inject。
- * 本文件仅做统一再导出，便于 feature 内引用与测试。
+ * 实际实现按职责拆分：types / env / storage / retrieval / merge / inject / lifecycle。
  */
 
 export * from './types';
@@ -11,3 +10,4 @@ export * from './storage';
 export * from './retrieval';
 export * from './merge';
 export * from './inject';
+export * from './lifecycle';

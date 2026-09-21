@@ -493,3 +493,11 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 文档：VISION §4/§6 状态更新；README/STRUCTURE 脚本清单 7→9
 - 测试：新增 usage-stats 4 用例，vitest 199 → 203（19 文件）
 - 验证：`npm run golden` 六项全通过；`tsc`/`check-isolation`/`check-features`/`npm test` 通过
+
+## 自主迭代（第 20 批：P3 记忆生命周期只读报告）
+- 完成时间：2026-09-21（自主推进）
+- `features/memory/lifecycle.ts`：`analyzeLifecycle`（淘汰候选：>180天未访问且引用≤1且置信度<0.7；升格候选：solutions/fact 且 recurrence≥5；冲突嫌疑：同类别标题 bigram-jaccard≥0.5；规模/陈旧度）+ `formatLifecycleReport`
+- `memory/index.ts`：`/memory lifecycle` 子命令（只读，不做写操作）
+- 文档：VISION §6 P3 状态更新
+- 测试：新增 lifecycle 2 用例，vitest 203 → 205
+- 验证：`npm run golden` 通过；`tsc`/`check-isolation`/`check-features`/`npm test` 通过
