@@ -12,6 +12,7 @@
     "build": "bash scripts/build.sh",
     "dev": "bash scripts/dev.sh",
     "check": "bash scripts/check-isolation.sh",
+    "golden": "bash scripts/golden-tasks.sh",
     "test": "vitest run --config vitest.config.ts",
     "sync": "bash scripts/sync-upstream.sh"
   },

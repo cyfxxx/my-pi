@@ -67,7 +67,9 @@ my-pi/
 │   ├── build.sh                      # 构建脚本
 │   ├── dev.sh                        # 开发模式脚本
 │   ├── setup-external.sh             # 外部服务/依赖安装（可选）
-│   └── patch-playwright-core.mjs     # Termux playwright-core 补丁
+│   ├── patch-playwright-core.mjs     # Termux playwright-core 补丁
+│   ├── golden-tasks.sh               # 行为防退化基准
+│   └── check-injection-surface.sh    # 注入面基线守门
 │
 ├── patches/                          # 上游补丁
 │   ├── 001-branding.patch            # 品牌化补丁
@@ -194,6 +196,9 @@ bash scripts/check-isolation.sh
 
 # 功能完整性检查
 bash scripts/check-features.sh
+
+# 行为防退化基准（聚合上述检查）
+npm run golden
 
 # TypeScript 类型检查
 npx tsc --noEmit -p custom/

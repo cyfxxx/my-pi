@@ -29,6 +29,7 @@ import {
 import { pruneToolResults } from './prune';
 import type { PruneMessage } from './prune';
 import { makeCompactDecider, makeAutoContinueGate } from './auto-compact';
+import { appendUsage, readUsage, summarizeUsage, formatUsageSummary } from './usage-stats';
 
 export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE };
 
@@ -111,12 +112,15 @@ ${getBudgetReport().used.toLocaleString()} / ${getBudgetReport().total.toLocaleS
     description: '用量诊断 (usage: /usage-diag)',
     handler: async (_args, ctx) => {
       const report = getBudgetReport();
+      const persisted = formatUsageSummary(summarizeUsage(readUsage()));
       ctx.ui.notify(
         `Token 用量诊断:
 已使用: ${report.used.toLocaleString()} / ${report.total.toLocaleString()} (${(report.ratio * 100).toFixed(1)}%)
 剩余: ${report.remaining.toLocaleString()} token
 压力级别: ${report.pressure}
-主要消耗: ${report.topConsumers.map(c => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}`,
+主要消耗: ${report.topConsumers.map(c => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}
+
+${persisted}`,
         'info',
       );
     },
@@ -228,7 +232,13 @@ ${getBudgetReport().used.toLocaleString()} / ${getBudgetReport().total.toLocaleS
   registerHook(pi, {
     event: 'tool_result',
     handler: async (event) => {
-      const e = event as { toolName?: string; content?: unknown; details?: unknown };
+      const e = event as {
+        toolName?: string;
+        content?: unknown;
+        details?: unknown;
+        isError?: boolean;
+        usage?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+      };
       let text = '';
       if (typeof e.content === 'string') {
         text = e.content;
@@ -237,6 +247,24 @@ ${getBudgetReport().used.toLocaleString()} / ${getBudgetReport().total.toLocaleS
           .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
           .map((b) => b.text as string)
           .join('\n');
+      }
+      // 度量：记录 token/缓存（用量统计度量基建；无 usage 时以输出估算兜底）
+      try {
+        const name = e.toolName ?? 'tool';
+        const start = toolState.toolCallStarts.get(name);
+        appendUsage({
+          ts: new Date().toISOString(),
+          tool: name,
+          ok: !e.isError,
+          input: e.usage?.input,
+          output: e.usage?.output,
+          cacheRead: e.usage?.cacheRead,
+          cacheWrite: e.usage?.cacheWrite,
+          outputTokens: e.usage?.output != null ? undefined : text ? estimateTokens(text) : 0,
+          durationMs: start ? Date.now() - start : undefined,
+        });
+      } catch {
+        /* fail-open */
       }
       if (!text) return;
       const pruned = pruneToolOutput(text, e.toolName ?? 'tool');

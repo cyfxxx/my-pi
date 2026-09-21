@@ -41,6 +41,7 @@ portable/agent/*
 !portable/agent/APPEND_SYSTEM.md
 !portable/agent/keybindings.json
 !portable/agent/settings.json
+!portable/agent/injection-baseline.json
 # 技能目录（pi 的 agentDir/skills，随仓库分发）
 !portable/agent/skills/
 !portable/agent/skills/**

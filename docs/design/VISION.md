@@ -85,13 +85,13 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 
 | 层 | 指标 | pi-tools 对应工具 | my-pi 现状 |
 |---|---|---|---|
-| 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **缺**：仅有 `custom/features/context/budget.ts` 的预算估算与 `getContextUsage` 校准，无命中率统计与注入面基线 |
-| 干预 | abort 快照留存率 / corrective 关联率 | pi-intervention → `memory/interventions.jsonl` | **缺**：`custom/features/intervention/` 为骨架，无落盘 |
-| 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **缺**：无任务遥测 |
-| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **部分**：`npx vitest run` 覆盖纯逻辑（27 用例），无行为级 golden tasks |
-| 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 | memory-lifecycle.mjs（只读报告） | **缺**：`note-store` 无可用于生命周期治理的字段 |
+| 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有**：`custom/features/context/usage-stats.ts` 持久化工具 token/缓存读写（`usage.jsonl`），`/usage-diag` 产出命中率；`scripts/check-injection-surface.sh` 注入面前缀指纹守门 |
+| 干预 | abort 快照留存率 / corrective 关联率 | pi-intervention → `memory/interventions.jsonl` | **已有**：`custom/features/intervention/` 落盘 `portable/memory/interventions.jsonl`，`/intervention stats` 产出关联率/近 7 天 |
+| 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **已有**：autopilot telemetry（按模型/任务成功率 + 预算）`/auto stats` |
+| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`npm run golden`）+ 199 单测用例 |
+| 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 | memory-lifecycle.mjs（只读报告） | **部分**：`memory/storage.ts` 已有治理字段（recurrence/confidence/accessedAt/source/links/supersededBy），只读生命周期报告待建（P3） |
 
-结论：**度量层是当前最大缺口**——§2 的所有"趋势/比率"类判据目前都无法测量。落地顺序见 §6。
+结论：度量层已基本建成（P1/P2 达成）；P3 记忆生命周期报告与 P4 升格通道待推进。落地顺序见 §6。
 
 ## 五、记忆生命周期治理规则 v1
 
@@ -110,9 +110,9 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 按依赖顺序推进；每阶段以"可验证"为完成判据。
 
 - **P0 已完成（2026-09-20）**：项目骨架与三隔离一收敛；12 个功能注册；纯逻辑迁移（token 预算、工具输出归档、脱敏、原子写入、笔记持久化、子代理内置角色）；`packs/`、技能、文档迁移；三层验证（check/tsc/vitest）全绿。
-- **P1 度量基建**：干预捕获落盘 → 任务遥测 → 缓存/用量统计。判据：能产出干预率、token 成本、缓存命中率三项可对比数字。
-- **P2 防退化**：行为级 golden tasks（确定性用例 + 无头会话冒烟）+ 注入面基线守门（system prompt 前缀指纹）。判据：结构性改动可被守门测试拦截。
-- **P3 记忆生命周期**：为记忆引入治理字段与只读生命周期报告；打通"教训挖掘 → 入库"。判据：§5 的四类报告可自动产出。
+- **P1 度量基建（已完成，2026-09-21）**：干预捕获落盘（`interventions.jsonl` + `/intervention stats`）→ 任务遥测（autopilot telemetry + `/auto stats`）→ 缓存/用量统计（`usage-stats.ts` + `/usage-diag`）。判据达成：可产出干预率、token 成本、缓存命中率三项数字。
+- **P2 防退化（已完成，2026-09-21）**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`--smoke` 无头冒烟）+ `scripts/check-injection-surface.sh`（system prompt 前缀指纹基线）。判据达成：结构性改动可被 `npm run golden` 拦截。
+- **P3 记忆生命周期**：治理字段已在 `memory/storage.ts` 就绪（recurrence/confidence/accessedAt/source/links/supersededBy）；**待建**：只读生命周期报告（淘汰/升格/冲突候选）与"教训挖掘 → 入库"。
 - **P4 升格通道执行**：按 §3.1 把反复有效的软引导硬化，并同步降权原软引导。判据：软层条目不无限增长（注入预算受控）。
 
 ## 七、未来展望（受限于算力与技术，暂缓）

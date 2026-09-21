@@ -479,3 +479,17 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `types.ts`：补 `VerifierConfig`/`defaultVerifierConfig`
 - 测试：新增 watchdog/verifier 5 用例，vitest 194 → 199
 - 验证：`tsc`、`npm test`（18 文件 199 用例）、`check-isolation`、`check-features` 通过
+
+## 自主迭代（第 19 批：P1 度量基建 + P2 防退化）
+- 完成时间：2026-09-21（用户离开期间自主推进，目标对齐 VISION §6）
+- P1 度量基建：
+  - `context/usage-stats.ts`：工具 token/缓存读写持久化（`portable/memory/context/usage.jsonl`，`PI_USAGE_FILE` 可覆盖），`summarizeUsage` 产出命中率/今日成本/高频工具
+  - `context/index.ts`：`tool_result` 钩子记录用量；`/usage-diag` 追加持久化统计
+  - 至此 VISION §4 三项判据（干预率/token 成本/缓存命中率）均可测量
+- P2 防退化：
+  - `scripts/check-injection-surface.sh`：system prompt 注入面前缀指纹基线（`portable/agent/injection-baseline.json`，`--update` 更新）
+  - `scripts/golden-tasks.sh`：聚合隔离/注册面/类型/单测/补丁/注入面（`--smoke` 无头冒烟）
+  - `npm run golden` 入口
+- 文档：VISION §4/§6 状态更新；README/STRUCTURE 脚本清单 7→9
+- 测试：新增 usage-stats 4 用例，vitest 199 → 203（19 文件）
+- 验证：`npm run golden` 六项全通过；`tsc`/`check-isolation`/`check-features`/`npm test` 通过
