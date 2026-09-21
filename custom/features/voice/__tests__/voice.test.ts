@@ -1,0 +1,131 @@
+/**
+ * voice 纯逻辑回归测试
+ * 覆盖 TTS 文本清洗/调度、配置解析、服务确保（注入 deps，无网络/录音）。
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { cleanForSpeech, isSpeechWorthy, createTtsDispatcher, extractAssistantText } from '../tts';
+import { loadConfig } from '../config';
+import { ensureWhisperService } from '../transcription';
+
+describe('cleanForSpeech', () => {
+  it('移除代码块/行内代码/链接/markdown 标记', () => {
+    const md = '# 标题\n这是 `code` 与 [链接](http://x) 文本\n```js\nvar x=1\n```\n- 列表';
+    const out = cleanForSpeech(md);
+    expect(out).not.toContain('```');
+    expect(out).not.toContain('http://x');
+    expect(out).toContain('标题');
+    expect(out).toContain('链接');
+    expect(out).toContain('这是 code 与');
+  });
+
+  it('超长截断', () => {
+    expect(cleanForSpeech('a'.repeat(500), 10)).toBe('aaaaaaaaaa...');
+  });
+});
+
+describe('isSpeechWorthy', () => {
+  it('短文本/JSON/纯符号不值得朗读', () => {
+    expect(isSpeechWorthy('a')).toBe(false);
+    expect(isSpeechWorthy('{"a":1}')).toBe(false);
+    expect(isSpeechWorthy('[1,2]')).toBe(false);
+    expect(isSpeechWorthy('***---')).toBe(false);
+    expect(isSpeechWorthy('这是一段正常的话')).toBe(true);
+  });
+});
+
+describe('createTtsDispatcher', () => {
+  it('合并待读为最新，串行执行', async () => {
+    const spoken: string[] = [];
+    const d = createTtsDispatcher({
+      speakFn: async (t) => {
+        spoken.push(t);
+        await new Promise((r) => setTimeout(r, 5));
+        return { code: 0, stdout: '', stderr: '' };
+      },
+    });
+    d.enqueue('一');
+    d.enqueue('二');
+    d.enqueue('三');
+    expect(d.pendingCount()).toBeLessThanOrEqual(1);
+    await d.flush();
+    // 同步连发时中间文本被合并丢弃，只读最新
+    expect(spoken).toContain('三');
+    expect(spoken).not.toContain('二');
+  });
+
+  it('朗读失败经 onError 回调', async () => {
+    const errors: string[] = [];
+    const d = createTtsDispatcher({
+      speakFn: async () => ({ code: 1, stdout: '', stderr: 'boom' }),
+      onError: (m) => errors.push(m),
+    });
+    d.enqueue('x');
+    await d.flush();
+    expect(errors).toContain('boom');
+  });
+});
+
+describe('extractAssistantText', () => {
+  it('拼接 text block', () => {
+    expect(extractAssistantText([{ type: 'text', text: 'a' }, { type: 'toolCall' }, { type: 'text', text: 'b' }])).toBe('a\nb');
+    expect(extractAssistantText('plain')).toBe('plain');
+    expect(extractAssistantText(undefined)).toBe('');
+  });
+});
+
+describe('config', () => {
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    for (const k of ['PI_VOICE_LINUX_TTS_RATE', 'PI_VOICE_LANGUAGE', 'PI_VOICE_STT_BACKEND']) saved[k] = process.env[k];
+  });
+  afterEach(() => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  it('env 覆盖语言/后端', () => {
+    process.env.PI_VOICE_LANGUAGE = 'en';
+    process.env.PI_VOICE_STT_BACKEND = 'whisper';
+    const c = loadConfig(process.env, '/nonexistent/pi-voice.json');
+    expect(c.language).toBe('en');
+    expect(c.sttBackend).toBe('whisper');
+    expect(c.whisperEndpoint).toContain('http');
+  });
+
+  it('非法 ttsRate 抛校验错误', () => {
+    process.env.PI_VOICE_LINUX_TTS_RATE = '10';
+    expect(() => loadConfig(process.env, '/nonexistent/pi-voice.json')).toThrow('配置校验失败');
+  });
+});
+
+describe('ensureWhisperService（注入 deps）', () => {
+  it('健康直接通过', async () => {
+    const r = await ensureWhisperService({} as never, { health: async () => true });
+    expect(r.ok).toBe(true);
+  });
+
+  it('不健康→启动成功→轮询就绪', async () => {
+    let healthy = false;
+    const r = await ensureWhisperService({} as never, {
+      health: async () => healthy,
+      start: async () => {
+        healthy = true;
+        return { code: 0, stdout: '', stderr: '' };
+      },
+      pollIntervalMs: 1,
+      pollTimeoutMs: 100,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it('启动失败→错误', async () => {
+    const r = await ensureWhisperService({} as never, {
+      health: async () => false,
+      start: async () => ({ code: 1, stdout: '', stderr: 'no script' }),
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('no script');
+  });
+});

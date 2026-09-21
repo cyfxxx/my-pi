@@ -9,9 +9,13 @@
   "hideThinkingBlock": false,
   "collapseChangelog": true,
   "defaultProjectTrust": "ask",
+  "transport": "auto",
+  "modelThinkingLevels": {},
   "compaction": {
+    "enabled": true,
     "reserveTokens": 32768,
-    "keepRecentTokens": 20000
+    "keepRecentTokens": 20000,
+    "modelOverrides": {}
   },
   "skills": [
     "+skills/pi-translate-zh/SKILL.md",

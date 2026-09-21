@@ -283,6 +283,105 @@ async function doSearch(
   return `搜索: "${query}"\n\n${results.join("\n")}`
 }
 
+// ── fetch_url 支撑：分块读取响应体（最多 cap 字节，防大文件全量入内存）──
+
+export async function readBodyLimited(
+  res: Response,
+  cap: number,
+): Promise<{ text: string; truncated: boolean }> {
+  if (!res.body) {
+    return { text: await res.text(), truncated: false }
+  }
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  let truncated = false
+  while (total < cap) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+    const room = cap - total
+    if (value.length > room) {
+      // 单块即超出 cap：直接判定截断（否则会漏报，pi-tools 原实现在此有缺陷）
+      chunks.push(value.subarray(0, room))
+      total = cap
+      truncated = true
+      break
+    }
+    chunks.push(value)
+    total += value.length
+  }
+  if (truncated || total >= cap) {
+    // 恰好读满 cap 且未确认剩余：再读一块判断（防 truncated 误报）；无论结果都 cancel 释放连接
+    if (!truncated) {
+      try {
+        const { done } = await reader.read()
+        truncated = !done
+      } catch {
+        truncated = true
+      }
+    }
+    try {
+      await reader.cancel()
+    } catch {
+      /* 流已结束 */
+    }
+  }
+  return { text: Buffer.concat(chunks).toString('utf-8'), truncated }
+}
+
+export const FETCH_BODY_CAP = 512 * 1024
+
+/** 轻量 HTTP GET（协议白名单 + 超时 + 响应体上限），返回格式化文本 */
+export async function fetchUrl(
+  url: string,
+  maxLength = 8000,
+  timeoutMs = HTTP_TIMEOUT_MS,
+  signal?: AbortSignal,
+): Promise<string> {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return `无效 URL：${url}`
+  }
+  // 协议白名单：仅放行 http/https（纵深防御，本地 SearXNG 等合法用途不受影响）
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return `不支持的协议 "${parsed.protocol}"：fetch_url 仅允许 http:/https: URL`
+  }
+  const cap = Math.max(0, Math.min(maxLength, 200000))
+  const controller = new AbortController()
+  const onUserAbort = () => controller.abort()
+  signal?.addEventListener?.('abort', onUserAbort)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PiBot/1.0)' },
+    })
+    if (!res.ok) {
+      try {
+        await res.body?.cancel()
+      } catch {
+        /* 已释放 */
+      }
+      return `HTTP ${res.status}: ${res.statusText}`
+    }
+    const { text, truncated: bodyTruncated } = await readBodyLimited(res, FETCH_BODY_CAP)
+    const out =
+      text.length > cap
+        ? text.slice(0, cap) + `\n\n...（共 ${text.length} 字符，仅显示前 ${cap} 字符）`
+        : text
+    const suffix = bodyTruncated ? '\n\n[响应体超过 512KB 已截断读取]' : ''
+    return out + suffix
+  } catch (e) {
+    return `请求失败: ${(e as Error).message}`
+  } finally {
+    clearTimeout(timeout)
+    signal?.removeEventListener?.('abort', onUserAbort)
+  }
+}
+
 // ── 并发限制器（wechat-article-exporter P-Queue 启发）────────────
 // 限制同时进行的异步操作数量，防止批量请求时 IP 被封或资源耗尽。
 // 适用于：批量 URL 抓取、知识源并发拉取、多引擎搜索等场景。

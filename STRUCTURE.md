@@ -12,7 +12,7 @@ my-pi/
 ├── packs/               # 外部技能包仓库（迁移自 pi-tools，按需读取，不注入系统提示词）
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── patches/             # 上游补丁
-├── scripts/             # 4 个运维脚本
+├── scripts/             # 5 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -77,14 +77,16 @@ my-pi 的自定义代码。三层结构：
 
 - `001-branding.patch`：品牌化（`package.json` name/piConfig）
 - `002-local-pi-mods.patch`：本地 pi 源码改动（config 项目级 `.pi` 发现、secrets 脱敏、Google TOO_MANY_TOOL_CALLS、离线跳过 model-data 校验、tsconfig 排除 src/custom、packages/README）
+- `003-tab-completion-fix.patch`：`handleTabCompletion` 斜杠命令上下文统一走 `handleSlashCommandCompletion()`，使子命令参数补全在 Tab 时可见
 
 ### `scripts/`
-仅 4 个脚本：
+仅 5 个脚本：
 
 - `build.sh`：构建 vendor/pi（vendor 缺失时自动引导）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `dev.sh`：开发模式运行
 - `sync-upstream.sh`：从上游同步
 - `check-isolation.sh`：验证隔离边界
+- `check-features.sh`：对照 pi-tools 注册面检查工具/命令/快捷键/钩子/补丁完整性
 
 ## 数据流向
 

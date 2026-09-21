@@ -44,6 +44,9 @@ portable/agent/*
 # 技能目录（pi 的 agentDir/skills，随仓库分发）
 !portable/agent/skills/
 !portable/agent/skills/**
+# 子代理角色目录（pi 的 agentDir/agents，随仓库分发）
+!portable/agent/agents/
+!portable/agent/agents/**
 portable/memory/*
 !portable/memory/.gitkeep
 

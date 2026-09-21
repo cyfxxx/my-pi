@@ -32,7 +32,6 @@ export function registerAll(pi: ExtensionAPI, featureList: RegisteredFeature[]):
   for (const feature of featureList) {
     try {
       feature.register(pi);
-      console.log(`✅ 已注册功能：${feature.name}`);
     } catch (error) {
       console.error(`❌ 注册功能失败：${feature.name}`, error);
       throw error;

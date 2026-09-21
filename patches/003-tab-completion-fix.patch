@@ -1,0 +1,13 @@
+diff --git a/packages/tui/src/components/editor.ts b/packages/tui/src/components/editor.ts
+index 42b722f8c..749aef23b 100644
+--- a/packages/tui/src/components/editor.ts
++++ b/packages/tui/src/components/editor.ts
+@@ -2257,7 +2257,7 @@ export class Editor implements Component, Focusable {
+ 		const currentLine = this.state.lines[this.state.cursorLine] || "";
+ 		const beforeCursor = currentLine.slice(0, this.state.cursorCol);
+ 
+-		if (this.isInSlashCommandContext(beforeCursor) && !beforeCursor.trimStart().includes(" ")) {
++		if (this.isInSlashCommandContext(beforeCursor)) {
+ 			this.handleSlashCommandCompletion();
+ 		} else {
+ 			this.forceFileAutocomplete(true);

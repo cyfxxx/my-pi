@@ -1,80 +1,349 @@
 /**
- * Autopilot Feature
- * 
- * 约束：
- *   - 只通过 adapters 与 Pi 交互
- *   - 不直接 import vendor/pi
+ * Autopilot Feature — 入口（只通过 adapters 与 Pi 交互）
+ *
+ * 迁移自 pi-tools `agent/extensions/pi-autopilot/{index,commands,tools}.ts`（核心）。
+ * 提供任务调度存储/策略/遥测/失败自愈判定，`/auto` 与 `/schedule` 命令。
+ * 未迁移（后续）：后台执行/注入循环、watchdog 自动重启、Best-of-N verifier、seeds/sessions。
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
+import { registerCommand, sendMessage, appendEntry } from '../../adapters/ui-adapter';
 import {
-  createAutopilotConfig,
-  createAutopilotState,
-  canContinue,
-  nextStep,
-  completeAutopilot,
-  addResult,
-  getResults,
-  clearResults,
+  readAutopilotConfig,
+  writeAutopilotConfig,
+  readTelemetry,
+  statsByModel,
+  statsByTask,
+  todayRuns,
+  todayCost,
+  formatBudgetUsage,
+  planFailover,
+  executeFailover,
+  checkBudget,
+  schedulerOverview,
+  currentModel,
+  isLocalModel,
+  readState,
+  readTasks,
+  listTasks,
+  addTask,
+  deleteTask,
+  updateTask,
+  updateTaskAfterRun,
+  previewCron,
+  renderPrompt,
+  formatInterval,
+  parseIntervalToMs,
+  computeNextRun,
 } from './logic';
+import type { TaskType, FallbackModel, Task } from './logic';
+
+function fmtTask(t: Task): string {
+  const flag = t.enabled ? '●' : '○';
+  const next = t.nextRun ? new Date(t.nextRun).toLocaleString() : '-';
+  const result = t.lastResult ? ` last=${t.lastResult}` : '';
+  return `${flag} ${t.name} [${t.type}:${t.schedule}] next=${next} runs=${t.runCount}${result}`;
+}
 
 export function register(pi: ExtensionAPI): void {
-  const config = createAutopilotConfig();
-  const state = createAutopilotState();
+  const cfg = readAutopilotConfig();
 
-  // 注册工具：启动自动驾驶
-  registerTool(pi, {
-    name: 'autopilot_start',
-    description: '启动自动驾驶模式',
-    parameters: {
-      task: { type: 'string', description: '要执行的任务' },
-    },
-    execute: async (args: { task?: string }) => {
-      if (!args?.task) return '错误：缺少任务参数';
-      
-      state.active = true;
-      state.step = 0;
-      clearResults(state);
-      
-      return `自动驾驶已启动: ${args.task}`;
-    },
-  });
-
-  // 注册工具：停止自动驾驶
-  registerTool(pi, {
-    name: 'autopilot_stop',
-    description: '停止自动驾驶模式',
-    parameters: {},
-    execute: async () => {
-      state.active = false;
-      const results = getResults(state);
-      return `自动驾驶已停止，执行了 ${results.length} 个步骤`;
-    },
-  });
-
-  // 注册工具：获取自动驾驶状态
+  // ── 工具：状态/统计/失败转移 ──
   registerTool(pi, {
     name: 'autopilot_status',
-    description: '获取自动驾驶状态',
+    description: '查看自动驾驶/调度器状态与预算使用',
     parameters: {},
     execute: async () => {
-      return `自动驾驶状态: ${state.active ? '运行中' : '已停止'}, 步骤: ${state.step}/${state.maxSteps}, 预算: ${state.budgetUsed}/${state.budgetLimit}`;
+      const ov = schedulerOverview();
+      const runs = readTelemetry();
+      const cm = currentModel();
+      return [
+        `自动驾驶: ${readAutopilotConfig().enabled ? '已启用' : '已禁用'}`,
+        `调度器: 任务 ${ov.total}（启用 ${ov.enabled}）${ov.paused ? ' [已暂停]' : ''}`,
+        `当前模型: ${cm.provider}/${cm.model}${isLocalModel() ? '（本地）' : ''}`,
+        formatBudgetUsage(runs),
+      ].join('\n');
     },
   });
 
-  // 注册钩子：每轮检查自动驾驶状态
-  registerHook(pi, {
-    event: 'before_agent_start',
-    handler: async (_event, ctx) => {
-      if (state.active && canContinue(state)) {
-        nextStep(state);
-      } else if (state.active) {
-        completeAutopilot(state, '自动驾驶完成');
+  registerTool(pi, {
+    name: 'autopilot_stats',
+    description: '查看按模型/任务的运行统计',
+    parameters: {},
+    execute: async () => {
+      const runs = readTelemetry();
+      const models = statsByModel(runs).slice(0, 5);
+      const tasks = statsByTask(runs).slice(0, 5);
+      const fmtR = (n: number): string => `${(n * 100).toFixed(0)}%`;
+      return [
+        '按模型:',
+        ...(models.length ? models.map((m) => `  ${m.provider}/${m.model}: ${m.runs} 次, 成功率 ${fmtR(m.successRate)}, $${m.totalCost.toFixed(4)}`) : ['  (无)']),
+        '按任务:',
+        ...(tasks.length ? tasks.map((t) => `  ${t.taskName}: ${t.runs} 次, 成功率 ${fmtR(t.successRate)}`) : ['  (无)']),
+      ].join('\n');
+    },
+  });
+
+  registerTool(pi, {
+    name: 'autopilot_failover',
+    description: '查看/触发模型故障转移（默认 dry-run 预览）',
+    parameters: {
+      execute: { type: 'boolean', description: 'true 时实际写入切换请求（默认 false 仅预览）', optional: true },
+    },
+    execute: async (args) => {
+      const c = readAutopilotConfig();
+      const cm = currentModel();
+      const plan = planFailover(c.fallbackModels, cm.provider, cm.model);
+      if (!plan.target) return `无法转移: ${plan.reason}`;
+      return executeFailover(plan.target, plan.reason, !(args.execute === true));
+    },
+  });
+
+  // ── /auto 命令 ──
+  registerCommand(pi, 'auto', {
+    description: '自动驾驶自管理 (usage: /auto <status|stats|policy|failover|pause|resume|help>)',
+    getArgumentCompletions: (prefix) => {
+      const subs = ['status', 'stats', 'policy', 'failover', 'pause', 'resume', 'help'];
+      const f = subs.filter((s) => s.startsWith(prefix));
+      return f.length ? f.map((s) => ({ value: s, label: s })) : null;
+    },
+    handler: async (args, ctx) => {
+      const [sub, ...rest] = args.trim().split(/\s+/);
+      const c = readAutopilotConfig();
+      const cm = currentModel();
+      const runs = readTelemetry();
+
+      if (!sub || sub === 'help') {
+        ctx.ui.notify('/auto <status|stats|policy|failover|pause|resume|help>', 'info');
+        return;
+      }
+      if (sub === 'status') {
+        const ov = schedulerOverview();
+        ctx.ui.notify(
+          `自动驾驶: ${c.enabled ? '启用' : '禁用'}\n调度器: ${ov.total} 任务（启用 ${ov.enabled}）${ov.paused ? ' [暂停]' : ''}\n当前模型: ${cm.provider}/${cm.model}\n${formatBudgetUsage(runs)}`,
+          'info',
+        );
+        return;
+      }
+      if (sub === 'stats') {
+        const models = statsByModel(runs).slice(0, 5);
+        ctx.ui.notify(models.length ? models.map((m) => `${m.provider}/${m.model}: ${m.runs} 次, 成功率 ${(m.successRate * 100).toFixed(0)}%`).join('\n') : '暂无遥测数据', 'info');
+        return;
+      }
+      if (sub === 'policy') {
+        ctx.ui.notify(
+          `failoverAfter=${c.policy.failoverAfter} suspendAfter=${c.policy.suspendAfter} timeoutFactor=${c.policy.timeoutFactor}\nfallbackModels: ${c.fallbackModels.map((f) => `${f.provider}/${f.model}`).join(', ') || '(无)'}\n预算: ${c.budget.maxRunsPerDay} 次/日, $${c.budget.maxCostPerDay ?? 0}/日`,
+          'info',
+        );
+        return;
+      }
+      if (sub === 'failover') {
+        const plan = planFailover(c.fallbackModels, cm.provider, cm.model);
+        if (!plan.target) {
+          ctx.ui.notify(`无法转移: ${plan.reason}`, 'info');
+          return;
+        }
+        const dry = !rest.includes('--exec');
+        ctx.ui.notify(executeFailover(plan.target, plan.reason, dry), 'info');
+        return;
+      }
+      if (sub === 'pause') {
+        writeAutopilotConfig({ ...c, enabled: false });
+        ctx.ui.notify('自动驾驶已暂停', 'info');
+        return;
+      }
+      if (sub === 'resume') {
+        writeAutopilotConfig({ ...c, enabled: true });
+        ctx.ui.notify('自动驾驶已恢复', 'info');
+        return;
+      }
+      ctx.ui.notify(`未知子命令: ${sub}`, 'info');
+    },
+  });
+
+  // ── /schedule 命令 ──
+  registerCommand(pi, 'schedule', {
+    description: '任务调度 (usage: /schedule <list|loop|remind|cron|edit|delete|enable|disable|preview|history|help>)',
+    getArgumentCompletions: (prefix) => {
+      const subs = ['list', 'loop', 'remind', 'cron', 'edit', 'delete', 'enable', 'disable', 'preview', 'history', 'help'];
+      const f = subs.filter((s) => s.startsWith(prefix));
+      return f.length ? f.map((s) => ({ value: s, label: s })) : null;
+    },
+    handler: async (args, ctx) => {
+      const parts = args.trim().split(/\s+/).filter(Boolean);
+      const sub = parts[0] || 'list';
+      const rest = parts.slice(1);
+      const help =
+        '/schedule list                        列出任务\n' +
+        '/schedule loop <间隔> <任务>          固定间隔（如 5m/1h）\n' +
+        '/schedule remind <时间> <任务>        一次性（如 +30m 或 ISO）\n' +
+        '/schedule cron <表达式> <任务>        POSIX cron（如 "0 9 * * 1-5"）\n' +
+        '/schedule edit <名> <字段> <值>       修改（schedule/type/enabled/prompt）\n' +
+        '/schedule delete <名>                 删除\n' +
+        '/schedule enable|disable <名>         启用/禁用\n' +
+        '/schedule preview <cron>              预览 cron 下次触发\n' +
+        '/schedule history <名>                查看执行历史';
+
+      try {
+        if (sub === 'help' || (sub !== 'list' && rest.length === 0 && sub !== 'help')) {
+          if (sub === 'help' || !['list'].includes(sub)) {
+            ctx.ui.notify(help, 'info');
+            return;
+          }
+        }
+        if (sub === 'list') {
+          const tasks = listTasks();
+          ctx.ui.notify(tasks.length ? tasks.map(fmtTask).join('\n') : '暂无调度任务', 'info');
+          return;
+        }
+        if (sub === 'preview') {
+          if (!rest[0]) {
+            ctx.ui.notify('用法: /schedule preview <cron 表达式>', 'info');
+            return;
+          }
+          ctx.ui.notify(previewCron(rest.join(' '), 5).join('\n'), 'info');
+          return;
+        }
+        if (sub === 'history') {
+          const name = rest.join(' ');
+          const t = listTasks().find((x) => x.name === name);
+          if (!t) {
+            ctx.ui.notify(`未找到任务: ${name}`, 'warning');
+            return;
+          }
+          ctx.ui.notify(
+            t.history.length
+              ? t.history.map((h) => `[${h.time}] ${h.result}: ${h.output.slice(0, 120)}`).join('\n')
+              : '暂无历史',
+            'info',
+          );
+          return;
+        }
+        if (sub === 'delete' || sub === 'enable' || sub === 'disable') {
+          const name = rest.join(' ');
+          if (!name) {
+            ctx.ui.notify(`用法: /schedule ${sub} <名>`, 'info');
+            return;
+          }
+          if (sub === 'delete') {
+            const ok = await deleteTask(name);
+            ctx.ui.notify(ok ? `已删除 ${name}` : `未找到 ${name}`, ok ? 'info' : 'warning');
+          } else {
+            const t = await updateTask(name, { enabled: sub === 'enable' });
+            ctx.ui.notify(t ? `已${sub === 'enable' ? '启用' : '禁用'} ${name}` : `未找到 ${name}`, t ? 'info' : 'warning');
+          }
+          return;
+        }
+        if (sub === 'edit') {
+          const [name, field, ...valParts] = rest;
+          if (!name || !field || valParts.length === 0) {
+            ctx.ui.notify('用法: /schedule edit <名> <schedule|type|enabled|prompt> <值>', 'info');
+            return;
+          }
+          const raw = valParts.join(' ');
+          const updates: Record<string, unknown> = {};
+          if (field === 'enabled') updates.enabled = raw === 'true' || raw === '1';
+          else if (field === 'schedule' || field === 'type' || field === 'prompt') updates[field] = raw;
+          else {
+            ctx.ui.notify(`不支持的字段: ${field}`, 'warning');
+            return;
+          }
+          const t = await updateTask(name, updates as never);
+          ctx.ui.notify(t ? `已更新 ${name}` : `未找到 ${name}`, t ? 'info' : 'warning');
+          return;
+        }
+        if (sub === 'loop' || sub === 'remind' || sub === 'cron') {
+          let type: TaskType;
+          let schedule: string;
+          let prompt: string;
+          if (sub === 'cron') {
+            type = 'cron';
+            // cron 表达式 5 字段
+            schedule = rest.slice(0, 5).join(' ');
+            prompt = rest.slice(5).join(' ');
+          } else {
+            type = sub === 'remind' ? 'once' : 'interval';
+            schedule = rest[0];
+            prompt = rest.slice(1).join(' ');
+          }
+          if (!schedule || !prompt) {
+            ctx.ui.notify(`用法: /schedule ${sub} ${sub === 'cron' ? '"<表达式>" ' : '<时间> '}<任务>`, 'info');
+            return;
+          }
+          const name = `task-${Date.now().toString(36)}`;
+          const task = await addTask({ name, type, schedule: schedule.replace(/^"|"$/g, ''), prompt });
+          ctx.ui.notify(`已创建任务 ${name}\n${fmtTask(task)}`, 'info');
+          return;
+        }
+        ctx.ui.notify(help, 'info');
+      } catch (e) {
+        ctx.ui.notify(`调度错误: ${(e as Error).message}`, 'error');
       }
     },
   });
 
-  console.log('✅ Autopilot feature registered');
+  // ── 兼容旧命令 /autopilot ──
+  registerCommand(pi, 'autopilot', {
+    description: '自动驾驶模式管理 (usage: /autopilot <start|stop|status|loop|schedule|remind|help>)',
+    handler: async (args, ctx) => {
+      const [sub, ...rest] = args.trim().split(/\s+/);
+      const c = readAutopilotConfig();
+      if (!sub || sub === 'help') {
+        ctx.ui.notify('/autopilot <start|stop|status|loop <间隔> <任务>|schedule <cron> <任务>|remind <时间> <任务>|help>', 'info');
+        return;
+      }
+      if (sub === 'start') {
+        writeAutopilotConfig({ ...c, enabled: true });
+        ctx.ui.notify('自动驾驶已启动', 'info');
+        return;
+      }
+      if (sub === 'stop') {
+        writeAutopilotConfig({ ...c, enabled: false });
+        ctx.ui.notify('自动驾驶已停止', 'info');
+        return;
+      }
+      if (sub === 'status') {
+        const ov = schedulerOverview();
+        ctx.ui.notify(`自动驾驶: ${c.enabled ? '运行中' : '已停止'}, 任务 ${ov.total}（启用 ${ov.enabled}）`, 'info');
+        return;
+      }
+      if (sub === 'loop' || sub === 'schedule' || sub === 'remind') {
+        // 转发到调度创建逻辑
+        const type: TaskType = sub === 'schedule' ? 'cron' : sub === 'remind' ? 'once' : 'interval';
+        const schedule = rest[0];
+        const prompt = sub === 'schedule' ? rest.slice(5).join(' ') : rest.slice(1).join(' ');
+        const sched = sub === 'schedule' ? rest.slice(0, 5).join(' ') : schedule;
+        if (!sched || !prompt) {
+          ctx.ui.notify(`用法: /autopilot ${sub} '${type === 'cron' ? '0 9 * * 1-5' : '+30m'}' <任务>`, 'info');
+          return;
+        }
+        try {
+          const task = await addTask({ name: `task-${Date.now().toString(36)}`, type, schedule: sched.replace(/^"|"$/g, ''), prompt });
+          appendEntry(pi, 'autopilot-schedule', { name: task.name, type, schedule: task.schedule });
+          ctx.ui.notify(`已创建任务 ${task.name}`, 'info');
+        } catch (e) {
+          ctx.ui.notify(`创建失败: ${(e as Error).message}`, 'error');
+        }
+        return;
+      }
+      ctx.ui.notify(`未知子命令: ${sub}`, 'info');
+    },
+  });
+
+  // ── 会话启动摘要 ──
+  registerHook(pi, {
+    event: 'session_start',
+    handler: async (_event, ctx) => {
+      const ov = schedulerOverview();
+      if (ov.total > 0 && ctx.hasUI) {
+        const due = listTasks().filter((t) => t.enabled && t.nextRun && new Date(t.nextRun).getTime() <= Date.now());
+        ctx.ui.notify(`自动驾驶: ${ov.total} 任务（启用 ${ov.enabled}）${due.length ? `，${due.length} 个已到期` : ''}`, 'info');
+      }
+    },
+  });
 }
+
+export { updateTaskAfterRun, renderPrompt, formatInterval, parseIntervalToMs, computeNextRun, readState, checkBudget };
+export type { FallbackModel };

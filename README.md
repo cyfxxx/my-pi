@@ -62,13 +62,15 @@ my-pi/
 │
 ├── scripts/
 │   ├── check-isolation.sh            # 隔离边界验证
+│   ├── check-features.sh             # 功能完整性检查
 │   ├── sync-upstream.sh              # 上游同步脚本
 │   ├── build.sh                      # 构建脚本
 │   └── dev.sh                        # 开发模式脚本
 │
 ├── patches/                          # 上游补丁
 │   ├── 001-branding.patch            # 品牌化补丁
-│   └── 002-local-pi-mods.patch       # 本地 pi 源码改动
+│   ├── 002-local-pi-mods.patch       # 本地 pi 源码改动
+│   └── 003-tab-completion-fix.patch  # Tab 命令参数补全
 │
 ├── my-pi.sh                          # 便携启动脚本
 ├── PROGRESS.md                       # 进度追踪
@@ -188,9 +190,59 @@ npx tsc --noEmit -p custom/
 # 隔离边界验证
 bash scripts/check-isolation.sh
 
+# 功能完整性检查
+bash scripts/check-features.sh
+
 # TypeScript 类型检查
 npx tsc --noEmit -p custom/
 ```
+
+## 外部服务安装
+
+某些功能依赖外部服务，需要手动安装：
+
+### SearXNG（web-search 功能）
+
+web-search 功能需要 SearXNG 实例提供搜索服务。
+
+```bash
+# 使用 Docker 安装 SearXNG
+docker run -d --name searxng -p 8889:8080 searxng/searxng
+
+# 或使用 Podman
+podman run -d --name searxng -p 8889:8080 searxng/searxng
+```
+
+安装后，在 `portable/agent/settings.json` 中配置 SearXNG 地址：
+
+```json
+{
+  "pi-web-search": {
+    "searxng_url": "http://127.0.0.1:8889",
+    "search_timeout": 30000
+  }
+}
+```
+
+### tmux（tmux 功能）
+
+tmux 功能需要系统安装 tmux：
+
+```bash
+# macOS
+brew install tmux
+
+# Ubuntu/Debian
+sudo apt update && sudo apt install tmux
+
+# CentOS/RHEL
+sudo yum install tmux
+```
+
+### 其他依赖
+
+- **Node.js**: >= 22.19.0
+- **npm**: 用于安装依赖
 
 ## 文档
 

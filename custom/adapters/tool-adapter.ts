@@ -16,10 +16,12 @@ import { Type, type TSchema } from 'typebox';
 
 /** 简化的参数声明：features 只描述类型与说明，由适配器编译成 TypeBox schema */
 export interface ToolParameter {
-  type: 'string' | 'number' | 'boolean';
+  type: 'string' | 'number' | 'boolean' | 'string[]' | 'json';
   description: string;
   /** 缺省为必填；显式置 true 表示可选 */
   optional?: boolean;
+  /** type='string' 时的枚举取值 */
+  enum?: readonly string[];
 }
 
 /**
@@ -36,12 +38,23 @@ export interface ToolDefinition {
 function buildParameterSchema(parameters: Record<string, ToolParameter>): TSchema {
   const properties: Record<string, TSchema> = {};
   for (const [name, spec] of Object.entries(parameters)) {
-    const base =
-      spec.type === 'number'
-        ? Type.Number({ description: spec.description })
-        : spec.type === 'boolean'
-          ? Type.Boolean({ description: spec.description })
-          : Type.String({ description: spec.description });
+    let base: TSchema;
+    if (spec.type === 'number') {
+      base = Type.Number({ description: spec.description });
+    } else if (spec.type === 'boolean') {
+      base = Type.Boolean({ description: spec.description });
+    } else if (spec.type === 'string[]') {
+      base = Type.Array(Type.String(), { description: spec.description });
+    } else if (spec.type === 'json') {
+      base = Type.Unknown({ description: spec.description });
+    } else if (spec.enum && spec.enum.length > 0) {
+      base = Type.Union(
+        spec.enum.map((v) => Type.Literal(v)),
+        { description: spec.description },
+      );
+    } else {
+      base = Type.String({ description: spec.description });
+    }
     properties[name] = spec.optional ? Type.Optional(base) : base;
   }
   return Type.Object(properties, { additionalProperties: false });
