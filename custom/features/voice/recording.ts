@@ -31,6 +31,22 @@ export function resolvePlatform(cfg: VoiceConfig): ResolvedPlatform {
 
 export function recorderSpec(cfg: VoiceConfig): RecorderSpec {
   const kind = resolvePlatform(cfg);
+  if (kind === 'windows') {
+    const micBin = cfg.micBin === 'termux-microphone-record' ? 'ffmpeg' : cfg.micBin;
+    return {
+      bin: micBin,
+      ext: 'wav',
+      needsConvert: false,
+      startArgs: (file) => {
+        const args = ['-f', 'dshow', '-i', `audio=${cfg.micDevice}`];
+        if (cfg.maxSeconds > 0) args.push('-t', String(cfg.maxSeconds));
+        args.push('-y', file);
+        return args;
+      },
+      stopArgs: () => null,
+      queryArgs: () => null,
+    };
+  }
   if (kind === 'termux') {
     return {
       bin: 'termux-microphone-record',
@@ -122,8 +138,8 @@ export function startRecording(
     args = [String(margin), recBin, ...args];
     recBin = 'timeout';
   }
-  const child = spawn(recBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-  if (kind === 'linux') {
+  const child = spawn(recBin, args, { stdio: kind === 'windows' ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'] });
+  if (kind === 'linux' || kind === 'windows') {
     const prev = activeRecorder;
     if (prev && prev.child.exitCode === null && prev.child.pid !== undefined) {
       try {
@@ -162,6 +178,30 @@ export function startRecording(
 
 export async function stopRecording(cfg: VoiceConfig): Promise<CommandResult> {
   const kind = resolvePlatform(cfg);
+  if (kind === 'windows') {
+    const rec = activeRecorder;
+    if (!rec || rec.child.exitCode !== null) return { code: 0, stdout: '', stderr: '' };
+    return new Promise<CommandResult>((resolve) => {
+      const killTimer = setTimeout(() => {
+        try {
+          rec.child.kill('SIGKILL');
+        } catch {
+          /* 已退出 */
+        }
+        resolve({ code: 0, stdout: '', stderr: 'stdin q 超时已强制终止' });
+      }, 2000);
+      rec.child.once('exit', () => {
+        clearTimeout(killTimer);
+        resolve({ code: 0, stdout: '', stderr: '' });
+      });
+      try {
+        rec.child.stdin?.write('q');
+      } catch {
+        clearTimeout(killTimer);
+        resolve({ code: 0, stdout: '', stderr: '' });
+      }
+    });
+  }
   if (kind === 'linux') {
     const rec = activeRecorder;
     if (!rec || rec.child.exitCode !== null || rec.child.pid === undefined) return { code: 0, stdout: '', stderr: '' };

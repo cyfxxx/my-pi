@@ -417,3 +417,12 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 未迁移：Windows dshow 录音、唤醒词、诊断基准
 - 测试：新增 recording 6 用例，vitest 178 → 184
 - 验证：`tsc`、`npm test`（17 文件 184 用例）、`check-isolation.sh`、`check-features.sh` 通过
+
+## 功能移植补充（第 12 批：voice 唤醒/诊断/Windows 录音）
+- 完成时间：2026-09-21
+- `recording.ts`：新增 Windows dshow 录音规格（ffmpeg dshow，stdin 'q' 优雅停止）
+- `wake.ts`：KWS 唤醒监听（Linux parec 流式采音 → sherpa `/wake`；环形缓冲、采集停滞看门狗、文件滚动重启）
+- `diagnostics.ts`：`doctor`（录音/ffmpeg/whisper/sherpa/TTS 检查）、`benchSuggestion`、`benchmark`（录音→转写 RTF）、`platformInstallGuide`
+- `index.ts`：`/voice wake <on|off|status>`、`/voice bench`、session_shutdown 停唤醒
+- 测试：新增 3 用例，vitest 184 → 187
+- 验证：`tsc`、`npm test`、`check-isolation`、`check-features` 通过

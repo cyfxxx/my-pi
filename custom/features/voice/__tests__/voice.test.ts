@@ -192,3 +192,27 @@ describe('recording 平台规格与工具', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('diagnostics / wake', () => {
+  const base = loadConfig({}, '/nonexistent/pi-voice.json');
+  it('benchSuggestion 按 RTF 分档', async () => {
+    const { benchSuggestion, platformInstallGuide } = await import('../diagnostics');
+    expect(benchSuggestion(1.5)).toContain('更小模型');
+    expect(benchSuggestion(0.7)).toContain('速度可接受');
+    expect(benchSuggestion(0.1)).toContain('速度充裕');
+    expect(platformInstallGuide({ ...base, platform: 'termux' } as never)).toContain('termux-api');
+  });
+
+  it('createWakeSession 非 linux 抛错', async () => {
+    const { createWakeSession } = await import('../wake');
+    expect(() => createWakeSession({ ...base, platform: 'termux' } as never, { onHit: () => {}, onStatus: () => {} })).toThrow('仅支持 Linux');
+  });
+
+  it('windows recorder spec 使用 ffmpeg dshow', async () => {
+    const { recorderSpec } = await import('../recording');
+    const spec = recorderSpec({ ...base, platform: 'windows', micDevice: '麦克风' } as never);
+    expect(spec.bin).toBe('ffmpeg');
+    expect(spec.ext).toBe('wav');
+    expect(spec.startArgs('x.wav').join(' ')).toContain('-f dshow');
+  });
+});

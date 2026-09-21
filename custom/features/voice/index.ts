@@ -29,10 +29,14 @@ import {
   queryRecording,
   convertToWav,
   cleanupStaleAudio,
+  createWakeSession,
+  benchmark,
   type VoiceConfig,
+  type WakeSession,
 } from './logic';
 
 let activeRecording: { file: string; startedAt: number } | null = null;
+let wakeSession: WakeSession | null = null;
 
 export function register(pi: ExtensionAPI): void {
   let cfg: VoiceConfig = loadConfig();
@@ -132,7 +136,7 @@ export function register(pi: ExtensionAPI): void {
   registerCommand(pi, 'voice', {
     description: '语音模式管理 (usage: /voice <on|off|status|toggle|tts|model|device|backend|language|doctor|help>)',
     getArgumentCompletions: (prefix) => {
-      const subs = ['on', 'off', 'status', 'toggle', 'tts', 'model', 'device', 'backend', 'language', 'doctor', 'help'];
+      const subs = ['on', 'off', 'status', 'toggle', 'tts', 'model', 'device', 'backend', 'language', 'doctor', 'wake', 'bench', 'help'];
       const f = subs.filter((s) => s.startsWith(prefix));
       return f.length ? f.map((s) => ({ value: s, label: s })) : null;
     },
@@ -148,6 +152,8 @@ export function register(pi: ExtensionAPI): void {
   /voice backend <whisper|sherpa> 设置转写后端
   /voice language <代码>      设置转写语言（空=自动）
   /voice doctor               后端健康检查
+  /voice wake <on|off|status> KWS 唤醒监听（Linux+sherpa）
+  /voice bench                录音→转写基准（RTF）
   /voice help                 本帮助`;
 
       if (!sub || sub === 'help') {
@@ -244,6 +250,45 @@ export function register(pi: ExtensionAPI): void {
         );
         return;
       }
+      if (sub === 'wake') {
+        const op = rest[0] ?? 'status';
+        if (op === 'status') {
+          ctx.ui.notify(wakeSession?.isRunning() ? `唤醒监听中（命中 ${wakeSession.hits()} 次）` : '唤醒监听未运行', 'info');
+          return;
+        }
+        if (op === 'off') {
+          const msg = wakeSession?.stop() ?? '唤醒监听未运行';
+          wakeSession = null;
+          ctx.ui.notify(msg, 'info');
+          return;
+        }
+        if (op === 'on') {
+          if (cfg.sttBackend !== 'sherpa') {
+            ctx.ui.notify('唤醒监听需要 sttBackend=sherpa（/voice backend sherpa）', 'warning');
+            return;
+          }
+          try {
+            wakeSession = createWakeSession(cfg, {
+              onHit: (kw) => {
+                sendMessage(pi, { customType: 'voice-wake', content: `唤醒词命中: ${kw}`, display: true }, { triggerTurn: true });
+              },
+              onStatus: (s) => ctx.ui.notify(s, 'info'),
+            });
+            await wakeSession.start();
+          } catch (e) {
+            ctx.ui.notify(`唤醒启动失败: ${(e as Error).message}`, 'error');
+          }
+          return;
+        }
+        ctx.ui.notify('用法: /voice wake <on|off|status>', 'info');
+        return;
+      }
+      if (sub === 'bench') {
+        ctx.ui.notify('正在进行录音基准测试（约 5s）...', 'info');
+        const r = await benchmark(cfg);
+        ctx.ui.notify(r.lines.join('\n'), 'info');
+        return;
+      }
       ctx.ui.notify(`未知子命令: ${sub}\n\n${help}`, 'info');
     },
   });
@@ -276,6 +321,16 @@ export function register(pi: ExtensionAPI): void {
     event: 'session_start',
     handler: async (_event, ctx) => {
       if (enabled && ctx.hasUI) ctx.ui.notify('语音自动朗读已启用（Ctrl+Alt+R 切换）', 'info');
+    },
+  });
+
+  registerHook(pi, {
+    event: 'session_shutdown',
+    handler: async () => {
+      if (wakeSession) {
+        wakeSession.stop();
+        wakeSession = null;
+      }
     },
   });
 }

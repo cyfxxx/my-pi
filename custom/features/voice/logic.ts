@@ -7,3 +7,5 @@ export * from './tts';
 export * from './whisper';
 export * from './transcription';
 export * from './recording';
+export * from './wake';
+export * from './diagnostics';
