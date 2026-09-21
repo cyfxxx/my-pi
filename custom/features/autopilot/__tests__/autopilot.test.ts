@@ -183,3 +183,27 @@ describe('computeNextRun 不变量', () => {
     expect(computeNextRun(t)).not.toBeNull();
   });
 });
+
+describe('runner 纯函数', () => {
+  it('buildRunArgs 含 json 模式标志并渲染 prompt 变量', async () => {
+    const { buildRunArgs } = await import('../runner');
+    const t = createTask({ name: 'x', type: 'interval', schedule: '5m', prompt: 'cwd={{cwd}}' });
+    const args = buildRunArgs(t);
+    expect(args).toContain('--mode');
+    expect(args).toContain('json');
+    expect(args).toContain('--no-extensions');
+    expect(args[args.length - 1]).toContain('cwd=');
+    expect(args[args.length - 1]).not.toContain('{{cwd}}');
+  });
+
+  it('extractRunOutput 取最后一条 assistant 文本', async () => {
+    const { extractRunOutput } = await import('../runner');
+    const lines = [
+      JSON.stringify({ type: 'message_end', message: { role: 'user', content: 'hi' } }),
+      JSON.stringify({ type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'one' }] } }),
+      JSON.stringify({ type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'final' }] } }),
+      'not json',
+    ];
+    expect(extractRunOutput(lines)).toBe('final');
+  });
+});

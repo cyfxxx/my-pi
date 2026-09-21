@@ -6,7 +6,7 @@
  * 未迁移（后续）：后台执行/注入循环、watchdog 自动重启、Best-of-N verifier、seeds/sessions。
  */
 
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand, sendMessage, appendEntry } from '../../adapters/ui-adapter';
@@ -37,8 +37,14 @@ import {
   formatInterval,
   parseIntervalToMs,
   computeNextRun,
+  isDue,
+  decide,
+  classifyError,
+  appendRun,
+  estimateCost,
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
+import { runTaskOnce } from './runner';
 
 function fmtTask(t: Task): string {
   const flag = t.enabled ? '●' : '○';
@@ -329,6 +335,83 @@ export function register(pi: ExtensionAPI): void {
         return;
       }
       ctx.ui.notify(`未知子命令: ${sub}`, 'info');
+    },
+  });
+
+  // ── 执行循环：每分钟检查到期任务并运行（子进程隔离）──
+  let running = false;
+  let tickTimer: ReturnType<typeof setInterval> | null = null;
+
+  const runDueTasks = async (ctx: ExtensionContext): Promise<void> => {
+    if (running) return;
+    const c = readAutopilotConfig();
+    if (!c.enabled) return;
+    const due = listTasks().filter((t) => t.enabled && isDue(t));
+    if (due.length === 0) return;
+    running = true;
+    const notify = (t: string, l: 'info' | 'warning' | 'error'): void => {
+      try {
+        if (ctx.hasUI && ctx.ui?.notify) ctx.ui.notify(t, l);
+      } catch {
+        /* stale ctx */
+      }
+    };
+    try {
+      for (const task of due) {
+        const { provider, model } = currentModel();
+        const budget = checkBudget(c.budget, `${provider}/${model}`);
+        if (!budget.allowed) {
+          notify(`autopilot: 跳过 ${task.name}（${budget.reason}）`, 'info');
+          continue;
+        }
+        const r = await runTaskOnce(task, process.cwd());
+        appendRun({
+          ts: new Date().toISOString(),
+          taskId: task.id,
+          taskName: task.name,
+          model,
+          provider,
+          result: r.result,
+          durationMs: r.durationMs,
+          outputLen: r.output.length,
+          estCost: estimateCost(provider, model, task.prompt.length, r.output.length),
+          errClass: r.result === 'failed' ? classifyError(r.stderr || r.output, r.exitCode) : null,
+        });
+        await updateTaskAfterRun(task.id, r.result, r.output, r.durationMs);
+        if (r.result === 'failed') {
+          const errClass = classifyError(r.stderr || r.output, r.exitCode);
+          const decision = decide(task, errClass, c.policy, c.fallbackModels, {
+            stderr: r.stderr || r.output,
+            exitCode: r.exitCode,
+            promptLen: task.prompt.length,
+            outputLen: r.output.length,
+            durationMs: r.durationMs,
+          });
+          notify(`autopilot 任务 ${task.name} 失败：${decision.note}`, 'warning');
+        } else {
+          notify(`autopilot 任务 ${task.name} 完成`, 'info');
+        }
+      }
+    } finally {
+      running = false;
+    }
+  };
+
+  registerHook(pi, {
+    event: 'session_start',
+    handler: async (_event, ctx) => {
+      if (tickTimer) clearInterval(tickTimer);
+      tickTimer = setInterval(() => void runDueTasks(ctx), 60000);
+      tickTimer.unref?.();
+      void runDueTasks(ctx);
+    },
+  });
+
+  registerHook(pi, {
+    event: 'session_shutdown',
+    handler: async () => {
+      if (tickTimer) clearInterval(tickTimer);
+      tickTimer = null;
     },
   });
 
