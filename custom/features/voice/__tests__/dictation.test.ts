@@ -2,8 +2,8 @@
  * voice dictation 状态机测试（注入 mock deps，无录音/网络依赖）
  */
 import { describe, it, expect } from 'vitest';
-import { createDictation } from '../dictation';
-import type { RecordingDeps } from '../dictation';
+import { createDictation } from '../audio/dictation';
+import type { RecordingDeps } from '../audio/dictation';
 import { loadConfig } from '../config';
 
 const cfg = { ...loadConfig({}, '/nonexistent/pi-voice.json'), maxSeconds: 0, platform: 'linux' as const };

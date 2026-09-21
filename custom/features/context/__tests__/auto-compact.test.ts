@@ -10,7 +10,7 @@ import {
   LARGE_WINDOW_RATIO,
   SMALL_WINDOW_RATIO,
   DEFAULT_COOLDOWN_MS,
-} from '../auto-compact';
+} from '../budget/auto-compact';
 
 describe('auto-compact: 阈值计算', () => {
   it('1M 大窗口 → 80% 触发', () => {

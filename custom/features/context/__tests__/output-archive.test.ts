@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { archiveOutput, archivedStub } from '../output-archive';
-import { pruneToolOutput } from '../budget';
+import { archiveOutput, archivedStub } from '../budget/output-archive';
+import { pruneToolOutput } from '../budget/budget';
 
 const tmp = mkdtempSync(join(tmpdir(), 'my-pi-archive-'));
 process.env.PI_OUTPUT_ARCHIVE_DIR = tmp;

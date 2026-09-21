@@ -3,10 +3,10 @@
  * 迁移自 pi-tools plan-mode/tests 的核心语义（状态机/选择器/序列化）。
  */
 import { describe, it, expect } from 'vitest';
-import { applyTaskMutation, EMPTY_STATE, isTransitionValid } from '../state';
-import { selectTasksByStatus, selectTodoCounts, selectVisibleTasks } from '../selectors';
-import { renderPlanFile, parsePlanFile, formatListLine } from '../view';
-import type { TaskState } from '../state';
+import { applyTaskMutation, EMPTY_STATE, isTransitionValid } from '../core/state';
+import { selectTasksByStatus, selectTodoCounts, selectVisibleTasks } from '../core/selectors';
+import { renderPlanFile, parsePlanFile, formatListLine } from '../ui/view';
+import type { TaskState } from '../core/state';
 
 function fresh(): TaskState {
   return { tasks: [...EMPTY_STATE.tasks], nextId: 1 };
@@ -104,7 +104,7 @@ describe('view: 序列化往返', () => {
 
 describe('selectOverlayLayout', () => {
   it('全量小于预算 → 全部可见', async () => {
-    const { selectOverlayLayout } = await import('../selectors');
+    const { selectOverlayLayout } = await import('../core/selectors');
     let s = fresh();
     s = applyTaskMutation(s, 'create', { subject: 'a' }).state;
     s = applyTaskMutation(s, 'create', { subject: 'b' }).state;
@@ -115,7 +115,7 @@ describe('selectOverlayLayout', () => {
   });
 
   it('超预算时优先保留非完成项并统计隐藏', async () => {
-    const { selectOverlayLayout } = await import('../selectors');
+    const { selectOverlayLayout } = await import('../core/selectors');
     let s = fresh();
     for (let i = 0; i < 6; i++) s = applyTaskMutation(s, 'create', { subject: `t${i}` }).state;
     // 完成 3 个
@@ -130,7 +130,7 @@ describe('selectOverlayLayout', () => {
 
 describe('plan-mode: 只读 bash 判定', () => {
   it('放行纯只读命令', async () => {
-    const { isReadonlyBashCommand } = await import('../readonly');
+    const { isReadonlyBashCommand } = await import('../core/readonly');
     expect(isReadonlyBashCommand('ls -la')).toBe(true);
     expect(isReadonlyBashCommand('git status')).toBe(true);
     expect(isReadonlyBashCommand('git -C /repo log --oneline -5')).toBe(true);
@@ -140,7 +140,7 @@ describe('plan-mode: 只读 bash 判定', () => {
   });
 
   it('拒绝命令串联与重定向', async () => {
-    const { isReadonlyBashCommand } = await import('../readonly');
+    const { isReadonlyBashCommand } = await import('../core/readonly');
     expect(isReadonlyBashCommand('ls; rm -rf /tmp/x')).toBe(false);
     expect(isReadonlyBashCommand('echo pwned > file')).toBe(false);
     expect(isReadonlyBashCommand('cat a | tee b')).toBe(false);
@@ -149,7 +149,7 @@ describe('plan-mode: 只读 bash 判定', () => {
   });
 
   it('拒绝可写标志与非白名单命令', async () => {
-    const { isReadonlyBashCommand } = await import('../readonly');
+    const { isReadonlyBashCommand } = await import('../core/readonly');
     expect(isReadonlyBashCommand('find . -delete')).toBe(false);
     expect(isReadonlyBashCommand('sort -o out.txt in.txt')).toBe(false);
     expect(isReadonlyBashCommand('date -s 2020-01-01')).toBe(false);

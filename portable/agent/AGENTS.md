@@ -14,14 +14,14 @@ vendor/pi/                 # 上游 Pi 代码（独立 clone，只读）
 custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
-scripts/                   # 4 个运维脚本
+scripts/                   # 10 个运维脚本
 patches/                   # 上游补丁
 ```
 
 ## 分层架构
 
 ```
-Layer 3 ─ 功能层 ───────────── custom/features/（12 个扩展，logic.ts 零 Pi 依赖）
+Layer 3 ─ 功能层 ───────────── custom/features/（12 个扩展，logic.ts 为纯逻辑出口；大功能按职责分子包）
     ↑
 Layer 2 ─ 适配器层 ─────────── custom/adapters/（唯一允许 import vendor/pi）
     ↑
@@ -30,7 +30,8 @@ Layer 1 ─ 服务层 ───────────── custom/core/（con
 Layer 0 ─ 基础层 ───────────── vendor/pi/（上游代码，永不修改）
 ```
 
-**依赖规则**：`features/*/logic.ts` 零 Pi 依赖；仅 `adapters/` 可 runtime import `vendor/pi`（`import type` 除外）。
+**依赖规则**：`features/` 的逻辑层（`index.ts` 与 `__tests__/` 除外）零 Pi 依赖；仅 `adapters/` 可 runtime import `vendor/pi`（`import type` 除外）。
+大功能的实现按职责分组（`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`），`logic.ts` 仅作 barrel。
 
 ## 关键配置
 

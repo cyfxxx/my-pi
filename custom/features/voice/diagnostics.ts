@@ -4,9 +4,9 @@
  */
 
 import type { VoiceConfig } from './config';
-import { resolvePlatform, recorderSpec, startRecording, stopRecording, waitForFileStable, fileExists, convertToWav, deleteAudioPair } from './recording';
+import { resolvePlatform, recorderSpec, startRecording, stopRecording, waitForFileStable, fileExists, convertToWav, deleteAudioPair } from './audio/recording';
 import { runCommand } from './types';
-import { transcribeByBackend } from './transcription';
+import { transcribeByBackend } from './stt/transcription';
 
 export function platformInstallGuide(cfg: VoiceConfig): string {
   const kind = resolvePlatform(cfg);

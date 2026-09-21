@@ -12,6 +12,66 @@ import { mkdir } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { isUrlAllowed } from '../../core/net-guard';
+import { getAgentDir, getMemoryDir } from '../../core/config';
+
+const SENSITIVE_SEGMENTS = [
+  '/.ssh/',
+  '/.gnupg/',
+  '/.aws/',
+  '/.kube/',
+  '/.config/gcloud/',
+  '/.config/gh/',
+  '/.docker/',
+  '/.password-store/',
+  '/.local/share/keyrings/',
+  '/.mozilla/',
+  '/.config/pi/',
+  '/.netrc',
+  '/.git-credentials',
+  '/.npmrc',
+  '/.pypirc',
+];
+
+const SENSITIVE_NAMES = [
+  '.env',
+  'auth.json',
+  'models-store.json',
+  'modes.json',
+  'keybindings.json',
+  'trust.json',
+  'credentials.json',
+  'tokens.json',
+  'id_rsa',
+  'id_ed25519',
+  'id_ecdsa',
+];
+
+const SENSITIVE_EXT_RE = /\.(pem|key|pfx|p12|kdbx)$/i;
+const SENSITIVE_SYS_RE = /^\/(proc|sys|dev)\//;
+const SENSITIVE_ETC = ['/etc/shadow', '/etc/gshadow', '/etc/sudoers'];
+
+/**
+ * 上传敏感路径判定（prompt 注入防护）：拒绝系统凭据/私钥目录、密钥文件，
+ * 以及 my-pi 运行时数据目录（含 auth.json / models 等）。
+ */
+export function isSensitiveUploadPath(realPath: string): boolean {
+  const p = realPath.replace(/\\/g, '/');
+  const lowered = p.toLowerCase();
+  const base = basename(p).toLowerCase();
+  if (SENSITIVE_SYS_RE.test(lowered) || SENSITIVE_ETC.some((s) => lowered.startsWith(s))) return true;
+  if (SENSITIVE_EXT_RE.test(lowered)) return true;
+  if (SENSITIVE_SEGMENTS.some((s) => lowered.includes(s))) return true;
+  if (SENSITIVE_NAMES.includes(base) || /^\.env(\.|$)/.test(base)) return true;
+  for (const dir of [getAgentDir(), getMemoryDir()]) {
+    try {
+      const rd = realpathSync(resolve(dir)).replace(/\\/g, '/').toLowerCase();
+      if (lowered === rd || lowered.startsWith(`${rd}/`)) return true;
+    } catch {
+      /* 目录不存在则跳过 */
+    }
+  }
+  return false;
+}
 
 export function shotDir(): string {
   return join(tmpdir(), `my-pi-browser-screenshots-${process.pid}`);
@@ -356,17 +416,11 @@ export class BrowserManager {
     } catch {
       /* 用原始路径 */
     }
-    const lowered = real.toLowerCase();
-    const SENSITIVE = [
-      '/.ssh/', '/.gnupg/', '/.aws/', '/.kube/', '/.config/gcloud/',
-      'auth.json', '.netrc', '.env', 'id_rsa', 'id_ed25519', 'id_ecdsa',
-      '.bash_history', '.zsh_history', '.sh_history', 'credentials.json', 'tokens.json',
-    ];
-    if (SENSITIVE.some((s) => lowered.includes(s)) || /\.(pem|key|pfx|p12|kdbx)$/.test(lowered)) {
+    if (isSensitiveUploadPath(real)) {
       throw new Error(`已拒绝上传疑似敏感凭据文件（prompt 注入防护）：${path} (已解析: ${real})`);
     }
     const page = await this.ensurePage();
-    await page.setInputFiles(selector, path);
+    await page.setInputFiles(selector, real);
   }
   async getCookies(url?: string): Promise<{ name: string; value: string; domain: string }[]> {
     const page = await this.ensurePage();

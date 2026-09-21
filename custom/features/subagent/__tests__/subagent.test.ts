@@ -3,7 +3,7 @@
  * 迁移自 pi-tools subagent/tests 的核心语义（frontmatter/agents/helpers/concurrency）。
  */
 import { describe, it, expect } from 'vitest';
-import { parseFrontmatter, discoverAgents } from '../agents';
+import { parseFrontmatter, discoverAgents } from '../core/agents';
 import {
   classifyTaskRisk,
   resolveAgentTools,
@@ -17,8 +17,8 @@ import {
   getFinalOutput,
   isFailedResult,
   getMaxParallelTasks,
-} from '../helpers';
-import type { SingleResult } from '../types';
+} from '../core/helpers';
+import type { SingleResult } from '../core/types';
 
 describe('parseFrontmatter', () => {
   it('解析 name/description/tools/readonly', () => {

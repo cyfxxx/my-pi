@@ -25,10 +25,10 @@ import {
   estimateTokens,
   getBudgetReport,
   pruneToolOutput,
-} from './budget';
-import { pruneToolResults } from './prune';
-import type { PruneMessage } from './prune';
-import { makeCompactDecider, makeAutoContinueGate } from './auto-compact';
+} from './budget/budget';
+import { pruneToolResults } from './budget/prune';
+import type { PruneMessage } from './budget/prune';
+import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
 import { appendUsage, readUsage, summarizeUsage, formatUsageSummary } from './usage-stats';
 
 export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE };

@@ -541,3 +541,17 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - **边界**：autopilot 超时保留退出码 124；subagent single 模式 agent 可选 + 本地 provider 并发限制生效；web-search 重试释放响应体/取消即停/max_results 校验/未配置 SEARXNG 明确提示；tmux `readOutput` fd 用 finally 关闭并改按字符截断；link `extractFinalReply` 兼容字符串 content；mode 配置运行时归一化。
 - **脚本**：patch-playwright 不再无条件返回 0；build.sh 不再吞补丁输出；sync-upstream 失败/冲突时恢复 stash 且仅在全部就绪后写同步点。
 - 验证：`npm run golden` 七项全绿，单测 208 → 228 用例。
+
+## 未处理项清理 + 目录结构化（第 26 批）
+- 完成时间：2026-09-21（自主优化）
+- **死代码**：删除 `custom/core/note-store.ts`（与 `features/memory/store/storage.ts` 重复且无人引用）及其测试，并移除 `core/index.ts` 中的相关导出。
+- **voice**：`voice_transcribe` 写入的临时 wav 改为 finally 清理；TTS 合成真正遵循 `ttsEngine`（auto 在模型存在时用 piper、否则 espeak；显式 piper 失败如实报错），删除废弃的 `writeTtsInput`；新增 `selectTtsEngine` 测试。
+- **browser**：上传敏感路径判定抽为纯函数 `isSensitiveUploadPath`，新增 `/proc`、`/etc/shadow`、`.npmrc`、`.docker`、`.config/gh`、agentDir/memoryDir 整体拒绝等规则，并按 realpath 传给 `setInputFiles`（防符号链接 TOCTOU）。
+- **link**：状态锁写入 pid+时间戳，仅在持锁者死亡或超时后抢占，超时不再误删他人有效锁。
+- **autopilot**：后台任务运行期置 `setBackgroundBusy`（不再被看门狗误判挂死）；`appendRun` 改为 await（消除预算竞态）；`bestOfN` 超时定时器在候选先完成时清理。
+- **memory**：`accessTouched` 集合按存活条目剪枝，避免无界增长。
+- **目录结构**：大功能按职责加一层子包，`logic.ts` 统一作 barrel（小功能保持扁平）：
+  `memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`；跨功能引用改走对方 `logic.ts`。
+- **文档/守门**：更新 `STRUCTURE.md`、`custom/README.md`、两个 `AGENTS.md`；`CHECK_REPORT.md` 移入 `docs/development/`；隔离脚本第 3 项改为按整个 features 树校验逻辑层。
+- **autopilot 数据**：配置/状态迁至 `portable/agent/autopilot/{config,state}.json`，读取保留旧路径回退（平滑迁移）。
+- 验证：`npm run golden` 七项全绿；单测 228 → 231（删除 note-store 测试、新增 voice/browser/link 用例）。

@@ -95,13 +95,15 @@ export function register(pi: ExtensionAPI): void {
       const wavPath = join(cfg.tmpDir, `stt-${Date.now()}-${process.pid}.wav`);
       try {
         writeFileSync(wavPath, Buffer.from(args.audio as string, 'base64'));
+        const useCfg = args.language ? { ...cfg, language: args.language as string } : cfg;
+        const r = await transcribeByBackend(useCfg, wavPath);
+        if (r.error) return `转写失败: ${r.error}`;
+        return r.text || '(未识别到语音)';
       } catch (e) {
-        return `写入音频失败: ${(e as Error).message}`;
+        return `转写失败: ${(e as Error).message}`;
+      } finally {
+        deleteAudioPair(cfg, wavPath);
       }
-      const useCfg = args.language ? { ...cfg, language: args.language as string } : cfg;
-      const r = await transcribeByBackend(useCfg, wavPath);
-      if (r.error) return `转写失败: ${r.error}`;
-      return r.text || '(未识别到语音)';
     },
   });
 

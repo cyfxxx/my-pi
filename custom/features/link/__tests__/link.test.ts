@@ -24,7 +24,9 @@ import {
   appendOutbox,
   readOutbox,
   OUTBOX_MAX,
+  withStateLock,
 } from '../logic';
+import { existsSync, readFileSync } from 'node:fs';
 import { wrapTaskMessage, extractReply, shellSingleQuote, buildRemoteCommand } from '../link';
 import type { DeviceConfig } from '../logic';
 
@@ -170,6 +172,39 @@ describe('link.ts 纯函数', () => {
     expect(cmd).not.toContain('--no-extensions');
     expect(cmd).not.toContain('PI_LINK_LAST_SESSION');
   });
+});
+
+describe('withStateLock', () => {
+  it('正常加锁执行并释放', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-lock-'));
+    const file = join(dir, 'state.json');
+    const r = withStateLock(file, () => 42);
+    expect(r).toBe(42);
+    expect(existsSync(`${file}.lock`)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('过期锁（时间戳超时）可被抢占', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-lock-'));
+    const file = join(dir, 'state.json');
+    writeFileSync(`${file}.lock`, JSON.stringify({ pid: process.pid, ts: Date.now() - 60_000 }));
+    const r = withStateLock(file, () => 'ok');
+    expect(r).toBe('ok');
+    expect(existsSync(`${file}.lock`)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('他人持有的“活锁”超时后不被删除，仅降级无锁执行', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-lock-'));
+    const file = join(dir, 'state.json');
+    writeFileSync(`${file}.lock`, JSON.stringify({ pid: process.pid, ts: Date.now() }));
+    const r = withStateLock(file, () => 'ran');
+    expect(r).toBe('ran');
+    // 未持有锁：不得删除他人锁文件
+    expect(existsSync(`${file}.lock`)).toBe(true);
+    expect(JSON.parse(readFileSync(`${file}.lock`, 'utf-8')).pid).toBe(process.pid);
+    rmSync(dir, { recursive: true, force: true });
+  }, 10000);
 });
 
 describe('link: extractFinalReply 兼容 string 与 blocks', () => {

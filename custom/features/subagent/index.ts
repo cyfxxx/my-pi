@@ -25,7 +25,7 @@ import {
   getResultOutput,
 } from './logic';
 import type { AgentConfig, AgentScope, SingleResult, SubagentDetails, SubagentToolParams } from './logic';
-import { renderSingleResult, renderChainResult, renderParallelResult } from './rendering';
+import { renderSingleResult, renderChainResult, renderParallelResult } from './ui/rendering';
 import { Text } from '../../adapters/ui-adapter';
 import { taskPreview, agentLabel } from './logic';
 import { readFileSync } from 'node:fs';

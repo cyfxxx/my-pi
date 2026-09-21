@@ -30,7 +30,7 @@
 ### 三隔离一收敛
 
 - **上游隔离**：`vendor/pi/` 是独立 git clone（上游 `earendil-works/pi-mono`），永不直接修改，改动经 `patches/` 管理；上游更新通过 `scripts/sync-upstream.sh` 合并
-- **逻辑隔离**：`custom/features/*/logic.ts` 零 Pi 依赖，纯逻辑永远不会因上游变更而崩溃
+- **逻辑隔离**：`custom/features/` 的逻辑层（`index.ts` 与 `__tests__/` 除外）零 Pi 依赖，纯逻辑永远不会因上游变更而崩溃
 - **接口隔离**：`custom/adapters/` 是唯一的 Pi API 接触点，上游 API 变更只需修改适配器
 - **数据收敛**：所有运行时数据通过环境变量重定向收敛到 `portable/` 目录（无符号链接）
 
@@ -47,10 +47,12 @@
 ### 添加新功能
 
 1. 在 `custom/features/` 下创建新目录
-2. 创建 `logic.ts` - 纯逻辑（零 Pi 依赖）
-3. 创建 `types.ts` - 类型定义（可选）
-4. 创建 `index.ts` - 入口，通过 `custom/adapters/` 注册工具/钩子
-5. 在 `custom/bootstrap.ts` 中注册该功能
+2. 创建 `logic.ts` - 纯逻辑出口（零 Pi 依赖）；小功能直接放实现，大功能作 barrel
+3. 创建 `index.ts` - 入口，通过 `custom/adapters/` 注册工具/钩子
+4. `types.ts` - 类型定义（可选）
+5. 模块较多时在功能目录下按职责建一层子包（如 `store/`、`recall/`、`ui/`），
+   子包内互引用用相对路径；跨功能引用只走对方 `logic.ts`
+6. 在 `custom/bootstrap.ts` 中注册该功能
 
 ### vendor 引导与上游同步
 

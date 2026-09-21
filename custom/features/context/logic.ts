@@ -113,5 +113,5 @@ export const LOW_PRESSURE_DELEGATION = '低压力委派：将简单任务委派�
 export const FULL_DELEGATION_ADVICE = '完全委派建议：对于重复性任务，考虑使用自动化脚本。';
 
 // ── 迁移自 pi-tools 的 token 预算模块（纯逻辑） ──
-export * from './budget';
-export * from './output-archive';
+export * from './budget/budget';
+export * from './budget/output-archive';

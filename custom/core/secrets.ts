@@ -1,7 +1,7 @@
 /**
  * secrets.ts — 密钥/敏感信息脱敏工具
  *
- * 迁移自 pi-tools core/secrets.ts，供 note-store、memory 等模块共用。
+ * 迁移自 pi-tools core/secrets.ts，供 memory、context 等模块共用。
  * 纯逻辑，零 Pi 依赖。
  */
 

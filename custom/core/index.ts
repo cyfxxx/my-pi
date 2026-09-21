@@ -23,14 +23,3 @@ export {
 export { scrubSecrets, SECRET_PATTERNS } from './secrets'
 export { writeJSONSync, writeTextSync, writeJSONAtomic } from './atomic-write'
 export { isBlockedHost, isUrlAllowed } from './net-guard'
-export {
-  dataDir,
-  notesFile,
-  checkpointsDir,
-  ensureDir,
-  loadNotes,
-  saveNotes,
-  updateNotes,
-  clearCompactionFlag,
-  getTotalSize,
-} from './note-store'

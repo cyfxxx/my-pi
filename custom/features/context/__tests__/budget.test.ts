@@ -12,15 +12,15 @@ import {
   getOutputReport,
   resetOutputBudget,
   resetAllBudgets,
-} from '../budget';
+} from '../budget/budget';
 
 describe('context-budget: 跨实例共享（jiti 隔离修复）', () => {
   beforeEach(() => resetAllBudgets());
 
   it('独立模块实例读写同一份状态', async () => {
-    const modA = await import('../budget');
+    const modA = await import('../budget/budget');
     vi.resetModules();
-    const modB = await import('../budget');
+    const modB = await import('../budget/budget');
 
     modA.setContextWindow(64_000);
     modA.recordToolUsage('bash', 1000);
@@ -31,9 +31,9 @@ describe('context-budget: 跨实例共享（jiti 隔离修复）', () => {
   });
 
   it('输出预算跨实例累计与重置', async () => {
-    const modA = await import('../budget');
+    const modA = await import('../budget/budget');
     vi.resetModules();
-    const modB = await import('../budget');
+    const modB = await import('../budget/budget');
 
     modA.recordOutput('bash', 1000);
     modB.recordOutput('read', 500);
@@ -156,7 +156,7 @@ describe('context-budget: 真实校准与输出累计', () => {
   });
 
   it('pruneToolOutput 将放行输出计入累计预算', async () => {
-    const { pruneToolOutput } = await import('../budget');
+    const { pruneToolOutput } = await import('../budget/budget');
     expect(getOutputReport()).toBe('');
     pruneToolOutput('hello world', 'bash');
     const report = getOutputReport();

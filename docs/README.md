@@ -28,6 +28,7 @@
 | [development/PI-EXT-DEV-NOTES.md](development/PI-EXT-DEV-NOTES.md) | pi 扩展开发实测经验：保留键、参数补全语义、UI API、缓存友好约定、黑盒开发流程 |
 | [development/PI-SDK-EXTENSION.md](development/PI-SDK-EXTENSION.md) | pi SDK 深度定制方案：纯函数增强、工具工厂、类型突破、命令上下文、自定义 Provider |
 | [development/SKILLS-MAINTENANCE.md](development/SKILLS-MAINTENANCE.md) | 技能使用后改进机制：偏差记录、合并节奏、packs 外部包处理 |
+| [development/CHECK-REPORT.md](development/CHECK-REPORT.md) | 历史功能/脚本检查报告（迁移波次补漏记录，供追溯） |
 
 ### 运维
 

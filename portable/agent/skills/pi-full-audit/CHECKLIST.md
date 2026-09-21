@@ -24,7 +24,7 @@
 - 文件句柄/网络连接/子进程是否关闭（try/finally）
 - 超时设置：外部调用（浏览器、网络搜索、语音）是否有超时，超时后行为是否正确
 - 大循环/递归深度：是否存在内存或 CPU 风险
-- 工具输出是否过大：超量输出应经 `custom/features/context/output-archive.ts` 归档为占位符
+- 工具输出是否过大：超量输出应经 `custom/features/context/budget/output-archive.ts` 归档为占位符
 
 ### 4. 并发与状态
 

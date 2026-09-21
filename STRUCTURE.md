@@ -43,8 +43,11 @@ for p in patches/*.patch; do git -C vendor/pi apply --3way "$p"; done
 my-pi 的自定义代码。三层结构：
 
 - `adapters/`：唯一允许 runtime import `vendor/pi/` 的地方（`import type` 除外）
-- `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`、`note-store.ts`（笔记持久化）
-- `features/`：每个功能包含 `logic.ts`（纯逻辑，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）；`context/` 含 token 预算模块，`__tests__/` 为 vitest 单测
+- `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`（原子写）、`net-guard.ts`（SSRF 防护）
+- `features/`：每个功能必须包含 `logic.ts`（纯逻辑出口/barrel，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）；`__tests__/` 为 vitest 单测
+  - 小功能直接把模块铺在功能根目录（如 `web-search/logic.ts`、`browser/impl.ts`）
+  - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`
+  - 子包内互引用用相对路径；跨功能引用只走对方 `logic.ts`
 - `bootstrap.ts`：入口，组装所有功能
 - 另有 `package.json`、`tsconfig.json`（工作区与编译配置），`dist/`（构建产物，gitignored）
 

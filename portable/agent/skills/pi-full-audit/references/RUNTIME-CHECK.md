@@ -21,7 +21,7 @@
    - 固定文案仅在 `high`/`critical` 注入（`getTokenPressureTag()`/`getUrgencyHint()`）：文案固定、无时间戳/精确数值，保证 system prompt 字节级稳定 → 缓存前缀稳定
    - 异常判据：压力长期停在 `critical`（压缩未触发或预算被低估）；tool 用量榜单一两个工具长期霸榜 → 对应工具输出未收敛
 
-3. **工具输出归档**（`custom/features/context/output-archive.ts`）
+3. **工具输出归档**（`custom/features/context/budget/output-archive.ts`）
    - 归档目录：`portable/memory/tool-outputs/`（`PI_OUTPUT_ARCHIVE_DIR` 可覆盖），路径 = `<前2hex>/<sha256(原文)前16hex>-<字符数>.txt`，内容相同即同路径（幂等、缓存友好）
    - 检查：目录体积与文件数是否异常增长；占位符中的归档路径是否真实可读回（`read` 抽查 1-2 个）
    - 异常判据：归档目录体积远超会话体积、存在大量重复内容（说明调用方未走归档路径）

@@ -3,10 +3,10 @@
  * 覆盖 TTS 文本清洗/调度、配置解析、服务确保（注入 deps，无网络/录音）。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { cleanForSpeech, isSpeechWorthy, createTtsDispatcher, extractAssistantText } from '../tts';
+import { cleanForSpeech, isSpeechWorthy, createTtsDispatcher, extractAssistantText, selectTtsEngine } from '../tts/tts';
 import { loadConfig } from '../config';
-import { ensureWhisperService } from '../transcription';
-import { recorderSpec, convertToWav, deleteAudioPair, fileExists, waitForFileStable, cleanupStaleAudio } from '../recording';
+import { ensureWhisperService } from '../stt/transcription';
+import { recorderSpec, convertToWav, deleteAudioPair, fileExists, waitForFileStable, cleanupStaleAudio } from '../audio/recording';
 import { mkdtempSync, rmSync, writeFileSync, utimesSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,6 +34,23 @@ describe('isSpeechWorthy', () => {
     expect(isSpeechWorthy('[1,2]')).toBe(false);
     expect(isSpeechWorthy('***---')).toBe(false);
     expect(isSpeechWorthy('这是一段正常的话')).toBe(true);
+  });
+});
+
+describe('selectTtsEngine', () => {
+  const base = loadConfig({}, '/nonexistent/pi-voice.json');
+  it('显式指定优先', () => {
+    expect(selectTtsEngine({ ...base, ttsEngine: 'espeak' })).toBe('espeak');
+    expect(selectTtsEngine({ ...base, ttsEngine: 'piper' })).toBe('piper');
+  });
+
+  it('auto：模型不存在回退 espeak，存在则 piper', () => {
+    expect(selectTtsEngine({ ...base, ttsEngine: 'auto', linuxPiperModel: '/nonexistent/m.onnx' })).toBe('espeak');
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-voice-'));
+    const model = join(dir, 'm.onnx');
+    writeFileSync(model, 'x');
+    expect(selectTtsEngine({ ...base, ttsEngine: 'auto', linuxPiperModel: model })).toBe('piper');
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 
@@ -204,12 +221,12 @@ describe('diagnostics / wake', () => {
   });
 
   it('createWakeSession 非 linux 抛错', async () => {
-    const { createWakeSession } = await import('../wake');
+    const { createWakeSession } = await import('../audio/wake');
     expect(() => createWakeSession({ ...base, platform: 'termux' } as never, { onHit: () => {}, onStatus: () => {} })).toThrow('仅支持 Linux');
   });
 
   it('windows recorder spec 使用 ffmpeg dshow', async () => {
-    const { recorderSpec } = await import('../recording');
+    const { recorderSpec } = await import('../audio/recording');
     const spec = recorderSpec({ ...base, platform: 'windows', micDevice: '麦克风' } as never);
     expect(spec.bin).toBe('ffmpeg');
     expect(spec.ext).toBe('wav');

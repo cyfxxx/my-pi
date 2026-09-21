@@ -38,14 +38,18 @@ else
     ERRORS=$((ERRORS + 1))
 fi
 
-# 检查 3: features/*/logic.ts 不得 import Pi 包
+# 检查 3: features 逻辑层（index.ts 与 __tests__/ 除外）不得 import Pi 包
 # 注意：真实 import 走包名 @earendil-works/*，而非路径 vendor/pi；必须按包名校验。
+# logic.ts 现为 barrel，实现下沉到子包，故按整个 features 树校验。
 PI_RE="from ['\"]@(earendil-works|mariozechner)/"
-if grep -rE "${PI_RE}" "$ROOT/custom/features"/*/logic.ts 2>/dev/null; then
-    echo "❌ logic.ts 中 import 了 Pi 包"
+LOGIC_HITS=$(grep -rlE "${PI_RE}" "$ROOT/custom/features" --include="*.ts" 2>/dev/null \
+    | grep -v "/__tests__/" | grep -v "/index\.ts$" || true)
+if [ -n "$LOGIC_HITS" ]; then
+    echo "❌ features 逻辑层中 import 了 Pi 包："
+    echo "$LOGIC_HITS"
     ERRORS=$((ERRORS + 1))
 else
-    echo "✅ logic.ts 无 Pi 包依赖"
+    echo "✅ features 逻辑层无 Pi 包依赖"
 fi
 
 # 检查 4: adapters/ 之外不得 runtime import Pi 包（import type 编译后擦除，允许）

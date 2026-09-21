@@ -44,13 +44,14 @@ import {
   estimateCost,
   touchActivity,
   setTurnBusy,
+  setBackgroundBusy,
   isHanging,
   resetWatchdogState,
   collectMetrics,
   formatMetrics,
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
-import { runTaskOnce } from './runner';
+import { runTaskOnce } from './run/runner';
 
 function fmtTask(t: Task): string {
   const flag = t.enabled ? '●' : '○';
@@ -359,6 +360,7 @@ export function register(pi: ExtensionAPI): void {
     const due = listTasks().filter((t) => t.enabled && isDue(t));
     if (due.length === 0) return;
     running = true;
+    setBackgroundBusy(true);
     const notify = (t: string, l: 'info' | 'warning' | 'error'): void => {
       try {
         if (ctx.hasUI && ctx.ui?.notify) ctx.ui.notify(t, l);
@@ -375,7 +377,7 @@ export function register(pi: ExtensionAPI): void {
           continue;
         }
         const r = await runTaskOnce(task, process.cwd());
-        appendRun({
+        await appendRun({
           ts: new Date().toISOString(),
           taskId: task.id,
           taskName: task.name,
@@ -404,6 +406,7 @@ export function register(pi: ExtensionAPI): void {
       }
     } finally {
       running = false;
+      setBackgroundBusy(false);
     }
   };
 

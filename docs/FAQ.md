@@ -183,7 +183,7 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 ### Q: 如何提高响应速度？
 
 1. 使用 `pi /compact` 压缩上下文
-2. 检查上下文预算与工具输出占用：`custom/features/context/budget.ts` 的预算报告
+2. 检查上下文预算与工具输出占用：`custom/features/context/budget/budget.ts` 的预算报告
 3. 优化工具输出：调整 `custom/features/context/` 的归档与裁剪阈值
    （归档落在 `portable/memory/tool-outputs/`）
 

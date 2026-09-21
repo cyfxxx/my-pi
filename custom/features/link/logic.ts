@@ -18,6 +18,7 @@ import {
   openSync,
   closeSync,
   unlinkSync,
+  statSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { getAgentDir } from '../../core/config';
@@ -404,8 +405,9 @@ export interface LocalState {
   updatedAt: number;
 }
 
-const LOCK_TIMEOUT_MS = 500;
-const LOCK_POLL_MS = 5;
+const LOCK_TIMEOUT_MS = 2000;
+const LOCK_STALE_MS = 15000;
+const LOCK_POLL_MS = 10;
 
 function sleepSync(ms: number): void {
   try {
@@ -418,32 +420,58 @@ function sleepSync(ms: number): void {
   }
 }
 
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    // EPERM 表示进程存在但无权限；ESRCH 表示已退出
+    return (e as NodeJS.ErrnoException)?.code === 'EPERM';
+  }
+}
+
+/** 锁是否可安全抢占：持有者进程已退出，或持锁时间超过 LOCK_STALE_MS。 */
+function lockIsStale(lockPath: string): boolean {
+  try {
+    const raw = JSON.parse(readFileSync(lockPath, 'utf-8')) as { pid?: number; ts?: number };
+    if (typeof raw.pid === 'number' && !pidAlive(raw.pid)) return true;
+    if (typeof raw.ts === 'number' && Date.now() - raw.ts > LOCK_STALE_MS) return true;
+    return false;
+  } catch {
+    // 内容损坏或正在写入：退化为按文件 mtime 判定
+    try {
+      return Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/** 写锁：锁文件记录 pid+时间戳，仅在持锁者死亡或超时后抢占，避免误删他人锁。 */
 export function withStateLock<T>(file: string, fn: () => T): T {
   const lockPath = `${file}.lock`;
   const start = Date.now();
   let fd: number | null = null;
-  let owned = false;
   for (;;) {
     try {
       fd = openSync(lockPath, 'wx');
-      owned = true;
+      try {
+        writeFileSync(fd, JSON.stringify({ pid: process.pid, ts: Date.now(), host: hostname() }));
+      } catch {
+        /* 元数据写失败不阻断持锁 */
+      }
       break;
     } catch (e) {
-      if ((e as NodeJS.ErrnoException)?.code !== 'EEXIST') break;
-      if (Date.now() - start >= LOCK_TIMEOUT_MS) {
+      if ((e as NodeJS.ErrnoException)?.code !== 'EEXIST') break; // 非竞争失败：不加锁直接执行
+      if (lockIsStale(lockPath)) {
         try {
           unlinkSync(lockPath);
         } catch {
-          /* ignore */
+          /* 已被他人抢占 */
         }
-        try {
-          fd = openSync(lockPath, 'wx');
-          owned = true;
-        } catch {
-          /* ignore */
-        }
-        break;
+        continue;
       }
+      if (Date.now() - start >= LOCK_TIMEOUT_MS) break; // 超时：不删他人有效锁，降级为无锁写
       sleepSync(LOCK_POLL_MS);
     }
   }
@@ -456,8 +484,6 @@ export function withStateLock<T>(file: string, fn: () => T): T {
       } catch {
         /* ignore */
       }
-    }
-    if (owned) {
       try {
         unlinkSync(lockPath);
       } catch {

@@ -14,8 +14,8 @@ import {
   PRUNE_PROTECT_TOKENS,
   PRUNE_MINIMUM_TOKENS,
   KEEP_RECENT_TURNS,
-} from '../prune';
-import type { PruneMessage } from '../prune';
+} from '../budget/prune';
+import type { PruneMessage } from '../budget/prune';
 
 function toolResult(text: string): PruneMessage {
   return { role: 'toolResult', content: [{ type: 'text', text }] };

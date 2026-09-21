@@ -33,7 +33,7 @@ import {
   isReadonlyBashCommand,
 } from './logic';
 import type { TaskAction, TaskMutationParams, Op, TaskState, Task } from './logic';
-import { TodoOverlay } from './overlay';
+import { TodoOverlay } from './ui/overlay';
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '待办',

@@ -15,11 +15,11 @@ import {
   computeContentHash,
   tokenize,
   jaccardSimilarity,
-} from '../storage';
-import type { MemoryEntry } from '../types';
-import { searchEntriesWithScores, visibleAt, qualityScore } from '../retrieval';
-import { detectContradiction, decideMerge } from '../merge';
-import { buildInjectionBlock, filterInjectedMessages, INJECT_TAG } from '../inject';
+} from '../store/storage';
+import type { MemoryEntry } from '../store/types';
+import { searchEntriesWithScores, visibleAt, qualityScore } from '../recall/retrieval';
+import { detectContradiction, decideMerge } from '../store/merge';
+import { buildInjectionBlock, filterInjectedMessages, INJECT_TAG } from '../recall/inject';
 
 function entry(over: Partial<MemoryEntry> = {}): MemoryEntry {
   const now = new Date().toISOString();
@@ -184,7 +184,7 @@ describe('inject: 注入块', () => {
 
 describe('lifecycle 生命周期报告', () => {
   it('识别淘汰/升格/冲突候选', async () => {
-    const { analyzeLifecycle } = await import('../lifecycle');
+    const { analyzeLifecycle } = await import('../mine/lifecycle');
     const now = Date.now();
     const old = new Date(now - 200 * 24 * 3600_000).toISOString();
     const entries: MemoryEntry[] = [
@@ -202,7 +202,7 @@ describe('lifecycle 生命周期报告', () => {
   });
 
   it('formatLifecycleReport 含四段', async () => {
-    const { analyzeLifecycle, formatLifecycleReport } = await import('../lifecycle');
+    const { analyzeLifecycle, formatLifecycleReport } = await import('../mine/lifecycle');
     const text = formatLifecycleReport(analyzeLifecycle([]));
     expect(text).toContain('淘汰候选');
     expect(text).toContain('升格候选');
@@ -213,7 +213,7 @@ describe('lifecycle 生命周期报告', () => {
 
 describe('lesson-miner 教训挖掘', () => {
   it('mineLessons 跳过无纠正、按既有内容哈希去重', async () => {
-    const { mineLessons, candidateToEntry, formatLessonReport } = await import('../lesson-miner');
+    const { mineLessons, candidateToEntry, formatLessonReport } = await import('../mine/lesson-miner');
     const records = [
       { id: 'a', prompt: '实现登录', correctivePrompt: '不要用 session，用 JWT' },
       { id: 'b', prompt: '无纠正', correctivePrompt: null },
@@ -231,7 +231,7 @@ describe('lesson-miner 教训挖掘', () => {
   });
 
   it('readInterventionRecords 读取 JSONL', async () => {
-    const { readInterventionRecords } = await import('../lesson-miner');
+    const { readInterventionRecords } = await import('../mine/lesson-miner');
     const { writeFileSync } = await import('node:fs');
     const file = join(dir, 'interventions.jsonl');
     writeFileSync(file, JSON.stringify({ id: 'x', correctivePrompt: '改用 pg' }) + '\nnot-json\n');
@@ -243,7 +243,7 @@ describe('lesson-miner 教训挖掘', () => {
 
 describe('memory: 会话摘要（summary.ts）', () => {
   it('buildSummaryEntry 抽取决策/事实/偏好/教训并保留全文', async () => {
-    const { buildSummaryEntry } = await import('../summary');
+    const { buildSummaryEntry } = await import('../store/summary');
     const text = [
       '# 会话摘要',
       '决策: 采用 JWT 鉴权',
@@ -262,8 +262,8 @@ describe('memory: 会话摘要（summary.ts）', () => {
   });
 
   it('appendSummary 按 sessionId 去重且 loadSummaries 可读回', async () => {
-    const { appendSummary, loadSummaries } = await import('../storage');
-    const { buildSummaryEntry } = await import('../summary');
+    const { appendSummary, loadSummaries } = await import('../store/storage');
+    const { buildSummaryEntry } = await import('../store/summary');
     appendSummary(buildSummaryEntry({ sessionId: 's1', text: '决策: A' }));
     appendSummary(buildSummaryEntry({ sessionId: 's1', text: '决策: B' }));
     const all = loadSummaries();
@@ -273,7 +273,7 @@ describe('memory: 会话摘要（summary.ts）', () => {
 
   it('loadSummaries 对缺失字段的损坏数据不抛异常', async () => {
     const { writeFileSync } = await import('node:fs');
-    const { loadSummaries, getStats } = await import('../storage');
+    const { loadSummaries, getStats } = await import('../store/storage');
     writeFileSync(join(dir, 'summaries.json'), JSON.stringify({ version: 1, summaries: [{ id: 'x', title: 't' }] }));
     expect(() => loadSummaries()).not.toThrow();
     expect(() => getStats([])).not.toThrow();
@@ -283,7 +283,7 @@ describe('memory: 会话摘要（summary.ts）', () => {
 describe('memory: purgeExpiredNotes 真正落盘', () => {
   it('删除过期 TTL 笔记，保留未到期与非法 TTL', async () => {
     const { writeFileSync, readFileSync } = await import('node:fs');
-    const { purgeExpiredNotes } = await import('../storage');
+    const { purgeExpiredNotes } = await import('../store/storage');
     const past = new Date(Date.now() - 60_000).toISOString();
     const future = new Date(Date.now() + 60_000).toISOString();
     writeFileSync(
@@ -301,7 +301,7 @@ describe('memory: purgeExpiredNotes 真正落盘', () => {
 
 describe('memory: merge 写入 contentHash', () => {
   it('mergeCandidates ADD 后带 contentHash，可被哈希去重', async () => {
-    const { mergeCandidates } = await import('../merge');
+    const { mergeCandidates } = await import('../store/merge');
     const entries: MemoryEntry[] = [];
     const c = entry({ title: 'M', content: '独特内容-unique-token' });
     await mergeCandidates(entries, [c]);

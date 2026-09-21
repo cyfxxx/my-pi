@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadConfig } from '../config';
-import { BrowserManager, shotDir, pdfDir, downloadsDirDefault } from '../impl';
+import { BrowserManager, shotDir, pdfDir, downloadsDirDefault, isSensitiveUploadPath } from '../impl';
 
 describe('config', () => {
   const saved: Record<string, string | undefined> = {};
@@ -66,5 +66,16 @@ describe('upload 敏感凭据拒绝（无需启动浏览器）', () => {
     const b = new BrowserManager({ headless: true, viewport_width: 800, viewport_height: 600 });
     await expect(b.uploadFile('input[type=file]', '/root/.ssh/id_rsa')).rejects.toThrow('敏感凭据');
     await expect(b.uploadFile('input[type=file]', '/tmp/server.pem')).rejects.toThrow('敏感凭据');
+  });
+
+  it('isSensitiveUploadPath 覆盖新增绕过向量', () => {
+    expect(isSensitiveUploadPath('/proc/self/environ')).toBe(true);
+    expect(isSensitiveUploadPath('/etc/shadow')).toBe(true);
+    expect(isSensitiveUploadPath('/home/u/.npmrc')).toBe(true);
+    expect(isSensitiveUploadPath('/home/u/.docker/config.json')).toBe(true);
+    expect(isSensitiveUploadPath('/home/u/.config/gh/hosts.yml')).toBe(true);
+    expect(isSensitiveUploadPath('/home/u/authorized_keys')).toBe(false);
+    expect(isSensitiveUploadPath('/home/u/authorized_keys.pub')).toBe(false);
+    expect(isSensitiveUploadPath('/tmp/photo.png')).toBe(false);
   });
 });
