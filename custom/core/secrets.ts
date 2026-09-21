@@ -23,8 +23,8 @@ export const SECRET_PATTERNS: Array<[RegExp, string]> = [
     /\b-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]+PRIVATE KEY-----\b/g,
     '[REDACTED:private-key]',
   ],
-  // 密码/令牌键值形态
-  [/\b(password|passwd|secret|api[_-]?key|token|access[_-]?key)\s*[=:]\s*['"]?[^\s'",;\x5b]{8,}/gi, '$1=[REDACTED]'],
+  // 密码/令牌键值形态（保留原分隔符与空白，避免改写被持久化内容）
+  [/\b(password|passwd|secret|api[_-]?key|token|access[_-]?key)(\s*[=:]\s*)['"]?[^\s'",;]{8,}/gi, '$1$2[REDACTED]'],
   // JSON 序列化形态
   [
     /("(?:password|passwd|secret|api[_-]?key|token|access[_-]?key)"\s*:\s*")(?!\[REDACTED)([^"]{8,})(")/gi,

@@ -28,10 +28,23 @@ import type { AgentConfig, AgentScope, SingleResult, SubagentDetails, SubagentTo
 import { renderSingleResult, renderChainResult, renderParallelResult } from './rendering';
 import { Text } from '../../adapters/ui-adapter';
 import { taskPreview, agentLabel } from './logic';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { getAgentDir } from '../../core/config';
 
 interface ThemeLike {
   fg: (color: string, text: string) => string;
   bold: (text: string) => string;
+}
+
+/** 读取 settings.json 的 defaultProvider 判断当前是否本地推理（决定并发上限） */
+function currentProviderIsLocal(): boolean {
+  try {
+    const raw = JSON.parse(readFileSync(join(getAgentDir(), 'settings.json'), 'utf-8')) as { defaultProvider?: string };
+    return isLocalProvider(raw.defaultProvider);
+  } catch {
+    return false;
+  }
 }
 
 export function register(pi: ExtensionAPI): void {
@@ -90,7 +103,7 @@ export function register(pi: ExtensionAPI): void {
         if (params.tasks.length > getMaxParallelTasks()) {
           return `Too many parallel tasks (${params.tasks.length}). Max is ${getMaxParallelTasks()}${isTermuxEnv() ? ' (Termux 环境限制)' : ''}.`;
         }
-        const results = await mapWithConcurrencyLimit(params.tasks, getMaxConcurrency(false), async (t, _index, internalSignal) =>
+        const results = await mapWithConcurrencyLimit(params.tasks, getMaxConcurrency(currentProviderIsLocal()), async (t, _index, internalSignal) =>
           runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel')),
         );
         const successCount = results.filter((r) => !isFailedResult(r)).length;
@@ -102,7 +115,7 @@ export function register(pi: ExtensionAPI): void {
         return `Parallel: ${successCount}/${results.length} succeeded\n\n${summaries.join('\n\n---\n\n')}`;
       }
 
-      if (params.agent && params.task) {
+      if (params.task) {
         const riskLevel = classifyTaskRisk(params.task);
         const riskHint = riskLevel !== '1σ' ? ` [risk=${riskLevel}]` : '';
         const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'));

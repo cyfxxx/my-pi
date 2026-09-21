@@ -240,3 +240,71 @@ describe('lesson-miner 教训挖掘', () => {
     expect(recs[0].id).toBe('x');
   });
 });
+
+describe('memory: 会话摘要（summary.ts）', () => {
+  it('buildSummaryEntry 抽取决策/事实/偏好/教训并保留全文', async () => {
+    const { buildSummaryEntry } = await import('../summary');
+    const text = [
+      '# 会话摘要',
+      '决策: 采用 JWT 鉴权',
+      '事实: 服务端口 8080',
+      '偏好: 中文注释',
+      '- 教训: 不要用 session',
+      '其他普通描述文字',
+    ].join('\n');
+    const s = buildSummaryEntry({ sessionId: 'sess-1', text });
+    expect(s.title).toBe('会话摘要');
+    expect(s.decisions).toEqual(['采用 JWT 鉴权']);
+    expect(s.facts).toEqual(['服务端口 8080']);
+    expect(s.prefs).toEqual(['中文注释']);
+    expect(s.lessons).toEqual(['不要用 session']);
+    expect(s.fullText).toContain('其他普通描述文字');
+  });
+
+  it('appendSummary 按 sessionId 去重且 loadSummaries 可读回', async () => {
+    const { appendSummary, loadSummaries } = await import('../storage');
+    const { buildSummaryEntry } = await import('../summary');
+    appendSummary(buildSummaryEntry({ sessionId: 's1', text: '决策: A' }));
+    appendSummary(buildSummaryEntry({ sessionId: 's1', text: '决策: B' }));
+    const all = loadSummaries();
+    expect(all).toHaveLength(1);
+    expect(all[0].fullText).toContain('B');
+  });
+
+  it('loadSummaries 对缺失字段的损坏数据不抛异常', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { loadSummaries, getStats } = await import('../storage');
+    writeFileSync(join(dir, 'summaries.json'), JSON.stringify({ version: 1, summaries: [{ id: 'x', title: 't' }] }));
+    expect(() => loadSummaries()).not.toThrow();
+    expect(() => getStats([])).not.toThrow();
+  });
+});
+
+describe('memory: purgeExpiredNotes 真正落盘', () => {
+  it('删除过期 TTL 笔记，保留未到期与非法 TTL', async () => {
+    const { writeFileSync, readFileSync } = await import('node:fs');
+    const { purgeExpiredNotes } = await import('../storage');
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const future = new Date(Date.now() + 60_000).toISOString();
+    writeFileSync(
+      join(dir, 'notes.json'),
+      JSON.stringify({ keep: 'v', __ttl_keep: future, old: 'v', __ttl_old: past, bad: 'v', __ttl_bad: 'not-a-date' }),
+    );
+    expect(purgeExpiredNotes()).toBe(1);
+    const saved = JSON.parse(readFileSync(join(dir, 'notes.json'), 'utf-8'));
+    expect(saved.old).toBeUndefined();
+    expect(saved.__ttl_old).toBeUndefined();
+    expect(saved.keep).toBe('v');
+    expect(saved.bad).toBe('v');
+  });
+});
+
+describe('memory: merge 写入 contentHash', () => {
+  it('mergeCandidates ADD 后带 contentHash，可被哈希去重', async () => {
+    const { mergeCandidates } = await import('../merge');
+    const entries: MemoryEntry[] = [];
+    const c = entry({ title: 'M', content: '独特内容-unique-token' });
+    await mergeCandidates(entries, [c]);
+    expect(entries[0].contentHash).toBe(computeContentHash(entries[0].content));
+  });
+});

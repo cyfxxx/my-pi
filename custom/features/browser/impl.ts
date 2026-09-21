@@ -11,6 +11,7 @@ import { existsSync, readdirSync, realpathSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
+import { isUrlAllowed } from '../../core/net-guard';
 
 export function shotDir(): string {
   return join(tmpdir(), `my-pi-browser-screenshots-${process.pid}`);
@@ -159,8 +160,11 @@ export class BrowserManager {
       if (proto !== 'http:' && proto !== 'https:') {
         throw new Error(`协议不支持: ${proto}//（仅允许 http/https，拒绝 ${url.slice(0, 60)}）`);
       }
+      if (!isUrlAllowed(url)) {
+        throw new Error(`拒绝访问内网/回环地址（仅允许公网 http/https）`);
+      }
     } catch (e) {
-      if (e instanceof Error && e.message.startsWith('协议不支持')) throw e;
+      if (e instanceof Error && (e.message.startsWith('协议不支持') || e.message.startsWith('拒绝访问'))) throw e;
       throw new Error(`无效 URL: ${String(url).slice(0, 80)}`);
     }
     const page = await this.ensurePage();

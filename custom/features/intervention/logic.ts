@@ -12,6 +12,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getMemoryDir } from '../../core/config';
+import { writeTextSync } from '../../core/atomic-write';
 
 export const MAX_RECORDS = 2000;
 export const PROMPT_TRUNC = 800;
@@ -139,10 +140,8 @@ export function readLines(file: string): InterventionRecord[] {
 }
 
 export function writeLines(file: string, records: InterventionRecord[]): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, records.map((r) => JSON.stringify(r)).join('\n') + '\n');
-  fs.renameSync(tmp, file);
+  // 原子写 + 随机 tmp 后缀：并发写同一 JSONL 不再互相覆盖。
+  writeTextSync(file, records.map((r) => JSON.stringify(r)).join('\n') + '\n');
 }
 
 export function appendRecord(file: string, record: InterventionRecord): void {
@@ -153,6 +152,8 @@ export function appendRecord(file: string, record: InterventionRecord): void {
 
 /** 把 corrective prompt 回填到指定 abort 记录（调用方负责关联窗判定） */
 export function linkCorrective(file: string, id: string, correctivePrompt: string, now?: Date): boolean {
+  // 空纠正视为无效：否则会写入空串，且下一轮因真值判断再次命中并重写整份 JSONL。
+  if (!correctivePrompt || !correctivePrompt.trim()) return false;
   const records = readLines(file);
   const idx = records.findIndex((r) => r.id === id);
   if (idx < 0 || records[idx].correctivePrompt) return false;

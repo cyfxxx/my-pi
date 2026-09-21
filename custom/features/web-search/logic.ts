@@ -1,10 +1,34 @@
 import type { SearchConfig, SearchResponse, SearchResultItem } from './types'
+import { isUrlAllowed } from '../../core/net-guard'
 
 // ── 错误分类（wechat-article-exporter 启发）────────────────────
 // 5xx / 网络错误 → 可重试（服务端临时故障或连接问题）
 // 4xx / 非重试状态码 → 立即失败（客户端错误，重试无意义）
 // 429 → 特殊处理：读取 Retry-After 头，否则指数退避
 export const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+
+function abortError(): Error {
+  const e = new Error('Aborted')
+  e.name = 'AbortError'
+  return e
+}
+
+/** 可被 signal 取消的 sleep（避免超时已 abort 后仍空等退避） */
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(abortError())
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', onAbort)
+      reject(abortError())
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
 
 export async function fetchWithRetry(
   url: string,
@@ -24,21 +48,30 @@ export async function fetchWithRetry(
       if (res.ok || RETRYABLE_STATUS.has(res.status)) {
         if (res.ok || attempt >= maxRetries) return res
 
+        // 重试前释放响应体（避免未消费的 body 占用连接）
+        try {
+          await res.body?.cancel()
+        } catch {
+          /* 已释放 */
+        }
+
         // 429: 读 Retry-After 头，否则指数退避
         const retryAfter = res.headers.get('Retry-After')
         const delayMs = retryAfter
           ? Math.min(parseInt(retryAfter, 10) * 1000, 10000)
           : Math.min(500 * Math.pow(2, attempt), 8000)
-        await new Promise(r => setTimeout(r, delayMs))
+        await sleep(delayMs, opts.signal)
         continue
       }
 
       return res
     } catch (e) {
+      // 取消/超时：立即抛出，不再重试
+      if (opts.signal.aborted) throw e
       if (attempt >= maxRetries) throw e
       // 网络错误：指数退避（500ms → 1s → 2s → 4s，上限8s）
       const delayMs = Math.min(500 * Math.pow(2, attempt), 8000)
-      await new Promise(r => setTimeout(r, delayMs))
+      await sleep(delayMs, opts.signal)
     }
   }
   throw new Error('重试耗尽')
@@ -106,10 +139,11 @@ export async function searchWeb(
   }
 }
 
-/** max_results 显式校验：<=0 或非有限数时回退默认 5（避免 slice(0,0) 空结果 / slice(0,-1) 全量泄露） */
+/** max_results 显式校验：非有限或 floor 后 <1 时回退默认 5（避免 slice(0,0) 空结果 / slice(0,-1) 全量泄露） */
 export function sanitizeMaxResults(maxResults?: number): number {
-  if (maxResults === undefined || !Number.isFinite(maxResults) || maxResults <= 0) return 5
-  return Math.floor(maxResults)
+  if (maxResults === undefined || !Number.isFinite(maxResults)) return 5
+  const n = Math.floor(maxResults)
+  return n >= 1 ? n : 5
 }
 
 export function formatResponse(data: SearchResponse, query: string, maxResults: number = 5, brief: boolean = false): string {
@@ -349,6 +383,10 @@ export async function fetchUrl(
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return `不支持的协议 "${parsed.protocol}"：fetch_url 仅允许 http:/https: URL`
   }
+  // SSRF 防护：拒绝回环/内网/链路本地/云元数据主机
+  if (!isUrlAllowed(url)) {
+    return `拒绝访问内网/回环地址：${parsed.hostname}（fetch_url 仅允许公网 http/https）`
+  }
   const cap = Math.max(0, Math.min(maxLength, 200000))
   const controller = new AbortController()
   const onUserAbort = () => controller.abort()
@@ -511,6 +549,12 @@ export async function batchFetch(
 
           // 5xx / 429 重试
           if (!res.ok && attempt < maxRetries) {
+            // 释放未消费的响应体，避免 socket/连接泄漏
+            try {
+              await res.body?.cancel()
+            } catch {
+              /* 已释放 */
+            }
             const delay = Math.min(500 * Math.pow(2, attempt), 4000)
             await new Promise(r => setTimeout(r, delay))
             continue

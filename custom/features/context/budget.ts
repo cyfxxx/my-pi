@@ -104,16 +104,13 @@ export function markCompacted(): void {
   getState().justCompacted = true;
 }
 
-// 真实用量校准
+// 真实用量校准：真实 context 用量是权威值，直接覆盖累计估算。
+// （此前用 Math.max 会让工具估算的虚高量无法回落，导致压力单调上升。）
 export function setUsedTokens(used: number): void {
   const s = getState();
   if (Number.isFinite(used) && used >= 0) {
-    if (s.justCompacted) {
-      s.usedTotal = used;
-      s.justCompacted = false;
-    } else {
-      s.usedTotal = Math.max(s.usedTotal, used);
-    }
+    s.usedTotal = used;
+    s.justCompacted = false;
   }
 }
 
@@ -228,24 +225,33 @@ export function recordOutput(tool: string, outputLength: number): void {
   s.outputTotalTokens += tokens;
 }
 
+/**
+ * 按会话累计输出预算裁剪工具输出，并把实际放行的输出计入预算。
+ * 此前只裁剪不累计，导致 20K 上限形同虚设（跨调用裁剪永不生效）。
+ */
 export function pruneToolOutput(text: string, toolName: string): string {
   const s = getState();
   const textTokens = estimateTokens(text);
-  const maxLenTokens = Math.min(PER_TOOL_TOKENS, Math.max(500, OUTPUT_BUDGET_TOKENS - s.outputTotalTokens));
-  if (textTokens <= maxLenTokens && s.outputTotalTokens + textTokens <= OUTPUT_BUDGET_TOKENS) {
-    return text;
+  const remaining = OUTPUT_BUDGET_TOKENS - s.outputTotalTokens;
+  const allowed = Math.min(PER_TOOL_TOKENS, Math.max(300, remaining));
+
+  let result: string;
+  if (textTokens <= allowed && s.outputTotalTokens + textTokens <= OUTPUT_BUDGET_TOKENS) {
+    result = text;
+  } else {
+    const truncated = truncateByTokens(text, allowed);
+    const truncatedText = truncated.replace(/\n\n\[截断\]$/, '');
+    const ratio = textTokens > 0 ? Math.round((allowed / textTokens) * 100) : 100;
+    result = archivedStub(
+      text,
+      `${truncatedText}\n\n[${toolName} 输出已截断：约 ${textTokens} token → ${allowed} token (${ratio}%)]`,
+    );
   }
-  const allowed = Math.min(maxLenTokens, Math.max(300, OUTPUT_BUDGET_TOKENS - s.outputTotalTokens));
-  if (allowed <= 0) {
-    return archivedStub(text, `[${toolName} 输出已裁剪：累计输出已达预算上限]`);
-  }
-  const ratio = Math.round((allowed / textTokens) * 100);
-  const truncated = truncateByTokens(text, allowed);
-  const truncatedText = truncated.replace(/\n\n\[截断\]$/, '');
-  return archivedStub(
-    text,
-    `${truncatedText}\n\n[${toolName} 输出已截断：约 ${textTokens} token → ${allowed} token (${ratio}%)]`,
-  );
+
+  // 记入实际放行内容（裁剪后），使累计预算随会话推进收敛。
+  s.outputEntries.push({ tool: toolName, tokens: estimateTokens(result), ts: Date.now() });
+  s.outputTotalTokens += estimateTokens(result);
+  return result;
 }
 
 export function getOutputReport(): string {

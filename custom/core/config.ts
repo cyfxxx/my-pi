@@ -38,9 +38,14 @@ export function getPortableRoot(): string {
 /**
  * pi 的运行时根目录（agentDir）。
  * 按 pi 的约定，配置、技能、会话与第三方扩展都在此目录下。
+ *
+ * 与 pi 的 `getAgentDir()` 保持同一真值：优先读 `PI_CODING_AGENT_DIR`，
+ * 未设置时回退到默认 `<root>/portable/agent`。这样无论是否经 my-pi.sh 启动，
+ * 自定义功能与 pi 始终指向同一目录。
  */
 export function getAgentDir(): string {
-  return join(getPortableRoot(), 'agent');
+  const envDir = process.env.PI_CODING_AGENT_DIR;
+  return envDir ? resolve(envDir) : join(getPortableRoot(), 'agent');
 }
 
 /** 技能目录（= agentDir/skills，pi 自动发现） */
@@ -58,9 +63,13 @@ export function getExtensionDir(): string {
   return join(getAgentDir(), 'extensions');
 }
 
-/** my-pi 自定义功能数据目录（note-store 笔记、工具输出归档） */
+/**
+ * my-pi 自定义功能数据目录（记忆库、工具输出归档、遥测等）。
+ * 优先读 `PI_MEMORY_DIR`，与 feature 层直接读 env 的路径保持同一真值。
+ */
 export function getMemoryDir(): string {
-  return join(getPortableRoot(), 'memory');
+  const envDir = process.env.PI_MEMORY_DIR;
+  return envDir ? resolve(envDir) : join(getPortableRoot(), 'memory');
 }
 
 export function getVendorPiDir(): string {

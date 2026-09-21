@@ -20,7 +20,7 @@ echo ""
 EXPECTED_TOOLS="web-search:web_search,fetch_url,web_fetch link:link_send,link_status browser:browser_navigate,browser_screenshot,browser_click,browser_type,browser_scroll,browser_extract,browser_evaluate,browser_find,browser_wait_for,browser_network,browser_select_option,browser_dialog,browser_download,browser_upload,browser_cookies,browser_pdf,browser_help,browser_close voice:voice_transcribe,voice_speak,voice_record tmux:tmux_run,tmux_status,tmux_read,tmux_send,tmux_stop,tmux_wait memory:memory_store,memory_search,memory_recall,memory_stats,memory_forget plan-mode:todo subagent:subagent autopilot:autopilot_status,autopilot_stats,autopilot_failover"
 EXPECTED_COMMANDS="autopilot:autopilot,auto,schedule context:context,usage-diag,tools mode:mode plan-mode:plan voice:voice memory:memory link:link intervention:intervention"
 EXPECTED_SHORTCUTS="voice plan-mode"
-HOOK_EVENTS="session_start before_agent_start context tool_call tool_result tool_execution_start tool_execution_end before_tool_call after_tool_call"
+HOOK_EVENTS="session_start before_agent_start context tool_call tool_result tool_execution_start"
 
 # ---- 1. 扩展目录完整性 ----
 echo "1. 扩展目录完整性"
@@ -87,7 +87,7 @@ echo ""
 # ---- 5. 适配器 API 覆盖面 ----
 echo "5. 适配器 API 覆盖面"
 for api in registerTool registerHook registerHooks registerCommand registerShortcut registerMessageRenderer getActiveTools setActiveTools appendEntry sendMessage Key; do
-  if grep -rq "$api" custom/adapters/ 2>/dev/null; then
+  if grep -rqw "$api" custom/adapters/ 2>/dev/null; then
     echo "  ✅ $api"
   else
     echo "  ❌ $api 未在适配器中实现"
@@ -97,15 +97,37 @@ done
 echo ""
 
 # ---- 6. 钩子事件覆盖 ----
+# 双重校验：事件名必须是 Pi 真实派发的（vendor/pi 类型中存在），且 feature 中确有注册。
 echo "6. 钩子事件覆盖"
+PI_TYPES="vendor/pi/packages/coding-agent/src/core/extensions/types.ts"
 for event in $HOOK_EVENTS; do
-  if grep -q "'$event'" custom/adapters/hook-adapter.ts 2>/dev/null; then
-    echo "  ✅ $event"
+  used=0; valid=0
+  grep -rq "event: '$event'" custom/features/ 2>/dev/null && used=1
+  if [ -f "$PI_TYPES" ]; then
+    grep -q "type: \"$event\"" "$PI_TYPES" && valid=1
   else
-    echo "  ❌ $event 未定义"
+    valid=1  # fresh checkout 无 vendor，跳过契约校验（仅警告）
+  fi
+  if [ "$used" -eq 1 ] && [ "$valid" -eq 1 ]; then
+    echo "  ✅ $event"
+  elif [ "$used" -eq 0 ]; then
+    echo "  ❌ $event 未被任何 feature 注册"
+    MISSING=$((MISSING + 1))
+  else
+    echo "  ❌ $event 不是 Pi 派发的事件（vendor 类型中不存在）"
     MISSING=$((MISSING + 1))
   fi
 done
+# 反向检查：feature 中不得出现 Pi 不派发的事件名
+if [ -f "$PI_TYPES" ]; then
+  while IFS= read -r bad; do
+    [ -z "$bad" ] && continue
+    echo "  ❌ feature 使用了 Pi 不派发的事件: $bad"
+    MISSING=$((MISSING + 1))
+  done < <(grep -rhoE "event: '[a-z_]+'" custom/features/ 2>/dev/null | sed "s/event: '//; s/'//" | sort -u | while read -r ev; do
+    grep -q "type: \"$ev\"" "$PI_TYPES" || echo "$ev"
+  done)
+fi
 echo ""
 
 # ---- 7. 关键配置文件 ----

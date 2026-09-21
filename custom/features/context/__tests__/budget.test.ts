@@ -138,3 +138,29 @@ describe('context-budget: 压力分母为真实窗口', () => {
     expect(getBudgetReport().pressure).toBe('low');
   });
 });
+
+describe('context-budget: 真实校准与输出累计', () => {
+  beforeEach(() => resetAllBudgets());
+
+  it('setUsedTokens 覆盖累计估算，不再单调虚高', () => {
+    setContextWindow(10_000);
+    recordToolUsage('bash', 8_000);
+    expect(getBudgetReport().used).toBe(8_000);
+    setUsedTokens(2_000);
+    expect(getBudgetReport().used).toBe(2_000);
+    // 新一轮估算在真实基线之上累加，再被下一次真实测量覆盖
+    recordToolUsage('bash', 300);
+    expect(getBudgetReport().used).toBe(2_300);
+    setUsedTokens(500);
+    expect(getBudgetReport().used).toBe(500);
+  });
+
+  it('pruneToolOutput 将放行输出计入累计预算', async () => {
+    const { pruneToolOutput } = await import('../budget');
+    expect(getOutputReport()).toBe('');
+    pruneToolOutput('hello world', 'bash');
+    const report = getOutputReport();
+    expect(report).toContain('bash');
+    expect(report).toMatch(/工具输出预算: \d+/);
+  });
+});

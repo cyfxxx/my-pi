@@ -69,8 +69,16 @@ fi
 npm run build
 
 # Termux：给 playwright-core 打 android→linux 平台补丁（幂等；非 Termux 自动跳过）
+# 不吞输出：补丁未命中时明确告警，避免"构建成功但浏览器不可用"。
 if [ -f "$ROOT/scripts/patch-playwright-core.mjs" ]; then
-    node "$ROOT/scripts/patch-playwright-core.mjs" >/dev/null 2>&1 && echo "✓ playwright-core 平台补丁已核对（Termux）" || true
+    set +e
+    PATCH_OUT="$(node "$ROOT/scripts/patch-playwright-core.mjs" 2>&1)"
+    PATCH_RC=$?
+    set -e
+    echo "$PATCH_OUT"
+    if [ "$PATCH_RC" -ne 0 ]; then
+        echo "⚠ playwright-core 平台补丁未完成（exit $PATCH_RC）：Termux 浏览器可能不可用，请检查上面的输出" >&2
+    fi
 fi
 
 # custom/ 不编译：pi 的扩展加载器内置 jiti，直接加载 custom/bootstrap.ts（TypeScript）。

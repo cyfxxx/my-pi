@@ -7,7 +7,7 @@
  *   - 对外暴露稳定的 HookHandler 接口
  */
 
-import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, ExtensionContext, ExtensionEvent } from '@earendil-works/pi-coding-agent';
 
 /**
  * 对上层暴露的稳定钩子上下文类型（Pi API 变更只需改此处）
@@ -15,48 +15,12 @@ import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-a
 export type HookContext = ExtensionContext;
 
 /**
- * 我们支持的钩子事件类型
- * 注意：只列出我们实际使用的，不要照搬 Pi 的全部事件
+ * 支持的钩子事件名：直接从 Pi 的 `ExtensionEvent` 派生。
+ * 手动维护的清单会漂移（例如历史上曾写入 Pi 并不派发的 `before_tool_call`），
+ * 此处以类型系统保证事件名有效，无效名会在 `tsc` 阶段报错。
+ * 工具执行前后对应 Pi 的 `tool_call`（可 block）与 `tool_result`（可改）。
  */
-export type HookEvent =
-  | 'agent_start'
-  | 'agent_end'
-  | 'before_tool_call'
-  | 'after_tool_call'
-  | 'message'
-  | 'session_start'
-  | 'session_shutdown'
-  | 'session_before_compact'
-  | 'session_compact'
-  | 'before_agent_start'
-  | 'context'
-  | 'turn_start'
-  | 'turn_end'
-  | 'input'
-  | 'tool_call'
-  | 'tool_result'
-  | 'tool_execution_start'
-  | 'tool_execution_update'
-  | 'tool_execution_end'
-  | 'message_start'
-  | 'message_update'
-  | 'message_end'
-  | 'model_select'
-  | 'thinking_level_select'
-  | 'user_bash'
-  | 'project_trust'
-  | 'resources_discover'
-  | 'session_info_changed'
-  | 'session_before_switch'
-  | 'session_before_fork'
-  | 'session_before_tree'
-  | 'session_tree'
-  | 'before_provider_request'
-  | 'before_provider_headers'
-  | 'after_provider_response'
-  | 'ui_prompt_start'
-  | 'ui_prompt_end'
-  | 'agent_settled';
+export type HookEvent = ExtensionEvent['type'];
 
 export interface HookHandler {
   event: HookEvent;
@@ -67,10 +31,9 @@ export interface HookHandler {
  * 注册一个钩子
  */
 export function registerHook(pi: ExtensionAPI, hook: HookHandler): void {
-  const on = pi.on as unknown as (
-    event: string,
-    handler: (event: unknown, ctx: ExtensionContext) => unknown,
-  ) => void;
+  // Pi 的 on() 是逐事件重载；这里收窄为受约束的 HookEvent，
+  // 事件名的有效性由 ExtensionEvent['type'] 在编译期保证。
+  const on = pi.on as (event: HookEvent, handler: (event: unknown, ctx: ExtensionContext) => unknown) => void;
   on(hook.event, hook.handler);
 }
 

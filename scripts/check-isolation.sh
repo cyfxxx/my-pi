@@ -38,26 +38,30 @@ else
     ERRORS=$((ERRORS + 1))
 fi
 
-# 检查 3: features/*/logic.ts 不得 import vendor/pi
-if grep -r "from.*vendor/pi" "$ROOT/custom/features"/*/logic.ts 2>/dev/null; then
-    echo "❌ logic.ts 中 import 了 vendor/pi"
+# 检查 3: features/*/logic.ts 不得 import Pi 包
+# 注意：真实 import 走包名 @earendil-works/*，而非路径 vendor/pi；必须按包名校验。
+PI_RE="from ['\"]@(earendil-works|mariozechner)/"
+if grep -rE "${PI_RE}" "$ROOT/custom/features"/*/logic.ts 2>/dev/null; then
+    echo "❌ logic.ts 中 import 了 Pi 包"
     ERRORS=$((ERRORS + 1))
 else
-    echo "✅ logic.ts 无 vendor/pi 依赖"
+    echo "✅ logic.ts 无 Pi 包依赖"
 fi
 
-# 检查 4: adapters/ 之外不得 runtime import vendor/pi（import type 编译后擦除，允许）
-VIOLATIONS_RUNTIME=$(grep -rl "from.*vendor/pi" "$ROOT/custom" --include="*.ts" 2>/dev/null | grep -v "/adapters/" | grep -v "/core/config.ts" | while read -r f; do
-    if ! grep -q "import type.*from.*vendor/pi" "$f" 2>/dev/null; then
+# 检查 4: adapters/ 之外不得 runtime import Pi 包（import type 编译后擦除，允许）
+# 约定：非适配器文件只能用顶层单行 `import type`。
+VIOLATIONS_RUNTIME=$(grep -rlE "${PI_RE}" "$ROOT/custom" --include="*.ts" 2>/dev/null \
+    | grep -v "/adapters/" | grep -v "/__tests__/" | while read -r f; do
+    if grep -E "${PI_RE}" "$f" 2>/dev/null | grep -vqE "^[[:space:]]*import[[:space:]]+type[[:space:]]"; then
         echo "$f"
     fi
 done || true)
 if [ -n "$VIOLATIONS_RUNTIME" ]; then
-    echo "❌ 以下文件在 adapters/ 外 runtime import 了 vendor/pi："
+    echo "❌ 以下文件在 adapters/ 外 runtime import 了 Pi 包："
     echo "$VIOLATIONS_RUNTIME"
     ERRORS=$((ERRORS + 1))
 else
-    echo "✅ adapters/ 外无 vendor/pi runtime 依赖（import type 已允许）"
+    echo "✅ adapters/ 外无 Pi 包 runtime 依赖（import type 已允许）"
 fi
 
 # 检查 5: portable/ 下无运行时依赖

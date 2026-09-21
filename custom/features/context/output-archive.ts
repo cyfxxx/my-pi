@@ -15,24 +15,29 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getMemoryDir } from '../../core/config';
+import { writeTextSync } from '../../core/atomic-write';
+import { scrubSecrets } from '../../core/secrets';
 
 /** 归档根目录（每次调用时读 env，便于测试注入） */
 export function archiveDir(): string {
   return process.env.PI_OUTPUT_ARCHIVE_DIR || join(getMemoryDir(), 'tool-outputs');
 }
 
-/** 归档原文，返回可读回的绝对路径；空文本或写盘失败返回 null */
+/**
+ * 归档原文，返回可读回的绝对路径；空文本或写盘失败返回 null。
+ * 写盘前脱敏（工具输出常含 token/env dump），并用原子写避免半截文件占用最终路径。
+ */
 export function archiveOutput(text: string): string | null {
   try {
     if (!text) return null;
-    const hash = createHash('sha256').update(text).digest('hex').slice(0, 16);
+    const safe = scrubSecrets(text);
+    const hash = createHash('sha256').update(safe).digest('hex').slice(0, 16);
     const dir = join(archiveDir(), hash.slice(0, 2));
-    mkdirSync(dir, { recursive: true });
-    const file = join(dir, `${hash}-${text.length}.txt`);
-    if (!existsSync(file)) writeFileSync(file, text);
+    const file = join(dir, `${hash}-${safe.length}.txt`);
+    if (!existsSync(file)) writeTextSync(file, safe);
     return file;
   } catch {
     return null;

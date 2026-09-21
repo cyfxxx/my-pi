@@ -30,6 +30,7 @@ import {
   formatListLine,
   formatGetLines,
   formatCommandTaskLine,
+  isReadonlyBashCommand,
 } from './logic';
 import type { TaskAction, TaskMutationParams, Op, TaskState, Task } from './logic';
 import { TodoOverlay } from './overlay';
@@ -69,9 +70,6 @@ function formatContent(op: Op, state: TaskState): string {
   }
 }
 
-const READONLY_BASH =
-  /^\s*(ls|cat|head|tail|wc|grep|rg|find|fd|tree|stat|file|pwd|which|type|echo|printf|sed -n|awk|sort|uniq|cut|git (status|log|diff|show|branch|remote|rev-parse)|node --version|npm ls|tsc --noEmit)\b/;
-
 const PLAN_USAGE = [
   '/plan                  切换规划模式',
   '/plan enter            进入规划模式（只读探索）',
@@ -84,18 +82,27 @@ const PLAN_USAGE = [
 
 export function register(pi: ExtensionAPI): void {
   let planModeEnabled = false;
+  // 进入计划模式前的活跃工具集合：退出时恢复原集合，而不是"全部工具"，
+  // 以免抹掉进入前用户/其他 feature 已禁用的工具。
+  let savedActiveTools: string[] | null = null;
   const overlay = new TodoOverlay();
 
   const restoreAllTools = (): void => {
-    setActiveTools(pi, getAllToolNames(pi));
+    if (savedActiveTools) {
+      setActiveTools(pi, savedActiveTools);
+      savedActiveTools = null;
+    } else {
+      setActiveTools(pi, getAllToolNames(pi));
+    }
   };
 
   const applyPlanMode = (enabled: boolean): void => {
     planModeEnabled = enabled;
     if (enabled) {
+      savedActiveTools = getActiveTools(pi);
       setActiveTools(
         pi,
-        getActiveTools(pi).filter((t) => !['edit', 'write', 'bash'].includes(t)),
+        savedActiveTools.filter((t) => !['edit', 'write', 'bash'].includes(t)),
       );
     } else {
       restoreAllTools();
@@ -248,17 +255,17 @@ export function register(pi: ExtensionAPI): void {
 
   // ── 只读强制：计划模式下阻止编辑/写入与非只读 bash ──
   registerHook(pi, {
-    event: 'before_tool_call',
+    event: 'tool_call',
     handler: async (event) => {
       if (!planModeEnabled) return;
-      const e = event as { toolName?: string; arguments?: unknown };
+      const e = event as { toolName?: string; input?: unknown };
       if (e.toolName === 'edit' || e.toolName === 'write') {
         return { block: true, reason: '计划模式：编辑/写入被禁用。使用 /plan exit 退出。' };
       }
       if (e.toolName === 'bash') {
-        const args = e.arguments as { command?: string } | undefined;
-        const cmd = args?.command ?? '';
-        if (cmd && !READONLY_BASH.test(cmd)) {
+        const input = e.input as { command?: string } | undefined;
+        const cmd = input?.command ?? '';
+        if (cmd && !isReadonlyBashCommand(cmd)) {
           return { block: true, reason: '计划模式：仅允许只读 bash 命令。使用 /plan exit 退出。' };
         }
       }

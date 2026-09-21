@@ -5,3 +5,4 @@ export * from './state';
 export * from './store';
 export * from './selectors';
 export * from './view';
+export * from './readonly';

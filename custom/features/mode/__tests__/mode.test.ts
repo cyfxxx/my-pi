@@ -50,3 +50,27 @@ describe('needsRestart', () => {
     expect(needsRestart(cfg({ systemPrompt: 'a' }))).toBe(true);
   });
 });
+
+describe('mode: normalizeModesFile 容错', () => {
+  it('缺字段/类型错误的模式被归一化，不抛异常', async () => {
+    const { normalizeModesFile } = await import('../logic');
+    const n = normalizeModesFile({
+      default: 'x',
+      current: 'missing',
+      modes: { x: { extensions: null, skills: 'no', thinking: 5 }, y: null },
+    });
+    expect(n.modes.x.extensions).toEqual([]);
+    expect(n.modes.x.skills).toEqual([]);
+    expect(n.modes.x.thinking).toBeNull();
+    expect(n.modes.y.extensions).toEqual([]);
+    expect(n.default).toBe('x');
+    expect(n.current).toBe('x');
+  });
+
+  it('非法 JSON 结构 → 回退 full 默认模式', async () => {
+    const { normalizeModesFile } = await import('../logic');
+    const n = normalizeModesFile({ modes: {} });
+    expect(Object.keys(n.modes)).toContain('full');
+    expect(n.default).toBe('full');
+  });
+});

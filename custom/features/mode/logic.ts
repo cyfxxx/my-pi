@@ -44,6 +44,32 @@ const DEFAULT_MODES: ModesFile = {
   },
 };
 
+function normalizeModeConfig(raw: unknown): ModeConfig {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const strArray = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  return {
+    description: typeof o.description === 'string' ? o.description : '',
+    extensions: strArray(o.extensions),
+    skills: strArray(o.skills),
+    systemPrompt: typeof o.systemPrompt === 'string' ? o.systemPrompt : null,
+    appendSystemPrompt: typeof o.appendSystemPrompt === 'string' ? o.appendSystemPrompt : null,
+    thinking: typeof o.thinking === 'string' ? o.thinking : null,
+  };
+}
+
+/** 运行时校验 modes.json：字段缺失/类型错误一律归一化，避免下游 TypeError 崩溃 */
+export function normalizeModesFile(raw: unknown): ModesFile {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const modesRaw = (o.modes && typeof o.modes === 'object' ? o.modes : {}) as Record<string, unknown>;
+  const modes: Record<string, ModeConfig> = {};
+  for (const [name, cfg] of Object.entries(modesRaw)) modes[name] = normalizeModeConfig(cfg);
+  if (Object.keys(modes).length === 0) modes.full = normalizeModeConfig(DEFAULT_MODES.modes.full);
+  const def = typeof o.default === 'string' && modes[o.default] ? o.default : 'full';
+  const current = typeof o.current === 'string' && modes[o.current] ? o.current : def;
+  return { default: def, current, modes };
+}
+
 export function loadModes(): ModesFile {
   const file = modesFilePath();
   if (!existsSync(file)) {
@@ -51,7 +77,7 @@ export function loadModes(): ModesFile {
     return DEFAULT_MODES;
   }
   try {
-    return JSON.parse(readFileSync(file, 'utf-8')) as ModesFile;
+    return normalizeModesFile(JSON.parse(readFileSync(file, 'utf-8')));
   } catch {
     return DEFAULT_MODES;
   }

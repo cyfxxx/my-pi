@@ -21,7 +21,8 @@ export {
 } from './registry'
 
 export { scrubSecrets, SECRET_PATTERNS } from './secrets'
-export { writeJSONSync, writeJSONAtomic } from './atomic-write'
+export { writeJSONSync, writeTextSync, writeJSONAtomic } from './atomic-write'
+export { isBlockedHost, isUrlAllowed } from './net-guard'
 export {
   dataDir,
   notesFile,

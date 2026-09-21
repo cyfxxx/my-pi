@@ -82,7 +82,8 @@ export function runTaskOnce(task: Task, cwd: string, timeoutMs = task.maxRunTime
       resolve({
         result: exitCode === 0 && !errMsg && output ? 'success' : 'failed',
         output: (errMsg ? `${errMsg}\n${output}` : output).slice(0, 4000) || (exitCode === 0 ? '(无输出)' : `exit ${exitCode}`),
-        exitCode: errMsg ? 1 : exitCode,
+        // 保留真实退出码：124=超时（ops.errClassOf 依赖它判定 timeout），不要被 errMsg 覆盖为 1
+        exitCode,
         durationMs: Date.now() - started,
         stderr: stderr.slice(-2000),
       });

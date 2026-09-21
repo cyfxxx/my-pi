@@ -55,8 +55,23 @@ if git merge-base --is-ancestor "$TARGET_COMMIT" HEAD 2>/dev/null; then
     exit 0
 fi
 
-# 保存本地修改
+# 保存本地修改（任何失败路径都要恢复，避免改动遗留在 stash）
 DID_STASH=0
+STASH_RESTORED=0
+restore_stash() {
+    rc=$?
+    if [ "$DID_STASH" -eq 1 ] && [ "$STASH_RESTORED" -eq 0 ]; then
+        echo "↩ 恢复本地改动（git stash pop）..."
+        if git stash pop; then
+            STASH_RESTORED=1
+        else
+            echo "⚠ git stash pop 失败：本地改动仍在 stash 中（git stash list），请手动处理" >&2
+        fi
+    fi
+    exit "$rc"
+}
+trap restore_stash EXIT
+
 if ! git diff --quiet; then
     git stash
     DID_STASH=1
@@ -76,11 +91,18 @@ for patch in "$ROOT/patches"/*.patch; do
     }
 done
 
-git rev-parse HEAD > LAST_SYNC_POINT
-
 if [ "$DID_STASH" -eq 1 ]; then
-    git stash pop || true
+    echo "↩ 恢复本地改动（git stash pop）..."
+    if git stash pop; then
+        STASH_RESTORED=1
+    else
+        echo "❌ git stash pop 冲突：本地改动仍在 stash 中，请手动解决后重试" >&2
+        exit 1
+    fi
 fi
+
+# 仅在合并、补丁与本地改动全部就绪后写同步点，保证标记与工作树一致
+git rev-parse HEAD > LAST_SYNC_POINT
 
 echo "🔨 类型检查 custom/..."
 cd "$ROOT"

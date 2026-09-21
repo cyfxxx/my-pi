@@ -22,10 +22,11 @@ export function register(pi: ExtensionAPI): void {
     execute: async (args) => {
       const query = args.query as string;
       const maxResults = (args.maxResults as number) ?? 5;
-      const config: SearchConfig = {
-        searxng_url: process.env.SEARXNG_URL || 'https://search.brave.com',
-        timeout: 15000,
-      };
+      const searxngUrl = process.env.SEARXNG_URL;
+      if (!searxngUrl) {
+        return '未配置 SEARXNG_URL。请设置 SearXNG 实例地址（如 http://127.0.0.1:8080）后重试；临时可用 web_fetch 作为免配置 fallback。';
+      }
+      const config: SearchConfig = { searxng_url: searxngUrl, timeout: 15000 };
       const result = await searchWeb(config, query, { max_results: maxResults });
       return result;
     },

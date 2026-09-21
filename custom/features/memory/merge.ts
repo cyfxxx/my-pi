@@ -13,6 +13,8 @@ import {
   applyMem0Action,
   mergeEnvironments,
   linkEntries,
+  computeContentHash,
+  autoLinkNewEntry,
 } from './storage';
 import { findSimilar } from './retrieval';
 
@@ -131,6 +133,7 @@ export async function mergeCandidates(
       continue;
     }
     if (decision.action === 'ADD') {
+      candidate.contentHash = computeContentHash(candidate.content);
       entries.push(candidate);
       applied.push(`ADD: ${candidate.title}`);
       continue;
@@ -140,6 +143,7 @@ export async function mergeCandidates(
       if (idx !== -1) {
         const e = entries[idx];
         e.content = candidate.content.length > e.content.length ? candidate.content : e.content;
+        e.contentHash = computeContentHash(e.content);
         e.tags = [...new Set([...e.tags, ...candidate.tags])];
         e.confidence = Math.max(e.confidence, candidate.confidence);
         e.recurrence += 1;
@@ -175,11 +179,13 @@ export async function resolveAndApply(
 ): Promise<MergeDecision & { applied: boolean }> {
   const decision = await decideMerge(entries, candidate);
   if (decision.action === 'ADD') {
+    candidate.contentHash = computeContentHash(candidate.content);
     entries.push(candidate);
+    autoLinkNewEntry(entries, candidate);
     saveEntries(entries);
     return { ...decision, applied: true };
   }
+  // applyMem0Action 内部已写盘（UPDATE/DELETE），NOOP 无改动；此处不再重复 saveEntries。
   const { applied } = applyMem0Action(entries, decision.action, candidate, decision.targetId);
-  saveEntries(entries);
   return { ...decision, applied };
 }

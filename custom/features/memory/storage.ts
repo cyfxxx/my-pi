@@ -92,14 +92,20 @@ function sanitizeEntry(e: MemoryEntry): MemoryEntry {
 }
 
 function sanitizeSummary(s: SummaryEntry): SummaryEntry {
+  // 历史/损坏数据可能缺字段：逐字段兜底，避免 getStats/注入路径整体抛错。
+  const list = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map((x) => scrubSecrets(x)) : [];
   return {
     ...s,
-    title: scrubSecrets(s.title),
-    fullText: scrubSecrets(s.fullText),
-    decisions: s.decisions.map((x) => scrubSecrets(x)),
-    facts: s.facts.map((x) => scrubSecrets(x)),
-    prefs: s.prefs.map((x) => scrubSecrets(x)),
-    lessons: s.lessons.map((x) => scrubSecrets(x)),
+    id: typeof s.id === 'string' ? s.id : '',
+    sessionId: typeof s.sessionId === 'string' ? s.sessionId : null,
+    ts: typeof s.ts === 'string' ? s.ts : '',
+    title: scrubSecrets(typeof s.title === 'string' ? s.title : ''),
+    fullText: scrubSecrets(typeof s.fullText === 'string' ? s.fullText : ''),
+    decisions: list(s.decisions),
+    facts: list(s.facts),
+    prefs: list(s.prefs),
+    lessons: list(s.lessons),
   };
 }
 
@@ -256,6 +262,27 @@ export function saveNotes(notes: Record<string, string>): void {
   rawSaveNotes(notes);
 }
 
+/**
+ * 删除已过期（TTL 到期）的工作笔记并落盘，返回删除条数。
+ * loadNotes 只在内存视图中过滤，不会持久化；清理命令走这里才真正生效。
+ */
+export function purgeExpiredNotes(): number {
+  const notes = rawLoadNotes();
+  const now = Date.now();
+  let removed = 0;
+  for (const key of Object.keys(notes)) {
+    const ttl = notes[`__ttl_${key}`];
+    const expires = ttl ? new Date(ttl).getTime() : NaN;
+    if (Number.isFinite(expires) && expires <= now) {
+      delete notes[key];
+      delete notes[`__ttl_${key}`];
+      removed++;
+    }
+  }
+  if (removed > 0) rawSaveNotes(notes);
+  return removed;
+}
+
 export function clearCompactionFlag(): void {
   updateNotes((notes) => {
     if (notes['_ctx.just_compacted']) {
@@ -349,12 +376,9 @@ export function storeEntry(
     return { entries: merged, action: 'merged' };
   }
 
+  // 近似内容合并：hash 完全相同已在上方命中；此处按 jaccard 合并近似重复（不同措辞的同义内容）。
   const contentTokens = tokenize(entry.content);
-  const mergeIdx = live.findIndex((e) => {
-    if (e.contentHash) return false;
-    const existingTokens = tokenize(e.content);
-    return jaccardSimilarity(contentTokens, existingTokens) > 0.7;
-  });
+  const mergeIdx = live.findIndex((e) => jaccardSimilarity(contentTokens, tokenize(e.content)) > 0.7);
   if (mergeIdx !== -1) {
     const e = live[mergeIdx];
     if (contentTokens.length > tokenize(e.content).length) {

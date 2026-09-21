@@ -19,6 +19,7 @@ import {
   loadSummaries,
   loadNotes,
   updateNotes,
+  purgeExpiredNotes,
   activeEntries,
   autoReclaim,
   storeEntry,
@@ -43,6 +44,8 @@ import {
   mineLessons,
   candidateToEntry,
   formatLessonReport,
+  appendSummary,
+  buildSummaryEntry,
 } from './logic';
 import type { MemoryCategory, MemoryEntry, RuntimeEnv } from './logic';
 
@@ -344,8 +347,9 @@ export function register(pi: ExtensionAPI): void {
           break;
         }
         case 'cleanup': {
+          const removed = purgeExpiredNotes();
           const notes = Object.keys(loadNotes()).filter((k) => !k.startsWith('__'));
-          ctx.ui.notify(`清理完成（当前笔记 ${notes.length} 条）`, 'info');
+          ctx.ui.notify(`清理完成：移除 ${removed} 条过期笔记（当前笔记 ${notes.length} 条）`, 'info');
           break;
         }
         default:
@@ -395,13 +399,26 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // ── compaction 完成：记录时间戳 ──
+  // ── compaction 完成：记录时间戳并持久化会话摘要（L2）──
   registerHook(pi, {
     event: 'session_compact',
-    handler: async () => {
+    handler: async (event, ctx) => {
       updateNotes((n) => {
         n['_ctx.compacted_at'] = new Date().toISOString();
       });
+      const summaryText = (event as { compactionEntry?: { summary?: string } })?.compactionEntry?.summary;
+      if (!summaryText || !summaryText.trim()) return;
+      let sessionId: string | null = null;
+      try {
+        sessionId = ctx.sessionManager?.getSessionId?.() ?? null;
+      } catch {
+        sessionId = null;
+      }
+      try {
+        appendSummary(buildSummaryEntry({ sessionId, text: summaryText }));
+      } catch {
+        /* fail-open：摘要持久化失败不影响压缩流程 */
+      }
     },
   });
 }

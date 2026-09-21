@@ -529,3 +529,15 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `scripts/golden-tasks.sh`：新增第 7 步文档链接
 - README/STRUCTURE 脚本清单 9 → 10
 - 验证：`npm run golden` 七项全通过
+
+## 全面审查与优化（第 25 批：契约/正确性/安全/守门）
+- 完成时间：2026-09-21（自主审查）
+- **契约失效（最严重）**：`hook-adapter` 的 `HookEvent` 手写清单含 Pi 并不派发的 `before_tool_call`/`after_tool_call`，导致 context 的工具用量计时与 plan-mode 只读强制**从未触发**。改为从 `ExtensionEvent['type']` 派生事件名（tsc 编译期校验），事件改用 `tool_call`/`tool_result`，字段改用 `input`/`content`。
+- **守门空转**：`check-isolation.sh` 按 `vendor/pi` 路径 grep，但真实 import 走包名 `@earendil-works/*`，隔离检查形同虚设；`check-features.sh` 用同一错误清单校验钩子。均改为按包名/真实事件双重校验，并加反向检查。
+- **路径真值**：`config.getAgentDir/getMemoryDir` 现优先读 `PI_CODING_AGENT_DIR`/`PI_MEMORY_DIR`，与 pi 及 storage 同一真值。
+- **功能修复**：context 输出预算从不累计（`recordOutput` 无调用）→ `pruneToolOutput` 计入放行输出；`setUsedTokens` 由 `Math.max` 改为真实覆盖（消除单调虚高）；memory 会话摘要从不落盘 → compaction 时经 `buildSummaryEntry` 持久化；`/memory cleanup` 实际清除过期 TTL 笔记。
+- **数据一致性**：`merge` ADD/UPDATE 补 `contentHash`；近似内容合并分支恢复生效；`sanitizeSummary` 字段兜底；`atomic-write` 随机 tmp + 失败清理。
+- **安全**：新增 `core/net-guard` SSRF 防护（fetch_url/browser_navigate 拒绝内网/回环/元数据）；output-archive 落盘前脱敏 + 原子写；plan-mode 只读判定重写（拒绝元字符/可写标志，fail-closed）。
+- **边界**：autopilot 超时保留退出码 124；subagent single 模式 agent 可选 + 本地 provider 并发限制生效；web-search 重试释放响应体/取消即停/max_results 校验/未配置 SEARXNG 明确提示；tmux `readOutput` fd 用 finally 关闭并改按字符截断；link `extractFinalReply` 兼容字符串 content；mode 配置运行时归一化。
+- **脚本**：patch-playwright 不再无条件返回 0；build.sh 不再吞补丁输出；sync-upstream 失败/冲突时恢复 stash 且仅在全部就绪后写同步点。
+- 验证：`npm run golden` 七项全绿，单测 208 → 228 用例。

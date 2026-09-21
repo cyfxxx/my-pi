@@ -56,3 +56,47 @@ describe('fetchUrl', () => {
     expect(await fetchUrl('https://example.com')).toContain('请求失败: boom');
   });
 });
+
+describe('fetchUrl: SSRF 防护', () => {
+  it('拒绝回环/内网/元数据地址', async () => {
+    for (const u of [
+      'http://127.0.0.1:8080/x',
+      'http://localhost/x',
+      'http://169.254.169.254/latest/meta-data',
+      'http://10.0.0.5/',
+      'http://192.168.1.1/',
+      'http://[::1]/',
+    ]) {
+      expect(await fetchUrl(u), u).toContain('拒绝访问内网');
+    }
+  });
+});
+
+describe('sanitizeMaxResults', () => {
+  it('非有限/小于 1 → 回退 5；其余向下取整', async () => {
+    const { sanitizeMaxResults } = await import('../logic');
+    expect(sanitizeMaxResults(undefined)).toBe(5);
+    expect(sanitizeMaxResults(NaN)).toBe(5);
+    expect(sanitizeMaxResults(0)).toBe(5);
+    expect(sanitizeMaxResults(0.5)).toBe(5);
+    expect(sanitizeMaxResults(-3)).toBe(5);
+    expect(sanitizeMaxResults(3.9)).toBe(3);
+  });
+});
+
+describe('fetchWithRetry: 取消即停', () => {
+  it('signal 已 abort 时不重试，直接抛错', async () => {
+    const { fetchWithRetry } = await import('../logic');
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      calls++;
+      const e = new Error('aborted');
+      e.name = 'AbortError';
+      throw e;
+    }));
+    const ctrl = new AbortController();
+    ctrl.abort();
+    await expect(fetchWithRetry('https://example.com', { signal: ctrl.signal, headers: {} }, 3)).rejects.toThrow();
+    expect(calls).toBe(1);
+  });
+});

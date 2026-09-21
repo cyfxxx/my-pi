@@ -582,23 +582,29 @@ export function appendOutbox(device: string, text: string): void {
   }
 }
 
+/** 提取 assistant 消息文本（兼容 string 与 content blocks 两种形态） */
+function assistantMessageText(m: unknown): string | undefined {
+  const msg = m as { role?: string; content?: unknown };
+  if (msg?.role !== 'assistant') return undefined;
+  if (typeof msg.content === 'string') return msg.content.trim() || undefined;
+  if (Array.isArray(msg.content)) {
+    const text = (msg.content as Array<{ type?: string; text?: string }>)
+      .filter((c) => c?.type === 'text' && typeof c.text === 'string' && c.text.trim())
+      .map((c) => c.text as string)
+      .join('\n')
+      .trim();
+    return text || undefined;
+  }
+  return undefined;
+}
+
 export function extractFinalReply(messages: unknown[]): string | undefined {
   if (!Array.isArray(messages)) return undefined;
-  const last = [...messages].reverse().find((m) => {
-    const msg = m as { role?: string; content?: unknown };
-    return (
-      msg?.role === 'assistant' &&
-      Array.isArray(msg.content) &&
-      (msg.content as Array<{ type?: string; text?: string }>).some((c) => c?.type === 'text' && c.text?.trim())
-    );
-  });
-  if (!last) return undefined;
-  const text = (last as { content: Array<{ type?: string; text?: string }> }).content
-    .filter((c) => c?.type === 'text' && c.text?.trim())
-    .map((c) => c.text)
-    .join('\n')
-    .trim();
-  return text || undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const text = assistantMessageText(messages[i]);
+    if (text) return text;
+  }
+  return undefined;
 }
 
 // ── 展示辅助 ──

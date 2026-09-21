@@ -171,3 +171,24 @@ describe('link.ts 纯函数', () => {
     expect(cmd).not.toContain('PI_LINK_LAST_SESSION');
   });
 });
+
+describe('link: extractFinalReply 兼容 string 与 blocks', () => {
+  it('字符串 content 的 assistant 消息也能提取', async () => {
+    const { extractFinalReply } = await import('../logic');
+    const msgs = [
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: '纯字符串回复' },
+    ];
+    expect(extractFinalReply(msgs)).toBe('纯字符串回复');
+  });
+
+  it('blocks 形态取最后一条非空 assistant 文本', async () => {
+    const { extractFinalReply } = await import('../logic');
+    const msgs = [
+      { role: 'assistant', content: [{ type: 'text', text: '第一' }] },
+      { role: 'user', content: 'x' },
+      { role: 'assistant', content: [{ type: 'text', text: '  第二  ' }] },
+    ];
+    expect(extractFinalReply(msgs)).toBe('第二');
+  });
+});

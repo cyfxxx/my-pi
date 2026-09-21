@@ -295,13 +295,17 @@ export async function readOutput(opts: TmuxOpts, name: string, lines = 100, maxC
     let logOk = false;
     try {
       const fd = openSync(logPath, 'r');
-      size = statSync(logPath).size;
-      const len = Math.min(size, TAIL_BYTES);
-      const buf = Buffer.alloc(len);
-      readSync(fd, buf, 0, len, size - len);
-      closeSync(fd);
-      content = buf.toString('utf-8');
-      logOk = true;
+      try {
+        size = statSync(logPath).size;
+        const len = Math.min(size, TAIL_BYTES);
+        const buf = Buffer.alloc(len);
+        readSync(fd, buf, 0, len, size - len);
+        content = buf.toString('utf-8');
+        logOk = true;
+      } finally {
+        // 必须在 finally 关闭：statSync/readSync 抛错时也不泄漏 fd
+        closeSync(fd);
+      }
     } catch {
       try {
         content = readFileSync(logPath, 'utf-8');
@@ -313,11 +317,12 @@ export async function readOutput(opts: TmuxOpts, name: string, lines = 100, maxC
     }
     if (logOk) {
       const sliced = content.split('\n').slice(-lines).join('\n');
-      const truncated = size > maxChars;
+      // 截断判定与截取都按字符（size 是字节，不能直接与 maxChars 比较）
+      const truncated = sliced.length > maxChars || content.length > sliced.length;
       return {
         text: truncated ? sliced.slice(-maxChars) : sliced,
         source: 'log',
-        truncated: truncated || content.length > sliced.length,
+        truncated,
       };
     }
   }

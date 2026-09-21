@@ -76,10 +76,12 @@ function main() {
   let applied = 0;
   let skipped = 0;
   let missing = 0;
+  const missingFiles = [];
   for (const rel of TARGET_FILES) {
     const file = join(dir, rel);
     if (!existsSync(file)) {
       missing++;
+      missingFiles.push(rel);
       continue;
     }
     const src = readFileSync(file, 'utf8');
@@ -93,6 +95,19 @@ function main() {
     applied++;
   }
   console.log(`完成：应用 ${applied} / 跳过 ${skipped} / 缺失 ${missing}`);
+  if (missing > 0) {
+    console.log(`缺失目标（playwright-core 版本可能变化，需人工核对）：${missingFiles.join(', ')}`);
+  }
+  // 完全未命中（既没应用也没跳过）说明补丁表与当前版本不匹配，必须人工处理。
+  if (applied === 0 && skipped === 0) {
+    console.error('playwright-core 补丁未命中任何目标文件，Termux 浏览器可能不可用');
+    return 1;
+  }
+  // 其余缺失仅告警：默认不致命（版本演进导致路径变化），可用 PI_PLAYWRIGHT_ALLOW_MISSING=0 要求严格。
+  if (missing > 0 && process.env.PI_PLAYWRIGHT_ALLOW_MISSING === '0') {
+    console.error('存在缺失目标文件且要求严格模式，退出 1');
+    return 1;
+  }
   return 0;
 }
 

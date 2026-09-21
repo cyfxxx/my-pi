@@ -127,3 +127,35 @@ describe('selectOverlayLayout', () => {
     expect(l.hiddenCompleted + l.truncatedTail).toBeGreaterThan(0);
   });
 });
+
+describe('plan-mode: 只读 bash 判定', () => {
+  it('放行纯只读命令', async () => {
+    const { isReadonlyBashCommand } = await import('../readonly');
+    expect(isReadonlyBashCommand('ls -la')).toBe(true);
+    expect(isReadonlyBashCommand('git status')).toBe(true);
+    expect(isReadonlyBashCommand('git -C /repo log --oneline -5')).toBe(true);
+    expect(isReadonlyBashCommand('grep -E "(a|b)" file')).toBe(true);
+    expect(isReadonlyBashCommand('rg foo')).toBe(true);
+    expect(isReadonlyBashCommand('tsc --noEmit')).toBe(true);
+  });
+
+  it('拒绝命令串联与重定向', async () => {
+    const { isReadonlyBashCommand } = await import('../readonly');
+    expect(isReadonlyBashCommand('ls; rm -rf /tmp/x')).toBe(false);
+    expect(isReadonlyBashCommand('echo pwned > file')).toBe(false);
+    expect(isReadonlyBashCommand('cat a | tee b')).toBe(false);
+    expect(isReadonlyBashCommand('ls && rm x')).toBe(false);
+    expect(isReadonlyBashCommand('echo $(whoami)')).toBe(false);
+  });
+
+  it('拒绝可写标志与非白名单命令', async () => {
+    const { isReadonlyBashCommand } = await import('../readonly');
+    expect(isReadonlyBashCommand('find . -delete')).toBe(false);
+    expect(isReadonlyBashCommand('sort -o out.txt in.txt')).toBe(false);
+    expect(isReadonlyBashCommand('date -s 2020-01-01')).toBe(false);
+    expect(isReadonlyBashCommand('git branch -D main')).toBe(false);
+    expect(isReadonlyBashCommand('rm -rf /')).toBe(false);
+    expect(isReadonlyBashCommand('python evil.py')).toBe(false);
+    expect(isReadonlyBashCommand('')).toBe(false);
+  });
+});

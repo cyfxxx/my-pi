@@ -94,12 +94,14 @@ export function register(pi: ExtensionAPI): void {
           ctx.ui.notify('上下文预算已重置', 'info');
           break;
           
-        case 'report':
+        case 'report': {
+          const r = getBudgetReport();
           const fullReport = `上下文预算报告:
-${getBudgetReport().used.toLocaleString()} / ${getBudgetReport().total.toLocaleString()} token
-压力级别: ${getBudgetReport().pressure}`;
+${r.used.toLocaleString()} / ${r.total.toLocaleString()} token
+压力级别: ${r.pressure}`;
           ctx.ui.notify(fullReport, 'info');
           break;
+        }
           
         default:
           ctx.ui.notify(`未知子命令: ${subcommand}\n\n${helpText}`, 'info');
@@ -162,31 +164,14 @@ ${persisted}`,
     },
   });
 
-  // 工具调用开始：记录时间
+  // 工具调用开始：记录时间（Pi 的 tool_call 事件，见 hook-adapter 事件名说明）
   registerHook(pi, {
-    event: 'before_tool_call',
+    event: 'tool_call',
     handler: async (event) => {
       const toolEvent = event as { toolName?: string };
       if (toolEvent.toolName) {
         toolState.toolCallStarts.set(toolEvent.toolName, Date.now());
       }
-    },
-  });
-
-  // 工具调用结束：记录用量并用真实用量校准
-  registerHook(pi, {
-    event: 'after_tool_call',
-    handler: async (event, ctx) => {
-      const toolEvent = event as { toolName?: string; isError?: boolean; result?: unknown };
-      if (toolEvent.toolName) {
-        toolState.toolCallStarts.delete(toolEvent.toolName);
-        toolState.runToolCount++;
-        toolState.lastToolRecomputeTs = Date.now();
-        const size = typeof toolEvent.result === 'string' ? toolEvent.result.length : 0;
-        if (size > 0) recordToolUsage(toolEvent.toolName, estimateTokens(String(toolEvent.result)));
-      }
-      const usage = ctx.getContextUsage?.();
-      if (usage?.tokens != null) setUsedTokens(usage.tokens);
     },
   });
 
@@ -248,10 +233,15 @@ ${persisted}`,
           .map((b) => b.text as string)
           .join('\n');
       }
+      // 工具生命周期：结束计时、累计本轮工具调用与已进入上下文的输出估算
+      const name = e.toolName ?? 'tool';
+      const start = toolState.toolCallStarts.get(name);
+      toolState.toolCallStarts.delete(name);
+      toolState.runToolCount++;
+      toolState.lastToolRecomputeTs = Date.now();
+      if (text) recordToolUsage(name, estimateTokens(text));
       // 度量：记录 token/缓存（用量统计度量基建；无 usage 时以输出估算兜底）
       try {
-        const name = e.toolName ?? 'tool';
-        const start = toolState.toolCallStarts.get(name);
         appendUsage({
           ts: new Date().toISOString(),
           tool: name,
