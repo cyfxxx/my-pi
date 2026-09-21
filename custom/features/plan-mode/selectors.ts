@@ -48,3 +48,30 @@ export function selectTodoCounts(state: TaskState): TodoCounts {
 export function selectHasActive(state: TaskState): boolean {
   return selectVisibleTasks(state).some((t) => t.status === 'in_progress' || t.status === 'pending');
 }
+
+export interface OverlayLayout {
+  visible: readonly Task[];
+  hiddenCompleted: number;
+  truncatedTail: number;
+}
+
+export function selectOverlayLayout(state: TaskState, budget: number): OverlayLayout {
+  const all = selectVisibleTasks(state);
+  if (all.length <= budget) return { visible: all, hiddenCompleted: 0, truncatedTail: 0 };
+  const innerBudget = budget - 1;
+  const nonCompleted = all.filter((t) => t.status !== 'completed');
+  const totalCompleted = all.length - nonCompleted.length;
+  if (nonCompleted.length <= innerBudget) {
+    const kept = new Set<Task>(nonCompleted);
+    for (const t of all) {
+      if (kept.size >= innerBudget) break;
+      if (t.status === 'completed') kept.add(t);
+    }
+    const visible = all.filter((t) => kept.has(t));
+    const shownCompleted = visible.filter((t) => t.status === 'completed').length;
+    return { visible, hiddenCompleted: totalCompleted - shownCompleted, truncatedTail: 0 };
+  }
+  const visible = nonCompleted.slice(0, innerBudget);
+  const truncatedTail = nonCompleted.length - innerBudget;
+  return { visible, hiddenCompleted: totalCompleted, truncatedTail };
+}

@@ -101,3 +101,29 @@ describe('view: 序列化往返', () => {
     expect(line).toContain('1次失败');
   });
 });
+
+describe('selectOverlayLayout', () => {
+  it('全量小于预算 → 全部可见', async () => {
+    const { selectOverlayLayout } = await import('../selectors');
+    let s = fresh();
+    s = applyTaskMutation(s, 'create', { subject: 'a' }).state;
+    s = applyTaskMutation(s, 'create', { subject: 'b' }).state;
+    const l = selectOverlayLayout(s, 10);
+    expect(l.visible).toHaveLength(2);
+    expect(l.hiddenCompleted).toBe(0);
+    expect(l.truncatedTail).toBe(0);
+  });
+
+  it('超预算时优先保留非完成项并统计隐藏', async () => {
+    const { selectOverlayLayout } = await import('../selectors');
+    let s = fresh();
+    for (let i = 0; i < 6; i++) s = applyTaskMutation(s, 'create', { subject: `t${i}` }).state;
+    // 完成 3 个
+    for (let id = 1; id <= 3; id++) s = applyTaskMutation(s, 'update', { id: 1, status: 'completed' }).state;
+    const l = selectOverlayLayout(s, 3);
+    expect(l.visible.length).toBeLessThanOrEqual(3);
+    // 非完成项优先
+    expect(l.visible.some((t) => t.status !== 'completed')).toBe(true);
+    expect(l.hiddenCompleted + l.truncatedTail).toBeGreaterThan(0);
+  });
+});

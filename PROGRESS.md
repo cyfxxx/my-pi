@@ -444,3 +444,11 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 文档：README/STRUCTURE 脚本清单更新（5 → 7）；README 外部服务段落引用 setup-external.sh
 - 未迁移：rebuild.sh 的镜像加速/Node 自动升级/TUI 补丁编排/cron-systemd 安装/wrapper（wrapper 与 my-pi 直启架构不符）
 - 验证：`tsc`、`npm test`（17 文件 187 用例）、`check-isolation`、`check-features` 通过
+
+## 功能移植补充（第 15 批：plan-mode TodoOverlay）
+- 完成时间：2026-09-21
+- `overlay.ts`：`TodoOverlay`（ctx.ui.setWidget aboveEditor 面板；全部完成时隐藏；opencode todos 风格勾选行；宽度自适应截断防渲染崩溃）
+- `selectors.ts`：补 `selectOverlayLayout`/`OverlayLayout`（此前遗漏）
+- `index.ts`：todo 工具与 /plan 各子命令后刷新面板；session_start 注入 uiCtx + 刷新；session_shutdown dispose
+- 测试：新增 selectOverlayLayout 2 用例，vitest 187 → 189
+- 验证：`tsc`、`npm test`（17 文件 189 用例）、`check-isolation`、`check-features` 通过

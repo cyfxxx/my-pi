@@ -32,6 +32,7 @@ import {
   formatCommandTaskLine,
 } from './logic';
 import type { TaskAction, TaskMutationParams, Op, TaskState, Task } from './logic';
+import { TodoOverlay } from './overlay';
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '待办',
@@ -83,6 +84,7 @@ const PLAN_USAGE = [
 
 export function register(pi: ExtensionAPI): void {
   let planModeEnabled = false;
+  const overlay = new TodoOverlay();
 
   const restoreAllTools = (): void => {
     setActiveTools(pi, getAllToolNames(pi));
@@ -123,6 +125,11 @@ export function register(pi: ExtensionAPI): void {
       }
       const result = applyTaskMutation(getState(), action, params as TaskMutationParams);
       commitState(result.state);
+      try {
+        overlay.update();
+      } catch {
+        /* UI 不可用时忽略 */
+      }
       const text = formatContent(result.op, result.state);
       return result.op.kind === 'error' ? `Error: ${text}` : text;
     },
@@ -138,6 +145,11 @@ export function register(pi: ExtensionAPI): void {
     },
     handler: async (args, ctx) => {
       const sub = (args.trim().split(/\s+/)[0] || '').toLowerCase();
+      try {
+        overlay.setUICtx(ctx.ui as never);
+      } catch {
+        /* 非交互环境 */
+      }
 
       if (sub === 'help' || sub === '') {
         ctx.ui.notify(PLAN_USAGE, 'info');
@@ -145,22 +157,26 @@ export function register(pi: ExtensionAPI): void {
       }
       if (sub === 'enter' || sub === 'on') {
         if (!planModeEnabled) applyPlanMode(true);
+        overlay.update();
         ctx.ui.notify('计划模式已启用。编辑/写入/bash 工具已禁用（只读探索）。', 'info');
         return;
       }
       if (sub === 'exit' || sub === 'off') {
         if (planModeEnabled) applyPlanMode(false);
+        overlay.update();
         ctx.ui.notify('计划模式已禁用。完整访问已恢复。', 'info');
         return;
       }
       if (sub === 'toggle') {
         applyPlanMode(!planModeEnabled);
+        overlay.update();
         ctx.ui.notify(planModeEnabled ? '计划模式已启用。' : '计划模式已禁用。', 'info');
         return;
       }
       if (sub === 'clear') {
         const count = getState().tasks.filter((t) => t.status !== 'deleted').length;
         resetState();
+        overlay.update();
         ctx.ui.notify(`已清空 ${count} 个计划任务。`, 'info');
         return;
       }
@@ -172,6 +188,7 @@ export function register(pi: ExtensionAPI): void {
         }
         planModeEnabled = false;
         restoreAllTools();
+        overlay.update();
         appendEntry(pi, 'plan-mode', { enabled: false, timestamp: Date.now() });
         sendMessage(
           pi,
@@ -252,7 +269,20 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'session_start',
     handler: async (_event, ctx) => {
+      try {
+        overlay.setUICtx(ctx.ui as never);
+        overlay.update();
+      } catch {
+        /* 非交互环境 */
+      }
       if (ctx.hasUI) ctx.ui.notify('计划模式已就绪（/plan help）', 'info');
+    },
+  });
+
+  registerHook(pi, {
+    event: 'session_shutdown',
+    handler: async () => {
+      overlay.dispose();
     },
   });
 }

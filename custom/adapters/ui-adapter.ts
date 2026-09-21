@@ -8,11 +8,11 @@
  */
 
 import type { ExtensionAPI, RegisteredCommand, MessageRenderer, ExtensionContext, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
-import { Key, Container, Markdown, Spacer, Text } from '@earendil-works/pi-tui';
+import { Key, Container, Markdown, Spacer, Text, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import type { KeyId, AutocompleteItem } from '@earendil-works/pi-tui';
 import { getMarkdownTheme as piGetMarkdownTheme } from '@earendil-works/pi-coding-agent';
 
-export { Key, Container, Markdown, Spacer, Text };
+export { Key, Container, Markdown, Spacer, Text, truncateToWidth, visibleWidth };
 
 /** 获取 Markdown 渲染主题（供功能层渲染器使用，避免直接 import vendor/pi） */
 export function getMarkdownTheme(): ReturnType<typeof piGetMarkdownTheme> {
