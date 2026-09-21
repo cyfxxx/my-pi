@@ -17,7 +17,7 @@ echo ""
 
 # ---- 期望清单（与 pi-tools 注册面对齐）----
 # 格式：feature:name1,name2
-EXPECTED_TOOLS="web-search:web_search,fetch_url,web_fetch link:link_send,link_status browser:browser_navigate,browser_screenshot,browser_click,browser_type,browser_scroll,browser_extract,browser_evaluate,browser_find,browser_wait_for,browser_network,browser_select_option,browser_dialog,browser_download,browser_upload,browser_cookies,browser_pdf,browser_help,browser_close voice:voice_transcribe,voice_speak tmux:tmux_run,tmux_status,tmux_read,tmux_send,tmux_stop,tmux_wait memory:memory_store,memory_search,memory_recall,memory_stats,memory_forget plan-mode:todo subagent:subagent autopilot:autopilot_status,autopilot_stats,autopilot_failover"
+EXPECTED_TOOLS="web-search:web_search,fetch_url,web_fetch link:link_send,link_status browser:browser_navigate,browser_screenshot,browser_click,browser_type,browser_scroll,browser_extract,browser_evaluate,browser_find,browser_wait_for,browser_network,browser_select_option,browser_dialog,browser_download,browser_upload,browser_cookies,browser_pdf,browser_help,browser_close voice:voice_transcribe,voice_speak,voice_record tmux:tmux_run,tmux_status,tmux_read,tmux_send,tmux_stop,tmux_wait memory:memory_store,memory_search,memory_recall,memory_stats,memory_forget plan-mode:todo subagent:subagent autopilot:autopilot_status,autopilot_stats,autopilot_failover"
 EXPECTED_COMMANDS="autopilot:autopilot,auto,schedule context:context,usage-diag,tools mode:mode plan-mode:plan voice:voice memory:memory link:link intervention:intervention"
 EXPECTED_SHORTCUTS="voice plan-mode"
 HOOK_EVENTS="session_start before_agent_start context tool_call tool_result tool_execution_start tool_execution_end before_tool_call after_tool_call"

@@ -6,6 +6,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { cleanForSpeech, isSpeechWorthy, createTtsDispatcher, extractAssistantText } from '../tts';
 import { loadConfig } from '../config';
 import { ensureWhisperService } from '../transcription';
+import { recorderSpec, convertToWav, deleteAudioPair, fileExists, waitForFileStable, cleanupStaleAudio } from '../recording';
+import { mkdtempSync, rmSync, writeFileSync, utimesSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 describe('cleanForSpeech', () => {
   it('移除代码块/行内代码/链接/markdown 标记', () => {
@@ -127,5 +131,64 @@ describe('ensureWhisperService（注入 deps）', () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain('no script');
+  });
+});
+
+describe('recording 平台规格与工具', () => {
+  const base = loadConfig({}, '/nonexistent/pi-voice.json');
+  it('termux spec: m4a + 需转码', () => {
+    const spec = recorderSpec({ ...base, platform: 'termux' } as never);
+    expect(spec.bin).toBe('termux-microphone-record');
+    expect(spec.ext).toBe('m4a');
+    expect(spec.needsConvert).toBe(true);
+    expect(spec.startArgs('x.m4a')).toContain('-e');
+    expect(spec.stopArgs()).toEqual(['-q']);
+  });
+
+  it('linux spec: wav 直出 + parec', () => {
+    const spec = recorderSpec({ ...base, platform: 'linux' } as never);
+    expect(spec.bin).toBe('parec');
+    expect(spec.ext).toBe('wav');
+    expect(spec.needsConvert).toBe(false);
+    expect(spec.startArgs('x.wav').join(' ')).toContain('--format=s16le');
+  });
+
+  it('convertToWav linux 直接返回原文件', async () => {
+    const r = await convertToWav({ ...base, platform: 'linux' } as never, '/tmp/a.wav');
+    expect(r.wav).toBe('/tmp/a.wav');
+    expect(r.error).toBe('');
+  });
+
+  it('fileExists / deleteAudioPair', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-voice-'));
+    const f = join(dir, 'a.m4a');
+    writeFileSync(f, 'x');
+    expect(fileExists(f)).toBe(true);
+    deleteAudioPair({} as never, f);
+    expect(fileExists(f)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('waitForFileStable 稳定文件快速返回 true', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-voice-'));
+    const f = join(dir, 'a.wav');
+    writeFileSync(f, 'x'.repeat(100));
+    expect(await waitForFileStable(f, { pollMs: 5, stableSamples: 2, maxWaitMs: 500 })).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('cleanupStaleAudio 仅删过期文件', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-voice-'));
+    const old = join(dir, 'old.wav');
+    const fresh = join(dir, 'new.wav');
+    writeFileSync(old, 'x');
+    writeFileSync(fresh, 'y');
+    const past = new Date(Date.now() - 48 * 3600_000);
+    utimesSync(old, past, past);
+    const removed = cleanupStaleAudio({ tmpDir: dir } as never, 24 * 3600_000);
+    expect(removed).toBe(1);
+    expect(existsSync(old)).toBe(false);
+    expect(existsSync(fresh)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

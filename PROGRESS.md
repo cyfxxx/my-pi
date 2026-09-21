@@ -409,3 +409,11 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 测试：新增 runner 纯函数 2 用例，vitest 176 → 178
 - 验证：`tsc`、`npm test`（17 文件 178 用例）通过
 - 安全：执行循环默认受 autopilot 配置 `enabled` 与预算三锁约束；失败不自动重启（仅提示，避免意外打断）
+
+## 功能移植补充（第 11 批：voice 录音核心）
+- 完成时间：2026-09-21
+- `recording.ts`：平台规格（termux m4a/需转码；linux parec wav 直出）、`startRecording`/`stopRecording`（SIGTERM→SIGKILL / termux -q、实例归属与会话锁防多实例误杀）、`queryRecording`、`convertToWav`（ffmpeg 16k mono）、`waitForFileStable`（m4a moov 尾部就绪）、`cleanupStaleAudio`、`detectAudioLevel`、`deleteAudioPair`/`fileExists`
+- `index.ts`：新增 `voice_record` 工具（start/stop/status，stop 后转码返回 wav 路径）
+- 未迁移：Windows dshow 录音、唤醒词、诊断基准
+- 测试：新增 recording 6 用例，vitest 178 → 184
+- 验证：`tsc`、`npm test`（17 文件 184 用例）、`check-isolation.sh`、`check-features.sh` 通过

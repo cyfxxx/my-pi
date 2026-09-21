@@ -24,8 +24,15 @@ import {
   whisperStatus,
   whisperModel,
   whisperDevice,
+  startRecording,
+  stopRecording,
+  queryRecording,
+  convertToWav,
+  cleanupStaleAudio,
   type VoiceConfig,
 } from './logic';
+
+let activeRecording: { file: string; startedAt: number } | null = null;
 
 export function register(pi: ExtensionAPI): void {
   let cfg: VoiceConfig = loadConfig();
@@ -73,6 +80,51 @@ export function register(pi: ExtensionAPI): void {
       if (!isSpeechWorthy(args.text as string)) return '(文本不适合朗读，已跳过)';
       const r = await speak(cfg, args.text as string);
       return r.code === 0 ? '语音播放完成' : `朗读失败: ${r.stderr || r.stdout}`;
+    },
+  });
+
+  // ── 工具：录音会话 ──
+  registerTool(pi, {
+    name: 'voice_record',
+    description: '录音会话控制：start 开始录音，stop 结束并转码为 16k mono wav 返回路径，status 查询状态。',
+    parameters: {
+      action: { type: 'string', enum: ['start', 'stop', 'status'], description: '操作' },
+    },
+    execute: async (args) => {
+      refresh();
+      const action = args.action as string;
+      if (action === 'status') {
+        const q = await queryRecording(cfg);
+        return activeRecording
+          ? `录音中: ${activeRecording.file}`
+          : q === null
+            ? '无录音（当前平台不支持状态查询）'
+            : q.isRecording
+              ? '服务端报告录音中'
+              : '空闲';
+      }
+      if (action === 'start') {
+        cleanupStaleAudio(cfg);
+        try {
+          const { file } = startRecording(cfg, () => {
+            /* 退出回调：状态由 stop/status 处理 */
+          });
+          activeRecording = { file, startedAt: Date.now() };
+          return `开始录音: ${file}`;
+        } catch (e) {
+          return `录音启动失败: ${(e as Error).message}`;
+        }
+      }
+      if (action === 'stop') {
+        await stopRecording(cfg);
+        const rec = activeRecording;
+        activeRecording = null;
+        if (!rec) return '当前无进行中的录音';
+        const { wav, error } = await convertToWav(cfg, rec.file);
+        if (!wav) return `转码失败: ${error}`;
+        return `录音完成（${Math.round((Date.now() - rec.startedAt) / 1000)}s）: ${wav}`;
+      }
+      return '用法: voice_record <start|stop|status>';
     },
   });
 

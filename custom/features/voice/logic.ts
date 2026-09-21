@@ -6,3 +6,4 @@ export * from './config';
 export * from './tts';
 export * from './whisper';
 export * from './transcription';
+export * from './recording';
