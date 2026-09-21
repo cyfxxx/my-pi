@@ -1,7 +1,7 @@
 /**
  * Memory Feature — 纯逻辑 barrel
  *
- * 实际实现按职责拆分：types / env / storage / retrieval / merge / inject / lifecycle。
+ * 实际实现按职责拆分：types / env / storage / retrieval / merge / inject / lifecycle / lesson-miner。
  */
 
 export * from './types';
@@ -11,3 +11,4 @@ export * from './retrieval';
 export * from './merge';
 export * from './inject';
 export * from './lifecycle';
+export * from './lesson-miner';

@@ -39,6 +39,10 @@ import {
   ENVIRONMENTS,
   analyzeLifecycle,
   formatLifecycleReport,
+  readInterventionRecords,
+  mineLessons,
+  candidateToEntry,
+  formatLessonReport,
 } from './logic';
 import type { MemoryCategory, MemoryEntry, RuntimeEnv } from './logic';
 
@@ -250,6 +254,7 @@ export function register(pi: ExtensionAPI): void {
         { value: 'stats', label: 'stats - 查看记忆库统计' },
         { value: 'summary', label: 'summary - 查看会话摘要' },
         { value: 'lifecycle', label: 'lifecycle - 生命周期只读报告（淘汰/升格/冲突候选）' },
+        { value: 'mine', label: 'mine [--ingest] - 从纠正意图挖掘教训（默认只读）' },
         { value: 'prune', label: 'prune - 清理失效记忆' },
         { value: 'cleanup', label: 'cleanup - 清理过期笔记' },
         { value: 'help', label: 'help - 显示帮助信息' },
@@ -270,6 +275,7 @@ export function register(pi: ExtensionAPI): void {
   stats            查看记忆库统计
   summary          查看会话摘要
   lifecycle        生命周期只读报告（淘汰/升格/冲突候选）
+  mine [--ingest]  从干预纠正意图挖掘教训（默认只读，--ingest 入库）
   prune            清理失效记忆
   cleanup          清理过期笔记
   help             显示帮助`;
@@ -309,6 +315,21 @@ export function register(pi: ExtensionAPI): void {
               : '暂无会话摘要',
             'info',
           );
+          break;
+        }
+        case 'mine': {
+          const existing = loadEntries();
+          const candidates = mineLessons(readInterventionRecords(), existing);
+          if (parts.includes('--ingest')) {
+            if (candidates.length === 0) {
+              ctx.ui.notify('无新的教训候选可入库', 'info');
+              break;
+            }
+            for (const c of candidates) storeEntry(existing, candidateToEntry(c));
+            ctx.ui.notify(`已入库 ${candidates.length} 条教训（自动去重）`, 'info');
+          } else {
+            ctx.ui.notify(formatLessonReport(candidates), 'info');
+          }
           break;
         }
         case 'lifecycle': {

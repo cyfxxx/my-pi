@@ -210,3 +210,33 @@ describe('lifecycle 生命周期报告', () => {
     expect(text).toContain('规模');
   });
 });
+
+describe('lesson-miner 教训挖掘', () => {
+  it('mineLessons 跳过无纠正、按既有内容哈希去重', async () => {
+    const { mineLessons, candidateToEntry, formatLessonReport } = await import('../lesson-miner');
+    const records = [
+      { id: 'a', prompt: '实现登录', correctivePrompt: '不要用 session，用 JWT' },
+      { id: 'b', prompt: '无纠正', correctivePrompt: null },
+      { id: 'c', prompt: '部署', correctivePrompt: '' },
+    ];
+    const first = mineLessons(records);
+    expect(first).toHaveLength(1);
+    expect(first[0].category).toBe('preference');
+    expect(first[0].content).toContain('JWT');
+
+    // 已入库同内容 → 去重
+    const existing = [candidateToEntry(first[0])];
+    expect(mineLessons(records, existing)).toHaveLength(0);
+    expect(formatLessonReport([])).toContain('未发现');
+  });
+
+  it('readInterventionRecords 读取 JSONL', async () => {
+    const { readInterventionRecords } = await import('../lesson-miner');
+    const { writeFileSync } = await import('node:fs');
+    const file = join(dir, 'interventions.jsonl');
+    writeFileSync(file, JSON.stringify({ id: 'x', correctivePrompt: '改用 pg' }) + '\nnot-json\n');
+    const recs = readInterventionRecords(file);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].id).toBe('x');
+  });
+});

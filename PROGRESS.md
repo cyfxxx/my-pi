@@ -501,3 +501,11 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 文档：VISION §6 P3 状态更新
 - 测试：新增 lifecycle 2 用例，vitest 203 → 205
 - 验证：`npm run golden` 通过；`tsc`/`check-isolation`/`check-features`/`npm test` 通过
+
+## 自主迭代（第 21 批：P3 教训挖掘 → 入库闭环）
+- 完成时间：2026-09-21（自主推进）
+- `features/memory/lesson-miner.ts`：读取 interventions.jsonl 的纠正意图，生成教训候选（跳过无纠正、按内容哈希与标题去重）；`candidateToEntry` 转记忆条目；`formatLessonReport`
+- `memory/index.ts`：`/memory mine [--ingest]`（默认只读报告；--ingest 经 `storeEntry` 写入并自动去重）
+- 文档：VISION §6 P3 标记完成
+- 测试：新增 lesson-miner 2 用例，vitest 205 → 207
+- 验证：`npm run golden`、`tsc`、`check-isolation`、`check-features`、`npm test` 通过
