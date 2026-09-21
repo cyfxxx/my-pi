@@ -11,7 +11,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
-import { registerCommand, registerShortcut, sendMessage, Key } from '../../adapters/ui-adapter';
+import { registerCommand, registerShortcut, sendMessage, sendUserMessage, Key } from '../../adapters/ui-adapter';
 import {
   loadConfig,
   persistConfig,
@@ -31,8 +31,16 @@ import {
   cleanupStaleAudio,
   createWakeSession,
   benchmark,
+  micLabel,
+  platformInstallGuide,
+  fileExists,
+  deleteAudioPair,
+  waitForFileStable,
+  detectAudioLevel,
+  createDictation,
   type VoiceConfig,
   type WakeSession,
+  type RecordingDeps,
 } from './logic';
 
 let activeRecording: { file: string; startedAt: number } | null = null;
@@ -47,6 +55,30 @@ export function register(pi: ExtensionAPI): void {
   const dispatcher = createTtsDispatcher({
     speakFn: (text) => speak(cfg, text),
     onError: (m) => console.error('[voice] TTS:', m),
+  });
+
+  const dictationDeps: RecordingDeps = {
+    startRecording,
+    stopRecording,
+    queryRecording,
+    fileExists,
+    convertToWav,
+    transcribe: (c, w) => transcribeByBackend(c, w),
+    deleteAudioPair,
+    waitForFileStable,
+    detectAudioLevel: (w) => detectAudioLevel(w, cfg.ffmpegBin),
+    micLabel: micLabel(cfg),
+    micInstallHint: platformInstallGuide(cfg).split('\n')[0],
+    micPermissionHint: '检查系统麦克风权限（Android: 设置→应用→Termux:API→麦克风）',
+  };
+  const dictation = createDictation(cfg, dictationDeps, {
+    onAutoComplete: (r) => {
+      sendMessage(pi, { customType: 'voice-dictation', content: r.message, display: true });
+      if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false });
+    },
+    onReady: () => {
+      sendMessage(pi, { customType: 'voice-dictation', content: '🎤 录音中', display: true });
+    },
   });
 
   // ── 工具：转写 ──
@@ -136,7 +168,7 @@ export function register(pi: ExtensionAPI): void {
   registerCommand(pi, 'voice', {
     description: '语音模式管理 (usage: /voice <on|off|status|toggle|tts|model|device|backend|language|doctor|help>)',
     getArgumentCompletions: (prefix) => {
-      const subs = ['on', 'off', 'status', 'toggle', 'tts', 'model', 'device', 'backend', 'language', 'doctor', 'wake', 'bench', 'help'];
+      const subs = ['on', 'off', 'status', 'toggle', 'record', 'tts', 'model', 'device', 'backend', 'language', 'doctor', 'wake', 'bench', 'help'];
       const f = subs.filter((s) => s.startsWith(prefix));
       return f.length ? f.map((s) => ({ value: s, label: s })) : null;
     },
@@ -152,6 +184,7 @@ export function register(pi: ExtensionAPI): void {
   /voice backend <whisper|sherpa> 设置转写后端
   /voice language <代码>      设置转写语言（空=自动）
   /voice doctor               后端健康检查
+  /voice record <start|stop|cancel|status>  录音→转写→发送（Ctrl+Alt+R）
   /voice wake <on|off|status> KWS 唤醒监听（Linux+sherpa）
   /voice bench                录音→转写基准（RTF）
   /voice help                 本帮助`;
@@ -283,6 +316,25 @@ export function register(pi: ExtensionAPI): void {
         ctx.ui.notify('用法: /voice wake <on|off|status>', 'info');
         return;
       }
+      if (sub === 'record') {
+        const op = rest[0] ?? 'toggle';
+        if (op === 'status') {
+          ctx.ui.notify(dictation.isRecording() ? '录音中' : dictation.isTranscribing() ? '转写中' : '空闲', 'info');
+          return;
+        }
+        if (op === 'cancel') {
+          ctx.ui.notify(dictation.cancel(), 'info');
+          return;
+        }
+        if (op === 'stop' || (op === 'toggle' && dictation.isRecording())) {
+          const r = await dictation.stop();
+          ctx.ui.notify(r.message, r.text ? 'info' : 'warning');
+          if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false });
+          return;
+        }
+        ctx.ui.notify(dictation.start(), 'info');
+        return;
+      }
       if (sub === 'bench') {
         ctx.ui.notify('正在进行录音基准测试（约 5s）...', 'info');
         const r = await benchmark(cfg);
@@ -293,13 +345,18 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // ── 快捷键 Ctrl+Alt+R：切换自动朗读 ──
+  // ── 快捷键 Ctrl+Alt+R：听写开关（录音 → 转写 → 发送）──
   registerShortcut(pi, Key.ctrlAlt('r'), {
-    description: '切换语音自动朗读 (Ctrl+Alt+R)',
+    description: '语音听写开关 (Ctrl+Alt+R)',
     handler: async (ctx) => {
-      enabled = !enabled;
-      persistConfig({ ttsEnabled: enabled });
-      if (ctx.hasUI) ctx.ui.notify(enabled ? '语音自动朗读已启用' : '语音自动朗读已禁用', 'info');
+      if (dictation.isRecording()) {
+        const r = await dictation.stop();
+        if (ctx.hasUI) ctx.ui.notify(r.message, r.text ? 'info' : 'warning');
+        if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false });
+      } else {
+        const msg = dictation.start();
+        if (ctx.hasUI) ctx.ui.notify(msg, 'info');
+      }
     },
   });
 
@@ -327,6 +384,7 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'session_shutdown',
     handler: async () => {
+      dictation.cleanup();
       if (wakeSession) {
         wakeSession.stop();
         wakeSession = null;

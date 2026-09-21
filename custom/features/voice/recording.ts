@@ -73,6 +73,15 @@ export function recorderSpec(cfg: VoiceConfig): RecorderSpec {
   };
 }
 
+/** 录音程序显示名（错误提示用） */
+export function micLabel(cfg: VoiceConfig): string {
+  const kind = resolvePlatform(cfg);
+  if (kind === 'termux') return 'termux-microphone-record';
+  if (kind === 'windows') return `ffmpeg dshow${cfg.micDevice ? ` [${cfg.micDevice}]` : ''}`;
+  const micBin = cfg.micBin === 'termux-microphone-record' ? 'parec' : cfg.micBin;
+  return `${micBin}${cfg.linuxMicDevice ? ` (${cfg.linuxMicDevice})` : ''}`;
+}
+
 let activeRecorder: { child: ChildProcess; file: string } | null = null;
 let termuxSessionActive = false;
 

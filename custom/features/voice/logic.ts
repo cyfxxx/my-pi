@@ -9,3 +9,4 @@ export * from './transcription';
 export * from './recording';
 export * from './wake';
 export * from './diagnostics';
+export * from './dictation';

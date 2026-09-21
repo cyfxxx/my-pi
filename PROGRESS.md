@@ -461,3 +461,11 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
   - vendor/pi 已存在时核对 `patches/*.patch` 应用状态（幂等，不改动）
   - Termux 下自动核对 playwright-core 平台补丁
 - 说明：wrapper / crash-recovery / L4 源码缓存与 my-pi 直启架构不符（N.A.）；cron/systemd 离线调度由 autopilot 会话内 tick 承担，未提供独立安装脚本
+
+## 功能移植补充（第 17 批：voice dictation 状态机）
+- 完成时间：2026-09-21
+- `dictation.ts`：录音/转写状态机 `createDictation`（idle→recording→transcribing；依赖注入；超时自动停止、录音进程异常退出续录/重试、假成功检测、转码重试、音量判定、即用即弃删除、cancel/cleanup）
+- `index.ts`：Ctrl+Alt+R 改为听写开关（录音→转写→发送），结果经 sendUserMessage 注入；`/voice record <start|stop|cancel|status>`；session_shutdown 清理
+- `recording.ts`：新增 `micLabel`
+- 测试：新增 dictation 5 用例，vitest 189 → 194（18 文件）
+- 验证：`tsc`、`npm test`、`check-isolation`、`check-features` 通过
