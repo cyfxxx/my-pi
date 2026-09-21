@@ -207,3 +207,59 @@ describe('runner 纯函数', () => {
     expect(extractRunOutput(lines)).toBe('final');
   });
 });
+
+describe('watchdog 纯逻辑', () => {
+  it('空闲判定与 busy 豁免', async () => {
+    const wd = await import('../watchdog');
+    wd.resetWatchdogState();
+    expect(wd.isHanging(1)).toBe(false); // 刚活动
+    wd.setTurnBusy(true);
+    const now = Date.now() + 90 * 1000;
+    expect(wd.isHanging(1, now)).toBe(false); // busy 宽限（2×maxIdle）
+    wd.setTurnBusy(false);
+    expect(wd.isHanging(0)).toBe(false); // maxIdle<=0
+  });
+});
+
+describe('verifier 纯逻辑', () => {
+  it('parseJudgeScores 解析候选分数并容错', async () => {
+    const { parseJudgeScores } = await import('../verifier');
+    const s = parseJudgeScores('候选1: 分数=0.8, 理由=好\n候选2: 分数=0.3, 理由=差', 2);
+    expect(s[0].score).toBeCloseTo(0.8);
+    expect(s[1].score).toBeCloseTo(0.3);
+    const missing = parseJudgeScores('无格式', 2);
+    expect(missing.every((x) => x.score === 0.5)).toBe(true);
+  });
+
+  it('selectBest / shouldVerify', async () => {
+    const { selectBest, shouldVerify } = await import('../verifier');
+    expect(selectBest([{ index: 0, score: 0.2, reasoning: '' }, { index: 1, score: 0.9, reasoning: '' }]).index).toBe(1);
+    expect(shouldVerify(1, { enabled: true, nCandidates: 3, verifyAfter: 1, threshold: 0.6, maxCostPerVerify: 0.01, logLevel: 'summary' })).toBe(true);
+    expect(shouldVerify(0, { enabled: true, nCandidates: 3, verifyAfter: 1, threshold: 0.6, maxCostPerVerify: 0.01, logLevel: 'summary' })).toBe(false);
+  });
+
+  it('ProgressTracker 评分与终止', async () => {
+    const { ProgressTracker } = await import('../verifier');
+    const p = new ProgressTracker(0.4);
+    expect(p.currentScore()).toBe(0.5);
+    p.step('read', '完成读取');
+    expect(p.currentScore()).toBeGreaterThan(0.5);
+    p.step('bash', 'error 失败');
+    p.step('bash', 'error 失败');
+    expect(p.shouldAbort()).toBe(true);
+  });
+
+  it('summarize 聚合', async () => {
+    const { summarize } = await import('../verifier-logger');
+    const base = {
+      ts: new Date().toISOString(), epoch: Date.now(), taskId: '1', taskName: 't', nCandidates: 3,
+      selectedIndex: 0, scores: [0.8, 0.5, 0.6], durationMs: 10, estCost: 0.02, baselineCost: 0.01,
+      costMultiplier: 2, passed: true, reasoning: '', result: 'success' as const, judgeModel: 'm',
+    };
+    const s = summarize([base, { ...base, passed: false, result: 'failed' }]);
+    expect(s.totalVerifications).toBe(2);
+    expect(s.passRate).toBe(0.5);
+    expect(s.avgCostMultiplier).toBe(2);
+    expect(s.marginalGain[0].n).toBe(3);
+  });
+});

@@ -42,6 +42,10 @@ import {
   classifyError,
   appendRun,
   estimateCost,
+  touchActivity,
+  setTurnBusy,
+  isHanging,
+  resetWatchdogState,
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
 import { runTaskOnce } from './runner';
@@ -397,13 +401,63 @@ export function register(pi: ExtensionAPI): void {
     }
   };
 
+  let hangNotified = false;
+  const checkHang = (ctx: ExtensionContext): void => {
+    const c = readAutopilotConfig();
+    if (isHanging(c.maxIdleMinutes)) {
+      if (!hangNotified) {
+        hangNotified = true;
+        try {
+          if (ctx.hasUI) ctx.ui.notify(`autopilot: 会话疑似挂死（>${c.maxIdleMinutes} 分钟无活动），建议检查或重启`, 'warning');
+        } catch {
+          /* stale ctx */
+        }
+      }
+    } else {
+      hangNotified = false;
+    }
+  };
+
   registerHook(pi, {
     event: 'session_start',
     handler: async (_event, ctx) => {
+      resetWatchdogState();
       if (tickTimer) clearInterval(tickTimer);
-      tickTimer = setInterval(() => void runDueTasks(ctx), 60000);
+      tickTimer = setInterval(() => {
+        void runDueTasks(ctx);
+        checkHang(ctx);
+      }, 60000);
       tickTimer.unref?.();
       void runDueTasks(ctx);
+    },
+  });
+
+  // ── 看门狗活动信号 ──
+  registerHook(pi, {
+    event: 'turn_start',
+    handler: async () => {
+      setTurnBusy(true);
+      touchActivity();
+    },
+  });
+  registerHook(pi, {
+    event: 'turn_end',
+    handler: async () => {
+      setTurnBusy(false);
+      touchActivity();
+    },
+  });
+  registerHook(pi, {
+    event: 'agent_settled',
+    handler: async () => {
+      setTurnBusy(false);
+      touchActivity();
+    },
+  });
+  registerHook(pi, {
+    event: 'input',
+    handler: async () => {
+      touchActivity();
     },
   });
 

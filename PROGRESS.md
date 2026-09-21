@@ -469,3 +469,13 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `recording.ts`：新增 `micLabel`
 - 测试：新增 dictation 5 用例，vitest 189 → 194（18 文件）
 - 验证：`tsc`、`npm test`、`check-isolation`、`check-features` 通过
+
+## 功能移植补充（第 18 批：autopilot watchdog / verifier）
+- 完成时间：2026-09-21
+- `watchdog.ts`：挂死检测（lastActivity + 最新会话 mtime 双信号、busy 宽限）；`triggerHangRecovery` 写重启请求
+- `index.ts`：活动信号钩子（turn_start/turn_end/agent_settled/input）+ tick 内挂死提示（my-pi 无 wrapper，仅提示不自动重启）
+- `verifier.ts`：`parseJudgeScores`/`selectBest`/`shouldVerify`/`ProgressTracker`/`bestOfN`（生成与评分注入，未提供评分 fail-open）
+- `verifier-logger.ts`：JSONL 记录 + `summarize` 聚合（落 `portable/memory/scheduler/`）
+- `types.ts`：补 `VerifierConfig`/`defaultVerifierConfig`
+- 测试：新增 watchdog/verifier 5 用例，vitest 194 → 199
+- 验证：`tsc`、`npm test`（18 文件 199 用例）、`check-isolation`、`check-features` 通过

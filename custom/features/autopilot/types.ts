@@ -97,6 +97,20 @@ export interface TelemetryEntry {
   errClass: ErrorClass | null;
 }
 
+export interface VerifierConfig {
+  enabled: boolean;
+  nCandidates: number;
+  verifyAfter: number;
+  threshold: number;
+  maxCostPerVerify: number;
+  logLevel: 'none' | 'summary' | 'full';
+  judgePrompt?: string;
+}
+
+export function defaultVerifierConfig(): VerifierConfig {
+  return { enabled: false, nCandidates: 3, verifyAfter: 1, threshold: 0.6, maxCostPerVerify: 0.01, logLevel: 'summary' };
+}
+
 export const STORE_VERSION = 3;
 export const DEFAULT_MAX_RUN_TIME = 300;
 export const RETRY_BASE_DELAY_MS = 30000;
