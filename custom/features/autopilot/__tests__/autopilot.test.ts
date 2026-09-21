@@ -263,3 +263,30 @@ describe('verifier 纯逻辑', () => {
     expect(s.marginalGain[0].n).toBe(3);
   });
 });
+
+describe('metrics 仪表盘', () => {
+  it('汇总干预/用量/任务三类指标', async () => {
+    const { collectMetrics, formatMetrics } = await import('../metrics');
+    const { mkdirSync, writeFileSync } = await import('node:fs');
+    const now = Date.now();
+    const md = join(dir, 'metrics-memory');
+    mkdirSync(join(md, 'context'), { recursive: true });
+    mkdirSync(join(md, 'scheduler'), { recursive: true });
+    writeFileSync(join(md, 'interventions.jsonl'),
+      JSON.stringify({ ts: new Date(now).toISOString(), correctivePrompt: 'fix' }) + '\n' +
+      JSON.stringify({ ts: new Date(now).toISOString(), correctivePrompt: null }) + '\n');
+    writeFileSync(join(md, 'context', 'usage.jsonl'),
+      JSON.stringify({ ts: new Date(now).toISOString(), input: 100, cacheRead: 100 }) + '\n');
+    writeFileSync(join(md, 'scheduler', 'telemetry.json'),
+      JSON.stringify({ runs: [{ result: 'success' }, { result: 'failed' }] }));
+    const d = collectMetrics(md, now);
+    expect(d.interventions.total).toBe(2);
+    expect(d.interventions.corrected).toBe(1);
+    expect(d.interventions.linkRate).toBe(0.5);
+    expect(d.usage.todayCount).toBe(1);
+    expect(d.usage.cacheHitRate).toBeCloseTo(0.5, 3);
+    expect(d.tasks.runs).toBe(2);
+    expect(d.tasks.successRate).toBe(0.5);
+    expect(formatMetrics(d)).toContain('缓存');
+  });
+});

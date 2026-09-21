@@ -509,3 +509,10 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 文档：VISION §6 P3 标记完成
 - 测试：新增 lesson-miner 2 用例，vitest 205 → 207
 - 验证：`npm run golden`、`tsc`、`check-isolation`、`check-features`、`npm test` 通过
+
+## 自主迭代（第 22 批：度量仪表盘 /auto metrics）
+- 完成时间：2026-09-21（自主推进）
+- `features/autopilot/metrics.ts`：聚合干预率、token 成本、缓存命中率、任务成功率（读取 interventions.jsonl / context/usage.jsonl / scheduler/telemetry.json，数据级解耦）；`/auto metrics`
+- 文档：VISION §2 三处现状更新为"已可度量"
+- 测试：新增 metrics 1 用例，vitest 207 → 208
+- 验证：`npm run golden`、`tsc`、`check-isolation`、`check-features`、`npm test` 通过

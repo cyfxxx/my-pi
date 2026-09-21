@@ -7,3 +7,4 @@ export * from './ops';
 export * from './watchdog';
 export * from './verifier-logger';
 export * from './verifier';
+export * from './metrics';

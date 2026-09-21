@@ -38,18 +38,18 @@
 
 ### 2.1 智能 — 执行任务时稳定、可靠、高效、契合用户的需求
 - 判据：三层验证全绿（`npm run check` 隔离边界、`npx tsc --noEmit -p custom/` 类型、`npx vitest run` 单测）；缓存命中率有基线且不劣化；任务级 token 成本不劣化。
-- my-pi 现状：三层验证已有且全绿（vitest 4 文件 27 用例）；**缓存命中率与 token 成本尚无度量**（pi-tools 的 usage-stats/cache-guard 未迁移），见 §4。
+- my-pi 现状（2026-09-21）：三层验证全绿（vitest 19 文件 208 用例）+ `npm run golden` 防退化；缓存命中率/token 成本经 `usage-stats` 持久化，`/auto metrics` 仪表盘可对比，见 §4。
 
 ### 2.2 自主 — 尽可能减少用户中途干预；重视每一次干预
 - 独立完成全流程后一次性汇报；每次 abort 均有快照留存并与用户的 corrective prompt 关联；
 - 分析自身意图与用户意图的差别，沉淀为 preference/habit 记忆，不断缩小差别。
 - 判据：干预率（干预次数 / 完成任务数）趋势下降；abort 快照留存率 100%。
-- my-pi 现状：`custom/features/intervention/`、`autopilot/` 已注册但为骨架，**无快照落盘与聚合指标**。
+- my-pi 现状（2026-09-21）：`intervention` 落盘 `interventions.jsonl`（abort 快照 + corrective 关联），`/intervention stats` 与 `/auto metrics` 产出关联率/干预率。
 
 ### 2.3 进化 — 重视每一次对话、每一个任务
 - 汲取教训、总结经验、优化 agent 运行。
 - 判据：教训闭环四态流转（挖掘 → 入库 → 验证 → 升格/淘汰）全部有程序承载；记忆库规模受控于注入预算。
-- my-pi 现状：已有 `custom/core/note-store.ts`（笔记持久化、写时脱敏）与技能改进机制（`docs/development/SKILLS-MAINTENANCE.md`）；**闭环四态尚无程序承载**，记忆为简单键值，无 `recurrence`/`confidence` 等治理字段，见 §5。
+- my-pi 现状（2026-09-21）：`memory` 具备治理字段（recurrence/confidence/accessedAt/source/links/supersededBy）、只读生命周期报告 `/memory lifecycle` 与教训闭环 `/memory mine [--ingest]`，见 §5。
 
 ## 三、方法论：软硬结合
 

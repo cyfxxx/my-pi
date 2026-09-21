@@ -46,6 +46,8 @@ import {
   setTurnBusy,
   isHanging,
   resetWatchdogState,
+  collectMetrics,
+  formatMetrics,
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
 import { runTaskOnce } from './runner';
@@ -115,7 +117,7 @@ export function register(pi: ExtensionAPI): void {
   registerCommand(pi, 'auto', {
     description: '自动驾驶自管理 (usage: /auto <status|stats|policy|failover|pause|resume|help>)',
     getArgumentCompletions: (prefix) => {
-      const subs = ['status', 'stats', 'policy', 'failover', 'pause', 'resume', 'help'];
+      const subs = ['status', 'stats', 'metrics', 'policy', 'failover', 'pause', 'resume', 'help'];
       const f = subs.filter((s) => s.startsWith(prefix));
       return f.length ? f.map((s) => ({ value: s, label: s })) : null;
     },
@@ -126,7 +128,7 @@ export function register(pi: ExtensionAPI): void {
       const runs = readTelemetry();
 
       if (!sub || sub === 'help') {
-        ctx.ui.notify('/auto <status|stats|policy|failover|pause|resume|help>', 'info');
+        ctx.ui.notify('/auto <status|stats|metrics|policy|failover|pause|resume|help>', 'info');
         return;
       }
       if (sub === 'status') {
@@ -140,6 +142,10 @@ export function register(pi: ExtensionAPI): void {
       if (sub === 'stats') {
         const models = statsByModel(runs).slice(0, 5);
         ctx.ui.notify(models.length ? models.map((m) => `${m.provider}/${m.model}: ${m.runs} 次, 成功率 ${(m.successRate * 100).toFixed(0)}%`).join('\n') : '暂无遥测数据', 'info');
+        return;
+      }
+      if (sub === 'metrics') {
+        ctx.ui.notify(formatMetrics(collectMetrics()), 'info');
         return;
       }
       if (sub === 'policy') {
