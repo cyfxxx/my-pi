@@ -32,6 +32,14 @@ export interface ToolDefinition {
   description: string;
   parameters: Record<string, ToolParameter>;
   execute: (args: Record<string, unknown>) => Promise<string>;
+  /** 可选：TUI 渲染回调（透传给 Pi；theme/context 不透明） */
+  renderCall?: (args: Record<string, unknown>, theme: unknown, context: unknown) => unknown;
+  renderResult?: (
+    result: { content: { type: string; text?: string }[]; details?: unknown },
+    options: { expanded?: boolean },
+    theme: unknown,
+    context: unknown,
+  ) => unknown;
 }
 
 /** 把简化参数声明编译为 TypeBox object schema */
@@ -75,6 +83,8 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
         content: [{ type: 'text', text: result }],
       };
     },
+    ...(def.renderCall ? { renderCall: def.renderCall } : {}),
+    ...(def.renderResult ? { renderResult: def.renderResult } : {}),
   } as unknown as PiToolDefinition;
   pi.registerTool(tool);
 }

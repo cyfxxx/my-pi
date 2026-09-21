@@ -25,6 +25,14 @@ import {
   getResultOutput,
 } from './logic';
 import type { AgentConfig, AgentScope, SingleResult, SubagentDetails, SubagentToolParams } from './logic';
+import { renderSingleResult, renderChainResult, renderParallelResult } from './rendering';
+import { Text } from '../../adapters/ui-adapter';
+import { taskPreview, agentLabel } from './logic';
+
+interface ThemeLike {
+  fg: (color: string, text: string) => string;
+  bold: (text: string) => string;
+}
 
 export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
@@ -106,6 +114,40 @@ export function register(pi: ExtensionAPI): void {
 
       const available = agents.map((a: AgentConfig) => `${a.name} (${a.source})`).join(', ') || 'none';
       return `Invalid parameters. Available agents: ${available}`;
+    },
+    renderCall: (rawArgs, theme) => {
+      const args = rawArgs as SubagentToolParams;
+      const t = theme as ThemeLike;
+      const scope: AgentScope = args.agentScope ?? 'user';
+      if (args.chain && args.chain.length > 0) {
+        let text = t.fg('toolTitle', t.bold('subagent ')) + t.fg('accent', `chain (${args.chain.length} steps)`) + t.fg('muted', ` [${scope}]`);
+        for (let i = 0; i < Math.min(args.chain.length, 3); i++) {
+          const step = args.chain[i];
+          text += `\n  ${t.fg('muted', `${i + 1}.`)} ${t.fg('accent', agentLabel(step.agent))}${t.fg('dim', ` ${taskPreview(step.task)}`)}`;
+        }
+        if (args.chain.length > 3) text += `\n  ${t.fg('muted', `... +${args.chain.length - 3} more`)}`;
+        return new Text(text, 0, 0);
+      }
+      if (args.tasks && args.tasks.length > 0) {
+        let text = t.fg('toolTitle', t.bold('subagent ')) + t.fg('accent', `parallel (${args.tasks.length} tasks)`) + t.fg('muted', ` [${scope}]`);
+        for (const task of args.tasks.slice(0, 3)) text += `\n  ${t.fg('accent', agentLabel(task.agent))}${t.fg('dim', ` ${taskPreview(task.task)}`)}`;
+        if (args.tasks.length > 3) text += `\n  ${t.fg('muted', `... +${args.tasks.length - 3} more`)}`;
+        return new Text(text, 0, 0);
+      }
+      const agentName = args.agent || '...';
+      const preview = args.task ? (args.task.length > 60 ? `${args.task.slice(0, 60)}...` : args.task) : '...';
+      return new Text(t.fg('toolTitle', t.bold('subagent ')) + t.fg('accent', agentName) + t.fg('muted', ` [${scope}]`) + `\n  ${t.fg('dim', preview)}`, 0, 0);
+    },
+    renderResult: (result, options, theme) => {
+      const details = result.details as SubagentDetails | undefined;
+      const t = theme as ThemeLike;
+      const first = result.content[0];
+      const fallback = first?.type === 'text' && first.text ? first.text : '(no output)';
+      if (!details || details.results.length === 0) return new Text(fallback, 0, 0);
+      if (details.mode === 'single' && details.results.length === 1) return renderSingleResult(details.results[0], Boolean(options.expanded), t);
+      if (details.mode === 'chain') return renderChainResult(details, Boolean(options.expanded), t);
+      if (details.mode === 'parallel') return renderParallelResult(details, Boolean(options.expanded), t);
+      return new Text(fallback, 0, 0);
     },
   });
 

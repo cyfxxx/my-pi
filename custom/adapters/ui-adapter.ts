@@ -8,14 +8,16 @@
  */
 
 import type { ExtensionAPI, RegisteredCommand, MessageRenderer, ExtensionContext, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
-import { Key } from '@earendil-works/pi-tui';
+import { Key, Container, Markdown, Spacer, Text } from '@earendil-works/pi-tui';
 import type { KeyId, AutocompleteItem } from '@earendil-works/pi-tui';
+import { getMarkdownTheme as piGetMarkdownTheme } from '@earendil-works/pi-coding-agent';
 
-/**
- * 重新导出 pi-tui 的 Key 常量，供功能层构造快捷键 ID
- * （功能层不得 runtime import vendor/pi，快捷键应经此适配器）
- */
-export { Key };
+export { Key, Container, Markdown, Spacer, Text };
+
+/** 获取 Markdown 渲染主题（供功能层渲染器使用，避免直接 import vendor/pi） */
+export function getMarkdownTheme(): ReturnType<typeof piGetMarkdownTheme> {
+  return piGetMarkdownTheme();
+}
 
 /**
  * 命令选项

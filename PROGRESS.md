@@ -426,3 +426,13 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `index.ts`：`/voice wake <on|off|status>`、`/voice bench`、session_shutdown 停唤醒
 - 测试：新增 3 用例，vitest 184 → 187
 - 验证：`tsc`、`npm test`、`check-isolation`、`check-features` 通过
+
+## 功能移植补充（第 13 批：subagent TUI 渲染）
+- 完成时间：2026-09-21
+- `rendering.ts`：`getDisplayItems`/`formatToolCall`/`renderSingleResult`/`renderChainResult`/`renderParallelResult`（迁移自 pi-tools subagent/rendering.ts）
+- `tool-adapter.ts`：`ToolDefinition` 新增可选 `renderCall`/`renderResult` 并透传给 Pi
+- `ui-adapter.ts`：导出 pi-tui 的 `Text/Container/Markdown/Spacer/getMarkdownTheme`（功能层经适配器使用，不直接 import vendor/pi）
+- `subagent/index.ts`：为 `subagent` 工具接入 renderCall/renderResult（single/parallel/chain 折叠与展开视图）
+- 说明：TUI 渲染依赖运行时 pi-tui 解析（由 pi 加载器提供），vitest 无法解析故未加渲染单测；`tsc` 校验类型
+- 未迁移：plan-mode TodoOverlay（交互式 overlay 组件）
+- 验证：`tsc`、`npm test`（17 文件 187 用例）、`check-isolation`、`check-features` 通过
