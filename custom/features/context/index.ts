@@ -23,6 +23,7 @@ import {
   extractUserRequest,
 } from './logic';
 import { recordTaskRecord } from './budget/task-record';
+import { buildPruneDumpRef, pruneRefsDir, PRUNE_REFS_RETENTION_DAYS } from './budget/prune-dump';
 import {
   createState,
   tickThinkingLevel,
@@ -41,7 +42,7 @@ import {
   pruneToolOutput,
   getCacheStats,
 } from './budget/budget';
-import { pruneToolResults } from './budget/prune';
+import { pruneToolResults, sweepPruneRefs } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
 import { snapshotBeforeCompact } from './budget/compression';
@@ -180,11 +181,12 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // 会话开始：重置预算
+  // 会话开始：重置预算 + 清理过期擦除溯源
   registerHook(pi, {
     event: 'session_start',
     handler: async () => {
       resetAllBudgets();
+      void sweepPruneRefs(pruneRefsDir(), { retentionDays: PRUNE_REFS_RETENTION_DAYS }).catch(() => {});
     },
   });
 
@@ -224,7 +226,7 @@ export function register(pi: ExtensionAPI): void {
   // 上下文构建阶段：确定性去重（仅保留最新 compactionSummary）+ 工具输出分层擦除
   registerHook(pi, {
     event: 'context',
-    handler: async (event) => {
+    handler: async (event, ctx) => {
       const e = event as { messages?: unknown[] };
       const messages = Array.isArray(e.messages) ? e.messages : [];
       if (!messages.length) return;
@@ -250,7 +252,8 @@ export function register(pi: ExtensionAPI): void {
         modified = true;
       }
 
-      const pruned = pruneToolResults(working as PruneMessage[]);
+      const dumpRef = buildPruneDumpRef(ctx as { sessionManager?: { getSessionId?: () => string | null } });
+      const pruned = pruneToolResults(working as PruneMessage[], { dumpRef });
       if (pruned.modified) {
         working = pruned.messages as unknown[];
         modified = true;

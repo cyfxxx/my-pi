@@ -629,3 +629,9 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `context/index.ts`：`agent_settled` 用真实 tokens/window 比例自动升降档（`PI_CONTEXT_THINKING_AUTO=off` 关闭）；新增 `thinking_level` 工具（模型建议·规则审批：死区/压力方向）。
 - `tool-groups.ts` 核心常驻加入 `thinking_level`；`check-features` 注册面同步；`STRUCTURE.md` 脚本数不变。
 - 测试：新增 `thinking-level.test.ts`（14 用例），context 套件 89 用例通过。
+
+## 擦除溯源 refs 接线（第 36 批）
+- 完成时间：2026-09-22
+- 新增 `context/budget/prune-dump.ts`（迁移自 pi-tools）：`buildPruneDumpRef` 把被擦除工具输出落盘到 `portable/memory/logs/prune-refs/<sessionId>.md`，占位符内嵌 ref 路径（`PI_PRUNE_REFS_DIR` 可覆盖、`PI_DISABLE_PRUNE_DUMP=1` 关闭）。
+- `context/index.ts`：`context` 钩子传 `dumpRef`（此前只擦除不落盘）；`session_start` 调 `sweepPruneRefs` 按 14 天/50MB 清理。
+- 测试：`prune.test.ts` 增 `buildPruneDumpRef` 2 用例，共 22 用例。

@@ -260,3 +260,25 @@ describe('sweepPruneRefs: 擦除溯源目录清理', () => {
     expect(stats.scanned).toBe(0);
   });
 });
+
+describe('buildPruneDumpRef: 擦除落盘回调', () => {
+  it('写入 refs 目录并返回路径；已含 marker 的文本返回 null', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'prune-dump-'));
+    process.env.PI_PRUNE_REFS_DIR = dir;
+    const { buildPruneDumpRef } = await import('../budget/prune-dump');
+    const dump = buildPruneDumpRef({ sessionManager: { getSessionId: () => 'sess/1' } })!;
+    expect(dump).toBeTypeOf('function');
+    const ref = dump('原始输出', { index: 3, chars: 4 });
+    expect(ref).toBe(join(dir, 'sess_1.md'));
+    expect(existsSync(ref!)).toBe(true);
+    expect(dump('[pruned: 4 chars]', { index: 3, chars: 4 })).toBeNull();
+    delete process.env.PI_PRUNE_REFS_DIR;
+  });
+
+  it('PI_DISABLE_PRUNE_DUMP=1 → 不落盘', async () => {
+    process.env.PI_DISABLE_PRUNE_DUMP = '1';
+    const { buildPruneDumpRef } = await import('../budget/prune-dump');
+    expect(buildPruneDumpRef(undefined)).toBeUndefined();
+    delete process.env.PI_DISABLE_PRUNE_DUMP;
+  });
+});
