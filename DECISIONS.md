@@ -379,3 +379,13 @@
 4. 新增 `scripts/doctor.sh`（本地 vs 仓库体检 + `--fix`），作为“对比本地环境与远程仓库”的常驻工具；`pi-source-build.sh` 增 `--no-build` 以免递归构建。
 5. 修正可复现性阻碍：`dev.sh` 用 vendor 内置 tsx；`check-features` 的每环境独立文件降级为警告；golden 补丁标签改为动态计数。
 **理由**：把“重建”和“更新”都收敛为幂等、可重复、无锁污染的单一入口；补丁以 commit 形式与本地一致，使 merge 自然工作且满足隔离检查；doctor 让缺口可见且可一键修复。
+
+### [2026-09-22] 更新 pi 上游至 v0.87.0 + sync/build 自愈式重建
+**背景**：用户要求“更新项目中的 pi”。基线为 v0.85.1（`71dca871b`），上游最新 `d201760ff`（v0.87.0，+134 commits）。旧 `sync-upstream.sh` 采用“merge 后再 apply 补丁”，在补丁改动与上游改动重叠时会产生语义错误（实测 002 的 `google-shared.ts` hunk 与上游新增的 `TOO_MANY_TOOL_CALLS` case 合并成重复 case）；旧 `build.sh` 只构建 coding-agent，而 v0.87.0 的 coding-agent 依赖工作区其它包与 `packages/ai` 联网生成的模型数据。
+**决策**：
+1. **补丁栈重建语义**：`patches/` 为唯一真值，vendor 分支 = 上游基线 + 每补丁一个 commit。`sync-upstream.sh` 在临时 worktree 中 checkout 目标基线 → 幂等应用并提交全部补丁 → 成功才移动 `main` 并写 `LAST_SYNC_POINT`；失败则 vendor 完全不变。避免依赖 git merge 对补丁漂移作隐式判断。
+2. **补丁随上游维护**：移除 002 中上游已修复的 hunk；按 biome 重新生成 004。补丁现对新基线 plain-apply。
+3. **构建全工作区**：`build.sh` 改用 `npm run build:offline` 按依赖顺序构建（含 `durable`/`session-backends`），并仅在模型数据缺失时联网 `generate-models`。
+4. **规避 Node IPv6 超时**：构建/生成默认注入 `--dns-result-order=ipv4first --no-network-family-autoselection`（本机 undici 对双栈域名超时，curl 正常）。
+5. **本地维护提交绕过上游钩子**：补丁 commit 加 `--no-verify`，并把 `LAST_SYNC_POINT` 加入 vendor `.git/info/exclude`。
+**理由**：上游更新必须可复现、可回滚、语义正确；确定性重建比隐式 merge 更安全，且与 fresh bootstrap 完全一致。

@@ -186,15 +186,18 @@ cd /Volumes/USB/my-pi
 | `~/.pi/agent/extensions/` | `portable/agent/extensions/` | `agentDir/extensions` 自动发现；my-pi 自身功能另经 `custom/bootstrap.ts` 加载 |
 | 记忆/笔记数据 | `portable/memory/` | `PI_MEMORY_DIR`（由 `custom/core/note-store.ts` 等识别） |
 
-> pi v0.85.1 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`（无 `PI_SKILLS_DIR`/`PI_EXTENSION_DIR`）；会话可用 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir` 覆盖。详见 [STRUCTURE.md](STRUCTURE.md) 的「已知偏离」。
+> pi v0.87.0 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`（无 `PI_SKILLS_DIR`/`PI_EXTENSION_DIR`）；会话可用 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir` 覆盖。详见 [STRUCTURE.md](STRUCTURE.md) 的「已知偏离」。
 
 ## 开发
 
 ### 构建
 
 ```bash
-# 构建 vendor/pi (coding-agent)
-cd vendor/pi/packages/coding-agent && npm run build
+# 一键重建（根依赖 + vendor 引导/补丁 + 工作区构建；模型数据缺失时联网生成）
+bash scripts/build.sh
+
+# 仅构建 vendor 工作区（依赖顺序；模型数据已就绪时用 offline）
+cd vendor/pi && npm run build:offline
 
 # 检查 custom/ 类型
 npx tsc --noEmit -p custom/

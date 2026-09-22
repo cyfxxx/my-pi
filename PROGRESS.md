@@ -699,3 +699,17 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `dev.sh` 优先使用 vendor 内置 tsx。
 - `check-features`：每环境独立文件（auth/models）改为警告；脚本清单纳入 `doctor.sh`。
 - 验证：`build.sh` 幂等路径通过；**fresh 引导补丁逻辑**在 base commit 的临时 worktree 上验证（4 补丁应用+提交、二次运行全跳过、清理）；`npm ci` 于根与 vendor 均不改动 lock；doctor rc=0；golden 七项全绿（29 文件 300 用例）；无头冒烟通过。
+
+## 更新 pi 上游 v0.85.1 → v0.87.0（第 43 批）
+- 完成时间：2026-09-22
+- 上游 `d201760ff`（v0.87.0，较基线 `71dca871b` 前进 134 次提交）；`vendor/PINNED_COMMIT` 已更新。
+- **补丁漂移修复**：
+  - `002-local-pi-mods.patch` 移除已过时的 `google-shared.ts` hunk（上游 v0.87.0 已处理 `TOO_MANY_TOOL_CALLS`，保留会产生重复 case → biome 报错）；同步更新 `packages/ai/scripts/check-model-data.ts` 之外的 hunk 均适配新基线。
+  - `004-footer-tweaks.patch` 按 biome 格式化后重新生成（原补丁的换行不符合上游格式规则）。
+  - 4 个补丁现可**直接 plain-apply** 到新基线，无需 3way。
+- **sync-upstream 重设计**为“确定性重建补丁栈”：fetch → 临时 worktree checkout 目标基线 → 幂等应用并提交 patches → 全部成功才 `git checkout -B main <stack>` 并更新 `LAST_SYNC_POINT`；失败则 vendor 不动。修复了旧版“merge 后再 apply 补丁”导致重复 case/无效提交的问题。
+- **build.sh 修复**：v0.87.0 的 coding-agent 依赖工作区其它包与 `packages/ai` 生成的模型数据；改为 `npm run build:offline` 按依赖顺序构建全部工作区包，并在 `src/providers/*.models.ts` 引用的 `data/*.json` 缺失时自动联网 `generate-models`（可用 `PI_SKIP_MODEL_GEN=1` 关闭）。
+- **网络修复**：Node undici 在本机对同时有 AAAA/A 记录的域名（models.dev/radius.pi.dev）因 IPv6 happy-eyeballs 超时；build.sh 默认注入 `NODE_OPTIONS="--dns-result-order=ipv4first --no-network-family-autoselection"`（`PI_NODE_IPV4=0` 可关）。
+- `lib-vendor.sh` 的补丁提交加 `--no-verify`（跳过上游 husky，避免其 biome 钩子干扰本地维护提交）；新增 `vendor_exclude_local` 把 `LAST_SYNC_POINT` 写入 vendor `.git/info/exclude`，保持 `git status` 干净。
+- 文档：STRUCTURE/README 版本与构建说明更新为 v0.87.0/工作区构建。
+- **验证**：vendor 全工作区构建成功；`custom/` 类型检查通过；`./my-pi.sh --version` = 0.87.0；golden 七项全绿（29 文件 300 用例）；无头冒烟（调用 `memory_stats`）通过；doctor 21 正常 / 0 警告 / 0 异常。

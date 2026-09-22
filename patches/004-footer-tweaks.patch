@@ -1,8 +1,8 @@
 diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
-index 26c9f2798..0e7558a00 100644
+index e69d5fd05..5171a8777 100644
 --- a/packages/coding-agent/src/modes/interactive/components/footer.ts
 +++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
-@@ -126,13 +126,20 @@ export class FooterComponent implements Component {
+@@ -128,13 +128,23 @@ export class FooterComponent implements Component {
  		}
  
  		// Build stats line
@@ -19,7 +19,10 @@ index 26c9f2798..0e7558a00 100644
 +		// Patch (004-footer-tweaks): CH 实时/会话双命中率（左=最近一轮，右=会话累计）。
 +		const sessionCacheHitRate =
 +			sessionPromptTotal > 0 ? (usageTotals.cacheRead / sessionPromptTotal) * 100 : undefined;
-+		if ((usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) && (latestCacheHitRate !== undefined || sessionCacheHitRate !== undefined)) {
++		if (
++			(usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) &&
++			(latestCacheHitRate !== undefined || sessionCacheHitRate !== undefined)
++		) {
 +			const hitRates = [];
 +			if (latestCacheHitRate !== undefined) hitRates.push(latestCacheHitRate.toFixed(1));
 +			if (sessionCacheHitRate !== undefined) hitRates.push(sessionCacheHitRate.toFixed(1));
@@ -27,7 +30,7 @@ index 26c9f2798..0e7558a00 100644
  		}
  
  		// Kimi Coding is subscription-backed despite using API-key authentication.
-@@ -140,20 +147,50 @@ export class FooterComponent implements Component {
+@@ -142,20 +152,45 @@ export class FooterComponent implements Component {
  			? state.model.provider === "kimi-coding" || this.session.modelRuntime.isUsingSubscription(state.model.provider)
  			: false;
  		if (usageTotals.cost || usingSubscription) {
@@ -50,12 +53,9 @@ index 26c9f2798..0e7558a00 100644
 +		const effWindow = contextWindow > 0 ? contextWindow : compactLine;
 +		const liveTokens = contextUsage?.tokens;
 +		const liveTokensStr =
-+			liveTokens !== null && liveTokens !== undefined && effWindow > 0
-+				? `${formatTokens(liveTokens)}/`
-+				: "";
++			liveTokens !== null && liveTokens !== undefined && effWindow > 0 ? `${formatTokens(liveTokens)}/` : "";
 +		// Patch (004-footer-tweaks): >40% 且 ≤70% 追加 ⚠（重启后首轮必全量重发，建议先 /compact）。
-+		const restartHint =
-+			contextPercent !== "?" && contextPercentValue > 40 && contextPercentValue <= 70 ? " ⚠" : "";
++		const restartHint = contextPercent !== "?" && contextPercentValue > 40 && contextPercentValue <= 70 ? " ⚠" : "";
  		const contextPercentDisplay =
  			contextPercent === "?"
 -				? `?/${formatTokens(contextWindow)}${autoIndicator}`
@@ -67,9 +67,7 @@ index 26c9f2798..0e7558a00 100644
 +				: `${liveTokensStr}${formatTokens(effWindow)}${autoIndicator}${restartHint}`;
 +		// Patch (004-footer-tweaks): 双指标着色——黄=达自动压缩参考线；红=超真实窗口 80%（溢出预警，超窗加 !!）。
 +		const linePct =
-+			liveTokens !== null && liveTokens !== undefined && compactLine > 0
-+				? (liveTokens / compactLine) * 100
-+				: -1;
++			liveTokens !== null && liveTokens !== undefined && compactLine > 0 ? (liveTokens / compactLine) * 100 : -1;
 +		const winPct =
 +			liveTokens !== null && liveTokens !== undefined && contextWindow > 0
 +				? (liveTokens / contextWindow) * 100

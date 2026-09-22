@@ -76,18 +76,6 @@ index 5c61b52c4..789780489 100644
 +// Temporarily skipped: model data hydration requires network access
 +// Run `npm run hydrate:model-data` from the repository root when online
 +console.log("Model data check skipped (offline mode).");
-diff --git a/packages/ai/src/api/google-shared.ts b/packages/ai/src/api/google-shared.ts
-index a49c66893..302bd6947 100644
---- a/packages/ai/src/api/google-shared.ts
-+++ b/packages/ai/src/api/google-shared.ts
-@@ -397,6 +397,7 @@ export function mapStopReason(reason: FinishReason): StopReason {
- 		case FinishReason.MALFORMED_FUNCTION_CALL:
- 		case FinishReason.UNEXPECTED_TOOL_CALL:
- 		case FinishReason.NO_IMAGE:
-+		case FinishReason.TOO_MANY_TOOL_CALLS:
- 			return "error";
- 		default: {
- 			const _exhaustive: never = reason;
 diff --git a/packages/coding-agent/src/config.ts b/packages/coding-agent/src/config.ts
 index 98398db2a..772aefafa 100644
 --- a/packages/coding-agent/src/config.ts

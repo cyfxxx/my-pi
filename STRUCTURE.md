@@ -27,13 +27,13 @@ my-pi/
 **永不直接修改**，所有改动通过 `patches/` 管理。
 
 - 上游 remote：`upstream` = `https://github.com/earendil-works/pi-mono.git`
-- 锁定 commit：`vendor/PINNED_COMMIT`（当前 `71dca871b`，版本 v0.85.1）
+- 锁定 commit：`vendor/PINNED_COMMIT`（当前 `d201760ff`，版本 v0.87.0）
 - `LAST_SYNC_POINT`：上次同步的上游 commit SHA
 - 本地补丁以 commit 形式叠加在上游之上；通过 `scripts/sync-upstream.sh` 更新
 
 **引导（fresh checkout）**：`vendor/pi` 不随主仓库分发。克隆主仓库后运行 `scripts/build.sh`
 会自动安装根工作区依赖、从上游 clone、checkout `PINNED_COMMIT`、幂等应用并提交 `patches/`、
-构建 coding-agent（等价的一次性入口，新设备可复现）。也可手动：
+构建 vendor 工作区（含模型数据生成；等价的一次性入口，新设备可复现）。也可手动：
 
 ```bash
 git clone https://github.com/earendil-works/pi-mono.git vendor/pi
@@ -92,7 +92,7 @@ my-pi 的自定义代码。三层结构：
 ### `scripts/`
 共 20 个运维脚本（含 1 个共享库 `lib-vendor.sh`）：
 
-- `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 构建 coding-agent；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
+- `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
 - `dev.sh`：开发模式运行（优先 vendor 内置 tsx）
 - `sync-upstream.sh`：上游同步 + 自动修复（merge → 幂等补丁 → 重建 dist → 刷新自愈缓存 → 类型检查；`PI_SYNC_DRY_RUN=1` 只读预演）
@@ -131,7 +131,7 @@ custom/features/*/logic.ts
 
 ## 已知偏离
 
-- **pi 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`**（vendor/pi v0.85.1 `config.ts`）：不存在 `PI_SKILLS_DIR`/`PI_EXTENSION_DIR`；会话目录的可覆盖变量是 `PI_CODING_AGENT_SESSION_DIR`（或 `--session-dir`）。my-pi 因此统一用 `portable/agent/`（agentDir）承载技能、会话与扩展，启动器不再导出无效变量。
+- **pi 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`**（vendor/pi v0.87.0 `config.ts`）：不存在 `PI_SKILLS_DIR`/`PI_EXTENSION_DIR`；会话目录的可覆盖变量是 `PI_CODING_AGENT_SESSION_DIR`（或 `--session-dir`）。my-pi 因此统一用 `portable/agent/`（agentDir）承载技能、会话与扩展，启动器不再导出无效变量。
 - **项目级配置目录是 `.pi` 而非 `.my-pi`**：`CONFIG_DIR_NAME` 取自运行时加载的 `vendor/pi/packages/coding-agent/package.json` 的 `piConfig.configDir`（值为 `.pi`），根 `package.json` 的 `.my-pi` 不参与运行时。故项目级设置/项目级扩展会落在 `<cwd>/.pi/`——my-pi 不使用项目级资源，`pi install` 也应避免 `-l/--local`。
 - **会话默认在 `portable/agent/sessions/`**：即 `agentDir/sessions/<转义 cwd>/`。若希望会话与配置分离，可在启动器加 `--session-dir "$MY_PI_ROOT/portable/sessions"`（当前未启用）。
 

@@ -24,6 +24,16 @@ deps_ok() {
 # 兼容旧名（build.sh/doctor.sh 曾用 root_deps_ok）
 root_deps_ok() { deps_ok "$1" && [ -f "$1/node_modules/typescript/package.json" ] && [ -f "$1/node_modules/vitest/package.json" ]; }
 
+# 让 vendor 的本地标记文件不出现在 git status（写入 $vendor/.git/info/exclude，不改上游 .gitignore）
+vendor_exclude_local() {
+  local vendor="$1"
+  local exclude="$vendor/.git/info/exclude"
+  [ -f "$exclude" ] || return 0
+  for name in LAST_SYNC_POINT; do
+    grep -qxF "$name" "$exclude" 2>/dev/null || echo "$name" >> "$exclude"
+  done
+}
+
 # 安装依赖（优先 npm ci 保证可复现，不改动 package-lock）。用法：deps_install <dir> [npm args...]
 deps_install() {
   local dir="$1"; shift
@@ -70,7 +80,7 @@ vendor_apply_patches() {
       git -C "$vendor" add -A
       git -C "$vendor" -c user.name="${MY_PI_COMMIT_NAME:-my-pi}" \
         -c user.email="${MY_PI_COMMIT_EMAIL:-my-pi@localhost}" \
-        commit -q -m "local: ${base%.patch}"
+        commit -q --no-verify -m "local: ${base%.patch}"
     fi
   done
   echo "  补丁：已应用 $applied，已存在 $skipped，失败 $failed"
