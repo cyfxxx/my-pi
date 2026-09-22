@@ -36,8 +36,6 @@ export interface Task {
   retries: number;
   failCount: number;
   failoverCount?: number;
-  pendingInject: boolean;
-  recoveryCount?: number;
   deleted?: boolean;
   createdAt: string;
   updatedAt: string;

@@ -673,3 +673,7 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - packs：INDEX 补 `reverse-skill`；新增 `packs/drafts/.gitkeep` 并忽略草稿内容。
 - 文档注释修正（my-pi.sh/dev.sh 的 note-store 引用、STRUCTURE 示例、CHECK-REPORT 历史标注）。
 - 运行 `bash scripts/golden-tasks.sh --smoke`：无头会话启动并通过（扩展全量加载）。
+
+## 深度检查补充：清除 autopilot 遗留字段（第 41 批续）
+- 删除 `Task.pendingInject`/`recoveryCount`（NEW 采用子进程 runner 执行任务，非 ORIG 的主会话注入模型，字段无消费者）及 storage 规范化/默认值中的对应项。
+- tsc（含 noUnusedLocals/Parameters）与 autopilot 37 用例通过。

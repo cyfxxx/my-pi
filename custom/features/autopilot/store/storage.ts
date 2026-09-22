@@ -114,7 +114,6 @@ function migrateTasks(data: TaskStore): void {
     if (typeof t.retries !== 'number') t.retries = 0;
     if (typeof t.failCount !== 'number') t.failCount = 0;
     if (typeof t.failoverCount !== 'number') t.failoverCount = 0;
-    if (typeof t.pendingInject !== 'boolean') t.pendingInject = false;
     if (typeof t.maxRunTime !== 'number') t.maxRunTime = DEFAULT_MAX_RUN_TIME;
     if (typeof t.notifyOnCompletion !== 'boolean') t.notifyOnCompletion = false;
     if (typeof t.useSubagent !== 'boolean') t.useSubagent = false;
@@ -352,8 +351,6 @@ export function createTask(params: {
     tags: params.tags ?? [],
     retries: Math.max(0, params.retries ?? 0),
     failCount: 0,
-    pendingInject: false,
-    recoveryCount: 0,
     createdAt: isoNow(),
     updatedAt: isoNow(),
   };
