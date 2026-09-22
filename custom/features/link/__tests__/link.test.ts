@@ -27,7 +27,7 @@ import {
   withStateLock,
 } from '../logic';
 import { existsSync, readFileSync } from 'node:fs';
-import { wrapTaskMessage, extractReply, shellSingleQuote, buildRemoteCommand } from '../link';
+import { wrapTaskMessage, extractReply, shellSingleQuote, buildRemoteCommand } from '../protocol';
 import type { DeviceConfig } from '../logic';
 
 describe('isValidUserHost / validateCard', () => {

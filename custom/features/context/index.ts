@@ -235,12 +235,26 @@ export function register(pi: ExtensionAPI): void {
       }
       const e = event as { systemPrompt?: string };
       if (typeof e.systemPrompt !== 'string') return;
-      // 重启提示：上下文超阈值时，提醒先 /compact 再重启，避免重启后首轮全量重发
-      let restartHint = '';
-      if (usage?.tokens != null && usage.tokens > RESTART_TOKENS) {
-        restartHint = `\n\n[上下文约 ${Math.round(usage.tokens / 1000)}K（> 重启阈值 ${Math.round(RESTART_TOKENS / 1000)}K）：如需重启，先 /compact 可避免重启后首轮全量重发。]`;
+      // 压力提示：按窗口比例分档（静态文本，仅跨档时变化，缓存友好；禁止注入精确数值）
+      const ratio = usage && usage.contextWindow > 0 ? (usage.tokens ?? 0) / usage.contextWindow : 0;
+      let pressureLine = '';
+      if (ratio >= 0.9) {
+        pressureLine =
+          '[上下文已占窗口 90%；达到压缩条件将自动压缩并生成摘要，关键决策与待办会保留在摘要中；需精确保真的细节可先存 memory_store。]';
+      } else if (ratio >= 0.75) {
+        pressureLine = '[上下文已占窗口 75%。]';
       }
-      return { systemPrompt: `${e.systemPrompt}\n\n${buildSleepingSummary(new Set(getAllToolNames(pi)))}${restartHint}` };
+      const advice = pressureLine
+        ? `${FULL_DELEGATION_ADVICE}\n${pressureLine}`
+        : LOW_PRESSURE_DELEGATION;
+      // 重启提示：超过绝对阈值时给静态指引（先 /compact 再重启，避免首轮全量重发）
+      const restartHint =
+        usage?.tokens != null && usage.tokens > RESTART_TOKENS
+          ? '\n\n[上下文已超过重启提示阈值：如需重启，建议先 /compact，可避免重启后首轮全量重发。]'
+          : '';
+      return {
+        systemPrompt: `${e.systemPrompt}\n\n${advice}\n\n${EFFICIENCY_ADVICE}\n\n${buildSleepingSummary(new Set(getAllToolNames(pi)))}${restartHint}`,
+      };
     },
   });
 

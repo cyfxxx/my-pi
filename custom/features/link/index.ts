@@ -33,8 +33,8 @@ import {
   OUTBOX_MAX,
 } from './logic';
 import type { LinkConfig, DeviceConfig } from './logic';
-import { probeDevice, sendToDevice, watchRemote, readRemoteOutbox, attachToRemote } from './link';
-import type { SendOptions } from './link';
+import { probeDevice, sendToDevice, watchRemote, readRemoteOutbox, attachToRemote } from './protocol';
+import type { SendOptions } from './protocol';
 
 export function register(pi: ExtensionAPI): void {
   let cfg: LinkConfig = loadConfig();
