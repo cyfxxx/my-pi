@@ -49,7 +49,6 @@ export interface SendOptions {
   signal?: AbortSignal;
 }
 
-const MAX_SESSION_BYTES = 1024 * 1024;
 
 export function wrapTaskMessage(message: string, fromName?: string): string {
   const from = fromName ? `（发起设备: ${fromName}）` : '';

@@ -662,6 +662,6 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 目录子包化：`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`，两侧 `logic.ts` 改 barrel（golden/iso 通过）。
 - 系统提示补全：压力分档 + 委派/效率建议；重启提示改静态（缓存友好）；移除 `context/index.ts` 冗余 re-export。
 - 新增 `deploy/systemd/pi-searxng.service` 与 `deploy/README.md`。
-- `scripts/knowledge-ingest.mjs` 可移植化 + `environments=['all']`，正式入库（脚本数 18→19）；`packs/knowledge-fetch/EXPERIENCE.md` 入库并勾选待办。
+- `scripts/knowledge-ingest.mjs` 可移植化 + `environments=['all']`，正式入库（脚本总数 18）；`packs/knowledge-fetch/EXPERIENCE.md` 入库并勾选待办。
 - 文档同步：`STRUCTURE.md`/`AGENTS.md` 更新子包列表、deploy、脚本数、补丁 004。
 - 测试：28 文件 297 用例；golden 七项全绿。

@@ -13,7 +13,6 @@ import { randomUUID, createHash } from 'node:crypto';
 import type {
   MemoryEntry,
   MemoryStore,
-  MemoryCategory,
   MemoryStats,
   SummaryEntry,
   SummaryStore,

@@ -7,7 +7,7 @@
  *   - 对外暴露稳定的 UI 接口
  */
 
-import type { ExtensionAPI, RegisteredCommand, MessageRenderer, ExtensionContext, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, MessageRenderer, ExtensionContext, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
 import { Key, Container, Markdown, Spacer, Text, truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import type { KeyId, AutocompleteItem } from '@earendil-works/pi-tui';
 import { getMarkdownTheme as piGetMarkdownTheme } from '@earendil-works/pi-coding-agent';

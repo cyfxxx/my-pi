@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # 使用 tsx 加载 TypeScript 源码
 cd "$ROOT"
 
-# pi 只识别 PI_CODING_AGENT_DIR；PI_MEMORY_DIR 由 custom/ 的 note-store 读取
+# pi 只识别 PI_CODING_AGENT_DIR；PI_MEMORY_DIR 由 custom/core/config.ts 解析
 export PI_CODING_AGENT_DIR="$ROOT/portable/agent"
 export PI_MEMORY_DIR="$ROOT/portable/memory"
 

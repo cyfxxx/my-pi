@@ -334,7 +334,6 @@ export function register(pi: ExtensionAPI): void {
       const start = toolState.toolCallStarts.get(name);
       toolState.toolCallStarts.delete(name);
       toolState.runToolCount++;
-      toolState.lastToolRecomputeTs = Date.now();
       if (text) recordToolUsage(name, estimateTokens(text));
       // 度量：记录 token/缓存（用量统计度量基建；无 usage 时以输出估算兜底）
       try {

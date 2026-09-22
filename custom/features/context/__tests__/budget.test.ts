@@ -8,9 +8,7 @@ import {
   markCompacted,
   recordToolUsage,
   getBudgetReport,
-  recordOutput,
   getOutputReport,
-  resetOutputBudget,
   resetAllBudgets,
 } from '../budget/budget';
 

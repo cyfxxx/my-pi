@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 19 个运维脚本
+├── scripts/             # 18 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -46,7 +46,7 @@ my-pi 的自定义代码。三层结构：
 - `adapters/`：唯一允许 runtime import `vendor/pi/` 的地方（`import type` 除外）
 - `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`（原子写）、`net-guard.ts`（SSRF 防护）
 - `features/`：每个功能必须包含 `logic.ts`（纯逻辑出口/barrel，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）；`__tests__/` 为 vitest 单测
-  - 小功能直接把模块铺在功能根目录（如 `web-search/logic.ts`、`browser/impl.ts`）
+  - 小功能直接把模块铺在功能根目录（如 `tmux/logic.ts`、`browser/impl.ts`）
   - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`
   - 子包内互引用用相对路径；跨功能引用只走对方 `logic.ts`
 - `bootstrap.ts`：入口，组装所有功能
@@ -85,7 +85,7 @@ my-pi 的自定义代码。三层结构：
 - `004-footer-tweaks.patch`：TUI footer 四项调整（实时上下文 token、双指标着色、CH 实时/会话命中率、`Σ/↑/↓` 字段与 `¥` 成本、>40% `⚠` 重启提示）
 
 ### `scripts/`
-共 19 个运维脚本：
+共 18 个运维脚本：
 
 - `build.sh`：构建 vendor/pi（vendor 缺失时自动引导）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `dev.sh`：开发模式运行

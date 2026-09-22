@@ -10,7 +10,7 @@
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
-import { registerCommand, sendMessage } from '../../adapters/ui-adapter';
+import { registerCommand } from '../../adapters/ui-adapter';
 import { listSessions, resolveSession } from '../../adapters/session-adapter';
 import { formatSessionList } from './store/sessions';
 import { syncSeedTasks } from './store/seeds';
@@ -21,8 +21,6 @@ import {
   readTelemetry,
   statsByModel,
   statsByTask,
-  todayRuns,
-  todayCost,
   formatBudgetUsage,
   planFailover,
   executeFailover,
@@ -32,7 +30,6 @@ import {
   isLocalModel,
   readState,
   writeRestartRequest,
-  readTasks,
   listTasks,
   addTask,
   deleteTask,
@@ -67,7 +64,6 @@ function fmtTask(t: Task): string {
 }
 
 export function register(pi: ExtensionAPI): void {
-  const cfg = readAutopilotConfig();
 
   // ── 工具：状态/统计/失败转移 ──
   registerTool(pi, {

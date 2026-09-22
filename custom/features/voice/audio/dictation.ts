@@ -84,7 +84,7 @@ export function createDictation(cfg: VoiceConfig, deps: RecordingDeps, cb: Dicta
     startedAt = Date.now();
     const { child, file } = deps.startRecording(
       cfg,
-      (code, detail) => {
+      (code, _detail) => {
         if (currentFile !== file || busy) return;
         if (code === 0) {
           void (async () => {

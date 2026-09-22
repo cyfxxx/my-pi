@@ -1,5 +1,8 @@
 # my-pi 功能检查与脚本检查报告
 
+> **历史报告**：记录 2026-09-21 的一次检查结论，其中的数量/命令面可能已随后续迁移变化；
+> 当前状态以 `PROGRESS.md`、`STRUCTURE.md` 与 `bash scripts/check-features.sh` 为准。
+
 **检查时间**：2026-09-21（第二轮修正）
 **检查分支**：main（工作区）
 **检查依据**：功能检查.md + 脚本检查.md + pi-tools 原项目（`scripts/rebuild.sh`）

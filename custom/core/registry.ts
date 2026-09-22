@@ -16,8 +16,6 @@ interface RegisteredFeature {
   register: FeatureRegister;
 }
 
-const features: RegisteredFeature[] = [];
-
 /**
  * 注册一个功能
  */
