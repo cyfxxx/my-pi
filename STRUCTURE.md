@@ -129,6 +129,15 @@ custom/features/*/index.ts
 custom/features/*/logic.ts
 ```
 
+## 目录内文档
+
+各代码目录附有就近说明文档（`README.md`），读者无需回到根文档即可了解该层职责与约定：
+
+- `custom/core/README.md`、`custom/adapters/README.md`、`custom/features/README.md`：三层底座与规范
+- `custom/features/<功能>/README.md`：全部 12 个功能的注册面、文件、数据与配置
+- 大功能的子包：`context/budget/`、`autopilot/{store,run}/`、`memory/{store,recall,mine}/`、`plan-mode/{core,ui}/`、`subagent/{core,ui}/`、`voice/{audio,stt}/` 各自有 `README.md`
+- `scripts/README.md`：运维脚本分类索引
+
 ## 已知偏离
 
 - **pi 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAGE_DIR`**（vendor/pi v0.87.0 `config.ts`）：不存在 `PI_SKILLS_DIR`/`PI_EXTENSION_DIR`；会话目录的可覆盖变量是 `PI_CODING_AGENT_SESSION_DIR`（或 `--session-dir`）。my-pi 因此统一用 `portable/agent/`（agentDir）承载技能、会话与扩展，启动器不再导出无效变量。

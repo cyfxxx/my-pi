@@ -57,6 +57,18 @@
 
 ---
 
+## 目录内文档（就近说明）
+
+代码目录内附有 `README.md`，覆盖该层职责、文件清单与约定：
+[custom/core](../custom/core/README.md)、[custom/adapters](../custom/adapters/README.md)、
+[custom/features](../custom/features/README.md)（含 12 个功能各自的 README）、
+[custom/features/context/budget](../custom/features/context/budget/README.md)、
+[custom/features/autopilot/store](../custom/features/autopilot/store/README.md)、
+[custom/features/memory/store](../custom/features/memory/store/README.md)、
+[scripts](../scripts/README.md)。完整层级见 [STRUCTURE.md](../STRUCTURE.md) 的「目录内文档」。
+
+---
+
 ## 来源与迁移说明
 
 本目录文档迁移自 pi-tools 项目（`https://github.com/cyfxxx/pi-tools`）的 `docs/`，并按 my-pi 硬分叉的实际结构逐篇检查、改写：路径、命令、子系统引用全部对齐 my-pi（`custom/`、`scripts/`、`patches/`、`portable/`），pi-tools 专有的 `agent/extensions`、`agent/services`、`scripts/rebuild.sh`、`searxng/`、`deploy/`、wrapper/systemd 等内容已删除或改写为 my-pi 对应物。

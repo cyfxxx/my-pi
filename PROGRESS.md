@@ -726,3 +726,13 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - plan-mode 合并：`STATUS_LABEL` 去重（index.ts 改用 logic 导出）；新增 `statusMarker()` 统一消息/面板的 `[✓]/[•]/[⏸]/[ ]` 标记。
 - 新增 core 单测 3 个（fs-json/text/cli，15 用例）。
 - 验证：tsc 通过；vitest 29 文件 315 用例；golden 七项全绿。
+
+## 目录说明文档（第 45 批）
+- 完成时间：2026-09-22
+- 决策的文档层级：**层根 + 功能根（全部 12 个）+ 有多文件的大功能子包**，更深层（单文件子包如 subagent/ui、voice/tts）并入上一层说明，避免碎片化。
+- 新增：
+  - 层/索引：`custom/core/README.md`、`custom/adapters/README.md`、`custom/features/README.md`、`scripts/README.md`。
+  - 功能根：12 个 `custom/features/<功能>/README.md`（注册面/文件/数据与配置/依赖/约定）。
+  - 子包：`context/budget`、`autopilot/{store,run}`、`memory/{store,recall,mine}`、`plan-mode/{core,ui}`、`subagent/{core,ui}`、`voice/{audio,stt}`。
+- 更新：`custom/README.md`（刷新结构 + 分层链接）、`STRUCTURE.md`（新增「目录内文档」）、`docs/README.md`（目录内文档索引）。
+- 验证：`check-doc-links` 扫描 md 由 42 → 70 且全绿；golden 七项全绿（32 文件 315 用例）。
