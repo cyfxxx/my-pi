@@ -5,6 +5,27 @@
  * 负责上下文管理、工具生命周期、消息过滤等
  */
 
+// ── 任务记录：提取最后一条用户请求摘要 ──
+
+export function extractUserRequest(messages: readonly unknown[], maxLen = 200): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as { role?: string; content?: unknown };
+    if (!m || m.role !== 'user') continue;
+    let text = '';
+    if (typeof m.content === 'string') {
+      text = m.content;
+    } else if (Array.isArray(m.content)) {
+      text = (m.content as { type?: string; text?: string }[])
+        .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+        .map((b) => b.text as string)
+        .join(' ');
+    }
+    text = text.replace(/\s+/g, ' ').trim();
+    if (text) return text.slice(0, maxLen);
+  }
+  return '';
+}
+
 // ── 压缩任务门（门1）：有进行中的计划任务时不自动压缩 ──
 
 export function hasInProgressTask(tasks: readonly { status: string }[]): boolean {

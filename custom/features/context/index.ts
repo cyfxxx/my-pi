@@ -20,7 +20,9 @@ import {
   LOW_PRESSURE_DELEGATION,
   FULL_DELEGATION_ADVICE,
   hasInProgressTask,
+  extractUserRequest,
 } from './logic';
+import { recordTaskRecord } from './budget/task-record';
 import { getTodos } from '../plan-mode/logic';
 import {
   resetAllBudgets,
@@ -30,6 +32,7 @@ import {
   estimateTokens,
   getBudgetReport,
   pruneToolOutput,
+  getCacheStats,
 } from './budget/budget';
 import { pruneToolResults } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
@@ -45,6 +48,7 @@ export function register(pi: ExtensionAPI): void {
   const autoContinueGate = makeAutoContinueGate();
   let layeringApplied = false;
   let lastContextMessages: unknown[] | null = null;
+  let compactedThisSettlement = false;
 
   // 注册命令：/context - 上下文预算查看
   registerCommand(pi, 'context', {
@@ -288,9 +292,31 @@ export function register(pi: ExtensionAPI): void {
       if (!decision.shouldCompact) return;
       // 压缩前快照（保留最近 8 份/7 天，失败不阻塞压缩）
       snapshotBeforeCompact(lastContextMessages, usage.tokens ?? 0, decision.threshold, 'threshold');
+      compactedThisSettlement = true;
       autoContinueGate.arm();
       compactDecider.markCompact();
       ctx.compact?.();
+    },
+  });
+
+  // 任务完成：写一条结构化任务记录（供 scripts/task-summarizer.mjs 批量总结）
+  registerHook(pi, {
+    event: 'agent_settled',
+    handler: async (_event, ctx) => {
+      const req = extractUserRequest(lastContextMessages ?? []);
+      const usage = ctx.getContextUsage?.();
+      const cache = getCacheStats();
+      recordTaskRecord({
+        userRequest: req,
+        contextTokens: usage?.tokens ?? 0,
+        cacheHit: cache.cacheReadTokens,
+        output: 0,
+        tools: toolState.runToolCount,
+        compacted: compactedThisSettlement,
+        userSeq: 0,
+      });
+      toolState.runToolCount = 0;
+      compactedThisSettlement = false;
     },
   });
 

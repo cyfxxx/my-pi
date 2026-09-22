@@ -606,3 +606,10 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `autopilot/index.ts` session_start：种子对账后输出"离线期间任务执行报告"并更新已读标记。
 - 新增 2 用例；autopilot 套件 32 用例通过。
 - 未迁：autopilot `sessions.ts`（会话切换编排）、Best-of-N 的 LLM 集成，以及 auto-compact 控制器的后台任务门/思考档/暖前缀回放。
+
+## 任务记录 + 批量总结层迁移（第 33 批）
+- 完成时间：2026-09-22
+- 新增 `context/budget/task-record.ts`（迁移自 pi-tools `services/diagnostics/task-record.ts`）：`recordTaskRecord`/`loadTaskRecords`，落点 `portable/memory/task-records.jsonl`，尊重 `PI_DISABLE_TASK_RECORD`（防总结递归）。
+- `context/index.ts`：`agent_settled` 写一条任务记录（用户请求摘要/工具数/context token/是否压缩）；`logic.ts` 新增 `extractUserRequest`。
+- 新增 `scripts/task-summarizer.mjs`（迁移自 pi-tools，spawn 改为可选）：按游标聚合实质任务→digest 写 `portable/memory/daily-results/task-summary-<date>.md`；`--dry-run` 列表、`--spawn` 可选调用 `my-pi.sh -p` 入库/起草 SKILL；`scripts/task-summarizer.d.mts` 提供类型。
+- 新增测试：task-record 提取、summarizer 分组/digest 等；context 套件 73 用例通过。
