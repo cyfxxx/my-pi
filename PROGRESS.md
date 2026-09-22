@@ -665,3 +665,11 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `scripts/knowledge-ingest.mjs` 可移植化 + `environments=['all']`，正式入库（脚本总数 18）；`packs/knowledge-fetch/EXPERIENCE.md` 入库并勾选待办。
 - 文档同步：`STRUCTURE.md`/`AGENTS.md` 更新子包列表、deploy、脚本数、补丁 004。
 - 测试：28 文件 297 用例；golden 七项全绿。
+
+## 深度检查与一致性修复（第 41 批，自主执行）
+- 完成时间：2026-09-22
+- 死代码/未用导入清理（context/link/memory/voice/autopilot/ui-adapter/registry）；`custom/tsconfig.json` 开启 noUnusedLocals/noUnusedParameters。
+- 运行时数据归位：`portable/memory/daily-results/...` 取消跟踪（遵守忽略策略）。
+- packs：INDEX 补 `reverse-skill`；新增 `packs/drafts/.gitkeep` 并忽略草稿内容。
+- 文档注释修正（my-pi.sh/dev.sh 的 note-store 引用、STRUCTURE 示例、CHECK-REPORT 历史标注）。
+- 运行 `bash scripts/golden-tasks.sh --smoke`：无头会话启动并通过（扩展全量加载）。

@@ -361,3 +361,11 @@
 5. Best-of-N 的 LLM 集成不迁移：原项目 `judgeCandidates` 为随机占位、`bestOfN` 依赖外部编排；纯评分逻辑（parseJudgeScores/selectBest/shouldVerify）已在 `autopilot/run/verifier` 迁移。
 6. `docs-check.mjs`/`docs-freshness.mjs` 不迁移：与本仓库 `check-doc-links.mjs` 重叠，且其"元信息表/目录导航"模板与本项目文档风格不符，会产生大量误报。
 **理由**：在不引入 vendor 核心补丁风险的前提下完成目录模块化与闭环；未能闭环或属环境专属的项以决策记录明确边界。
+
+### [2026-09-22] 深度检查：死代码清理、运行时数据归位、packs 索引补全
+**背景**：自主深度检查发现若干不一致：未用导入/死代码、`portable/memory/daily-results` 单文件被 force-add 与 `.gitignore`（运行时数据不入库）冲突、`packs/INDEX.md` 漏 `reverse-skill`、`packs/drafts` 目录缺失。
+**决策**：
+1. 删除 `context/logic.ts` 死代码（暖前缀/未用状态与函数）与各文件未用导入；`custom/tsconfig.json` 开启 `noUnusedLocals`/`noUnusedParameters` 防回归。
+2. 运行时产物归位：`git rm --cached portable/memory/daily-results/...`，遵守 `portable/memory/*` 忽略策略（文件保留在磁盘）。
+3. 补全 `packs/INDEX.md` 的 `reverse-skill`（入口 `skills/SKILL.md`）；新增 `packs/drafts/.gitkeep` 并在 `.gitignore` 忽略草稿内容，闭合 task-summarizer 起草落点。
+**理由**：深度检查的目标是消除死代码、文档/策略不一致与运行时数据入库，保证便携与可维护。

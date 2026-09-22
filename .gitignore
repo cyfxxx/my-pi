@@ -68,3 +68,7 @@ data/plans/
 
 # vendor/pi 独立 git 仓库（上游 pi 源码，不纳入主仓库）
 vendor/pi/
+
+# packs 草稿（task-summarizer 自动生成，待人工确认；仅保留占位）
+packs/drafts/*
+!packs/drafts/.gitkeep

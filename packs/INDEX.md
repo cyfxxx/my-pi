@@ -20,6 +20,7 @@
 > | `novel-writing` | 写小说、网文、长篇写作、小说大纲 | 长篇小说工程化写作 |
 > | `pcb-design` | PCB、原理图、硬件、电路板审查、KiCad | PCB/硬件设计辅助 |
 > | `pdf-toolkit` | PDF、pdf、文档提取、合并、加密 | PDF 全场景处理 |
+> | `reverse-skill` | 逆向、渗透、安全研究、CTF、漏洞利用 | 逆向/授权渗透/安全研究技能路由（入口 `skills/SKILL.md`） |
 > | `repo-size-audit` | 仓库体积、git 体积、git gc、git 仓库审计 | git 仓库体积审计 |
 > | `skill-integration` | 技能包、整合、外部技能、GitHub 技能包 | 外部技能包整合流程 |
 > | `wechatide-skill` | 微信、IDE、微信开发、小程序 | 微信相关开发辅助 |
