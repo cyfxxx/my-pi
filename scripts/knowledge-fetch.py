@@ -3,7 +3,7 @@
 """knowledge-fetch.py —— 知识订阅（v2 官方源直连，零 LLM）
 用法: knowledge-fetch.py [--limit K]
 不再依赖本地 SearXNG 搜索引擎，直接轮询权威/稳定源（官方 API + RSS + 轻量 HTML 抓取），
-按标题 hash 去重（logs/knowledge/.seen.txt），新增追加写 logs/knowledge/<date>.md。
+按标题 hash 去重（<KLOG>/.seen.txt），新增追加写 <KLOG>/<date>.md（KLOG 见下，默认 portable/memory/knowledge）。
 各源独立容错：单个源失败不影响其余。主题分 5 个 section：安全/漏洞、人工智能、
 科技数码、生活热点、重要新闻。渠道与频率可在 SOURCES / 调度处调整。
 """
@@ -256,7 +256,7 @@ def main():
         with open(SEEN, 'a', encoding='utf-8') as f:
             for h in new_h:
                 f.write(h + '\n')
-        print(f'新增 {added_total} 条 -> logs/knowledge/{date}.md')
+        print(f'新增 {added_total} 条 -> {os.path.join(KLOG, f"{date}.md")}')
     else:
         print('无新增（各源与上次一致）')
     today = os.path.join(KLOG, f'{date}.md')

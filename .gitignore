@@ -72,3 +72,7 @@ vendor/pi/
 # packs 草稿（task-summarizer 自动生成，待人工确认；仅保留占位）
 packs/drafts/*
 !packs/drafts/.gitkeep
+
+# Python 缓存（knowledge-fetch.py 等）
+__pycache__/
+*.pyc
