@@ -59,6 +59,9 @@ vendor_apply_patches() {
       applied=$((applied + 1))
       echo "  ↑ 三方合并应用：$base"
     else
+      # --3way 失败可能在工作树/索引留下冲突，回滚到已提交状态，避免污染 vendor
+      git -C "$vendor" reset -q 2>/dev/null || true
+      git -C "$vendor" checkout -q -- . 2>/dev/null || true
       echo "  ✗ 应用失败（上游可能已改动相关文件）：$base" >&2
       failed=$((failed + 1))
       continue

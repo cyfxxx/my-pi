@@ -98,7 +98,8 @@ else
     fi
 
     echo "合并上游..."
-    if ! git merge --no-edit "$TARGET_COMMIT"; then
+    if ! git -c user.name="${MY_PI_COMMIT_NAME:-my-pi}" -c user.email="${MY_PI_COMMIT_EMAIL:-my-pi@localhost}" \
+         merge --no-edit "$TARGET_COMMIT"; then
         echo "❌ 合并冲突，以下文件与本地补丁冲突：" >&2
         git diff --name-only --diff-filter=U >&2 || true
         git merge --abort 2>/dev/null || true
