@@ -71,13 +71,12 @@ function formatContent(op: Op, state: TaskState): string {
 }
 
 const PLAN_USAGE = [
-  '/plan                  切换规划模式',
   '/plan enter            进入规划模式（只读探索）',
   '/plan exit             退出规划模式（保留任务）',
+  '/plan resume           退出并继续未完成计划',
+  '/plan todos            按状态分组显示计划任务',
   '/plan clear            清空所有计划任务',
-  '/plan resume           恢复执行模式并继续未完成计划',
-  '/plan todos            按状态分组显示所有计划任务',
-  '/plan help             显示本帮助',
+  '/plan help             显示本帮助（Ctrl+Alt+P 切换）',
 ].join('\n');
 
 export function register(pi: ExtensionAPI): void {
@@ -144,11 +143,18 @@ export function register(pi: ExtensionAPI): void {
 
   // ── /plan 命令 ──
   registerCommand(pi, 'plan', {
-    description: '计划模式：只读探索与任务跟踪 (usage: /plan <enter|exit|clear|resume|todos|help>)',
+    description: '计划模式：只读探索与任务跟踪',
     getArgumentCompletions: (prefix) => {
-      const subs = ['enter', 'exit', 'clear', 'resume', 'todos', 'help'];
-      const filtered = subs.filter((s) => s.startsWith(prefix));
-      return filtered.length > 0 ? filtered.map((s) => ({ value: s, label: s })) : null;
+      const subs = [
+        { value: 'enter', label: 'enter', description: '进入规划模式（只读探索）' },
+        { value: 'exit', label: 'exit', description: '退出规划模式（保留任务）' },
+        { value: 'resume', label: 'resume', description: '退出并继续未完成计划' },
+        { value: 'todos', label: 'todos', description: '按状态分组显示计划任务' },
+        { value: 'clear', label: 'clear', description: '清空所有计划任务' },
+        { value: 'help', label: 'help', description: '显示用法' },
+      ];
+      const filtered = subs.filter((s) => s.value.startsWith(prefix));
+      return filtered.length > 0 ? filtered : null;
     },
     handler: async (args, ctx) => {
       const sub = (args.trim().split(/\s+/)[0] || '').toLowerCase();
@@ -162,22 +168,16 @@ export function register(pi: ExtensionAPI): void {
         ctx.ui.notify(PLAN_USAGE, 'info');
         return;
       }
-      if (sub === 'enter' || sub === 'on') {
+      if (sub === 'enter') {
         if (!planModeEnabled) applyPlanMode(true);
         overlay.update();
         ctx.ui.notify('计划模式已启用。编辑/写入/bash 工具已禁用（只读探索）。', 'info');
         return;
       }
-      if (sub === 'exit' || sub === 'off') {
+      if (sub === 'exit') {
         if (planModeEnabled) applyPlanMode(false);
         overlay.update();
         ctx.ui.notify('计划模式已禁用。完整访问已恢复。', 'info');
-        return;
-      }
-      if (sub === 'toggle') {
-        applyPlanMode(!planModeEnabled);
-        overlay.update();
-        ctx.ui.notify(planModeEnabled ? '计划模式已启用。' : '计划模式已禁用。', 'info');
         return;
       }
       if (sub === 'clear') {

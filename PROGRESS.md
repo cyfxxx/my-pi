@@ -555,3 +555,13 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - **文档/守门**：更新 `STRUCTURE.md`、`custom/README.md`、两个 `AGENTS.md`；`CHECK_REPORT.md` 移入 `docs/development/`；隔离脚本第 3 项改为按整个 features 树校验逻辑层。
 - **autopilot 数据**：配置/状态迁至 `portable/agent/autopilot/{config,state}.json`，读取保留旧路径回退（平滑迁移）。
 - 验证：`npm run golden` 七项全绿；单测 228 → 231（删除 note-store 测试、新增 voice/browser/link 用例）。
+
+## 记忆迁移 + 工具按需加载 + 崩溃自愈 + TUI/命令整理（第 27 批）
+- 完成时间：2026-09-22
+- **长期记忆**：从 pi-tools `data/memory/entries.json`（982 条）精选迁移 **139 条** 到 `portable/memory/entries.json`。过滤规则：剔除敏感（PAT/SSH/Tailscale/主机名/私钥路径）、旧路径（`~/.pi`/`agent/extensions`/`pi-tools`）、旧脚本/旧扩展名、设备专属（termux/wsl2）、新闻类（`knowledge *`）、测试垃圾与重复标题；保留 Pi/SDK 行为、规划模式、扩展调试、记忆治理等可移植经验，全部重打标签 `migrated-from-pi-tools`，`environments=['all']`。残留敏感/旧路径命中 0。未迁移 summaries/notes/interventions/extract-sessions（旧项目运行数据）。迁移脚本：`/tmp/curate-memory.mjs`（一次性，不入库）。
+- **工具按需加载**（补迁 pi-tools `pi-context/tool-groups|tool-layering`）：新增 `context/budget/tool-groups.ts`（纯逻辑：CORE_TOOLS/6 组休眠组/`computeActiveTools`/`buildSleepingSummary`/`validateGroups`）与 `context/budget/tool-layering.ts`（运行态：`applyToolLayering`/`dormantToolsActive`/`enableGroup`/`buildToolsReport`），注册 `enable_tool` 工具，`before_agent_start` 首次分层并注入休眠组简介（静态、缓存友好），计划模式退出后自愈；`/tools` 支持 list/enable/help。核心 18 工具常驻，31 工具休眠。新增 6 用例。
+- **崩溃自愈**（按 pi-tools 最新 design：wrapper 检查/分类/启动，pi 自行修复）：新增 `scripts/pi-supervisor.sh`（崩溃捕获→`transient` 指数退避 / `external` 用当前 pi `--no-extensions --no-skills` 自修复 / `pi_self` 用源码缓存 pi 修复并回退 `scripts/build.sh`；健康检查、崩溃计数+熔断、最大恢复轮数、审计 JSONL）与 `scripts/pi-source-build.sh`（构建并缓存 dist 到 `portable/agent/recovery/cache`）。`my-pi.sh` 改为 exec supervisor，`MY_PI_NO_SUPERVISOR=1` 可直启。`DECISIONS.md` 原 N.A. 条目据此更新。
+- **TUI footer**：合并 pi-tools 四个 dist 补丁为源码补丁 `patches/004-footer-tweaks.patch`：实时上下文 token（分母恒为真实窗口）+ 双指标着色（黄=压缩参考线 `PI_CONTEXT_ABSOLUTE_TOKENS` 默认 256K，红=超窗口 80%+`!!`）、CH 实时/会话双命中率、`Σ/↑/↓` 字段与人民币成本（`CNY_PER_USD`）、>40% 窗口 `⚠` 重启提示；vendor 提交并重建 dist。
+- **`/` 命令**：顶层描述改短、补子命令补全说明；删除冗余 `/autopilot`（重复 /auto+/schedule）与 `/usage-diag`（并回 /context）；`/context` 去 `reset`、`/voice` 去 `on|off` 与 `tts on|off`（保留 toggle）、`/plan` 去隐藏的 `on|off|toggle`（保留 enter/exit 与 Ctrl+Alt+P）。check-features 期望面同步。
+- **每日任务种子**：迁移 `autopilot/store/seeds.ts`（种子对账 + 漂移检测），session_start/tick 对账；`scheduled-seeds.json` 改写为 NEW 路径，移除依赖未迁移脚本的 3 个种子（knowledge-subscribe/tool-stats-daily/daily-health），保留重写的 daily-review 与 golden-fast；`.gitignore` 放行 `scheduled-seeds.json`/`modes.json`。新增 3 用例。
+- 验证：golden 七项全绿；vitest 21 文件 **240 用例**；`my-pi.sh --version` 经 supervisor 正常。

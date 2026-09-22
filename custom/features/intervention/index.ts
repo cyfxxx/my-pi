@@ -113,7 +113,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerCommand(pi, 'intervention', {
-    description: '干预捕获：查看中断快照与统计 (usage: /intervention <recent|stats|help> [N])',
+    description: '干预捕获：中断快照与统计',
     getArgumentCompletions: (prefix) => {
       const first = (prefix?.trim().split(/\s+/)[0] ?? '').toLowerCase();
       const items = [

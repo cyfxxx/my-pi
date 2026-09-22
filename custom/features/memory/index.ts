@@ -250,7 +250,7 @@ export function register(pi: ExtensionAPI): void {
 
   // ── /memory 命令 ──
   registerCommand(pi, 'memory', {
-    description: '记忆库管理 (usage: /memory <search|stats|summary|prune|cleanup|help> [args])',
+    description: '记忆库：搜索/统计/摘要/治理',
     getArgumentCompletions: (prefix) => {
       const subs = [
         { value: 'search', label: 'search <关键词> - 搜索记忆' },

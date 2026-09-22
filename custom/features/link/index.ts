@@ -120,15 +120,22 @@ export function register(pi: ExtensionAPI): void {
 
   // ── /link 命令 ──
   registerCommand(pi, 'link', {
-    description: '多设备互联: /link send <设备> <消息> | status | help',
+    description: '多设备互联：发送/监听/收件箱',
     getArgumentCompletions: (prefix) => {
       const p = prefix ?? '';
       const parts = p.trim().split(/\s+/);
       const first = parts[0] ?? '';
       if (!p.includes(' ')) {
-        return ['send', 'status', 'watch', 'inbox', 'export-card', 'import-card', 'attach', 'help']
-          .filter((c) => c.startsWith(first))
-          .map((c) => ({ value: c + ' ', label: c }));
+        return [
+          { value: 'send ', label: 'send', description: '发送消息到设备' },
+          { value: 'status', label: 'status', description: '查看设备状态' },
+          { value: 'watch ', label: 'watch', description: '监听设备消息' },
+          { value: 'inbox', label: 'inbox', description: '查看收件箱' },
+          { value: 'attach ', label: 'attach', description: '附加文件并发送' },
+          { value: 'export-card', label: 'export-card', description: '导出互联卡片' },
+          { value: 'import-card ', label: 'import-card', description: '导入互联卡片' },
+          { value: 'help', label: 'help', description: '显示用法' },
+        ].filter((c) => c.value.startsWith(first));
       }
       if ((first === 'send' || first === 'watch') && parts.length === 2) {
         const sub = parts[1] ?? '';

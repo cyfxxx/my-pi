@@ -39,7 +39,7 @@ const MODE_HELP = `用法:
 
 export function register(pi: ExtensionAPI): void {
   registerCommand(pi, 'mode', {
-    description: '查看/切换当前模式 (usage: /mode <list|name|help>)',
+    description: '查看/切换当前模式',
     getArgumentCompletions: (prefix) => {
       const first = (prefix?.trim().split(/\s+/)[0] ?? '').toLowerCase();
       const items = [

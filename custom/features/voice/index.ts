@@ -168,35 +168,44 @@ export function register(pi: ExtensionAPI): void {
 
   // ── /voice 命令 ──
   registerCommand(pi, 'voice', {
-    description: '语音模式管理 (usage: /voice <on|off|status|toggle|tts|model|device|backend|language|doctor|help>)',
+    description: '语音：朗读与录音转写',
     getArgumentCompletions: (prefix) => {
-      const subs = ['on', 'off', 'status', 'toggle', 'record', 'tts', 'model', 'device', 'backend', 'language', 'doctor', 'wake', 'bench', 'help'];
-      const f = subs.filter((s) => s.startsWith(prefix));
-      return f.length ? f.map((s) => ({ value: s, label: s })) : null;
+      const subs = [
+        { value: 'status', label: 'status', description: '查看语音状态' },
+        { value: 'toggle', label: 'toggle', description: '开关自动朗读' },
+        { value: 'tts ', label: 'tts', description: '朗读控制（status / speak <文本>）' },
+        { value: 'record ', label: 'record', description: '录音→转写→发送（Ctrl+Alt+R）' },
+        { value: 'model ', label: 'model', description: '设置 whisper 模型' },
+        { value: 'device ', label: 'device', description: '设置推理设备（auto/cpu/cuda）' },
+        { value: 'backend ', label: 'backend', description: '设置转写后端（whisper/sherpa）' },
+        { value: 'language ', label: 'language', description: '设置转写语言（空=自动）' },
+        { value: 'doctor', label: 'doctor', description: '后端健康检查' },
+        { value: 'wake ', label: 'wake', description: 'KWS 唤醒监听（Linux+sherpa）' },
+        { value: 'bench', label: 'bench', description: '录音转写基准（RTF）' },
+        { value: 'help', label: 'help', description: '显示用法' },
+      ];
+      const f = subs.filter((s) => s.value.startsWith(prefix));
+      return f.length ? f : null;
     },
     handler: async (args, ctx) => {
       refresh();
       const [sub, ...rest] = args.trim().split(/\s+/);
-      const help = `语音命令:
-  /voice on|off|toggle        开关自动朗读
-  /voice status               查看状态
-  /voice tts <on|off|status|speak <文本>>  TTS 控制
-  /voice model <名>           设置 whisper 模型（需重启服务）
-  /voice device <auto|cpu|cuda> 设置推理设备
-  /voice backend <whisper|sherpa> 设置转写后端
-  /voice language <代码>      设置转写语言（空=自动）
-  /voice doctor               后端健康检查
-  /voice record <start|stop|cancel|status>  录音→转写→发送（Ctrl+Alt+R）
-  /voice wake <on|off|status> KWS 唤醒监听（Linux+sherpa）
-  /voice bench                录音→转写基准（RTF）
-  /voice help                 本帮助`;
+      const help = `/voice <子命令>
+  status                      查看语音状态
+  toggle                      开关自动朗读
+  tts status|speak <文本>     朗读控制
+  record <start|stop|cancel|status>  录音→转写→发送（Ctrl+Alt+R）
+  model <名> / device <auto|cpu|cuda> / backend <whisper|sherpa> / language <代码>  转写配置
+  doctor                      后端健康检查
+  wake <on|off|status>        KWS 唤醒监听（Linux+sherpa）
+  bench                       录音→转写基准（RTF）`;
 
       if (!sub || sub === 'help') {
         ctx.ui.notify(help, 'info');
         return;
       }
-      if (sub === 'on' || sub === 'off' || sub === 'toggle') {
-        enabled = sub === 'toggle' ? !enabled : sub === 'on';
+      if (sub === 'toggle') {
+        enabled = !enabled;
         persistConfig({ ttsEnabled: enabled });
         ctx.ui.notify(`语音自动朗读已${enabled ? '启用' : '禁用'}`, 'info');
         return;
@@ -212,12 +221,6 @@ export function register(pi: ExtensionAPI): void {
       }
       if (sub === 'tts') {
         const [op, ...txt] = rest;
-        if (op === 'on' || op === 'off') {
-          enabled = op === 'on';
-          persistConfig({ ttsEnabled: enabled });
-          ctx.ui.notify(`自动朗读已${enabled ? '启用' : '禁用'}`, 'info');
-          return;
-        }
         if (op === 'status') {
           ctx.ui.notify(`自动朗读: ${enabled ? '启用' : '禁用'}${dispatcher.isSpeaking() ? '（正在朗读）' : ''}`, 'info');
           return;
@@ -236,7 +239,7 @@ export function register(pi: ExtensionAPI): void {
           ctx.ui.notify('已加入朗读队列', 'info');
           return;
         }
-        ctx.ui.notify('用法: /voice tts <on|off|status|speak <文本>>', 'info');
+        ctx.ui.notify('用法: /voice tts <status|speak <文本>>', 'info');
         return;
       }
       if (sub === 'model') {

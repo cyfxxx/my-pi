@@ -275,3 +275,18 @@
 - 选项 3 会破坏"一个扩展一个目录"的迁移映射，且增加跨包依赖。
 - 选项 2 保留 `index.ts`（注册）与 `logic.ts`（纯逻辑出口）在根层，守门脚本与跨功能引用不受影响；仅多一层目录，符合"同功能文件放一起、嵌套不深"。子包内互引用用相对路径，跨功能只走对方 `logic.ts`，维持分层。
 - 数据仍在 `portable/` 收敛（项目硬约束优先于"代码/配置/数据同目录"的个人偏好）；仅将 autopilot 的配置/状态从 agentDir 根收拢到 `portable/agent/autopilot/`，并保留旧路径读取回退。
+
+### [2026-09-22] 崩溃自愈重新引入 supervisor（推翻此前 N.A.）
+**背景**：此前以"my-pi 直启无 wrapper"为由把 crash-recovery 标为 N.A.。用户澄清：最新 pi-tools 已改为「用 pi 修复 pi」，轻度崩溃（external）用屏蔽扩展/技能的当前 pi 自修复，重度（pi_self）用源码编译的 pi 修复损坏的 pi，且 `/tmp` 有最新 clone。
+**决策**：按该设计重新引入轻量 supervisor（`scripts/pi-supervisor.sh`），`my-pi.sh` 默认经它启动。
+**理由**：崩溃时只有外部进程能重启/救援，直启无法自愈；my-pi 的 vendor 即源码，`pi-source-build.sh` 构建并缓存 dist 作为"好 pi"，无需再 clone 上游。保留熔断/最大轮数/健康检查/审计，避免"越修越坏"。
+
+### [2026-09-22] 长期记忆只做精选迁移，不整库导入
+**背景**：pi-tools 记忆库 982 条含 PAT 泄露记录、Tailscale/SSH 主机信息与大量旧路径。
+**决策**：过滤敏感/旧路径/设备专属/新闻/测试垃圾后迁移 139 条，不迁移 summaries/notes/interventions/extract-sessions。
+**理由**：长期记忆价值在可移植的经验，而非旧项目运行日志与安全敏感清单；整库导入会把误导与泄露一并带入。
+
+### [2026-09-22] 命令面去冗余与"少手动、多自动"
+**背景**：顶层描述内联长 usage，子命令无说明；`/autopilot` 整体重复 `/auto`+`/schedule`，`/usage-diag` 重复 `/context`。
+**决策**：删冗余命令，顶层短描述 + 子命令补全说明；砍掉与自动行为重复的手动子命令（`/context reset`、`/voice on|off`、`/plan on|off|toggle`），自动切换交由 hook/快捷键（Ctrl+Alt+R / Ctrl+Alt+P）。
+**理由**：命令是低频入口，手动开关不符合"智能化"，且每多一个命令都增加认知与维护成本。

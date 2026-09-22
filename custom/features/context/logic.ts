@@ -115,3 +115,4 @@ export const FULL_DELEGATION_ADVICE = '完全委派建议：对于重复性任�
 // ── 迁移自 pi-tools 的 token 预算模块（纯逻辑） ──
 export * from './budget/budget';
 export * from './budget/output-archive';
+export * from './budget/tool-groups';

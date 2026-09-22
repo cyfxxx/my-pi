@@ -10,7 +10,10 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { registerCommand, getActiveTools, sendMessage } from '../../adapters/ui-adapter';
+import { registerCommand, sendMessage } from '../../adapters/ui-adapter';
+import { registerTool } from '../../adapters/tool-adapter';
+import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
+import { SLEEPING_GROUPS } from './budget/tool-groups';
 import {
   createToolLifecycleState,
   EFFICIENCY_ADVICE,
@@ -29,7 +32,7 @@ import {
 import { pruneToolResults } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
-import { appendUsage, readUsage, summarizeUsage, formatUsageSummary } from './usage-stats';
+import { appendUsage } from './usage-stats';
 
 export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE };
 
@@ -37,111 +40,103 @@ export function register(pi: ExtensionAPI): void {
   const toolState = createToolLifecycleState();
   const compactDecider = makeCompactDecider();
   const autoContinueGate = makeAutoContinueGate();
+  let layeringApplied = false;
 
-  // 注册命令：/context - 上下文管理
+  // 注册命令：/context - 上下文预算查看
   registerCommand(pi, 'context', {
-    description: '上下文管理 (usage: /context <usage|reset|report|help>)',
+    description: '查看上下文预算与 token 用量',
     getArgumentCompletions: (prefix) => {
       const subcommands = [
-        { value: 'usage', label: 'usage - 显示 token 使用诊断信息' },
-        { value: 'reset', label: 'reset - 重置上下文预算' },
-        { value: 'report', label: 'report - 显示详细报告' },
-        { value: 'help', label: 'help - 显示帮助信息' },
+        { value: 'usage', label: 'usage', description: '显示 token 使用诊断' },
+        { value: 'report', label: 'report', description: '显示预算报告' },
+        { value: 'help', label: 'help', description: '显示用法' },
       ];
       const filtered = subcommands.filter((s) => s.value.startsWith(prefix));
       return filtered.length > 0 ? filtered : null;
     },
     handler: async (args, ctx) => {
       const subcommand = args.trim() || 'usage';
-      
-      // 帮助信息
-      const helpText = `上下文管理命令:
-
-用法: /context <子命令>
-
-子命令:
-  usage   显示 token 使用诊断信息
-  reset   重置上下文预算
-  report  显示详细报告
-  help    显示此帮助信息
-
-说明:
-  此命令用于管理和查看 AI 助手的上下文使用情况。
-  可以查看 token 使用量、剩余预算、压力级别等信息。
-  
-示例:
-  /context usage   查看 token 使用情况
-  /context reset   重置上下文预算`;
-      
-      switch (subcommand) {
-        case 'help':
-          ctx.ui.notify(helpText, 'info');
-          break;
-          
-        case 'usage':
-        case 'usage-diag':
-          const report = getBudgetReport();
-          const reportText = `Token 使用报告:
-已使用: ${report.used.toLocaleString()} / ${report.total.toLocaleString()} (${(report.ratio * 100).toFixed(1)}%)
-剩余: ${report.remaining.toLocaleString()} token
-压力级别: ${report.pressure}
-主要消耗: ${report.topConsumers.map(c => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}`;
-          ctx.ui.notify(reportText, 'info');
-          break;
-          
-        case 'reset':
-          resetAllBudgets();
-          ctx.ui.notify('上下文预算已重置', 'info');
-          break;
-          
-        case 'report': {
-          const r = getBudgetReport();
-          const fullReport = `上下文预算报告:
-${r.used.toLocaleString()} / ${r.total.toLocaleString()} token
-压力级别: ${r.pressure}`;
-          ctx.ui.notify(fullReport, 'info');
-          break;
-        }
-          
-        default:
-          ctx.ui.notify(`未知子命令: ${subcommand}\n\n${helpText}`, 'info');
+      const helpText = '/context <子命令>\n  usage   显示 token 使用诊断\n  report  显示预算报告';
+      if (subcommand === 'help') {
+        ctx.ui.notify(helpText, 'info');
+        return;
       }
+      if (subcommand === 'usage' || subcommand === 'report') {
+        const r = getBudgetReport();
+        ctx.ui.notify(
+          `Token 使用报告:
+已使用: ${r.used.toLocaleString()} / ${r.total.toLocaleString()} (${(r.ratio * 100).toFixed(1)}%)
+剩余: ${r.remaining.toLocaleString()} token
+压力级别: ${r.pressure}
+主要消耗: ${r.topConsumers.map((c) => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}`,
+          'info',
+        );
+        return;
+      }
+      ctx.ui.notify(`未知子命令: ${subcommand}\n${helpText}`, 'info');
     },
   });
 
-  // 注册命令：/usage-diag - 用量诊断（pi-tools 同名命令）
-  registerCommand(pi, 'usage-diag', {
-    description: '用量诊断 (usage: /usage-diag)',
-    handler: async (_args, ctx) => {
-      const report = getBudgetReport();
-      const persisted = formatUsageSummary(summarizeUsage(readUsage()));
-      ctx.ui.notify(
-        `Token 用量诊断:
-已使用: ${report.used.toLocaleString()} / ${report.total.toLocaleString()} (${(report.ratio * 100).toFixed(1)}%)
-剩余: ${report.remaining.toLocaleString()} token
-压力级别: ${report.pressure}
-主要消耗: ${report.topConsumers.map(c => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}
-
-${persisted}`,
-        'info',
-      );
+  // 注册工具：enable_tool —— 启用休眠工具组（本会话内保持）
+  registerTool(pi, {
+    name: 'enable_tool',
+    description: `启用休眠工具组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）。启用后工具列表更新一次（前缀缓存重算），本会话内保持，重启恢复默认；已启用组再次启用无副作用。`,
+    parameters: {
+      group: {
+        type: 'string',
+        enum: SLEEPING_GROUPS.map((g) => g.name),
+        description: '要启用的休眠工具组名',
+      },
+    },
+    execute: async (args) => {
+      const group = typeof args.group === 'string' ? args.group : '';
+      const r = enableGroup(pi, group);
+      if (!r.ok) return r.message;
+      return r.message;
     },
   });
 
-  // 注册命令：/tools - 查看活跃工具（pi-tools 同名命令）
+  // 注册命令：/tools - 工具分层管理（list / enable <组> / help）
   registerCommand(pi, 'tools', {
-    description: '查看活跃工具 (usage: /tools [list])',
+    description: '工具分层：list 查看分组/状态，enable <组> 启用休眠组',
     getArgumentCompletions: (prefix) => {
-      const subcommands = [{ value: 'list', label: 'list - 列出当前活跃工具' }];
-      const filtered = subcommands.filter((s) => s.value.startsWith(prefix));
-      return filtered.length > 0 ? filtered : null;
+      const trimmed = prefix.trim();
+      const first = trimmed.split(/\s+/)[0] ?? '';
+      if (!trimmed.includes(' ')) {
+        const items = [
+          { value: 'list', label: 'list - 查看分组/状态' },
+          { value: 'enable ', label: 'enable - 启用休眠组' },
+          { value: 'help', label: 'help - 显示用法' },
+        ];
+        return items.filter((i) => i.value.startsWith(first)) || null;
+      }
+      if (first === 'enable') {
+        const arg = trimmed.split(/\s+/)[1] ?? '';
+        return SLEEPING_GROUPS.filter((g) => g.name.startsWith(arg)).map((g) => ({
+          value: 'enable ' + g.name,
+          label: g.name,
+          description: g.tools.join(', '),
+        }));
+      }
+      return null;
     },
-    handler: async (_args, ctx) => {
-      const tools = getActiveTools(pi);
-      ctx.ui.notify(
-        tools.length ? `活跃工具 (${tools.length}):\n${tools.map(t => `- ${t}`).join('\n')}` : '无活跃工具',
-        'info',
-      );
+    handler: async (args, ctx) => {
+      const [cmd, ...rest] = args.trim().split(/\s+/);
+      if (cmd === 'enable' && rest[0]) {
+        const r = enableGroup(pi, rest[0]);
+        ctx.ui.notify(r.message, r.ok ? 'info' : 'warning');
+        return;
+      }
+      if (cmd === 'help') {
+        ctx.ui.notify(
+          `工具分层命令:\n\n用法: /tools <子命令>\n\n子命令:\n  list          查看分组/状态\n  enable <组>   启用休眠组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）\n  help          显示此帮助`,
+          'info',
+        );
+        return;
+      }
+      const report = buildToolsReport(pi);
+      ctx.ui.notify(`tools: ${SLEEPING_GROUPS.length} 个休眠组`, 'info');
+      sendMessage(pi, { customType: 'tools-report', content: report, display: true }, { triggerTurn: false });
     },
   });
 
@@ -153,14 +148,25 @@ ${persisted}`,
     },
   });
 
-  // 回合开始：用真实 contextWindow 与用量校准预算
+  // 回合开始：应用工具分层 + 注入休眠组简介 + 用真实 contextWindow/用量校准预算
   registerHook(pi, {
     event: 'before_agent_start',
-    handler: async (_event, ctx) => {
+    handler: async (event, ctx) => {
+      if (!layeringApplied) {
+        applyToolLayering(pi);
+        layeringApplied = true;
+      } else if (dormantToolsActive(pi)) {
+        // 计划模式退出等会恢复全量工具，这里自愈回分层
+        applyToolLayering(pi);
+      }
       const usage = ctx.getContextUsage?.();
-      if (!usage) return;
-      setContextWindow(usage.contextWindow);
-      if (usage.tokens != null) setUsedTokens(usage.tokens);
+      if (usage) {
+        setContextWindow(usage.contextWindow);
+        if (usage.tokens != null) setUsedTokens(usage.tokens);
+      }
+      const e = event as { systemPrompt?: string };
+      if (typeof e.systemPrompt !== 'string') return;
+      return { systemPrompt: `${e.systemPrompt}\n\n${buildSleepingSummary()}` };
     },
   });
 

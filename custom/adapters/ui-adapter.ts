@@ -14,6 +14,9 @@ import { getMarkdownTheme as piGetMarkdownTheme } from '@earendil-works/pi-codin
 
 export { Key, Container, Markdown, Spacer, Text, truncateToWidth, visibleWidth };
 
+/** 供 features 内部模块引用扩展 API 的结构化类型别名（避免直接 import Pi 包） */
+export type PiApi = ExtensionAPI;
+
 /** 获取 Markdown 渲染主题（供功能层渲染器使用，避免直接 import vendor/pi） */
 export function getMarkdownTheme(): ReturnType<typeof piGetMarkdownTheme> {
   return piGetMarkdownTheme();

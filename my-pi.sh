@@ -23,6 +23,5 @@ if [ ! -f "$CLI" ]; then
     exit 1
 fi
 
-exec node "$CLI" \
-    --extension "$MY_PI_ROOT/custom/bootstrap.ts" \
-    "$@"
+# 崩溃自愈 supervisor（分类/修复者 pi/健康检查/熔断）；MY_PI_NO_SUPERVISOR=1 可直启
+exec bash "$MY_PI_ROOT/scripts/pi-supervisor.sh" "$@"

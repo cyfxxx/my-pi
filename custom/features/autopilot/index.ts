@@ -9,7 +9,8 @@
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
-import { registerCommand, sendMessage, appendEntry } from '../../adapters/ui-adapter';
+import { registerCommand, sendMessage } from '../../adapters/ui-adapter';
+import { syncSeedTasks } from './store/seeds';
 import {
   readAutopilotConfig,
   writeAutopilotConfig,
@@ -116,11 +117,20 @@ export function register(pi: ExtensionAPI): void {
 
   // ── /auto 命令 ──
   registerCommand(pi, 'auto', {
-    description: '自动驾驶自管理 (usage: /auto <status|stats|policy|failover|pause|resume|help>)',
+    description: '自动驾驶状态与策略管理',
     getArgumentCompletions: (prefix) => {
-      const subs = ['status', 'stats', 'metrics', 'policy', 'failover', 'pause', 'resume', 'help'];
-      const f = subs.filter((s) => s.startsWith(prefix));
-      return f.length ? f.map((s) => ({ value: s, label: s })) : null;
+      const subs = [
+        { value: 'status', label: 'status', description: '运行状态与调度概览' },
+        { value: 'stats', label: 'stats', description: '按模型的运行统计' },
+        { value: 'metrics', label: 'metrics', description: '运行质量指标' },
+        { value: 'policy', label: 'policy', description: '查看策略与预算' },
+        { value: 'failover', label: 'failover', description: '故障转移（加 --exec 执行）' },
+        { value: 'pause', label: 'pause', description: '暂停自动驾驶' },
+        { value: 'resume', label: 'resume', description: '恢复自动驾驶' },
+        { value: 'help', label: 'help', description: '显示用法' },
+      ];
+      const f = subs.filter((s) => s.value.startsWith(prefix));
+      return f.length ? f : null;
     },
     handler: async (args, ctx) => {
       const [sub, ...rest] = args.trim().split(/\s+/);
@@ -129,7 +139,10 @@ export function register(pi: ExtensionAPI): void {
       const runs = readTelemetry();
 
       if (!sub || sub === 'help') {
-        ctx.ui.notify('/auto <status|stats|metrics|policy|failover|pause|resume|help>', 'info');
+        ctx.ui.notify(
+          '/auto <子命令>\n  status   运行状态与调度概览\n  stats    按模型的运行统计\n  metrics  运行质量指标\n  policy   查看策略与预算\n  failover 故障转移（加 --exec 执行）\n  pause    暂停自动驾驶\n  resume   恢复自动驾驶',
+          'info',
+        );
         return;
       }
       if (sub === 'status') {
@@ -182,11 +195,27 @@ export function register(pi: ExtensionAPI): void {
 
   // ── /schedule 命令 ──
   registerCommand(pi, 'schedule', {
-    description: '任务调度 (usage: /schedule <list|loop|remind|cron|edit|delete|enable|disable|preview|history|help>)',
+    description: '定时任务管理',
     getArgumentCompletions: (prefix) => {
-      const subs = ['list', 'loop', 'remind', 'cron', 'edit', 'delete', 'enable', 'disable', 'preview', 'history', 'help'];
-      const f = subs.filter((s) => s.startsWith(prefix));
-      return f.length ? f.map((s) => ({ value: s, label: s })) : null;
+      const subs = [
+        { value: 'list', label: 'list', description: '列出所有任务' },
+        { value: 'loop ', label: 'loop', description: '固定间隔任务（如 loop 5m <任务>）' },
+        { value: 'remind ', label: 'remind', description: '一次性提醒（如 remind +30m <任务>）' },
+        { value: 'cron ', label: 'cron', description: 'cron 任务（如 cron "0 9 * * 1-5" <任务>）' },
+        { value: 'edit ', label: 'edit', description: '修改任务字段' },
+        { value: 'delete ', label: 'delete', description: '删除任务' },
+        { value: 'enable ', label: 'enable', description: '启用任务' },
+        { value: 'disable ', label: 'disable', description: '禁用任务' },
+        { value: 'preview ', label: 'preview', description: '预览 cron 下次触发' },
+        { value: 'history ', label: 'history', description: '查看执行历史' },
+        { value: 'help', label: 'help', description: '显示用法' },
+      ];
+      const first = (prefix.split(/\s+/)[0] ?? '');
+      if (!prefix.includes(' ')) {
+        const f = subs.filter((s) => s.value.startsWith(first));
+        return f.length ? f : null;
+      }
+      return null;
     },
     handler: async (args, ctx) => {
       const parts = args.trim().split(/\s+/).filter(Boolean);
@@ -301,54 +330,6 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // ── 兼容旧命令 /autopilot ──
-  registerCommand(pi, 'autopilot', {
-    description: '自动驾驶模式管理 (usage: /autopilot <start|stop|status|loop|schedule|remind|help>)',
-    handler: async (args, ctx) => {
-      const [sub, ...rest] = args.trim().split(/\s+/);
-      const c = readAutopilotConfig();
-      if (!sub || sub === 'help') {
-        ctx.ui.notify('/autopilot <start|stop|status|loop <间隔> <任务>|schedule <cron> <任务>|remind <时间> <任务>|help>', 'info');
-        return;
-      }
-      if (sub === 'start') {
-        writeAutopilotConfig({ ...c, enabled: true });
-        ctx.ui.notify('自动驾驶已启动', 'info');
-        return;
-      }
-      if (sub === 'stop') {
-        writeAutopilotConfig({ ...c, enabled: false });
-        ctx.ui.notify('自动驾驶已停止', 'info');
-        return;
-      }
-      if (sub === 'status') {
-        const ov = schedulerOverview();
-        ctx.ui.notify(`自动驾驶: ${c.enabled ? '运行中' : '已停止'}, 任务 ${ov.total}（启用 ${ov.enabled}）`, 'info');
-        return;
-      }
-      if (sub === 'loop' || sub === 'schedule' || sub === 'remind') {
-        // 转发到调度创建逻辑
-        const type: TaskType = sub === 'schedule' ? 'cron' : sub === 'remind' ? 'once' : 'interval';
-        const schedule = rest[0];
-        const prompt = sub === 'schedule' ? rest.slice(5).join(' ') : rest.slice(1).join(' ');
-        const sched = sub === 'schedule' ? rest.slice(0, 5).join(' ') : schedule;
-        if (!sched || !prompt) {
-          ctx.ui.notify(`用法: /autopilot ${sub} '${type === 'cron' ? '0 9 * * 1-5' : '+30m'}' <任务>`, 'info');
-          return;
-        }
-        try {
-          const task = await addTask({ name: `task-${Date.now().toString(36)}`, type, schedule: sched.replace(/^"|"$/g, ''), prompt });
-          appendEntry(pi, 'autopilot-schedule', { name: task.name, type, schedule: task.schedule });
-          ctx.ui.notify(`已创建任务 ${task.name}`, 'info');
-        } catch (e) {
-          ctx.ui.notify(`创建失败: ${(e as Error).message}`, 'error');
-        }
-        return;
-      }
-      ctx.ui.notify(`未知子命令: ${sub}`, 'info');
-    },
-  });
-
   // ── 执行循环：每分钟检查到期任务并运行（子进程隔离）──
   let running = false;
   let tickTimer: ReturnType<typeof setInterval> | null = null;
@@ -435,9 +416,17 @@ export function register(pi: ExtensionAPI): void {
       tickTimer = setInterval(() => {
         void runDueTasks(ctx);
         checkHang(ctx);
+        void syncSeedTasks();
       }, 60000);
       tickTimer.unref?.();
       void runDueTasks(ctx);
+      const sync = await syncSeedTasks();
+      if ((sync.added || sync.drifted.length) && ctx.hasUI) {
+        ctx.ui.notify(
+          `种子任务对账: 新增 ${sync.added}${sync.drifted.length ? `，与种子不一致: ${sync.drifted.join('；')}` : ''}`,
+          sync.drifted.length ? 'warning' : 'info',
+        );
+      }
     },
   });
 
