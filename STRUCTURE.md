@@ -12,7 +12,7 @@ my-pi/
 ├── packs/               # 外部技能包仓库（迁移自 pi-tools，按需读取，不注入系统提示词）
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── patches/             # 上游补丁
-├── scripts/             # 12 个运维脚本
+├── scripts/             # 13 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介

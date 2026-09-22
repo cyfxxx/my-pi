@@ -2,10 +2,22 @@
  * web-search fetch 纯逻辑回归测试（迁移自 pi-tools pi-web-search/tests/fetch.test.ts 语义）
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { readBodyLimited, fetchUrl } from '../logic';
+import { readBodyLimited, fetchUrl, resolveSearxngUrl } from '../logic';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete process.env.SEARXNG_URL;
+  delete process.env.PI_WEB_TOOLKIT_SEARXNG_URL;
+});
+
+describe('resolveSearxngUrl', () => {
+  it('优先 SEARXNG_URL，其次 pi-tools 兼容名，未配置为 null', () => {
+    expect(resolveSearxngUrl()).toBeNull();
+    process.env.PI_WEB_TOOLKIT_SEARXNG_URL = 'http://127.0.0.1:8889';
+    expect(resolveSearxngUrl()).toBe('http://127.0.0.1:8889');
+    process.env.SEARXNG_URL = 'https://searx.be';
+    expect(resolveSearxngUrl()).toBe('https://searx.be');
+  });
 });
 
 describe('readBodyLimited', () => {

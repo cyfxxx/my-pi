@@ -290,3 +290,13 @@
 **背景**：顶层描述内联长 usage，子命令无说明；`/autopilot` 整体重复 `/auto`+`/schedule`，`/usage-diag` 重复 `/context`。
 **决策**：删冗余命令，顶层短描述 + 子命令补全说明；砍掉与自动行为重复的手动子命令（`/context reset`、`/voice on|off`、`/plan on|off|toggle`），自动切换交由 hook/快捷键（Ctrl+Alt+R / Ctrl+Alt+P）。
 **理由**：命令是低频入口，手动开关不符合"智能化"，且每多一个命令都增加认知与维护成本。
+
+### [2026-09-22] web_search 端点解析与无 SearXNG 降级
+**背景**：web-search 迁移后仅认 `SEARXNG_URL`，而 my-pi 运行环境无该变量、且本机未装 SearXNG，导致 web_search 恒不可用。
+**决策**：端点按 `SEARXNG_URL` → `PI_WEB_TOOLKIT_SEARXNG_URL`（pi-tools 兼容名）解析；两者皆无时自动降级为免配置 HTTP 搜索（`web_fetch` 同源 Bing 直连）并在结果前注明。
+**理由**：搜索是高频能力，不应因可选外部服务缺失而不可用；显式配置仍优先，降级不隐藏（结果首行说明）。
+
+### [2026-09-22] 不迁移 auto-compact 控制器与 task-summarizer 流水线（口径）
+**背景**：pi-tools `pi-context/auto-compact-controller.ts` 与 `task-summarizer.mjs` 依赖 `.usage-diag.jsonl`、task-record、thinking-level、warm-prefix、prune-dump 等一整条未迁移的数据/编排链。
+**决策**：本轮只保留已迁移的阈值判定器；快照/任务门控/思考档切换/暖前缀回放与技能草稿流水线暂不迁，在 PROGRESS 记录依赖缺口。
+**理由**：为对齐而引入整条数据链会使改动面远超收益，且与"逻辑可移植则移植、编排依赖则替代或标注"的既有口径一致。

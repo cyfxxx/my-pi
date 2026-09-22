@@ -8,7 +8,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerTool } from '../../adapters/tool-adapter';
-import { searchWeb, searchDirect, fetchUrl } from './logic';
+import { searchWeb, searchDirect, fetchUrl, resolveSearxngUrl } from './logic';
 import type { SearchConfig } from './types';
 
 export function register(pi: ExtensionAPI): void {
@@ -22,9 +22,11 @@ export function register(pi: ExtensionAPI): void {
     execute: async (args) => {
       const query = args.query as string;
       const maxResults = (args.maxResults as number) ?? 5;
-      const searxngUrl = process.env.SEARXNG_URL;
+      // 端点解析：SEARXNG_URL > PI_WEB_TOOLKIT_SEARXNG_URL（pi-tools 兼容名）
+      const searxngUrl = resolveSearxngUrl();
       if (!searxngUrl) {
-        return '未配置 SEARXNG_URL。请设置 SearXNG 实例地址（如 http://127.0.0.1:8080）后重试；临时可用 web_fetch 作为免配置 fallback。';
+        // 未配置本地/远程 SearXNG 时自动降级为免配置 HTTP 搜索（Bing 直连）
+        return `[未配置 SearXNG，已用免配置 HTTP 搜索 fallback；如需本地实例见 scripts/setup-external.sh web]\n\n${await searchDirect(query, maxResults)}`;
       }
       const config: SearchConfig = { searxng_url: searxngUrl, timeout: 15000 };
       const result = await searchWeb(config, query, { max_results: maxResults });

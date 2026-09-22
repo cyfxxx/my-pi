@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "跨设备每日任务种子（git 入库共享）：各设备 pi-autopilot 启动/运行中对账，本地缺失同名任务则自动注册；已存在则跳过不覆盖本地修改。修改种子文件后 push，其他设备 pull 后 60s 内自动生效。未迁移的种子（knowledge-subscribe/tool-stats-daily/daily-health）依赖 pi-tools 的 scripts/knowledge-fetch.py、tool-stats-sync.mjs、maintenance/daily-health.mjs，my-pi 尚未迁移这些脚本，故暂不注册。",
+  "note": "跨设备每日任务种子（git 入库共享）：各设备 pi-autopilot 启动/运行中对账，本地缺失同名任务则自动注册；已存在则跳过不覆盖本地修改。修改种子文件后 push，其他设备 pull 后 60s 内自动生效。未迁移的种子（knowledge-subscribe/tool-stats-daily）依赖 pi-tools 的 scripts/knowledge-fetch.py、tool-stats-sync.mjs，my-pi 尚未迁移这些脚本，故暂不注册。",
   "tasks": [
     {
       "name": "daily-review",
@@ -15,6 +15,21 @@
       "tags": [
         "daily",
         "review"
+      ]
+    },
+    {
+      "name": "daily-health",
+      "type": "cron",
+      "schedule": "50 7 * * *",
+      "prompt": "每日健康度量（确定性零 LLM，勿做其他事）：运行 node scripts/daily-health.mjs（输出结论行并自动追加 portable/memory/logs/daily-health.log）。仅当输出含 结论=alert 时：将该行与原因写入 portable/memory/daily-results/{{date}}-health-<本机hostname>.md，git add 该文件后 commit（message: 'daily-health: alert {{date}}'）并 push（冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。结论=ok 时立即结束，不写文件不提交。",
+      "useSubagent": true,
+      "notifyMain": true,
+      "waitForUserOnLocal": true,
+      "maxRunTime": 300,
+      "retries": 1,
+      "tags": [
+        "health",
+        "daily"
       ]
     },
     {

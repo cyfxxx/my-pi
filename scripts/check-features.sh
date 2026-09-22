@@ -144,7 +144,7 @@ echo ""
 
 # ---- 8. 运维脚本 ----
 echo "8. 运维脚本"
-for script in build.sh dev.sh sync-upstream.sh check-isolation.sh check-features.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh check-doc-links.mjs pi-supervisor.sh pi-source-build.sh; do
+for script in build.sh dev.sh sync-upstream.sh check-isolation.sh check-features.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh check-doc-links.mjs pi-supervisor.sh pi-source-build.sh daily-health.mjs; do
   if [ -f "scripts/$script" ]; then
     echo "  ✅ scripts/$script"
   else

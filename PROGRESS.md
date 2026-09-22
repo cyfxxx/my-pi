@@ -565,3 +565,12 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - **`/` 命令**：顶层描述改短、补子命令补全说明；删除冗余 `/autopilot`（重复 /auto+/schedule）与 `/usage-diag`（并回 /context）；`/context` 去 `reset`、`/voice` 去 `on|off` 与 `tts on|off`（保留 toggle）、`/plan` 去隐藏的 `on|off|toggle`（保留 enter/exit 与 Ctrl+Alt+P）。check-features 期望面同步。
 - **每日任务种子**：迁移 `autopilot/store/seeds.ts`（种子对账 + 漂移检测），session_start/tick 对账；`scheduled-seeds.json` 改写为 NEW 路径，移除依赖未迁移脚本的 3 个种子（knowledge-subscribe/tool-stats-daily/daily-health），保留重写的 daily-review 与 golden-fast；`.gitignore` 放行 `scheduled-seeds.json`/`modes.json`。新增 3 用例。
 - 验证：golden 七项全绿；vitest 21 文件 **240 用例**；`my-pi.sh --version` 经 supervisor 正常。
+
+## 外部服务审计 + 度量脚本适配（第 28 批）
+- 完成时间：2026-09-22
+- **外部服务现状（本机）**：tmux 3.4 / ffmpeg / fdfind / rg / chromium-browser 已装；docker、podman、whisper、espeak、piper、sherpa-onnx、SearXNG 均未装/未运行。
+- **web_search 适配**：原来仅读未配置的 `SEARXNG_URL`，导致工具恒返回"未配置"。改为 `SEARXNG_URL` > `PI_WEB_TOOLKIT_SEARXNG_URL`（pi-tools 兼容名）解析，未配置时自动降级为免配置 HTTP 搜索（Bing），并提示 `scripts/setup-external.sh web`。新增 `resolveSearxngUrl` 测试。
+- **setup-external.sh 扩充**：`fd-rg` 改用 exec shim（原 `ln -s` 会违反 `portable/` 无符号链接的隔离检查）；status 增加 ffmpeg/chromium/espeak/piper/sherpa 探测；新增 `web`（无 docker 时给出 SearXNG 原生 uvicorn 部署步骤）。
+- **daily-health 适配迁移**：新增 `scripts/daily-health.mjs`（确定性零 LLM）：24h 缓存命中率（`portable/memory/context/usage.jsonl`）、记忆库体积/条目、种子-任务失配、守门脚本未提交改动 → `结论=ok|alert`，追加 `portable/memory/logs/daily-health.log`；`scripts/scheduled-seeds.json` 重新加入 daily-health 种子。
+- **未迁移（记录口径）**：task-metrics/lesson-miner 的脚本版依赖 pi-tools `.usage-diag.jsonl`/`tool-events.jsonl`（NEW 无该数据源；教训挖掘已由 `/memory mine` 承载）；task-summarizer 批量取决于未迁移的 task-record→SKILL 草稿流水线；auto-compact 的压缩前快照/任务门控/思考档切换/暖前缀回放是耦合子系统，当前只迁了阈值判定器。以上如需再单独评估。
+- 验证：golden 七项全绿；vitest 21 文件 241 用例；`daily-health.mjs --print` 正常产出结论行。

@@ -1,6 +1,14 @@
 import type { SearchConfig, SearchResponse, SearchResultItem } from './types'
 import { isUrlAllowed } from '../../core/net-guard'
 
+/**
+ * 解析 SearXNG 端点：SEARXNG_URL 优先，兼容 pi-tools 的 PI_WEB_TOOLKIT_SEARXNG_URL。
+ * 未配置返回 null（调用方降级为免配置 HTTP 搜索）。
+ */
+export function resolveSearxngUrl(): string | null {
+  return process.env.SEARXNG_URL || process.env.PI_WEB_TOOLKIT_SEARXNG_URL || null
+}
+
 // ── 错误分类（wechat-article-exporter 启发）────────────────────
 // 5xx / 网络错误 → 可重试（服务端临时故障或连接问题）
 // 4xx / 非重试状态码 → 立即失败（客户端错误，重试无意义）
