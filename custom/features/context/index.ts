@@ -10,10 +10,10 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { registerCommand, sendMessage } from '../../adapters/ui-adapter';
+import { registerCommand, sendMessage, getAllToolNames } from '../../adapters/ui-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
-import { SLEEPING_GROUPS } from './budget/tool-groups';
+import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
 import {
   createToolLifecycleState,
   EFFICIENCY_ADVICE,
@@ -120,11 +120,13 @@ export function register(pi: ExtensionAPI): void {
       }
       if (first === 'enable') {
         const arg = trimmed.split(/\s+/)[1] ?? '';
-        return SLEEPING_GROUPS.filter((g) => g.name.startsWith(arg)).map((g) => ({
-          value: 'enable ' + g.name,
-          label: g.name,
-          description: g.tools.join(', '),
-        }));
+        return groupsWithTools(new Set(getAllToolNames(pi)))
+          .filter((g) => g.name.startsWith(arg))
+          .map((g) => ({
+            value: 'enable ' + g.name,
+            label: g.name,
+            description: g.tools.join(', '),
+          }));
       }
       return null;
     },
@@ -174,7 +176,7 @@ export function register(pi: ExtensionAPI): void {
       }
       const e = event as { systemPrompt?: string };
       if (typeof e.systemPrompt !== 'string') return;
-      return { systemPrompt: `${e.systemPrompt}\n\n${buildSleepingSummary()}` };
+      return { systemPrompt: `${e.systemPrompt}\n\n${buildSleepingSummary(new Set(getAllToolNames(pi)))}` };
     },
   });
 

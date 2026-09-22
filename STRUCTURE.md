@@ -12,7 +12,7 @@ my-pi/
 ├── packs/               # 外部技能包仓库（迁移自 pi-tools，按需读取，不注入系统提示词）
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── patches/             # 上游补丁
-├── scripts/             # 16 个运维脚本
+├── scripts/             # 18 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -83,18 +83,24 @@ my-pi 的自定义代码。三层结构：
 - `003-tab-completion-fix.patch`：`handleTabCompletion` 斜杠命令上下文统一走 `handleSlashCommandCompletion()`，使子命令参数补全在 Tab 时可见
 
 ### `scripts/`
-仅 10 个脚本：
+共 18 个运维脚本：
 
 - `build.sh`：构建 vendor/pi（vendor 缺失时自动引导）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `dev.sh`：开发模式运行
 - `sync-upstream.sh`：从上游同步
 - `check-isolation.sh`：验证隔离边界
 - `check-features.sh`：对照 pi-tools 注册面检查工具/命令/快捷键/钩子/补丁完整性
-- `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 容器 / whisper 指引 / fd-rg 链接）
-- `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
-- `golden-tasks.sh`：行为防退化基准（隔离/注册面/类型/单测/补丁/注入面，`--smoke` 追加无头冒烟）
 - `check-injection-surface.sh`：system prompt 注入面前缀指纹基线守门（`--update` 更新基线）
 - `check-doc-links.mjs`：文档内部相对链接一致性校验
+- `golden-tasks.sh`：行为防退化基准（隔离/注册面/类型/单测/补丁/注入面/文档，`--smoke` 追加无头冒烟）
+- `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
+- `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg 链接）
+- `searxng-config.sh`：生成 SearXNG `settings.yml`（禁用不可达引擎、bing 指向 cn.bing.com；`--force/--probe`）
+- `pi-supervisor.sh` / `pi-source-build.sh`：崩溃自愈外壳与源码缓存构建
+- `daily-health.mjs`：每日健康检查（命中率/记忆库/种子失配/守门脏改）
+- `knowledge-fetch.py`：知识源抓取（落 `portable/memory/knowledge/`）
+- `tool-stats-sync.mjs`：工具使用统计汇总（`usage.jsonl` → 跨设备计数）
+- `task-summarizer.mjs`：任务记录批量总结（游标聚合 → digest，`--spawn` 可选入库）
 
 ## 数据流向
 

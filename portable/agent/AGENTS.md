@@ -14,7 +14,7 @@ vendor/pi/                 # 上游 Pi 代码（独立 clone，只读）
 custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
-scripts/                   # 16 个运维脚本
+scripts/                   # 18 个运维脚本
 patches/                   # 上游补丁
 ```
 
@@ -52,6 +52,14 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-st
 - 自定义功能数据：`portable/memory/`（`PI_MEMORY_DIR`；工具输出归档走 `PI_OUTPUT_ARCHIVE_DIR`，默认 `portable/memory/tool-outputs/`）
 
 运行时数据全部收敛到 `portable/`，实现便携（U 盘即插即用，无符号链接）。
+
+## 网络搜索（三级通路）
+
+- `web_search`：走可配置的 SearXNG 端点（`settings.json` 的 `pi-web-search.searxng_url` > `SEARXNG_URL`/`PI_WEB_TOOLKIT_SEARXNG_URL` > 本地 `http://127.0.0.1:8889`）；不可达/无结果时自动降级 `searchDirect`（Bing）。
+- `web_fetch`：免 SearXNG 的 Bing 直搜（休眠组 `web-fallback`，需 `enable_tool("web-fallback")`）。
+- `fetch_url`：轻量 HTTP GET（仅公网 http/https，拒绝内网/回环）。
+- **SearXNG 引擎配置是常见坑**：默认启用 google/duckduckgo/brave/wikipedia 等被封锁引擎会全部 timeout 并拖垮整次搜索。用 `bash scripts/searxng-config.sh --force` 生成只启可达引擎（baidu/bing/sogou/360search/bilibili/yandex/stackoverflow/github）且 bing 指向 `cn.bing.com` 的配置。
+- 超时默认 30s（`pi-web-search.search_timeout`），因本地多引擎聚合常需 10s+。
 
 ## 关键约定
 

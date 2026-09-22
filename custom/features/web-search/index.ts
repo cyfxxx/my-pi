@@ -8,7 +8,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerTool } from '../../adapters/tool-adapter';
-import { searchWeb, searchDirect, fetchUrl, resolveSearxngUrl } from './logic';
+import { searchWeb, searchDirect, fetchUrl, resolveSearxngUrl, resolveSearchTimeout, DEFAULT_SEARXNG_URL } from './logic';
 import type { SearchConfig } from './types';
 
 export function register(pi: ExtensionAPI): void {
@@ -22,9 +22,9 @@ export function register(pi: ExtensionAPI): void {
     execute: async (args) => {
       const query = args.query as string;
       const maxResults = (args.maxResults as number) ?? 5;
-      // 端点解析：SEARXNG_URL > PI_WEB_TOOLKIT_SEARXNG_URL（pi-tools 兼容名）> 本地默认
-      const searxngUrl = resolveSearxngUrl() || 'http://127.0.0.1:8889';
-      const config: SearchConfig = { searxng_url: searxngUrl, timeout: 15000 };
+      // 端点解析：环境变量 > settings.json（pi-web-search.searxng_url）> 本地默认
+      const searxngUrl = resolveSearxngUrl() || DEFAULT_SEARXNG_URL;
+      const config: SearchConfig = { searxng_url: searxngUrl, timeout: resolveSearchTimeout() };
       const result = await searchWeb(config, query, { max_results: maxResults });
       // SearXNG 不可达/无结果时自动降级为免配置 HTTP 搜索（Bing 直连）
       if (/^搜索(失败|超时)|^未找到结果/.test(result)) {
@@ -45,7 +45,7 @@ export function register(pi: ExtensionAPI): void {
     execute: async (args) => {
       const url = args.url as string;
       const maxLength = (args.max_length as number) ?? 8000;
-      return fetchUrl(url, maxLength, 15000);
+      return fetchUrl(url, maxLength, resolveSearchTimeout());
     },
   });
 

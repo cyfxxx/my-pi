@@ -1,13 +1,31 @@
 /**
  * web-search fetch 纯逻辑回归测试（迁移自 pi-tools pi-web-search/tests/fetch.test.ts 语义）
  */
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { readBodyLimited, fetchUrl, resolveSearxngUrl } from '../logic';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  readBodyLimited,
+  fetchUrl,
+  resolveSearxngUrl,
+  resolveSearchTimeout,
+  parseBingResults,
+  decodeHtmlEntities,
+  decodeBingRedirect,
+} from '../logic';
+
+const OLD_AGENT = process.env.PI_CODING_AGENT_DIR;
+
+beforeEach(() => {
+  // 隔离 settings.json（避免读取真实 portable/agent/settings.json 的 pi-web-search 段）
+  process.env.PI_CODING_AGENT_DIR = '/tmp/opencode/__nonexistent_agent_dir__';
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.SEARXNG_URL;
   delete process.env.PI_WEB_TOOLKIT_SEARXNG_URL;
+  delete process.env.PI_WEB_TOOLKIT_SEARCH_TIMEOUT;
+  if (OLD_AGENT === undefined) delete process.env.PI_CODING_AGENT_DIR;
+  else process.env.PI_CODING_AGENT_DIR = OLD_AGENT;
 });
 
 describe('resolveSearxngUrl', () => {
@@ -17,6 +35,44 @@ describe('resolveSearxngUrl', () => {
     expect(resolveSearxngUrl()).toBe('http://127.0.0.1:8889');
     process.env.SEARXNG_URL = 'https://searx.be';
     expect(resolveSearxngUrl()).toBe('https://searx.be');
+  });
+});
+
+describe('resolveSearchTimeout', () => {
+  it('默认 30s；环境变量覆盖', () => {
+    expect(resolveSearchTimeout()).toBe(30000);
+    process.env.PI_WEB_TOOLKIT_SEARCH_TIMEOUT = '5000';
+    expect(resolveSearchTimeout()).toBe(5000);
+  });
+});
+
+describe('parseBingResults（原项目踩坑：属性顺序/实体/跳转）', () => {
+  const html = `<div class="b_algo"><h2 class=""><a target="_blank" target="_blank" href="https://juejin.cn/post/1" h="ID=SERP,1"><strong>Rust Web</strong> 框架 &amp; 选型</a></h2></div>
+    <li class="b_algo"><h2><a href="https://www.bing.com/ck/a?!&&p=x&u=a1aHR0cHM6Ly9yb2NrZXQucnMv" h="ID=SERP,2">Rocket &lt;Rust&gt;</a></h2></li>`;
+
+  it('匹配带属性/内联标签的 h2>a，解码实体', () => {
+    const r = parseBingResults(html, 5);
+    expect(r[0]).toContain('Rust Web 框架 & 选型');
+    expect(r[1]).toBe('   https://juejin.cn/post/1');
+  });
+
+  it('还原 bing /ck/a 跳转为真实 URL', () => {
+    const r = parseBingResults(html, 5);
+    expect(r[3]).toBe('   https://rocket.rs/');
+    expect(r[2]).toContain('Rocket <Rust>');
+  });
+
+  it('无结果时返回空数组', () => {
+    expect(parseBingResults('<html><body>no results</body></html>', 5)).toEqual([]);
+  });
+});
+
+describe('decodeHtmlEntities / decodeBingRedirect', () => {
+  it('解码常见实体', () => {
+    expect(decodeHtmlEntities('a &amp; b &#39;c&#39; &lt;d&gt;')).toBe("a & b 'c' <d>");
+  });
+  it('非 bing 链接原样返回', () => {
+    expect(decodeBingRedirect('https://example.com/a?u=a1x')).toBe('https://example.com/a?u=a1x');
   });
 });
 

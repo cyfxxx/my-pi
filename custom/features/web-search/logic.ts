@@ -1,12 +1,57 @@
+import { readFileSync, existsSync } from 'fs'
+import { join } from 'path'
 import type { SearchConfig, SearchResponse, SearchResultItem } from './types'
 import { isUrlAllowed } from '../../core/net-guard'
+import { getAgentDir } from '../../core/config'
+
+/** 本地 SearXNG 默认端点（见 scripts/searxng-config.sh / setup-external.sh web）。 */
+export const DEFAULT_SEARXNG_URL = 'http://127.0.0.1:8889'
+/** 默认搜索超时：本地 SearXNG 多引擎聚合常需 10s+，沿用 pi-tools 的 30s 口径。 */
+export const DEFAULT_SEARCH_TIMEOUT = 30000
+
+/** 读取 settings.json 中 pi-web-search（兼容旧 pi-web-toolkit）配置段。 */
+function readSettingsSections(): Record<string, unknown>[] {
+  const paths = [join(getAgentDir(), 'settings.json'), join(process.cwd(), '.pi', 'settings.json')]
+  const out: Record<string, unknown>[] = []
+  for (const p of paths) {
+    if (!existsSync(p)) continue
+    try {
+      const raw = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>
+      const ext = raw?.extensions as Record<string, unknown> | undefined
+      for (const key of ['pi-web-search', 'pi-web-toolkit']) {
+        const s = (ext?.[key] ?? raw?.[key]) as Record<string, unknown> | undefined
+        if (s && typeof s === 'object') out.push(s)
+      }
+    } catch {
+      /* 忽略坏配置 */
+    }
+  }
+  return out
+}
 
 /**
- * 解析 SearXNG 端点：SEARXNG_URL 优先，兼容 pi-tools 的 PI_WEB_TOOLKIT_SEARXNG_URL。
- * 未配置返回 null（调用方降级为免配置 HTTP 搜索）。
+ * 解析 SearXNG 端点：环境变量 > settings.json（parity 原项目）> 默认本地端点。
+ * 未显式配置时返回 null（调用方使用 DEFAULT_SEARXNG_URL）。
  */
 export function resolveSearxngUrl(): string | null {
-  return process.env.SEARXNG_URL || process.env.PI_WEB_TOOLKIT_SEARXNG_URL || null
+  const env = process.env.SEARXNG_URL || process.env.PI_WEB_TOOLKIT_SEARXNG_URL
+  if (env) return env
+  for (const s of readSettingsSections()) {
+    const url = s.searxng_url
+    if (typeof url === 'string' && url.trim()) return url.trim()
+  }
+  return null
+}
+
+/** 解析搜索超时：环境变量 > settings.json > 默认 30s（原项目同一口径）。 */
+export function resolveSearchTimeout(): number {
+  const env = Number(process.env.PI_WEB_TOOLKIT_SEARCH_TIMEOUT)
+  if (Number.isFinite(env) && env > 0) return env
+  for (const s of readSettingsSections()) {
+    const v = Number(s.search_timeout)
+    if (Number.isFinite(v) && v > 0) return v
+  }
+  return DEFAULT_SEARCH_TIMEOUT
 }
 
 // ── 错误分类（wechat-article-exporter 启发）────────────────────
@@ -267,7 +312,7 @@ export function truncate(s: string, max: number): string {
 // ── 共享 HTTP 超时常量 ────────────────────────────────────────
 // 与 config.ts DEFAULT_CONFIG.search.timeout 同源口径（15000ms），
 // 避免各处硬编码漂移；调用方可用 searchDirect 的 timeoutMs 参数覆盖。
-export const HTTP_TIMEOUT_MS = 15000
+export const HTTP_TIMEOUT_MS = DEFAULT_SEARCH_TIMEOUT
 
 export async function searchDirect(
   query: string,
@@ -275,7 +320,8 @@ export async function searchDirect(
   signal?: AbortSignal,
   timeoutMs = HTTP_TIMEOUT_MS,
 ): Promise<string> {
-  const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}`
+  // mkt/setlang 固定中文市场：Bing 会 302 到 cn.bing.com，避免结果随出口 IP 漂移
+  const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&mkt=zh-CN&setlang=zh-CN`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   // 审计修复：用户停止生成（signal）转发到内部 controller，与内部超时
@@ -290,6 +336,59 @@ export async function searchDirect(
   }
 }
 
+/** 解码 HTML 实体（标题/URL 中常见 &amp; &#39; 等） */
+export function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+}
+
+/**
+ * Bing 结果链接匹配。
+ * 注意（原项目踩坑）：Bing（尤其 cn.bing.com）当前 HTML 为
+ * `<h2 class=""><a target="_blank" href="…">`，属性出现在 href 之前，
+ * 旧正则 `/<h2><a href="…">/` 完全匹配不到 → 工具返回"无结果"。这里放宽为
+ * "h2 内任意属性顺序的 a[href]"，标题允许含 <strong> 等内联标签。
+ */
+const BING_LINK_RE = /<h2[^>]*>[\s\S]*?<a[^>]*\bhref="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/h2>/gi
+
+/** 还原 Bing 跳转链接（/ck/a?...&u=a1<base64url>）为真实目标 URL */
+export function decodeBingRedirect(url: string): string {
+  try {
+    const u = new URL(url)
+    if (!/(^|\.)bing\.com$/.test(u.hostname) || !u.pathname.startsWith('/ck/a')) return url
+    const raw = u.searchParams.get('u')
+    if (!raw) return url
+    const b64 = raw.replace(/^a1/, '').replace(/-/g, '+').replace(/_/g, '/')
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    const decoded = Buffer.from(padded, 'base64').toString('utf-8')
+    return /^https?:\/\//.test(decoded) ? decoded : url
+  } catch {
+    return url
+  }
+}
+
+/** 解析 Bing 搜索 HTML 为 ["1. 标题", "   URL", ...]（纯函数，便于测试） */
+export function parseBingResults(html: string, maxResults = 5): string[] {
+  const out: string[] = []
+  const re = new RegExp(BING_LINK_RE.source, BING_LINK_RE.flags)
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html)) !== null && out.length / 2 < maxResults) {
+    const title = decodeHtmlEntities(m[2].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim()
+    if (title) {
+      out.push(`${out.length / 2 + 1}. ${title}`)
+      out.push(`   ${decodeBingRedirect(decodeHtmlEntities(m[1]))}`)
+    }
+  }
+  return out
+}
+
 async function doSearch(
   url: string,
   maxResults: number,
@@ -297,7 +396,10 @@ async function doSearch(
   reqSignal: AbortSignal,
 ): Promise<string> {
   const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    },
     signal: reqSignal,
   })
   // fetch 失败必抛异常（网络/DNS/超时 abort），不会返回 null——此分支为死代码，已移除
@@ -307,18 +409,7 @@ async function doSearch(
     return `搜索失败: HTTP ${res.status}`
   }
   const html = await res.text()
-  const results: string[] = []
-  const linkRe = /<h2><a href="(https?:\/\/[^"]+)"[^>]*>(.+?)<\/a>/g
-  let match: RegExpExecArray | null
-  let count = 0
-  while ((match = linkRe.exec(html)) !== null && count < maxResults) {
-    const title = match[2].replace(/<[^>]+>/g, "").trim()
-    if (title) {
-      results.push(`${count + 1}. ${title}`)
-      results.push(`   ${match[1]}`)
-      count++
-    }
-  }
+  const results = parseBingResults(html, maxResults)
   if (results.length === 0) {
     return `搜索 "${query}" 无结果（Bing 可能返回了验证页面）`
   }

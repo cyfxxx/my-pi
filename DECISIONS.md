@@ -315,3 +315,18 @@
 **背景**：pi-tools 快照写 `~/.pi/logs/compact-snapshots`；my-pi 已有 `portable/memory/checkpoints/`（memory 功能使用）且无 `portable/agent/logs`。
 **决策**：`snapshotBeforeCompact` 统一写 `portable/memory/checkpoints/`，保留最近 8 份/7 天。
 **理由**：运行时检查点数据集中一处，便于 memory 治理与清理；避免为日志再开一个目录。
+
+### [2026-09-22] task-record/task-summarizer 改为适配迁移（取代同日"不迁移"口径）
+**背景**：先前以"依赖整条未迁移数据链"为由暂缓；实际 `task-record` 生产者可确定性重建（agent_settled 写结构化记录），总结层可去掉 spawn 强依赖。
+**决策**：迁移为 `context/budget/task-record.ts`（写 `portable/memory/task-records.jsonl`）+ `scripts/task-summarizer.mjs`（游标聚合 → digest 写 `portable/memory/daily-results/`；`--dry-run` 列表；`--spawn` 才调用 `my-pi.sh -p` 并行入库/起草 SKILL）。默认不 spawn，避免无 provider/管道场景挂起。
+**理由**：保留"即时记录 + 批量总结"的自主学习闭环，同时把编排依赖降为可选。
+
+### [2026-09-22] 网络搜索可用性修复（对齐 pi-tools 注意事项）
+**背景**：本机 SearXNG 用默认引擎集，google/duckduckgo/brave/wikipedia 等全部 timeout 拖垮整次搜索（空结果）；`web_fetch`（Bing 直搜）因 HTML 结构变化（`<h2 class=...><a target=... href=...>`，属性在 href 前）旧正则匹配不到，恒返回"无结果"；`fetch_url` 在受限出口仅部分主机可达。
+**决策**：(1) 迁移 `scripts/searxng-config.sh`，只启可达引擎并令 bing 走 `cn.bing.com`；(2) `searchDirect` 放宽为"h2 内任意属性顺序的 a[href]"，加实体解码与 `/ck/a` 跳转还原；(3) `resolveSearxngUrl`/`resolveSearchTimeout` 增加 `settings.json`（`pi-web-search`）读取，默认超时 30s（原项目口径）。
+**理由**：这三项是原项目 README/CHANGELOG 明确记录的网络搜索注意事项；修复后本地 SearXNG 与 Bing 直搜均可用。
+
+### [2026-09-22] 工具分层"常驻配置"同步 pi-tools，并按已注册工具过滤
+**背景**：需将 pi-tools `tool-groups.ts` 的常驻（CORE_TOOLS）与休眠组名单同步到 my-pi，但其中 `plan_*`/`ctx_*`/`admin_*`/`verify_*`/`ask_user`/`thinking_level`/`autopilot_policy`/`schedule_task` 对应功能尚未迁移。
+**决策**：完整同步原项目名单以保持一致；新增 `groupsWithTools(presentTools)`，`buildSleepingSummary(present)`、`/tools` 补全与报告、`enableGroup` 均只暴露"当前已注册工具"所属的组，未迁移组不注入 system prompt、不可启用。
+**理由**：既保持与上游常驻配置同源、后续迁移自动生效，又避免向模型宣传不可用工具导致无效调用。

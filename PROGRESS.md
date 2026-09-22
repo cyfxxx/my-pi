@@ -613,3 +613,12 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `context/index.ts`：`agent_settled` 写一条任务记录（用户请求摘要/工具数/context token/是否压缩）；`logic.ts` 新增 `extractUserRequest`。
 - 新增 `scripts/task-summarizer.mjs`（迁移自 pi-tools，spawn 改为可选）：按游标聚合实质任务→digest 写 `portable/memory/daily-results/task-summary-<date>.md`；`--dry-run` 列表、`--spawn` 可选调用 `my-pi.sh -p` 入库/起草 SKILL；`scripts/task-summarizer.d.mts` 提供类型。
 - 新增测试：task-record 提取、summarizer 分组/digest 等；context 套件 73 用例通过。
+
+## 网络搜索修复 + 工具常驻配置同步（第 34 批）
+- 完成时间：2026-09-22
+- 排查原项目网络搜索注意事项：默认 SearXNG 引擎集含被封锁引擎会 timeout 拖垮搜索；`bing` 需 `base_url: https://cn.bing.com`；三级通路 SearXNG → Bing 直搜（`web_fetch`）→ `fetch_url`；`fetch_url` 不拦内网（my-pi 出于安全保留 SSRF 防护）。
+- 新增 `scripts/searxng-config.sh`（迁移自 `searxng/generate-config.sh`）：默认只启 baidu/bing/sogou/360search/bilibili/yandex/stackoverflow/github，禁用不可达引擎，保留 secret_key；本机生成后 SearXNG 搜索恢复有结果（10s 内）。
+- 修复 `searchDirect`：放宽 Bing 结果正则（属性顺序无关）、HTML 实体解码、`/ck/a?u=a1<base64>` 跳转还原；`web_fetch` 恢复可用（实测 5 条）。
+- `resolveSearxngUrl`/`resolveSearchTimeout` 增加 `settings.json`（`pi-web-search`）读取，默认超时 30s 对齐原项目；`web_search`/`fetch_url` 统一使用。
+- 工具常驻配置同步：`context/budget/tool-groups.ts` 完整对齐 pi-tools 名单；新增 `groupsWithTools` 运行时过滤，未迁移功能的组不注入简介/不可启用；`/tools` 报告与补全只展示已注册工具。
+- 测试：web-search 18 用例、context 75 用例通过；`portable/agent/AGENTS.md` 增补"网络搜索"注意事项；脚本数 18。
