@@ -138,7 +138,7 @@ Layer 0 ─ 基础层 ───────────── vendor/pi/ (上游
 | 目标 | 入口 | 说明 |
 |------|------|------|
 | 干预率 | `/intervention stats` | abort 快照 + corrective 关联，落 `portable/memory/interventions.jsonl` |
-| token/缓存 | `/usage-diag`、`/auto metrics` | `usage-stats` 持久化工具 token 与缓存命中率 |
+| token/缓存 | `/context usage`、`/auto stats` | `usage-stats` 持久化工具 token 与缓存命中率 |
 | 任务成功率 | `/auto stats`、`/auto metrics` | autopilot telemetry（按模型/任务） |
 | 记忆治理 | `/memory lifecycle` | 只读报告：淘汰/升格/冲突/规模 |
 | 教训闭环 | `/memory mine [--ingest]` | 从纠正意图挖掘教训并入库（自动去重） |

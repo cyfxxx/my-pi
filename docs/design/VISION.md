@@ -85,7 +85,7 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 
 | 层 | 指标 | pi-tools 对应工具 | my-pi 现状 |
 |---|---|---|---|
-| 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有**：`custom/features/context/usage-stats.ts` 持久化工具 token/缓存读写（`usage.jsonl`），`/usage-diag` 产出命中率；`scripts/check-injection-surface.sh` 注入面前缀指纹守门 |
+| 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有**：`custom/features/context/usage-stats.ts` 持久化工具 token/缓存读写（`usage.jsonl`），`/context usage` 产出命中率；`scripts/check-injection-surface.sh` 注入面前缀指纹守门 |
 | 干预 | abort 快照留存率 / corrective 关联率 | pi-intervention → `memory/interventions.jsonl` | **已有**：`custom/features/intervention/` 落盘 `portable/memory/interventions.jsonl`，`/intervention stats` 产出关联率/近 7 天 |
 | 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **已有**：autopilot telemetry（按模型/任务成功率 + 预算）`/auto stats` |
 | 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`npm run golden`）+ 199 单测用例 |
@@ -110,7 +110,7 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 按依赖顺序推进；每阶段以"可验证"为完成判据。
 
 - **P0 已完成（2026-09-20）**：项目骨架与三隔离一收敛；12 个功能注册；纯逻辑迁移（token 预算、工具输出归档、脱敏、原子写入、笔记持久化、子代理内置角色）；`packs/`、技能、文档迁移；三层验证（check/tsc/vitest）全绿。
-- **P1 度量基建（已完成，2026-09-21）**：干预捕获落盘（`interventions.jsonl` + `/intervention stats`）→ 任务遥测（autopilot telemetry + `/auto stats`）→ 缓存/用量统计（`usage-stats.ts` + `/usage-diag`）。判据达成：可产出干预率、token 成本、缓存命中率三项数字。
+- **P1 度量基建（已完成，2026-09-21）**：干预捕获落盘（`interventions.jsonl` + `/intervention stats`）→ 任务遥测（autopilot telemetry + `/auto stats`）→ 缓存/用量统计（`usage-stats.ts` + `/context usage`）。判据达成：可产出干预率、token 成本、缓存命中率三项数字。
 - **P2 防退化（已完成，2026-09-21）**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`--smoke` 无头冒烟）+ `scripts/check-injection-surface.sh`（system prompt 前缀指纹基线）。判据达成：结构性改动可被 `npm run golden` 拦截。
 - **P3 记忆生命周期（已完成，2026-09-21）**：治理字段在 `memory/store/storage.ts` 就绪（recurrence/confidence/accessedAt/source/links/supersededBy）；只读生命周期报告 `memory/mine/lifecycle.ts` + `/memory lifecycle`（§5 淘汰/升格/冲突/规模四类）；教训闭环 `memory/mine/lesson-miner.ts` + `/memory mine [--ingest]`（从干预纠正意图挖掘并入记忆库，自动去重）。
 - **P4 升格通道执行**：按 §3.1 把反复有效的软引导硬化，并同步降权原软引导。判据：软层条目不无限增长（注入预算受控）。
