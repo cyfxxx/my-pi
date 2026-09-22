@@ -330,3 +330,8 @@
 **背景**：需将 pi-tools `tool-groups.ts` 的常驻（CORE_TOOLS）与休眠组名单同步到 my-pi，但其中 `plan_*`/`ctx_*`/`admin_*`/`verify_*`/`ask_user`/`thinking_level`/`autopilot_policy`/`schedule_task` 对应功能尚未迁移。
 **决策**：完整同步原项目名单以保持一致；新增 `groupsWithTools(presentTools)`，`buildSleepingSummary(present)`、`/tools` 补全与报告、`enableGroup` 均只暴露"当前已注册工具"所属的组，未迁移组不注入 system prompt、不可启用。
 **理由**：既保持与上游常驻配置同源、后续迁移自动生效，又避免向模型宣传不可用工具导致无效调用。
+
+### [2026-09-22] 迁移 thinking 档位自适应切档（含模型建议 tool）
+**背景**：pi-tools `thinking-level.ts` 是 auto-compact 控制器的一环：按真实窗口比例在 low/medium/high 间自动升降档（critical→降档省 token、回落→升回基准），并提供 `thinking_level` 工具让模型"建议"、规则审批（死区/压力方向）。
+**决策**：迁移为 `context/budget/thinking-level.ts`（纯逻辑 + 审计 JSONL 落 `portable/memory/logs/level-changes.jsonl`），在 `agent_settled` 依据 `getContextUsage()` 的 tokens/window 驱动，注册 `thinking_level` 工具；用 `PI_CONTEXT_THINKING_AUTO=off` 关闭自动切档，`PI_LEVEL_CHANGE_FILE`/`PI_DISABLE_LEVEL_AUDIT` 控制审计。
+**理由**：上下文压力与思考预算争抢是剪枝/缓存断裂主因，自适应档位收益明确；比例分母用真实窗口（非 256K 压缩阈值），压缩后自然回落可升回。副作用：内核会持久化 `settings.defaultThinkingLevel`（合法值 off/low/medium/high，无 max），属预期。

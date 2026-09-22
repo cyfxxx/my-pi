@@ -10,7 +10,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { registerCommand, sendMessage, getAllToolNames } from '../../adapters/ui-adapter';
+import { registerCommand, sendMessage, getAllToolNames, getThinkingLevel, setThinkingLevel } from '../../adapters/ui-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
 import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
@@ -23,6 +23,13 @@ import {
   extractUserRequest,
 } from './logic';
 import { recordTaskRecord } from './budget/task-record';
+import {
+  createState,
+  tickThinkingLevel,
+  proposeThinkingLevel,
+  inferTaskType,
+  type ThinkLevelState,
+} from './budget/thinking-level';
 import { getTodos } from '../plan-mode/logic';
 import {
   resetAllBudgets,
@@ -49,6 +56,8 @@ export function register(pi: ExtensionAPI): void {
   let layeringApplied = false;
   let lastContextMessages: unknown[] | null = null;
   let compactedThisSettlement = false;
+  let thinkState: ThinkLevelState | null = null;
+  const thinkingAutoEnabled = process.env.PI_CONTEXT_THINKING_AUTO !== 'off';
 
   // 注册命令：/context - 上下文预算查看
   registerCommand(pi, 'context', {
@@ -100,6 +109,27 @@ export function register(pi: ExtensionAPI): void {
       const group = typeof args.group === 'string' ? args.group : '';
       const r = enableGroup(pi, group);
       if (!r.ok) return r.message;
+      return r.message;
+    },
+  });
+
+  // 注册工具：thinking_level —— 模型建议切档，规则审批（死区/压力方向）
+  registerTool(pi, {
+    name: 'thinking_level',
+    description:
+      '建议切换 thinking 档位（low/medium/high）。程序做防抖死区与压力方向审批：死区内或上下文压力 critical 时升档会被拒绝；通过后记账。默认由程序自动切档，本工具供模型在需要更强/更省推理时主动申请。',
+    parameters: {
+      level: { type: 'string', enum: ['low', 'medium', 'high'], description: '目标档位' },
+      reason: { type: 'string', description: '切换理由（将记入审计日志）' },
+    },
+    execute: async (args) => {
+      if (!thinkState) thinkState = createState(getThinkingLevel(pi));
+      const r = proposeThinkingLevel(
+        thinkState,
+        String(args.level ?? ''),
+        String(args.reason ?? ''),
+        (l) => setThinkingLevel(pi, l),
+      );
       return r.message;
     },
   });
@@ -319,6 +349,22 @@ export function register(pi: ExtensionAPI): void {
       });
       toolState.runToolCount = 0;
       compactedThisSettlement = false;
+
+      // 自适应 thinking 档位：按真实窗口比例升降（压缩后自然回落，可升回）
+      if (thinkingAutoEnabled) {
+        if (!thinkState) thinkState = createState(getThinkingLevel(pi));
+        const window = usage?.contextWindow;
+        const tokens = usage?.tokens;
+        if (window && tokens != null && window > 0) {
+          tickThinkingLevel(
+            thinkState,
+            tokens / window,
+            (l) => setThinkingLevel(pi, l),
+            Date.now(),
+            inferTaskType(req),
+          );
+        }
+      }
     },
   });
 

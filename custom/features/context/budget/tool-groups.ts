@@ -45,6 +45,8 @@ export const CORE_TOOLS: string[] = [
   'admin_restart',
   // ask_user（用户交互核心）
   'ask_user',
+  // pi-context（模型建议切思考档位，原项目未分组，按"未知工具默认核心"语义）
+  'thinking_level',
   // voice（本机听写转写为核心；原项目 voice 未分组，按"未知工具默认核心"语义）
   'voice_transcribe',
 ];
