@@ -5,6 +5,12 @@
  * 负责上下文管理、工具生命周期、消息过滤等
  */
 
+// ── 压缩任务门（门1）：有进行中的计划任务时不自动压缩 ──
+
+export function hasInProgressTask(tasks: readonly { status: string }[]): boolean {
+  return tasks.some((t) => t.status === 'in_progress');
+}
+
 // ── 工具生命周期状态 ──
 
 export interface ToolLifecycleState {
@@ -116,3 +122,4 @@ export const FULL_DELEGATION_ADVICE = '完全委派建议：对于重复性任�
 export * from './budget/budget';
 export * from './budget/output-archive';
 export * from './budget/tool-groups';
+export * from './budget/compression';

@@ -585,3 +585,17 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
   - `setup-external.sh web` 优先复用 `/opt/searxng` 原生实例，`fd-rg` 用 exec shim
 - **仍未迁移**：`tool-stats-daily` 依赖 `tool-stats-sync.mjs`（工具计数聚合），暂不注册；whisper/faster-whisper 与 piper 模型未安装（重型/需模型下载）。
 - 验证：golden 七项全绿；vitest 21 文件 241 用例；SearXNG `/search?format=json` 返回 200。
+
+## 工具统计同步迁移（第 30 批）
+- 完成时间：2026-09-22
+- 新增 `scripts/tool-stats-sync.mjs`（迁移自 pi-tools，适配 NEW 数据源为 `portable/memory/context/usage.jsonl`）：`--daily` 聚合本机事件→`portable/memory/stats/tool-count-<device>.json`（可 git 入库共享），默认合并各设备计数+本机增量→`portable/agent/stats/tool-usage.json`，支持 `--prune/--report/--days`。
+- `.gitignore` 放行 `portable/memory/stats/`（仅精简计数入库，原始 usage.jsonl 仍不入库）；`scheduled-seeds.json` 重新加入 `tool-stats-daily` 种子，至此 5 个每日任务种子全部迁移。
+- 验证：脚本使用临时目录端到端跑通；golden 七项全绿。
+
+## 自动压缩增强：压缩前快照 + JSON 结构性压缩 + 任务门（第 31 批）
+- 完成时间：2026-09-22
+- 新增 `context/budget/compression.ts`（迁移自 pi-tools `pi-context/compression.ts`）：`compactJson`/`shrinkHalf`/`jsonBytes` 纯逻辑，以及 `snapshotBeforeCompact`（落点 `portable/memory/checkpoints/`，保留最近 8 份/7 天，失败不阻塞压缩）。
+- `context/index.ts`：记忆最近一次上下文消息，在自动压缩前写快照；新增**门1 任务门**——存在进行中的计划任务时不自动压缩（避免打断多步任务；pi 硬溢出仍会压缩）。
+- 新增测试：compression 4 用例、task-gate 2 用例。
+- 未迁：pi-tools auto-compact 控制器的后台任务门（tmux registry 适配）、思考档切换、暖前缀回放（记录为后续）。
+- 验证：tsc 通过；context 套件 68 用例通过。

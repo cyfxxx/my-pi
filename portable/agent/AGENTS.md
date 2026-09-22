@@ -14,7 +14,7 @@ vendor/pi/                 # 上游 Pi 代码（独立 clone，只读）
 custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
-scripts/                   # 14 个运维脚本
+scripts/                   # 15 个运维脚本
 patches/                   # 上游补丁
 ```
 

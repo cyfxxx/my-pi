@@ -310,3 +310,8 @@
 **背景**：`check-isolation` 规定 `portable/` 不放运行时依赖（node/chromium/ffmpeg 等），且 `portable/` 禁符号链接。
 **决策**：SearXNG 原生装到 `/opt/searxng`（可用 `SEARXNG_HOME` 覆盖），由 `scripts/setup-external.sh web` 管理启动；工具 shim 写入 `portable/agent/bin` 用 exec 脚本而非 `ln -s`。
 **理由**：保持"portable/ 仅运行时数据"的边界与无符号链接约束，同时外部服务可复现安装。
+
+### [2026-09-22] 压缩前快照落点迁移到 portable/memory/checkpoints
+**背景**：pi-tools 快照写 `~/.pi/logs/compact-snapshots`；my-pi 已有 `portable/memory/checkpoints/`（memory 功能使用）且无 `portable/agent/logs`。
+**决策**：`snapshotBeforeCompact` 统一写 `portable/memory/checkpoints/`，保留最近 8 份/7 天。
+**理由**：运行时检查点数据集中一处，便于 memory 治理与清理；避免为日志再开一个目录。

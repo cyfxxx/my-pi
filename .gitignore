@@ -52,6 +52,9 @@ portable/agent/*
 !portable/agent/agents/**
 portable/memory/*
 !portable/memory/.gitkeep
+# 工具使用计数（跨设备共享的精简聚合，几 KB；原始 usage.jsonl 仍不入库）
+!portable/memory/stats/
+!portable/memory/stats/**
 
 # 运行时数据（data/ 目录）
 data/logs/

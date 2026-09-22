@@ -19,7 +19,9 @@ import {
   EFFICIENCY_ADVICE,
   LOW_PRESSURE_DELEGATION,
   FULL_DELEGATION_ADVICE,
+  hasInProgressTask,
 } from './logic';
+import { getTodos } from '../plan-mode/logic';
 import {
   resetAllBudgets,
   setContextWindow,
@@ -32,6 +34,7 @@ import {
 import { pruneToolResults } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
+import { snapshotBeforeCompact } from './budget/compression';
 import { appendUsage } from './usage-stats';
 
 export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE };
@@ -41,6 +44,7 @@ export function register(pi: ExtensionAPI): void {
   const compactDecider = makeCompactDecider();
   const autoContinueGate = makeAutoContinueGate();
   let layeringApplied = false;
+  let lastContextMessages: unknown[] | null = null;
 
   // 注册命令：/context - 上下文预算查看
   registerCommand(pi, 'context', {
@@ -188,6 +192,7 @@ export function register(pi: ExtensionAPI): void {
       const e = event as { messages?: unknown[] };
       const messages = Array.isArray(e.messages) ? e.messages : [];
       if (!messages.length) return;
+      lastContextMessages = messages;
 
       let latestSummary = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -277,8 +282,12 @@ export function register(pi: ExtensionAPI): void {
       if (!usage) return;
       setContextWindow(usage.contextWindow);
       if (usage.tokens != null) setUsedTokens(usage.tokens);
+      // 门1：有进行中的计划任务时不自动压缩（避免打断多步任务；pi 硬溢出仍会压缩）
+      if (hasInProgressTask(getTodos())) return;
       const decision = compactDecider.decide(usage.tokens ?? 0, usage.contextWindow);
       if (!decision.shouldCompact) return;
+      // 压缩前快照（保留最近 8 份/7 天，失败不阻塞压缩）
+      snapshotBeforeCompact(lastContextMessages, usage.tokens ?? 0, decision.threshold, 'threshold');
       autoContinueGate.arm();
       compactDecider.markCompact();
       ctx.compact?.();
