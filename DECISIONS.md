@@ -345,3 +345,8 @@
 **背景**：pi-tools `pi-autopilot/sessions.ts` + `admin_*` 工具（列表/切换会话/重启）未迁移；NEW 的 admin state（`writeRestartRequest`）此前只写无人消费，且 `tool-adapter` 不向工具透传 ctx，无法做 UI 确认/主动关机。
 **决策**：① `tool-adapter` 增加 `ToolExecuteContext`（hasUI/confirm/notify/shutdown）并从 Pi ctx 提取；② 新增 `adapters/session-adapter.ts` 封装 vendor `SessionManager.list/listAll`（替代 ORIG 手写文件扫描，拿到 cwd/messageCount 等结构化字段）；③ `autopilot/store/sessions.ts` 纯格式化；④ autopilot 注册 `admin_list_sessions`/`admin_switch_session`/`admin_restart`（名称与 ORIG 一致，落入 admin 休眠组/核心）；⑤ `pi-supervisor.sh` 正常退出时消费 admin state，`restart` 重拉、`switch_session` 以 `--session <path>` 重拉并清理请求。
 **理由**：会话编排是 autopilot 运维核心；用 vendor 结构化 API 比手写扫描更稳；supervisor 消费请求是让 admin 工具真正生效的最后一环。
+
+### [2026-09-22] 补全 auto-compact 门控（背景任务/环境阈值/上下文回退/重启提示）
+**背景**：NEW 的自动压缩仅在 turn_end 按阈值 + 计划任务门判定；缺 pi-tools 控制器的背景任务门、环境比例/绝对阈值、真实 usage 缺失时的上下文回退与重启提示阈值。
+**决策**：新增 `context/budget/task-gate.ts`（`ABSOLUTE_TOKENS`/`RESTART_TOKENS`/`COMPACT_COOLDOWN_MS`/`TASK_GATE`、`readEnvRatio`、`resolveContext`、`hasBackgroundTask`）。turn_end 改用 `resolveContext`（真实 usage → provider token 回退），加背景任务门；`compactDecider` 注入环境比例/绝对阈值/冷却；`before_agent_start` 在 tokens > `RESTART_TOKENS` 时注入"先 /compact 再重启"提示。
+**理由**：三重门（阈值/任务/后台）避免压缩打断进行中的多步/后台任务；回退保证真实 usage 缺失时仍能判定；重启提示减少重启后首轮全量重发。`hasBackgroundTask` 仅在 `PI_SESSION_ID` 可归属且 tmux 会话存活时生效（否则门惰性安全）。

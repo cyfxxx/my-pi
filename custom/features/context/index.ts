@@ -52,6 +52,15 @@ import {
 import { pruneToolResults, sweepPruneRefs } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
+import {
+  ABSOLUTE_TOKENS,
+  RESTART_TOKENS,
+  COMPACT_COOLDOWN_MS,
+  TASK_GATE,
+  readEnvRatio,
+  resolveContext,
+  hasBackgroundTask,
+} from './budget/task-gate';
 import { snapshotBeforeCompact } from './budget/compression';
 import { appendUsage } from './usage-stats';
 
@@ -61,8 +70,17 @@ export function register(pi: ExtensionAPI): void {
   const toolState = createToolLifecycleState();
   // 连续失败熔断计数（进程内存态，成功即清零）
   const failStreak = new Map<string, number>();
-  const compactDecider = makeCompactDecider();
+  const compactDecider = makeCompactDecider(COMPACT_COOLDOWN_MS, {
+    largeRatio: readEnvRatio('PI_CONTEXT_COMPACT_LARGE_RATIO'),
+    smallRatio: readEnvRatio('PI_CONTEXT_COMPACT_SMALL_RATIO'),
+    absoluteTokens: ABSOLUTE_TOKENS,
+  });
   const autoContinueGate = makeAutoContinueGate();
+  const fallbackContextWindow = (() => {
+    const n = Number(process.env.PI_CONTEXT_WINDOW_FALLBACK);
+    return Number.isFinite(n) && n > 0 ? n : 1_000_000;
+  })();
+  let lastProviderContextTokens = 0;
   let layeringApplied = false;
   let lastContextMessages: unknown[] | null = null;
   let compactedThisSettlement = false;
@@ -217,7 +235,12 @@ export function register(pi: ExtensionAPI): void {
       }
       const e = event as { systemPrompt?: string };
       if (typeof e.systemPrompt !== 'string') return;
-      return { systemPrompt: `${e.systemPrompt}\n\n${buildSleepingSummary(new Set(getAllToolNames(pi)))}` };
+      // 重启提示：上下文超阈值时，提醒先 /compact 再重启，避免重启后首轮全量重发
+      let restartHint = '';
+      if (usage?.tokens != null && usage.tokens > RESTART_TOKENS) {
+        restartHint = `\n\n[上下文约 ${Math.round(usage.tokens / 1000)}K（> 重启阈值 ${Math.round(RESTART_TOKENS / 1000)}K）：如需重启，先 /compact 可避免重启后首轮全量重发。]`;
+      }
+      return { systemPrompt: `${e.systemPrompt}\n\n${buildSleepingSummary(new Set(getAllToolNames(pi)))}${restartHint}` };
     },
   });
 
@@ -335,17 +358,24 @@ export function register(pi: ExtensionAPI): void {
   // 回合结束：按窗口比例判定自动压缩（防抖 + 压缩后自动继续门）
   registerHook(pi, {
     event: 'turn_end',
-    handler: async (_event, ctx) => {
-      const usage = ctx.getContextUsage?.();
-      if (!usage) return;
-      setContextWindow(usage.contextWindow);
-      if (usage.tokens != null) setUsedTokens(usage.tokens);
-      // 门1：有进行中的计划任务时不自动压缩（避免打断多步任务；pi 硬溢出仍会压缩）
-      if (hasInProgressTask(getTodos())) return;
-      const decision = compactDecider.decide(usage.tokens ?? 0, usage.contextWindow);
+    handler: async (event, ctx) => {
+      // 记录本轮 provider 上下文 token（真实 usage 缺失时的回退来源）
+      const msg = (event as { message?: { usage?: { input?: number; cacheRead?: number } } }).message;
+      if (msg?.usage) {
+        lastProviderContextTokens = (msg.usage.input ?? 0) + (msg.usage.cacheRead ?? 0);
+      }
+      const resolved = resolveContext(ctx, lastProviderContextTokens, fallbackContextWindow);
+      if (!resolved) return;
+      setContextWindow(resolved.window);
+      setUsedTokens(resolved.tokens);
+      // 门1：有进行中的计划任务时不自动压缩（PI_CONTEXT_TASK_GATE=off 可关）
+      if (TASK_GATE && hasInProgressTask(getTodos())) return;
+      // 门2b：本会话仍有后台任务（tmux）时不自动压缩
+      if (hasBackgroundTask()) return;
+      const decision = compactDecider.decide(resolved.tokens, resolved.window);
       if (!decision.shouldCompact) return;
       // 压缩前快照（保留最近 8 份/7 天，失败不阻塞压缩）
-      snapshotBeforeCompact(lastContextMessages, usage.tokens ?? 0, decision.threshold, 'threshold');
+      snapshotBeforeCompact(lastContextMessages, resolved.tokens, decision.threshold, 'threshold');
       compactedThisSettlement = true;
       autoContinueGate.arm();
       compactDecider.markCompact();

@@ -650,3 +650,9 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `autopilot/index.ts`：注册 `admin_list_sessions`、`admin_switch_session`（UI 确认 + 写 switch_session 请求 + shutdown）、`admin_restart`；`check-features` 注册面同步。
 - `scripts/pi-supervisor.sh`：正常退出时读取 `portable/agent/autopilot/state.json`（`PI_ADMIN_STATE_FILE`），`restart`/`restart_hang` 重拉、`switch_session` 以 `--session <path>` 重拉，随后清理请求（5 分钟新鲜度窗口）。
 - 测试：autopilot 套件 37 用例；golden 七项全绿。
+
+## auto-compact 门控补全（第 39 批）
+- 完成时间：2026-09-22
+- 新增 `context/budget/task-gate.ts`：环境常量（绝对阈值/重启阈值/压缩冷却/任务门开关）、`readEnvRatio`、`resolveContext`（真实 usage → provider token 回退）、`hasBackgroundTask`（读 tmux registry，按 `PI_SESSION_ID` 归属 + tmux 存活判定）。
+- `context/index.ts`：turn_end 改用 `resolveContext` 并加背景任务门；`compactDecider` 注入环境比例/绝对阈值/冷却；回合开始超 `RESTART_TOKENS` 注入"先 /compact 再重启"提示。
+- 新增 `task-gate.test.ts`（7 用例），context 套件 105 用例通过。
