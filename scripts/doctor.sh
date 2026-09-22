@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# doctor.sh — 本地环境 vs 仓库 体检（新设备可复现性）
+#
+# 逐项核对“重建/运行所需”的本地状态与仓库内容是否一致，输出缺口与修复命令；
+# 加 --fix 时按安全顺序自动修复（幂等，可重复运行）。
+#
+# 用法：
+#   bash scripts/doctor.sh          # 只体检
+#   bash scripts/doctor.sh --fix    # 体检并修复可自动修复项
+#   bash scripts/doctor.sh --full   # 追加较慢检查（custom/ 类型检查）
+#   bash scripts/doctor.sh --no-net # 跳过 git fetch（离线）
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENDOR_PI="$ROOT/vendor/pi"
+CLI="$VENDOR_PI/packages/coding-agent/dist/cli.js"
+CACHE_CLI="$ROOT/portable/agent/recovery/cache/dist/cli.js"
+BIN_DIR="$ROOT/portable/agent/bin"
+# shellcheck source=scripts/lib-vendor.sh
+. "$ROOT/scripts/lib-vendor.sh"
+
+FIX=0; FULL=0; NET=1
+for a in "$@"; do
+  case "$a" in
+    --fix) FIX=1 ;;
+    --full) FULL=1 ;;
+    --no-net) NET=0 ;;
+  esac
+done
+
+OK=0; WARN=0; BAD=0
+ok()   { echo "  ✓ $1"; OK=$((OK + 1)); }
+warn() { echo "  ⚠ $1"; WARN=$((WARN + 1)); }
+bad()  { echo "  ✗ $1"; BAD=$((BAD + 1)); }
+maybe_fix() { [ "$FIX" = "1" ] && echo "      → 修复中…"; }
+
+cd "$ROOT" || exit 1
+echo "=== my-pi doctor（$ROOT）==="
+
+# ── 1. Node ──
+echo "[1] 运行时"
+if command -v node >/dev/null 2>&1; then
+  MAJOR="$(node -v | sed 's/^v//' | cut -d. -f1)"
+  if [ "${MAJOR:-0}" -ge 22 ]; then ok "Node $(node -v)"; else bad "Node $(node -v) < 22（需要 >=22）"; fi
+else
+  bad "未找到 node（安装 Node >=22）"
+fi
+
+# ── 2. 根工作区依赖 ──
+echo "[2] 依赖"
+if root_deps_ok "$ROOT"; then
+  ok "根依赖与 package-lock 一致"
+else
+  if [ "$FIX" = "1" ]; then
+    maybe_fix; PI_SKIP_VENDOR_BUILD=1 bash "$ROOT/scripts/build.sh" && ok "根依赖已安装" || bad "根依赖安装失败"
+  else
+    bad "根依赖缺失或与 package-lock 不一致（bash scripts/build.sh）"
+  fi
+fi
+
+# ── 3. vendor/pi 引导 ──
+echo "[3] vendor/pi"
+if [ -d "$VENDOR_PI/.git" ]; then
+  ok "vendor/pi 是独立 git 仓库"
+  if git -C "$VENDOR_PI" diff --quiet 2>/dev/null; then ok "vendor/pi 工作树干净"; else
+    warn "vendor/pi 有未提交修改（check-isolation 会失败）"
+  fi
+  if grep -Eq '^[0-9a-f]{7,40}([[:space:]]|$)' "$VENDOR_PI/LAST_SYNC_POINT" 2>/dev/null; then
+    ok "LAST_SYNC_POINT: $(awk '{print $1}' "$VENDOR_PI/LAST_SYNC_POINT")"
+  else
+    bad "LAST_SYNC_POINT 缺失或格式无效"
+  fi
+  if [ "$FIX" = "1" ]; then
+    NEED=0; for p in "$ROOT"/patches/*.patch; do
+      [ -e "$p" ] || continue
+      git -C "$VENDOR_PI" apply --check --reverse "$p" >/dev/null 2>&1 || NEED=1
+    done
+    if [ "$NEED" = "1" ]; then maybe_fix; vendor_apply_patches "$ROOT" "$VENDOR_PI" 1 || bad "补丁应用失败"; fi
+  fi
+  if vendor_patch_status "$ROOT" "$VENDOR_PI" >/tmp/doctor-patches.log 2>&1; then
+    ok "补丁齐备（$(grep -c '已应用' /tmp/doctor-patches.log)）"
+  else
+    bad "补丁未齐备（详情：bash scripts/doctor.sh --fix）"
+    sed 's/^/      /' /tmp/doctor-patches.log
+  fi
+else
+  if [ "$FIX" = "1" ]; then maybe_fix; bash "$ROOT/scripts/build.sh" && ok "vendor/pi 已引导" || bad "引导失败"; else
+    bad "vendor/pi 不存在（bash scripts/build.sh）"
+  fi
+fi
+
+# ── 4. 构建产物新鲜度 ──
+echo "[4] 构建产物"
+if [ -f "$CLI" ]; then
+  ok "dist/cli.js 存在"
+  NEWEST_SRC="$(find "$VENDOR_PI/packages" -path '*/node_modules' -prune -o -path '*/dist' -prune -o -name '*.ts' -newer "$CLI" -print 2>/dev/null | head -1)"
+  if [ -n "$NEWEST_SRC" ]; then
+    if [ "$FIX" = "1" ]; then maybe_fix; PI_SKIP_ROOT_INSTALL=1 bash "$ROOT/scripts/build.sh" && ok "dist 已重建" || bad "重建失败"; else
+      warn "dist 可能过期（源码较新：$NEWEST_SRC；PI_SKIP_ROOT_INSTALL=1 bash scripts/build.sh）"
+    fi
+  else
+    ok "dist 与源码同步"
+  fi
+else
+  if [ "$FIX" = "1" ]; then maybe_fix; PI_SKIP_ROOT_INSTALL=1 bash "$ROOT/scripts/build.sh" && ok "dist 已构建" || bad "构建失败"; else
+    bad "dist/cli.js 缺失（bash scripts/build.sh）"
+  fi
+fi
+
+# ── 5. 崩溃自愈缓存 ──
+echo "[5] 自愈缓存"
+if [ -f "$CACHE_CLI" ]; then
+  ok "recovery/cache/dist 就绪"
+else
+  if [ "$FIX" = "1" ]; then maybe_fix; bash "$ROOT/scripts/pi-source-build.sh" --no-build >/dev/null 2>&1 && ok "自愈缓存已生成" || warn "自愈缓存生成失败（不影响运行）"; else
+    warn "recovery/cache/dist 缺失（bash scripts/pi-source-build.sh --no-build）"
+  fi
+fi
+
+# ── 6. 运行时目录与 shim ──
+echo "[6] 运行时目录"
+for d in portable/agent portable/memory; do
+  [ -d "$d" ] && ok "$d" || bad "$d 缺失"
+done
+if [ "$FIX" = "1" ] && { [ ! -x "$BIN_DIR/fd" ] || [ ! -x "$BIN_DIR/rg" ]; }; then
+  maybe_fix; bash "$ROOT/scripts/setup-external.sh" fd-rg >/dev/null 2>&1 || true
+fi
+for b in fd rg; do
+  if [ -x "$BIN_DIR/$b" ]; then ok "portable/agent/bin/$b 就绪"; else warn "portable/agent/bin/$b 缺失（bash scripts/setup-external.sh fd-rg）"; fi
+done
+
+# ── 7. 每环境独立文件（不入库，主动提示）──
+echo "[7] 每环境独立配置"
+[ -f portable/agent/auth.json ] && ok "auth.json 存在" || warn "auth.json 缺失（首次用需配置 API 凭据；不入库）"
+[ -f portable/agent/models.json ] && ok "models.json 存在" || warn "models.json 缺失（可选；按本机能力配置）"
+
+# ── 8. 外部工具（可选能力）──
+echo "[8] 外部工具（可选）"
+have() { command -v "$1" >/dev/null 2>&1; }
+have tmux && ok "tmux" || warn "tmux 未安装（tmux_* 工具不可用）"
+have fd || have fdfind && ok "fd" || warn "fd 未安装"
+have rg && ok "rg" || warn "rg 未安装"
+have espeak-ng || have espeak && ok "espeak-ng" || warn "espeak-ng 未安装（TTS fallback）"
+have ffmpeg && ok "ffmpeg" || warn "ffmpeg 未安装（语音转码）"
+if curl -s --max-time 3 http://127.0.0.1:8889/ >/dev/null 2>&1; then ok "SearXNG 运行中"
+elif [ "$FIX" = "1" ]; then maybe_fix; bash "$ROOT/scripts/setup-external.sh" web >/dev/null 2>&1 && ok "SearXNG 已启动" || warn "SearXNG 启动失败"
+else warn "SearXNG 未运行（bash scripts/setup-external.sh web）"; fi
+
+# ── 9. 类型检查（--full）──
+if [ "$FULL" = "1" ]; then
+  echo "[9] 类型检查"
+  if npx tsc --noEmit -p custom/ >/tmp/doctor-tsc.log 2>&1; then ok "custom/ 类型检查通过"; else bad "custom/ 类型检查失败（见 /tmp/doctor-tsc.log）"; fi
+fi
+
+# ── 10. 本地 vs 远程 ──
+echo "[10] 本地 vs origin"
+if [ "$NET" = "1" ] && git rev-parse --git-dir >/dev/null 2>&1; then
+  git fetch origin -q 2>/dev/null || true
+  if git rev-parse --verify origin/main >/dev/null 2>&1; then
+    AHEAD="$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)"
+    BEHIND="$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)"
+    if [ "$BEHIND" -gt 0 ]; then warn "落后 origin/main $BEHIND 个提交（git pull）"; else ok "与 origin/main 同步（领先 $AHEAD）"; fi
+  else
+    warn "无 origin/main 引用"
+  fi
+else
+  echo "  • 已跳过（--no-net 或非 git 仓库）"
+fi
+
+echo ""
+echo "=== 结果：$OK 正常 / $WARN 警告 / $BAD 异常 ==="
+if [ "$BAD" -gt 0 ]; then
+  [ "$FIX" = "1" ] && echo "部分项修复失败，请按上面提示处理" || echo "运行 bash scripts/doctor.sh --fix 自动修复可修复项"
+  exit 1
+fi
+[ "$WARN" -gt 0 ] && echo "无阻断性异常（警告项多为可选能力）"
+exit 0

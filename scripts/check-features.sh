@@ -132,7 +132,7 @@ echo ""
 
 # ---- 7. 关键配置文件 ----
 echo "7. 关键配置文件"
-for f in portable/agent/settings.json portable/agent/auth.json portable/agent/keybindings.json portable/agent/modes.json; do
+for f in portable/agent/settings.json portable/agent/keybindings.json portable/agent/modes.json; do
   if [ -f "$f" ]; then
     echo "  ✅ $f"
   else
@@ -140,11 +140,20 @@ for f in portable/agent/settings.json portable/agent/auth.json portable/agent/ke
     MISSING=$((MISSING + 1))
   fi
 done
+# 每环境独立（gitignore）：缺失只警告，不阻断 fresh checkout
+for f in portable/agent/auth.json portable/agent/models.json; do
+  if [ -f "$f" ]; then
+    echo "  ✅ $f"
+  else
+    echo "  ⚠ $f 缺失（每环境独立，首次使用需配置）"
+    WARN=$((WARN + 1))
+  fi
+done
 echo ""
 
 # ---- 8. 运维脚本 ----
 echo "8. 运维脚本"
-for script in build.sh dev.sh sync-upstream.sh check-isolation.sh check-features.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh check-doc-links.mjs pi-supervisor.sh pi-source-build.sh daily-health.mjs knowledge-fetch.py tool-stats-sync.mjs task-summarizer.mjs searxng-config.sh knowledge-ingest.mjs; do
+for script in build.sh dev.sh doctor.sh sync-upstream.sh check-isolation.sh check-features.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh check-doc-links.mjs pi-supervisor.sh pi-source-build.sh daily-health.mjs knowledge-fetch.py tool-stats-sync.mjs task-summarizer.mjs searxng-config.sh knowledge-ingest.mjs; do
   if [ -f "scripts/$script" ]; then
     echo "  ✅ scripts/$script"
   else

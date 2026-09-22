@@ -128,12 +128,25 @@ git pull          # 拉取共享更新（settings.json / keybindings.json / AGEN
 ```
 
 ```bash
-# 新环境首次克隆后：引导 vendor（已 gitignore）并构建
+# 新环境首次克隆后：一键重建（安装根依赖 + 引导 vendor + 构建）
 bash scripts/build.sh
+
+# 体检并自动修复缺口（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/可选服务）
+bash scripts/doctor.sh --fix
 
 # 启动（自动指向 portable/ 运行时数据）
 ./my-pi.sh
 ```
+
+```bash
+# 更新 pi（上游）后：自动修复（合并上游 → 补齐补丁 → 重建 dist → 刷新自愈缓存 → 类型检查）
+bash scripts/sync-upstream.sh
+# 只读预演（看将同步到哪个 commit，不改动任何内容）
+PI_SYNC_DRY_RUN=1 bash scripts/sync-upstream.sh
+```
+
+> `sync-upstream.sh` 需要网络；拉取超时可用 `PI_FETCH_TIMEOUT` 调整。若上游改动与本地补丁冲突，
+> 脚本会中止并列出冲突文件、回滚 vendor，不会留下半完成状态。
 
 ```bash
 # 定期同步与归档（在任一环境）

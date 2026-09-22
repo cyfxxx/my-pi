@@ -681,3 +681,21 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 ## 深度检查补充：autopilot 配置健壮性（第 41 批续）
 - `readAutopilotConfig` 增加类型校验（数值字段仅接受有限正数、布尔/数组按类型过滤），防手改 `config.json` 写成字符串导致 `decide()` 比较恒 false、failover/suspend 策略静默失效（对齐 ORIG autoconfig.ts 审计修复）。
 - 新增 `autopilot/__tests__/config.test.ts`（3 用例）。
+
+## 重建脚本优化与 pi 更新自动修复（第 42 批）
+- 完成时间：2026-09-22
+- 对比本地环境与远程仓库，定位新设备不可复现的缺口：
+  1. `build.sh` 从不安装根工作区依赖（custom/ 的 typebox/tinyglobby/playwright-core/cloakbrowser 提升到根 node_modules），fresh checkout 后 `./my-pi.sh` 的扩展加载与 `npx tsc`/`npm test` 均会失败。
+  2. 补丁模型不一致：本地 vendor 把补丁作为本地 commit，`build.sh`/`sync-upstream.sh` 却按“未提交补丁”处理；且 check-isolation 要求 vendor 干净 → fresh 引导必然失败。
+  3. `sync-upstream.sh` 同步后不重建 dist、不刷新自愈缓存，且补丁重复应用会失败。
+  4. `dev.sh` 用根 `npx tsx`，而 tsx 只在 vendor 安装 → 新设备离线时失败。
+  5. `check-features` 把每环境独立的 `auth.json` 当必检项 → fresh checkout golden 必失败。
+  6. 自愈缓存 `portable/agent/recovery/cache/dist` 未在重建时生成。
+- 新增 `scripts/lib-vendor.sh`（补丁幂等应用/状态、依赖一致性判断，被 build/sync/doctor source）。
+- `build.sh` 重写：根依赖 `npm ci`（lock 不变）→ vendor 引导（幂等应用并提交补丁、vendor 工作树保持干净）→ 在 vendor 根 `npm ci`（不改上游 lock）构建 → 可选 fd-rg/自愈缓存；支持 `PI_SKIP_*`/`PI_CN_MIRROR`/超时变量。
+- `sync-upstream.sh` 自动修复：fetch 超时保护 → merge（冲突则 abort 回滚并列冲突文件）→ 幂等补齐补丁 → 重建 dist → 刷新自愈缓存 → 类型检查；新增 `PI_SYNC_DRY_RUN=1` 只读预演。
+- 新增 `scripts/doctor.sh`：本地环境 vs 仓库体检（Node/依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`。
+- `pi-source-build.sh` 支持 `--no-build`（仅缓存现有 dist，供 build/doctor 复用）。
+- `dev.sh` 优先使用 vendor 内置 tsx。
+- `check-features`：每环境独立文件（auth/models）改为警告；脚本清单纳入 `doctor.sh`。
+- 验证：`build.sh` 幂等路径通过；**fresh 引导补丁逻辑**在 base commit 的临时 worktree 上验证（4 补丁应用+提交、二次运行全跳过、清理）；`npm ci` 于根与 vendor 均不改动 lock；doctor rc=0；golden 七项全绿（29 文件 300 用例）；无头冒烟通过。

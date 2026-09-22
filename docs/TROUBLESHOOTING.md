@@ -6,9 +6,9 @@
 
 | 属性 | 值 |
 |------|-----|
-| 版本 | v1.0 |
-| 更新日期 | 2026-09-20 |
-| 适用范围 | my-pi 运行时故障、扩展（custom/features）问题、配置问题 |
+| 版本 | v1.1 |
+| 更新日期 | 2026-09-22 |
+| 适用范围 | my-pi 运行时故障、重建/上游更新、扩展（custom/features）问题、配置问题 |
 | 相关文档 | [FAQ.md](./FAQ.md), [operations/ENVIRONMENTS.md](./operations/ENVIRONMENTS.md), [development/PI-EXT-DEV-NOTES.md](./development/PI-EXT-DEV-NOTES.md) |
 
 ---
@@ -112,21 +112,57 @@ ls vendor/pi/packages/coding-agent/dist/cli.js
 
 **症状：** `bash scripts/build.sh` 中途失败，通常在应用 `patches/` 阶段。
 
-**原因：** `patches/` 中的补丁（`001-branding.patch`、`002-local-pi-mods.patch`）与当前 `vendor/PINNED_COMMIT` 不匹配。
+**原因：** `patches/` 中的补丁（`001-branding.patch`、`002-local-pi-mods.patch` 等）与当前 `vendor/PINNED_COMMIT` 不匹配。
 
 **解决：**
 ```bash
-# 同步到锁定的上游基线（不带参数则同步到最新上游）
+# 更新上游 + 自动修复（合并 → 幂等补齐补丁 → 重建 dist → 刷新自愈缓存 → 类型检查）
 bash scripts/sync-upstream.sh
 
 # 同步到指定 commit
 bash scripts/sync-upstream.sh <commit-sha>
 
-# 重新构建
+# 只读预演：看将同步到哪个 commit，不改动任何内容
+PI_SYNC_DRY_RUN=1 bash scripts/sync-upstream.sh
+
+# 补丁失配时按提示调整 patches/ 后重新构建
 bash scripts/build.sh
 ```
 
 `vendor/pi/` 永不直接修改；一切改动都经 `patches/` 管理，上游更新只走 `scripts/sync-upstream.sh`。
+
+### 2.3 新设备重建 / pi 更新后自动修复
+
+**目标：** 在新设备上从仓库复现可运行环境；或在更新上游 pi 后自动修复构建/补丁/缓存。
+
+**一键重建（新设备）：**
+```bash
+bash scripts/build.sh          # 根依赖 npm ci + 引导 vendor + 幂等提交补丁 + 构建
+bash scripts/doctor.sh --fix   # 体检并自动修复缺口
+```
+
+**体检（本地环境 vs 仓库缺口对比）：**
+```bash
+bash scripts/doctor.sh          # 依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin
+bash scripts/doctor.sh --full   # 追加 custom/ 类型检查
+bash scripts/doctor.sh --no-net # 离线
+```
+
+doctor 的检查项与自动修复：
+
+| 检查 | 异常时的 `--fix` 动作 |
+|------|----------------------|
+| Node >=22 | 仅提示（需人工安装） |
+| 根依赖与 `package-lock` 一致 | `npm ci`（不改动 lock） |
+| vendor/pi 存在且干净、`LAST_SYNC_POINT` 有效 | `scripts/build.sh`（引导） |
+| `patches/` 已应用/可应用 | 幂等应用并提交 |
+| `dist/cli.js` 存在且不旧于源码 | 重建 coding-agent |
+| 崩溃自愈缓存 `recovery/cache/dist` | `pi-source-build.sh --no-build` |
+| `portable/agent/bin/{fd,rg}` shim | `setup-external.sh fd-rg` |
+| SearXNG 未运行 | `setup-external.sh web` |
+
+**更新 pi 后自动修复：** `sync-upstream.sh` 会在合并上游后自动重建 dist、刷新自愈缓存并跑类型检查；
+若上游 API 变更导致 `custom/` 类型报错，按提示调整 `custom/adapters/`（唯一接触 Pi API 的层）即可。
 
 ### 2.3 启动时报 JSON 解析错误
 

@@ -369,3 +369,13 @@
 2. 运行时产物归位：`git rm --cached portable/memory/daily-results/...`，遵守 `portable/memory/*` 忽略策略（文件保留在磁盘）。
 3. 补全 `packs/INDEX.md` 的 `reverse-skill`（入口 `skills/SKILL.md`）；新增 `packs/drafts/.gitkeep` 并在 `.gitignore` 忽略草稿内容，闭合 task-summarizer 起草落点。
 **理由**：深度检查的目标是消除死代码、文档/策略不一致与运行时数据入库，保证便携与可维护。
+
+### [2026-09-22] 重建脚本优化与 pi 更新自动修复
+**背景**：用户要求对比本地环境与远程仓库，确保新设备能顺利重建、更新 pi 后能自动修复。审查发现多处“本地可用但新设备不可复现”的缺口：根依赖从未安装、补丁模型自相矛盾（本地为 commit，脚本按未提交处理，而 check-isolation 要求 vendor 干净）、同步后不重建/刷缓存、dev.sh 依赖未安装的根 tsx、check-features 把每环境独立的 auth.json 当必检项。
+**决策**：
+1. 新增 `scripts/lib-vendor.sh` 作为 build/sync/doctor 的共享逻辑：补丁**幂等**应用（reverse-check 跳过已应用，新应用提交为本地 commit 使 vendor 保持干净），依赖一致性用 `node_modules/.package-lock.json` 的 mtime 判断（逐字节比较会因 npm 精简隐藏锁而误报）。
+2. `build.sh` 重写为“一键重建”：Node 检查 → 根 `npm ci`（不改 lock）→ vendor 引导（clone/checkout/幂等提交补丁）→ vendor 根 `npm ci` + 构建 → 可选 shim/自愈缓存；用 `PI_SKIP_*`、`PI_CN_MIRROR`、`PI_CLONE_TIMEOUT` 控制。
+3. `sync-upstream.sh` 升级为“更新即修复”：fetch 超时保护 → merge（冲突 abort 回滚并列出文件，不留半完成态）→ 幂等补齐补丁 → 重建 dist → 刷新自愈缓存 → 类型检查；`PI_SYNC_DRY_RUN=1` 只读预演。
+4. 新增 `scripts/doctor.sh`（本地 vs 仓库体检 + `--fix`），作为“对比本地环境与远程仓库”的常驻工具；`pi-source-build.sh` 增 `--no-build` 以免递归构建。
+5. 修正可复现性阻碍：`dev.sh` 用 vendor 内置 tsx；`check-features` 的每环境独立文件降级为警告；golden 补丁标签改为动态计数。
+**理由**：把“重建”和“更新”都收敛为幂等、可重复、无锁污染的单一入口；补丁以 commit 形式与本地一致，使 merge 自然工作且满足隔离检查；doctor 让缺口可见且可一键修复。

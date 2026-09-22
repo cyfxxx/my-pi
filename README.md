@@ -61,11 +61,13 @@ my-pi/
 ├── docs/                             # 项目文档（使用/开发/运维）
 │
 ├── scripts/
+│   ├── build.sh                      # 一键重建/引导（新设备可复现）
+│   ├── doctor.sh                     # 本地环境 vs 仓库体检（--fix 自动修复）
+│   ├── sync-upstream.sh              # 上游同步 + 自动修复（重建/刷缓存/类型检查）
+│   ├── lib-vendor.sh                 # build/sync/doctor 共享逻辑（补丁幂等）
+│   ├── dev.sh                        # 开发模式脚本
 │   ├── check-isolation.sh            # 隔离边界验证
 │   ├── check-features.sh             # 功能完整性检查
-│   ├── sync-upstream.sh              # 上游同步脚本
-│   ├── build.sh                      # 构建脚本
-│   ├── dev.sh                        # 开发模式脚本
 │   ├── setup-external.sh             # 外部服务/依赖安装（可选）
 │   ├── patch-playwright-core.mjs     # Termux playwright-core 补丁
 │   ├── golden-tasks.sh               # 行为防退化基准
@@ -75,7 +77,8 @@ my-pi/
 ├── patches/                          # 上游补丁
 │   ├── 001-branding.patch            # 品牌化补丁
 │   ├── 002-local-pi-mods.patch       # 本地 pi 源码改动
-│   └── 003-tab-completion-fix.patch  # Tab 命令参数补全
+│   ├── 003-tab-completion-fix.patch  # Tab 命令参数补全
+│   └── 004-footer-tweaks.patch       # TUI footer 调整
 │
 ├── my-pi.sh                          # 便携启动脚本
 ├── PROGRESS.md                       # 进度追踪
@@ -85,21 +88,25 @@ my-pi/
 
 ## 快速开始
 
-> fresh checkout 时 `vendor/pi/` 不存在（已 gitignore）。先运行 `bash scripts/build.sh`
-> 会自动从上游 clone 并 checkout `vendor/PINNED_COMMIT`、应用 `patches/`。
+> fresh checkout 时 `vendor/pi/` 不存在（已 gitignore）。新设备只需一条命令：
+> `bash scripts/build.sh` —— 自动安装根依赖、从上游 clone、checkout `vendor/PINNED_COMMIT`、
+> 幂等应用 `patches/` 并构建。之后 `./my-pi.sh` 即可启动。
 
 ```bash
-# 1. 启动 my-pi（开发模式，使用 tsx 直接运行 TypeScript）
-bash scripts/dev.sh
-
-# 2. 构建生产版本
+# 1. 新设备一键重建（安装根依赖 + 引导 vendor + 构建）
 bash scripts/build.sh
+
+# 2. 体检并自动修复缺口（依赖/vendor/补丁/dist/自愈缓存/shim）
+bash scripts/doctor.sh --fix
 
 # 3. 使用构建后的版本
 ./my-pi.sh
 
 # 4. 查看版本
 ./my-pi.sh --version
+
+# 开发模式（直接跑 TypeScript 源码，无需构建）
+bash scripts/dev.sh
 ```
 
 ## 核心功能

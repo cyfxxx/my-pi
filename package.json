@@ -10,6 +10,8 @@
   },
   "scripts": {
     "build": "bash scripts/build.sh",
+    "rebuild": "bash scripts/build.sh",
+    "doctor": "bash scripts/doctor.sh",
     "dev": "bash scripts/dev.sh",
     "check": "bash scripts/check-isolation.sh",
     "golden": "bash scripts/golden-tasks.sh",

@@ -38,7 +38,7 @@ if [ -d vendor/pi ]; then
       ok=0; fail "补丁状态未知：$(basename "$p")"
     fi
   done
-  [ "$ok" = "1" ] && pass "patches 001-003 可应用/已应用"
+  [ "$ok" = "1" ] && pass "patches 全部可应用/已应用（$(ls patches/*.patch 2>/dev/null | wc -l | tr -d ' ') 个）"
 else
   echo "  ⚠ vendor/pi 不存在（跳过）"
 fi

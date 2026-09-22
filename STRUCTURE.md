@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 18 个运维脚本
+├── scripts/             # 20 个运维脚本（含共享库 lib-vendor.sh）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -32,13 +32,18 @@ my-pi/
 - 本地补丁以 commit 形式叠加在上游之上；通过 `scripts/sync-upstream.sh` 更新
 
 **引导（fresh checkout）**：`vendor/pi` 不随主仓库分发。克隆主仓库后运行 `scripts/build.sh`
-会自动从上游 clone 并 checkout `PINNED_COMMIT`、应用 `patches/`；也可手动：
+会自动安装根工作区依赖、从上游 clone、checkout `PINNED_COMMIT`、幂等应用并提交 `patches/`、
+构建 coding-agent（等价的一次性入口，新设备可复现）。也可手动：
 
 ```bash
 git clone https://github.com/earendil-works/pi-mono.git vendor/pi
 git -C vendor/pi checkout "$(cat vendor/PINNED_COMMIT)"
 for p in patches/*.patch; do git -C vendor/pi apply --3way "$p"; done
 ```
+
+> 补丁以本地 commit 形式落盘，使 vendor 工作树保持干净（`check-isolation` 要求）；
+> `scripts/sync-upstream.sh` 据此在更新上游后自动 merge + 补齐补丁 + 重建 dist + 刷新自愈缓存。
+> 环境体检与缺口修复用 `bash scripts/doctor.sh [--fix]`。
 
 ### `custom/`
 my-pi 的自定义代码。三层结构：
@@ -85,20 +90,22 @@ my-pi 的自定义代码。三层结构：
 - `004-footer-tweaks.patch`：TUI footer 四项调整（实时上下文 token、双指标着色、CH 实时/会话命中率、`Σ/↑/↓` 字段与 `¥` 成本、>40% `⚠` 重启提示）
 
 ### `scripts/`
-共 18 个运维脚本：
+共 20 个运维脚本（含 1 个共享库 `lib-vendor.sh`）：
 
-- `build.sh`：构建 vendor/pi（vendor 缺失时自动引导）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
-- `dev.sh`：开发模式运行
-- `sync-upstream.sh`：从上游同步
+- `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 构建 coding-agent；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
+- `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
+- `dev.sh`：开发模式运行（优先 vendor 内置 tsx）
+- `sync-upstream.sh`：上游同步 + 自动修复（merge → 幂等补丁 → 重建 dist → 刷新自愈缓存 → 类型检查；`PI_SYNC_DRY_RUN=1` 只读预演）
+- `lib-vendor.sh`：被 build/sync/doctor source 的共享逻辑（补丁幂等应用、依赖一致性判断）
 - `check-isolation.sh`：验证隔离边界
 - `check-features.sh`：对照 pi-tools 注册面检查工具/命令/快捷键/钩子/补丁完整性
 - `check-injection-surface.sh`：system prompt 注入面前缀指纹基线守门（`--update` 更新基线）
 - `check-doc-links.mjs`：文档内部相对链接一致性校验
 - `golden-tasks.sh`：行为防退化基准（隔离/注册面/类型/单测/补丁/注入面/文档，`--smoke` 追加无头冒烟）
 - `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
-- `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg 链接）
+- `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg shim）
 - `searxng-config.sh`：生成 SearXNG `settings.yml`（禁用不可达引擎、bing 指向 cn.bing.com；`--force/--probe`）
-- `pi-supervisor.sh` / `pi-source-build.sh`：崩溃自愈外壳与源码缓存构建
+- `pi-supervisor.sh` / `pi-source-build.sh`：崩溃自愈外壳与源码缓存构建（`--no-build` 仅缓存现有 dist）
 - `daily-health.mjs`：每日健康检查（命中率/记忆库/种子失配/守门脏改）
 - `knowledge-fetch.py`：知识源抓取（落 `portable/memory/knowledge/`）
 - `knowledge-ingest.mjs`：知识订阅入库（零 LLM，`storeEntry` 内置去重）

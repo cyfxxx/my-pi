@@ -1,17 +1,37 @@
 #!/bin/bash
+# build.sh — 一键重建 / 引导（新设备可复现）
+#
+# 阶段：
+#   1. Node 版本检查（>=22）
+#   2. 根工作区依赖安装（npm workspaces，含 custom/ 依赖；package-lock 一致则跳过）
+#   3. vendor/pi 引导：clone 上游 → checkout PINNED_COMMIT → 幂等应用并提交 patches/
+#   4. 构建 vendor/pi (coding-agent)
+#   5. 可选：生成 portable/agent/bin 的 fd/rg shim（PI_SETUP_BIN=1）
+#   6. 可选：缓存已知良好 dist 供崩溃自愈（PI_CACHE_DIST=1）
+#
+# 环境变量：
+#   PI_SKIP_ROOT_INSTALL=1   跳过根依赖安装
+#   PI_SKIP_VENDOR_BUILD=1   跳过 vendor 构建（只做引导/依赖）
+#   PI_FORCE_ROOT_INSTALL=1  强制重新安装根依赖
+#   PI_CN_MIRROR=1           使用 npmmirror 加速 npm
+#   PI_NPM_REGISTRY=<url>    指定 npm registry
 set -e
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENDOR_PI="$ROOT/vendor/pi"
 PIN_FILE="$ROOT/vendor/PINNED_COMMIT"
 UPSTREAM_URL="${PI_UPSTREAM_URL:-https://github.com/earendil-works/pi-mono.git}"
-# 可选国内镜像（npm 安装加速）：PI_CN_MIRROR=1 bash scripts/build.sh
+# shellcheck source=scripts/lib-vendor.sh
+. "$ROOT/scripts/lib-vendor.sh"
+
 NPM_REGISTRY="${PI_NPM_REGISTRY:-}"
 if [ "${PI_CN_MIRROR:-0}" = "1" ] && [ -z "$NPM_REGISTRY" ]; then
   NPM_REGISTRY="https://registry.npmmirror.com"
 fi
+npm_args=()
+[ -n "$NPM_REGISTRY" ] && npm_args+=(--registry="$NPM_REGISTRY")
 
-# ── Node 版本检查（my-pi engines 要求 >= 22）──
+# ── 1. Node 版本检查（my-pi engines 要求 >= 22）──
 if ! command -v node >/dev/null 2>&1; then
   echo "✗ 未找到 node。请安装 Node.js >= 22（https://nodejs.org 或 nvm install 22）" >&2
   exit 1
@@ -24,64 +44,92 @@ if [ "${NODE_MAJOR:-0}" -lt 22 ]; then
 fi
 echo "✓ Node.js $(node -v) / npm $(npm -v 2>/dev/null || echo '?')"
 
-# ── vendor/pi 引导（独立 git clone，不纳入主仓库）──
+# ── 2. 根工作区依赖（custom/ 依赖提升到根 node_modules）──
+if [ "${PI_SKIP_ROOT_INSTALL:-0}" = "1" ]; then
+  echo "• 跳过根依赖安装（PI_SKIP_ROOT_INSTALL=1）"
+elif [ "${PI_FORCE_ROOT_INSTALL:-0}" != "1" ] && root_deps_ok "$ROOT"; then
+  echo "✓ 根依赖已就绪（package-lock 一致，跳过）"
+else
+  echo "📦 安装根工作区依赖（npm ci，不改动 lock）..."
+  deps_install "$ROOT" "${npm_args[@]}"
+fi
+
+# ── 3. vendor/pi 引导（独立 git clone，不纳入主仓库）──
 if [ ! -d "$VENDOR_PI/.git" ]; then
-    echo "📥 vendor/pi 不存在，从上游引导..."
-    rm -rf "$VENDOR_PI"
-    git clone "$UPSTREAM_URL" "$VENDOR_PI"
+  echo "📥 vendor/pi 不存在，从上游引导..."
+  rm -rf "$VENDOR_PI"
+  if ! timeout "${PI_CLONE_TIMEOUT:-600}" git clone "$UPSTREAM_URL" "$VENDOR_PI"; then
+    echo "✗ clone 上游失败/超时（网络受限？）。可设 PI_UPSTREAM_URL 指向镜像。" >&2
+    exit 1
+  fi
 
-    PIN="$(grep -v '^#' "$PIN_FILE" 2>/dev/null | head -1 | awk '{print $1}')"
-    if [ -n "$PIN" ]; then
-        echo "锁定到 $PIN"
-        git -C "$VENDOR_PI" checkout "$PIN"
+  PIN="$(grep -v '^#' "$PIN_FILE" 2>/dev/null | head -1 | awk '{print $1}')"
+  if [ -n "$PIN" ]; then
+    echo "锁定到 $PIN"
+    git -C "$VENDOR_PI" checkout "$PIN"
+  fi
+  BASE_SHA="$(git -C "$VENDOR_PI" rev-parse HEAD)"
+
+  echo "应用补丁（幂等，首次引导会提交为本地 commit）..."
+  vendor_apply_patches "$ROOT" "$VENDOR_PI" 1 || {
+    echo "✗ 补丁应用失败，vendor/pi 处于未完成引导状态；请检查 patches/ 与 PINNED_COMMIT 是否匹配" >&2
+    exit 1
+  }
+
+  echo "$BASE_SHA" > "$VENDOR_PI/LAST_SYNC_POINT"
+  echo "  同步点（上游基线）：$BASE_SHA"
+else
+  echo "• vendor/pi 已存在，核对补丁状态（只读，不自动提交；需修复用 scripts/doctor.sh --fix）"
+  vendor_patch_status "$ROOT" "$VENDOR_PI" || true
+fi
+
+# ── 4. 构建 vendor/pi (coding-agent) ──
+if [ "${PI_SKIP_VENDOR_BUILD:-0}" = "1" ]; then
+  echo "• 跳过 vendor 构建（PI_SKIP_VENDOR_BUILD=1）"
+else
+  echo "🔨 构建 vendor/pi (coding-agent)..."
+  # 在 vendor 工作区根用 npm ci：按 lock 安装、不改动上游 package-lock（保持 vendor 干净）
+  if [ "${PI_FORCE_VENDOR_INSTALL:-0}" != "1" ] && deps_ok "$VENDOR_PI"; then
+    echo "  ✓ vendor 依赖已就绪（跳过）"
+  else
+    if [ -n "$NPM_REGISTRY" ]; then
+      echo "  npm registry: $NPM_REGISTRY"
+      deps_install "$VENDOR_PI" --registry="$NPM_REGISTRY"
+    else
+      deps_install "$VENDOR_PI"
     fi
+  fi
+  ( cd "$VENDOR_PI/packages/coding-agent" && npm run build )
 
-    for patch in "$ROOT/patches"/*.patch; do
-        [ -e "$patch" ] || continue
-        echo "应用补丁：$(basename "$patch")"
-        git -C "$VENDOR_PI" apply --3way "$patch"
-    done
-
-    git -C "$VENDOR_PI" rev-parse HEAD > "$VENDOR_PI/LAST_SYNC_POINT"
-else
-    # 已存在：核对补丁是否已应用（幂等提示，不改动）
-    for patch in "$ROOT/patches"/*.patch; do
-        [ -e "$patch" ] || continue
-        base="$(basename "$patch")"
-        if git -C "$VENDOR_PI" apply --check "$patch" >/dev/null 2>&1; then
-            echo "⚠ 补丁未应用：$base（运行 bash scripts/sync-upstream.sh 或 git apply）"
-        elif git -C "$VENDOR_PI" apply --check --reverse "$patch" >/dev/null 2>&1; then
-            echo "✓ 补丁已应用：$base"
-        else
-            echo "⚠ 补丁状态未知（基线不符？）：$base"
-        fi
-    done
-fi
-
-echo "🔨 构建 vendor/pi (coding-agent)..."
-cd "$VENDOR_PI/packages/coding-agent"
-if [ -n "$NPM_REGISTRY" ]; then
-    echo "  npm registry: $NPM_REGISTRY"
-    npm install --registry="$NPM_REGISTRY"
-else
-    npm install
-fi
-npm run build
-
-# Termux：给 playwright-core 打 android→linux 平台补丁（幂等；非 Termux 自动跳过）
-# 不吞输出：补丁未命中时明确告警，避免"构建成功但浏览器不可用"。
-if [ -f "$ROOT/scripts/patch-playwright-core.mjs" ]; then
+  # Termux：给 playwright-core 打 android→linux 平台补丁（幂等；非 Termux 自动跳过）
+  if [ -f "$ROOT/scripts/patch-playwright-core.mjs" ]; then
     set +e
     PATCH_OUT="$(node "$ROOT/scripts/patch-playwright-core.mjs" 2>&1)"
     PATCH_RC=$?
     set -e
     echo "$PATCH_OUT"
     if [ "$PATCH_RC" -ne 0 ]; then
-        echo "⚠ playwright-core 平台补丁未完成（exit $PATCH_RC）：Termux 浏览器可能不可用，请检查上面的输出" >&2
+      echo "⚠ playwright-core 平台补丁未完成（exit $PATCH_RC）：Termux 浏览器可能不可用，请检查上面的输出" >&2
     fi
+  fi
+
+  CLI="$VENDOR_PI/packages/coding-agent/dist/cli.js"
+  [ -f "$CLI" ] || { echo "✗ 构建产物缺失：$CLI" >&2; exit 1; }
+  echo "✓ 构建产物：$CLI"
+fi
+
+# ── 5. 可选：fd/rg shim ──
+if [ "${PI_SETUP_BIN:-0}" = "1" ]; then
+  echo "🔧 生成 portable/agent/bin 的 fd/rg shim..."
+  bash "$ROOT/scripts/setup-external.sh" fd-rg || true
+fi
+
+# ── 6. 可选：崩溃自愈的已知良好 dist 缓存 ──
+if [ "${PI_CACHE_DIST:-0}" = "1" ]; then
+  echo "🗃  缓存已知良好 dist（供崩溃自愈 pi_self 路径）..."
+  bash "$ROOT/scripts/pi-source-build.sh" --no-build || true
 fi
 
 # custom/ 不编译：pi 的扩展加载器内置 jiti，直接加载 custom/bootstrap.ts（TypeScript）。
-# 类型检查用 `npx tsc --noEmit -p custom/`（见 npm run check 与文档）。
 echo "✅ 构建完成（custom/ 以 TypeScript 源码由 pi 加载，无需编译）"
-echo "  启动：./my-pi.sh   类型检查：npx tsc --noEmit -p custom/   完整检查：npm run check"
+echo "  启动：./my-pi.sh   体检：bash scripts/doctor.sh   类型检查：npx tsc --noEmit -p custom/"
