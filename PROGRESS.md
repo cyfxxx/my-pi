@@ -677,3 +677,7 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 ## 深度检查补充：清除 autopilot 遗留字段（第 41 批续）
 - 删除 `Task.pendingInject`/`recoveryCount`（NEW 采用子进程 runner 执行任务，非 ORIG 的主会话注入模型，字段无消费者）及 storage 规范化/默认值中的对应项。
 - tsc（含 noUnusedLocals/Parameters）与 autopilot 37 用例通过。
+
+## 深度检查补充：autopilot 配置健壮性（第 41 批续）
+- `readAutopilotConfig` 增加类型校验（数值字段仅接受有限正数、布尔/数组按类型过滤），防手改 `config.json` 写成字符串导致 `decide()` 比较恒 false、failover/suspend 策略静默失效（对齐 ORIG autoconfig.ts 审计修复）。
+- 新增 `autopilot/__tests__/config.test.ts`（3 用例）。

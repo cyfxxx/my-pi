@@ -67,17 +67,45 @@ export function configPath(): string {
   return candidatePaths(process.env.PI_AUTOPILOT_CONFIG, 'config.json', '.pi-autopilot-config.json')[0];
 }
 
+function positiveNum(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
+/** 只取 src 中为有限正数的字段（防手改配置写成字符串导致比较恒 false、策略静默失效） */
+function numericFields(src: unknown, keys: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!src || typeof src !== 'object') return out;
+  const source = src as Record<string, unknown>;
+  for (const k of keys) {
+    const v = source[k];
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = v;
+  }
+  return out;
+}
+
 export function readAutopilotConfig(): ReturnType<typeof defaultAutopilotConfig> {
   const base = defaultAutopilotConfig();
   for (const p of candidatePaths(process.env.PI_AUTOPILOT_CONFIG, 'config.json', '.pi-autopilot-config.json')) {
     try {
-      const raw = JSON.parse(fs.readFileSync(p, 'utf-8')) as Partial<ReturnType<typeof defaultAutopilotConfig>>;
+      const raw = JSON.parse(fs.readFileSync(p, 'utf-8')) as Record<string, unknown>;
       return {
-        ...base,
-        ...raw,
-        budget: { ...base.budget, ...(raw.budget ?? {}) },
-        policy: { ...base.policy, ...(raw.policy ?? {}) },
-        fallbackModels: raw.fallbackModels ?? base.fallbackModels,
+        enabled: typeof raw.enabled === 'boolean' ? raw.enabled : base.enabled,
+        maxIdleMinutes: positiveNum(raw.maxIdleMinutes, base.maxIdleMinutes),
+        requeueOnRestart: typeof raw.requeueOnRestart === 'boolean' ? raw.requeueOnRestart : base.requeueOnRestart,
+        fallbackModels: Array.isArray(raw.fallbackModels)
+          ? (raw.fallbackModels as typeof base.fallbackModels)
+          : base.fallbackModels,
+        budget: {
+          ...base.budget,
+          ...numericFields(raw.budget, ['maxRunsPerDay', 'maxCostPerDay']),
+          allowedModels: Array.isArray((raw.budget as { allowedModels?: unknown })?.allowedModels)
+            ? ((raw.budget as { allowedModels: string[] }).allowedModels)
+            : base.budget.allowedModels,
+        },
+        policy: {
+          ...base.policy,
+          ...numericFields(raw.policy, ['failoverAfter', 'suspendAfter', 'timeoutFactor', 'maxFailovers', 'verifyAfter']),
+        },
       };
     } catch {
       /* 试下一个候选路径 */

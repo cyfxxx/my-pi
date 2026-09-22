@@ -32,4 +32,4 @@
 ### 待办
 - [x] knowledge-ingest.mjs 的 import 路径改为基于 ROOT 解析（可移植性）
 - [x] 知识订阅条目 environments 统一用 'all'（跨设备可见）
-- [ ] stdout 文案 `logs/knowledge/` 与实际路径不符，可改为打印真实 KLOG 路径（属 knowledge-fetch.py）
+- [x] stdout 文案改为打印真实 KLOG 路径（属 knowledge-fetch.py，已修）
