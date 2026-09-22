@@ -13,9 +13,9 @@
  * provider 设置、不进注入面，切换不额外破坏缓存前缀。
  */
 
-import { appendFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
+import { appendJSONL, readJSONL } from '../../../core/fs-json';
 import { getBudgetReport } from './budget';
 
 // ── 任务类型推断（用于 thinking 档位自适应） ──
@@ -223,28 +223,14 @@ export function levelChangeFile(): string {
 export function recordLevelChange(e: Omit<LevelChange, 'type' | 'ts'>): void {
   if (process.env.PI_DISABLE_LEVEL_AUDIT === '1') return;
   try {
-    mkdirSync(dirname(levelChangeFile()), { recursive: true });
-    appendFileSync(levelChangeFile(), JSON.stringify({ type: 'level-change', ts: Date.now(), ...e }) + '\n');
+    appendJSONL(levelChangeFile(), { type: 'level-change', ts: Date.now(), ...e });
   } catch {
     /* 审计失败不影响切档 */
   }
 }
 
 export function loadLevelChanges(): LevelChange[] {
-  try {
-    if (!existsSync(levelChangeFile())) return [];
-    const out: LevelChange[] = [];
-    for (const l of readFileSync(levelChangeFile(), 'utf-8').split('\n')) {
-      if (!l.trim()) continue;
-      try {
-        const r = JSON.parse(l) as LevelChange;
-        if (r && r.type === 'level-change') out.push(r);
-      } catch {
-        /* 跳过坏行 */
-      }
-    }
-    return out;
-  } catch {
-    return [];
-  }
+  return readJSONL<LevelChange>(levelChangeFile(), (r): r is LevelChange => {
+    return typeof r === 'object' && r !== null && (r as { type?: unknown }).type === 'level-change';
+  });
 }

@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand, registerShortcut, sendMessage, sendUserMessage, Key } from '../../adapters/ui-adapter';
+import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   loadConfig,
   persistConfig,
@@ -184,12 +185,12 @@ export function register(pi: ExtensionAPI): void {
         { value: 'bench', label: 'bench', description: '录音转写基准（RTF）' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
-      const f = subs.filter((s) => s.value.startsWith(prefix));
+      const f = filterCompletions(subs, prefix);
       return f.length ? f : null;
     },
     handler: async (args, ctx) => {
       refresh();
-      const [sub, ...rest] = args.trim().split(/\s+/);
+      const { sub, rest } = parseSubcommand(args);
       const help = `/voice <子命令>
   status                      查看语音状态
   toggle                      开关自动朗读

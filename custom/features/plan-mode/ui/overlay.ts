@@ -7,7 +7,7 @@
 import { truncateToWidth, visibleWidth } from '../../../adapters/ui-adapter';
 import { getState } from '../core/store';
 import { selectHasActive, selectOverlayLayout, selectTodoCounts } from '../core/selectors';
-import { formatStatusLabel } from './view';
+import { formatStatusLabel, statusMarker } from './view';
 import type { Task } from '../core/state';
 
 type TaskStatus = Task['status'];
@@ -159,8 +159,7 @@ export class TodoOverlay {
   }
 
   private formatCheckboxLine(task: { id: number; subject: string; status: TaskStatus; activeForm?: string }, theme: ThemeLike, width: number): string {
-    const check =
-      task.status === 'completed' ? '[✓]' : task.status === 'in_progress' ? '[•]' : task.status === 'blocked' ? '[⏸]' : '[ ]';
+    const check = statusMarker(task.status);
     const color = task.status === 'in_progress' ? 'warning' : 'dim';
     const prefix = `${theme.fg(color, check)} `;
     const prefixWidth = visibleWidth(prefix);

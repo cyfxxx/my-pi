@@ -11,6 +11,7 @@ import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-a
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
+import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { listSessions, resolveSession } from '../../adapters/session-adapter';
 import { formatSessionList } from './store/sessions';
 import { syncSeedTasks } from './store/seeds';
@@ -182,11 +183,11 @@ export function register(pi: ExtensionAPI): void {
         { value: 'resume', label: 'resume', description: '恢复自动驾驶' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
-      const f = subs.filter((s) => s.value.startsWith(prefix));
+      const f = filterCompletions(subs, prefix);
       return f.length ? f : null;
     },
     handler: async (args, ctx) => {
-      const [sub, ...rest] = args.trim().split(/\s+/);
+      const { sub, rest } = parseSubcommand(args);
       const c = readAutopilotConfig();
       const cm = currentModel();
       const runs = readTelemetry();
@@ -265,15 +266,14 @@ export function register(pi: ExtensionAPI): void {
       ];
       const first = (prefix.split(/\s+/)[0] ?? '');
       if (!prefix.includes(' ')) {
-        const f = subs.filter((s) => s.value.startsWith(first));
+        const f = filterCompletions(subs, first);
         return f.length ? f : null;
       }
       return null;
     },
     handler: async (args, ctx) => {
-      const parts = args.trim().split(/\s+/).filter(Boolean);
-      const sub = parts[0] || 'list';
-      const rest = parts.slice(1);
+      const { sub: subRaw, rest } = parseSubcommand(args);
+      const sub = subRaw || 'list';
       const help =
         '/schedule list                        列出任务\n' +
         '/schedule loop <间隔> <任务>          固定间隔（如 5m/1h）\n' +

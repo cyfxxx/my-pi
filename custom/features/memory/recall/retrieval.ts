@@ -7,8 +7,8 @@
 import type { MemoryEntry, MemoryCategory } from '../store/types';
 import { activeEntries, tokenize, dataDir, jaccardSimilarity } from '../store/storage';
 import { isEnvVisible, type RuntimeEnv } from '../env';
-import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { appendJSONLRotating } from '../../../core/fs-json';
 
 const K1 = 1.5;
 const B = 0.75;
@@ -238,16 +238,7 @@ export function traceFile(): string {
 
 export function logSearchTrace(t: SearchTraceInput): void {
   try {
-    const file = traceFile();
-    mkdirSync(dirname(file), { recursive: true });
-    if (existsSync(file) && statSync(file).size > 4_000_000) {
-      try {
-        renameSync(file, file + '.1');
-      } catch {
-        /* 并发写可容忍 */
-      }
-    }
-    appendFileSync(file, JSON.stringify({ ts: new Date().toISOString(), ...t }) + '\n');
+    appendJSONLRotating(traceFile(), { ts: new Date().toISOString(), ...t }, 4_000_000, '.1');
   } catch {
     /* fail-open */
   }

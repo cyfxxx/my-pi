@@ -15,6 +15,7 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
+import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   CORRECTIVE_WINDOW_MS,
   TOOL_BRIEF_TRUNC,
@@ -115,16 +116,16 @@ export function register(pi: ExtensionAPI): void {
   registerCommand(pi, 'intervention', {
     description: '干预捕获：中断快照与统计',
     getArgumentCompletions: (prefix) => {
-      const first = (prefix?.trim().split(/\s+/)[0] ?? '').toLowerCase();
+      const first = parseSubcommand(prefix).sub;
       const items = [
         { value: 'recent', label: 'recent', description: '最近 N 条中断快照（默认 5）' },
         { value: 'stats', label: 'stats', description: '累计统计（总数/关联率/近7天）' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
-      return items.filter((i) => i.value.startsWith(first));
+      return filterCompletions(items, first);
     },
     handler: async (args, ctx) => {
-      const [sub, ...rest] = args.trim().split(/\s+/);
+      const { sub, rest } = parseSubcommand(args);
       const records = readLines(file);
 
       if (sub === 'recent' || sub === undefined || sub === '') {

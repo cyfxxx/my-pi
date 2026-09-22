@@ -17,14 +17,18 @@ export function formatStatusLabel(status: TaskStatus): string {
   return STATUS_LABEL[status];
 }
 
+/** 状态标记（消息/面板统一）：完成 [✓]、进行 [•]、阻塞 [⏸]、其余 [ ] */
+export function statusMarker(status: TaskStatus): string {
+  return status === 'completed' ? '[✓]' : status === 'in_progress' ? '[•]' : status === 'blocked' ? '[⏸]' : '[ ]';
+}
+
 export function formatCommandTaskLine(t: Task, glyph: string): string {
   const form = t.status === 'in_progress' && t.activeForm ? ` (${t.activeForm})` : '';
   return `  ${glyph} #${t.id} ${t.subject}${form}`;
 }
 
 export function formatPlanMessageLine(t: Task, maxSubject = 40): string {
-  const check =
-    t.status === 'completed' ? '[✓]' : t.status === 'in_progress' ? '[•]' : t.status === 'blocked' ? '[⏸]' : '[ ]';
+  const check = statusMarker(t.status);
   const subject = t.subject.length > maxSubject ? `${t.subject.slice(0, maxSubject - 1)}…` : t.subject;
   const form = t.status === 'in_progress' && t.activeForm ? ` (${t.activeForm})` : '';
   return `${t.id}. ${check} ${subject}${form}`;

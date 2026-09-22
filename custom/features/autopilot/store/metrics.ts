@@ -5,9 +5,10 @@
  * 以数据文件读取方式聚合（新增干预快照 / 用量统计 / autopilot 遥测），不改动各 feature 代码。
  */
 
-import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
+import { readJSONL, readJSONOr } from '../../../core/fs-json';
+import { localDay } from '../../../core/text';
 
 interface InterventionLike {
   ts?: string;
@@ -32,40 +33,11 @@ export interface MetricsDashboard {
   generatedAt: string;
 }
 
-function readJsonl(file: string): unknown[] {
-  if (!existsSync(file)) return [];
-  const out: unknown[] = [];
-  try {
-    for (const line of readFileSync(file, 'utf-8').split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        out.push(JSON.parse(line));
-      } catch {
-        /* skip */
-      }
-    }
-  } catch {
-    return [];
-  }
-  return out;
-}
-
-function localDay(d: Date | string | number): string {
-  const date = typeof d === 'object' ? d : new Date(d);
-  const off = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - off).toISOString().slice(0, 10);
-}
-
 export function collectMetrics(memoryDir: string = getMemoryDir(), now: number = Date.now()): MetricsDashboard {
-  const interventions = readJsonl(join(memoryDir, 'interventions.jsonl')) as InterventionLike[];
-  const usage = readJsonl(join(memoryDir, 'context', 'usage.jsonl')) as UsageLike[];
-  let telemetry: TelemetryLike[] = [];
-  try {
-    const data = JSON.parse(readFileSync(join(memoryDir, 'scheduler', 'telemetry.json'), 'utf-8')) as { runs?: TelemetryLike[] };
-    telemetry = Array.isArray(data.runs) ? data.runs : [];
-  } catch {
-    telemetry = [];
-  }
+  const interventions = readJSONL<InterventionLike>(join(memoryDir, 'interventions.jsonl'));
+  const usage = readJSONL<UsageLike>(join(memoryDir, 'context', 'usage.jsonl'));
+  const telemetryData = readJSONOr<{ runs?: TelemetryLike[] }>(join(memoryDir, 'scheduler', 'telemetry.json'), {});
+  const telemetry: TelemetryLike[] = Array.isArray(telemetryData.runs) ? telemetryData.runs : [];
 
   const weekAgo = now - 7 * 24 * 3600_000;
   const totalInterventions = interventions.length;

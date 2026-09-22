@@ -8,6 +8,7 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerCommand, getThinkingLevel, setThinkingLevel } from '../../adapters/ui-adapter';
+import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   loadModes,
   getCurrentMode,
@@ -41,7 +42,7 @@ export function register(pi: ExtensionAPI): void {
   registerCommand(pi, 'mode', {
     description: '查看/切换当前模式',
     getArgumentCompletions: (prefix) => {
-      const first = (prefix?.trim().split(/\s+/)[0] ?? '').toLowerCase();
+      const first = parseSubcommand(prefix).sub;
       const items = [
         { value: 'list', label: 'list', description: '列出所有可用模式' },
         { value: 'help', label: 'help', description: '显示帮助信息' },
@@ -51,10 +52,10 @@ export function register(pi: ExtensionAPI): void {
           description: (getModeConfig(name) || { description: '' }).description,
         })),
       ];
-      return prefix?.includes(' ') ? items : items.filter((i) => i.value.startsWith(first));
+      return prefix?.includes(' ') ? items : filterCompletions(items, first);
     },
     handler: async (args, ctx) => {
-      const subcmd = (args.trim().split(/\s+/)[0] || '').toLowerCase();
+      const { sub: subcmd } = parseSubcommand(args);
 
       if (subcmd === 'help' || subcmd === '-h' || subcmd === '--help') {
         ctx.ui.notify(MODE_HELP, 'info');

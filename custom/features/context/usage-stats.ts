@@ -5,9 +5,10 @@
  * 产出「缓存命中率 / token 成本」可对比数字。落盘 `portable/memory/context/usage.jsonl`。
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import { getMemoryDir } from '../../core/config';
+import { appendJSONLRotating, readJSONL } from '../../core/fs-json';
+import { localDay } from '../../core/text';
 
 export interface UsageEvent {
   ts: string;
@@ -32,37 +33,14 @@ export function usageFilePath(): string {
 
 export function appendUsage(event: UsageEvent): void {
   try {
-    const f = usageFilePath();
-    if (existsSync(f) && statSync(f).size > MAX_SIZE) {
-      try {
-        renameSync(f, `${f}.old`);
-      } catch {
-        /* 轮转失败忽略 */
-      }
-    }
-    mkdirSync(dirname(f), { recursive: true });
-    appendFileSync(f, JSON.stringify(event) + '\n', 'utf8');
+    appendJSONLRotating(usageFilePath(), event, MAX_SIZE);
   } catch {
     /* fail-open：度量不阻塞主流程 */
   }
 }
 
 export function readUsage(): UsageEvent[] {
-  try {
-    const raw = readFileSync(usageFilePath(), 'utf-8');
-    const out: UsageEvent[] = [];
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        out.push(JSON.parse(line) as UsageEvent);
-      } catch {
-        /* skip 损坏行 */
-      }
-    }
-    return out;
-  } catch {
-    return [];
-  }
+  return readJSONL<UsageEvent>(usageFilePath());
 }
 
 export interface UsageSummary {
@@ -76,12 +54,6 @@ export interface UsageSummary {
   /** 缓存命中率 = cacheRead / (input + cacheRead) */
   cacheHitRate: number;
   topTools: Array<{ tool: string; count: number; tokens: number }>;
-}
-
-function localDay(d: Date | string): string {
-  const date = typeof d === 'string' ? new Date(d) : d;
-  const off = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - off).toISOString().slice(0, 10);
 }
 
 export function summarizeUsage(events: UsageEvent[], now: number = Date.now()): UsageSummary {

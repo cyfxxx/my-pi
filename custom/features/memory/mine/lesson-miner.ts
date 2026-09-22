@@ -6,9 +6,10 @@
  * 数据级读取 interventions.jsonl（不与 intervention feature 代码耦合）。
  */
 
-import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
+import { readJSONL } from '../../../core/fs-json';
+import { truncateChars } from '../../../core/text';
 import { computeContentHash } from '../store/storage';
 import type { MemoryEntry, MemoryCategory } from '../store/types';
 
@@ -27,21 +28,7 @@ export function interventionsFile(): string {
 }
 
 export function readInterventionRecords(file = interventionsFile()): InterventionRecordLike[] {
-  if (!existsSync(file)) return [];
-  const out: InterventionRecordLike[] = [];
-  try {
-    for (const line of readFileSync(file, 'utf-8').split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        out.push(JSON.parse(line) as InterventionRecordLike);
-      } catch {
-        /* skip 损坏行 */
-      }
-    }
-  } catch {
-    return [];
-  }
-  return out;
+  return readJSONL<InterventionRecordLike>(file);
 }
 
 export interface LessonCandidate {
@@ -54,7 +41,7 @@ export interface LessonCandidate {
 }
 
 function trunc(s: string, max: number): string {
-  return s.length <= max ? s : `${s.slice(0, max)}…`;
+  return truncateChars(s, max);
 }
 
 export interface MineOptions {

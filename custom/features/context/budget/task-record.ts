@@ -7,9 +7,9 @@
  * `scripts/task-summarizer.mjs` 聚合。仅数据文件、不进注入面；失败静默。
  */
 
-import { appendFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
+import { appendJSONL, readJSONL } from '../../../core/fs-json';
 
 export interface TaskRecord {
   type: 'task';
@@ -37,27 +37,14 @@ export function recordTaskRecord(e: Omit<TaskRecord, 'type' | 'ts'>): void {
   if (process.env.PI_DISABLE_TASK_RECORD === '1') return;
   try {
     const rec: TaskRecord = { type: 'task', ts: Date.now(), ...e };
-    appendFileSync(taskRecordFile(), JSON.stringify(rec) + '\n');
+    appendJSONL(taskRecordFile(), rec);
   } catch {
     /* ignore */
   }
 }
 
 export function loadTaskRecords(): TaskRecord[] {
-  try {
-    if (!existsSync(taskRecordFile())) return [];
-    const recs: TaskRecord[] = [];
-    for (const l of readFileSync(taskRecordFile(), 'utf-8').split('\n')) {
-      if (!l.trim()) continue;
-      try {
-        const r = JSON.parse(l) as TaskRecord;
-        if (r && r.type === 'task') recs.push(r);
-      } catch {
-        /* 跳过损坏行 */
-      }
-    }
-    return recs;
-  } catch {
-    return [];
-  }
+  return readJSONL<TaskRecord>(taskRecordFile(), (r): r is TaskRecord => {
+    return typeof r === 'object' && r !== null && (r as { type?: unknown }).type === 'task';
+  });
 }

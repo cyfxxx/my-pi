@@ -9,6 +9,7 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
+import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   registerCommand,
   registerShortcut,
@@ -31,17 +32,10 @@ import {
   formatGetLines,
   formatCommandTaskLine,
   isReadonlyBashCommand,
+  STATUS_LABEL,
 } from './logic';
 import type { TaskAction, TaskMutationParams, Op, TaskState, Task } from './logic';
 import { TodoOverlay } from './ui/overlay';
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: '待办',
-  in_progress: '进行中',
-  completed: '已完成',
-  blocked: '已阻塞',
-  deleted: '已删除',
-};
 
 function formatContent(op: Op, state: TaskState): string {
   switch (op.kind) {
@@ -153,11 +147,11 @@ export function register(pi: ExtensionAPI): void {
         { value: 'clear', label: 'clear', description: '清空所有计划任务' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
-      const filtered = subs.filter((s) => s.value.startsWith(prefix));
+      const filtered = filterCompletions(subs, prefix);
       return filtered.length > 0 ? filtered : null;
     },
     handler: async (args, ctx) => {
-      const sub = (args.trim().split(/\s+/)[0] || '').toLowerCase();
+      const { sub } = parseSubcommand(args);
       try {
         overlay.setUICtx(ctx.ui as never);
       } catch {

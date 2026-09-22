@@ -4,10 +4,10 @@
  * 落盘：portable/memory/scheduler/verifier.jsonl + verifier-summary.json。
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, renameSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
 import { writeJSONSync } from '../../../core/atomic-write';
+import { appendJSONLRotating, readJSONL } from '../../../core/fs-json';
 
 export interface VerificationRecord {
   ts: string;
@@ -53,16 +53,7 @@ export function verifierSummaryPath(): string {
 
 export function logVerification(record: VerificationRecord): void {
   try {
-    const f = verifierLogPath();
-    if (existsSync(f) && statSync(f).size > MAX_SIZE) {
-      try {
-        renameSync(f, `${f}.old`);
-      } catch {
-        /* ignore */
-      }
-    }
-    mkdirSync(dirname(f), { recursive: true });
-    appendFileSync(f, JSON.stringify(record) + '\n', 'utf8');
+    appendJSONLRotating(verifierLogPath(), record, MAX_SIZE);
     writeJSONSync(verifierSummaryPath(), summarize(readVerifications()));
   } catch {
     /* fail-open */
@@ -70,21 +61,7 @@ export function logVerification(record: VerificationRecord): void {
 }
 
 export function readVerifications(): VerificationRecord[] {
-  try {
-    const raw = readFileSync(verifierLogPath(), 'utf-8');
-    const out: VerificationRecord[] = [];
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        out.push(JSON.parse(line) as VerificationRecord);
-      } catch {
-        /* skip */
-      }
-    }
-    return out;
-  } catch {
-    return [];
-  }
+  return readJSONL<VerificationRecord>(verifierLogPath());
 }
 
 /** 聚合统计（纯函数，便于单测） */

@@ -3,6 +3,7 @@
  * 迁移自 pi-tools `agent/extensions/subagent/helpers.ts`（去掉 pi-ai/pi-coding-agent 依赖）。
  */
 
+import { formatTokens } from '../../../core/text';
 import type { RiskLevel, SingleResult } from './types';
 
 export const MAX_PARALLEL_TASKS = 8;
@@ -73,12 +74,7 @@ export function scheduleKillChain(
   return clear;
 }
 
-export function formatTokens(count: number): string {
-  if (count < 1000) return count.toString();
-  if (count < 10000) return `${(count / 1000).toFixed(1)}k`;
-  if (count < 1000000) return `${Math.round(count / 1000)}k`;
-  return `${(count / 1000000).toFixed(1)}M`;
-}
+export { formatTokens };
 
 export function calculateContextTokens(usage: {
   input?: number;

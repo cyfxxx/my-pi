@@ -5,8 +5,10 @@
  * 用 `notifications-seen.json` 记录上次已报告时间戳。
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { writeJSONSync } from '../../../core/atomic-write';
+import { readJSONOr } from '../../../core/fs-json';
 import { resultsFilePath, schedulerDir } from './storage';
 
 export interface ResultEntry {
@@ -53,17 +55,13 @@ export function formatSummary(entries: ResultEntry[]): string {
 }
 
 export function readSeenTs(): number {
-  try {
-    const d = JSON.parse(readFileSync(seenMarkerPath(), 'utf-8')) as { ts?: number };
-    return typeof d.ts === 'number' ? d.ts : 0;
-  } catch {
-    return 0;
-  }
+  const d = readJSONOr<{ ts?: number }>(seenMarkerPath(), {});
+  return typeof d.ts === 'number' ? d.ts : 0;
 }
 
 export function writeSeenTs(ts: number): void {
   try {
-    writeFileSync(seenMarkerPath(), JSON.stringify({ ts }), 'utf-8');
+    writeJSONSync(seenMarkerPath(), { ts });
   } catch {
     /* 标记失败不阻塞 */
   }

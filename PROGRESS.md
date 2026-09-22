@@ -713,3 +713,16 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - `lib-vendor.sh` 的补丁提交加 `--no-verify`（跳过上游 husky，避免其 biome 钩子干扰本地维护提交）；新增 `vendor_exclude_local` 把 `LAST_SYNC_POINT` 写入 vendor `.git/info/exclude`，保持 `git status` 干净。
 - 文档：STRUCTURE/README 版本与构建说明更新为 v0.87.0/工作区构建。
 - **验证**：vendor 全工作区构建成功；`custom/` 类型检查通过；`./my-pi.sh --version` = 0.87.0；golden 七项全绿（29 文件 300 用例）；无头冒烟（调用 `memory_stats`）通过；doctor 21 正常 / 0 警告 / 0 异常。
+
+## 扩展通用能力下沉 core + 去重（第 44 批）
+- 完成时间：2026-09-22
+- 新增 `core/fs-json.ts`（`ensureDir`/`readJSONSync`/`readJSONOr`/`readJSONL`/`appendJSONL`/`appendJSONLRotating`）、`core/text.ts`（`localDay`/`truncateChars`/`oneLine`/`formatTokens`）、`core/cli.ts`（`parseSubcommand`/`filterCompletions`），并纳入 `core/index.ts`。
+- 迁移去重（保持行为/落盘字节一致）：
+  - JSONL 容错读取：context usage-stats/task-record/thinking-level、autopilot metrics/notifications/verifier-logger、memory lesson-miner、intervention readLines。
+  - 轮转追加：context usage-stats(4MB)、autopilot verifier-logger(4MB)/storage.appendTaskResult(2MB)、memory retrieval(4MB, .1)。
+  - `localDay` 三处重复（usage-stats/metrics/ops）→ core。
+  - `truncateChars`（intervention.trunc/lesson-miner.trunc）、`oneLine`（intervention）、`formatTokens`（subagent helpers，保留再导出）。
+  - 命令解析：mode/intervention/plan-mode/memory/voice/autopilot/context 的 `parseSubcommand`+`filterCompletions`。
+- plan-mode 合并：`STATUS_LABEL` 去重（index.ts 改用 logic 导出）；新增 `statusMarker()` 统一消息/面板的 `[✓]/[•]/[⏸]/[ ]` 标记。
+- 新增 core 单测 3 个（fs-json/text/cli，15 用例）。
+- 验证：tsc 通过；vitest 29 文件 315 用例；golden 七项全绿。

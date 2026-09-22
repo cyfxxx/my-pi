@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getAgentDir } from '../../../core/config';
 import { writeJSONSync } from '../../../core/atomic-write';
+import { localDay } from '../../../core/text';
 import { readTasks, telemetryPath, withStoreLock } from './storage';
 import type {
   AutopilotBudget,
@@ -248,12 +249,6 @@ export function statsByTask(runs: TelemetryEntry[]): { taskId: string; taskName:
     });
   }
   return out.sort((a, b) => b.runs - a.runs);
-}
-
-function localDay(d: Date | string): string {
-  const date = typeof d === 'string' ? new Date(d) : d;
-  const off = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - off).toISOString().slice(0, 10);
 }
 
 export function todayRuns(runs: TelemetryEntry[]): number {

@@ -12,6 +12,7 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerCommand, sendMessage, getAllToolNames, getThinkingLevel, setThinkingLevel } from '../../adapters/ui-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
+import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
 import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
 import {
@@ -96,7 +97,7 @@ export function register(pi: ExtensionAPI): void {
         { value: 'report', label: 'report', description: '显示预算报告' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
-      const filtered = subcommands.filter((s) => s.value.startsWith(prefix));
+      const filtered = filterCompletions(subcommands, prefix);
       return filtered.length > 0 ? filtered : null;
     },
     handler: async (args, ctx) => {
@@ -174,7 +175,7 @@ export function register(pi: ExtensionAPI): void {
           { value: 'enable ', label: 'enable - 启用休眠组' },
           { value: 'help', label: 'help - 显示用法' },
         ];
-        return items.filter((i) => i.value.startsWith(first)) || null;
+        return filterCompletions(items, first) || null;
       }
       if (first === 'enable') {
         const arg = trimmed.split(/\s+/)[1] ?? '';
@@ -189,7 +190,7 @@ export function register(pi: ExtensionAPI): void {
       return null;
     },
     handler: async (args, ctx) => {
-      const [cmd, ...rest] = args.trim().split(/\s+/);
+      const { sub: cmd, rest } = parseSubcommand(args);
       if (cmd === 'enable' && rest[0]) {
         const r = enableGroup(pi, rest[0]);
         ctx.ui.notify(r.message, r.ok ? 'info' : 'warning');

@@ -8,11 +8,12 @@
  * 缓存纪律：本模块不注入 system prompt、不写入时间戳到提示词。
  */
 
-import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getMemoryDir } from '../../core/config';
 import { writeTextSync } from '../../core/atomic-write';
+import { readJSONL } from '../../core/fs-json';
+import { oneLine, truncateChars } from '../../core/text';
 
 export const MAX_RECORDS = 2000;
 export const PROMPT_TRUNC = 800;
@@ -59,17 +60,10 @@ export function resolveInterventionsFile(memoryDir?: string): string {
 
 export function trunc(text: string, max: number): string {
   if (!text) return '';
-  return text.length <= max ? text : text.slice(0, max) + '…';
+  return truncateChars(text, max);
 }
 
-export function oneLine(value: unknown): string {
-  try {
-    const s = typeof value === 'string' ? value : JSON.stringify(value) ?? '';
-    return s.replace(/\s+/g, ' ').trim();
-  } catch {
-    return '';
-  }
-}
+export { oneLine };
 
 /** 从 agent_end 的 messages 中提取最后一条 assistant 文本尾部 */
 export function extractAssistantTail(messages: unknown): string {
@@ -126,17 +120,7 @@ export function buildRecord(input: {
 }
 
 export function readLines(file: string): InterventionRecord[] {
-  if (!fs.existsSync(file)) return [];
-  const raw = fs.readFileSync(file, 'utf-8').split('\n').filter(Boolean);
-  const out: InterventionRecord[] = [];
-  for (const line of raw) {
-    try {
-      out.push(JSON.parse(line));
-    } catch {
-      /* 跳过损坏行 */
-    }
-  }
-  return out;
+  return readJSONL<InterventionRecord>(file);
 }
 
 export function writeLines(file: string, records: InterventionRecord[]): void {

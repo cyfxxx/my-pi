@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
+import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   loadEntries,
   loadSummaries,
@@ -262,13 +263,13 @@ export function register(pi: ExtensionAPI): void {
         { value: 'cleanup', label: 'cleanup - 清理过期笔记' },
         { value: 'help', label: 'help - 显示帮助信息' },
       ];
-      const filtered = subs.filter((s) => s.value.startsWith(prefix));
+      const filtered = filterCompletions(subs, prefix);
       return filtered.length > 0 ? filtered : null;
     },
     handler: async (args, ctx) => {
-      const parts = args.trim().split(/\s+/);
-      const sub = parts[0] || 'stats';
-      const keyword = parts.slice(1).join(' ');
+      const { sub: subRaw, rest } = parseSubcommand(args);
+      const sub = subRaw || 'stats';
+      const keyword = rest.join(' ');
       const helpText = `记忆库管理命令:
 
 用法: /memory <子命令> [参数]
@@ -323,7 +324,7 @@ export function register(pi: ExtensionAPI): void {
         case 'mine': {
           const existing = loadEntries();
           const candidates = mineLessons(readInterventionRecords(), existing);
-          if (parts.includes('--ingest')) {
+          if (rest.includes('--ingest')) {
             if (candidates.length === 0) {
               ctx.ui.notify('无新的教训候选可入库', 'info');
               break;

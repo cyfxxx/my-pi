@@ -4,12 +4,13 @@
  * cron 使用内置 5 字段解析（pi-tools 依赖 croner，my-pi 不引入额外依赖）。
  */
 
-import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync, existsSync, openSync, closeSync, statSync, appendFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, openSync, closeSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { getMemoryDir } from '../../../core/config';
 import { writeJSONSync } from '../../../core/atomic-write';
+import { appendJSONLRotating } from '../../../core/fs-json';
 import type { Task, TaskStore, SchedulerSettings, ExecHistoryEntry } from '../types';
 import { STORE_VERSION, DEFAULT_MAX_RUN_TIME, RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS, HISTORY_LIMIT } from '../types';
 
@@ -51,18 +52,9 @@ export interface TaskResultEntry {
 export function appendTaskResult(entry: TaskResultEntry): void {
   const MAX = 2 * 1024 * 1024;
   try {
-    const f = resultsFilePath();
-    if (existsSync(f) && statSync(f).size > MAX) {
-      try {
-        renameSync(f, `${f}.old`);
-      } catch {
-        /* 轮转失败忽略 */
-      }
-    }
-    mkdirSync(resultsDir(), { recursive: true });
-    appendFileSync(
-      f,
-      JSON.stringify({
+    appendJSONLRotating(
+      resultsFilePath(),
+      {
         ts: new Date().toISOString(),
         device: deviceTag(),
         taskId: entry.taskId,
@@ -70,8 +62,8 @@ export function appendTaskResult(entry: TaskResultEntry): void {
         result: entry.result,
         output: (entry.output || '').slice(0, 500),
         ...(entry.durationMs !== undefined ? { durationMs: entry.durationMs } : {}),
-      }) + '\n',
-      'utf8',
+      },
+      MAX,
     );
   } catch {
     /* 静默 */
