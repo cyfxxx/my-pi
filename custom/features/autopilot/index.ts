@@ -3,7 +3,7 @@
  *
  * 迁移自 pi-tools `agent/extensions/pi-autopilot/{index,commands,tools}.ts`（核心）。
  * 提供任务调度存储/策略/遥测/失败自愈判定，`/auto` 与 `/schedule` 命令。
- * 后台执行循环/watchdog/verifier 已实现；未迁移：seeds/sessions/notifications 与 Best-of-N 的 LLM 集成。
+ * 后台执行循环/watchdog/verifier/seeds/notifications 已实现；未迁移：sessions（会话切换编排）与 Best-of-N 的 LLM 集成。
  */
 
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
@@ -11,6 +11,7 @@ import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand, sendMessage } from '../../adapters/ui-adapter';
 import { syncSeedTasks } from './store/seeds';
+import { collectUnread, formatSummary, writeSeenTs } from './store/notifications';
 import {
   readAutopilotConfig,
   writeAutopilotConfig,
@@ -426,6 +427,12 @@ export function register(pi: ExtensionAPI): void {
           `种子任务对账: 新增 ${sync.added}${sync.drifted.length ? `，与种子不一致: ${sync.drifted.join('；')}` : ''}`,
           sync.drifted.length ? 'warning' : 'info',
         );
+      }
+      // 离线期间任务执行报告（报告后更新已读标记）
+      const unread = collectUnread();
+      if (unread.length) {
+        if (ctx.hasUI) ctx.ui.notify(formatSummary(unread), unread.some((e) => e.result !== 'success') ? 'warning' : 'info');
+        writeSeenTs(Date.now());
       }
     },
   });

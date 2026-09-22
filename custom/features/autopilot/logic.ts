@@ -8,6 +8,7 @@ export * from './types';
 export * from './store/storage';
 export * from './store/ops';
 export * from './store/metrics';
+export * from './store/notifications';
 export * from './run/watchdog';
 export * from './run/verifier-logger';
 export * from './run/verifier';

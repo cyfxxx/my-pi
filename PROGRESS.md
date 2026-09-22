@@ -599,3 +599,10 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 新增测试：compression 4 用例、task-gate 2 用例。
 - 未迁：pi-tools auto-compact 控制器的后台任务门（tmux registry 适配）、思考档切换、暖前缀回放（记录为后续）。
 - 验证：tsc 通过；context 套件 68 用例通过。
+
+## 离线任务执行报告迁移（第 32 批）
+- 完成时间：2026-09-22
+- 新增 `autopilot/store/notifications.ts`（迁移自 pi-tools `pi-autopilot/notifications.ts`，数据源改为 `results-<device>.jsonl` + `notifications-seen.json` 已读标记）：`parseResults`/`formatSummary` 纯逻辑 + `collectUnread`/`readSeenTs`/`writeSeenTs`。
+- `autopilot/index.ts` session_start：种子对账后输出"离线期间任务执行报告"并更新已读标记。
+- 新增 2 用例；autopilot 套件 32 用例通过。
+- 未迁：autopilot `sessions.ts`（会话切换编排）、Best-of-N 的 LLM 集成，以及 auto-compact 控制器的后台任务门/思考档/暖前缀回放。
