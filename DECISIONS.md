@@ -350,3 +350,14 @@
 **背景**：NEW 的自动压缩仅在 turn_end 按阈值 + 计划任务门判定；缺 pi-tools 控制器的背景任务门、环境比例/绝对阈值、真实 usage 缺失时的上下文回退与重启提示阈值。
 **决策**：新增 `context/budget/task-gate.ts`（`ABSOLUTE_TOKENS`/`RESTART_TOKENS`/`COMPACT_COOLDOWN_MS`/`TASK_GATE`、`readEnvRatio`、`resolveContext`、`hasBackgroundTask`）。turn_end 改用 `resolveContext`（真实 usage → provider token 回退），加背景任务门；`compactDecider` 注入环境比例/绝对阈值/冷却；`before_agent_start` 在 tokens > `RESTART_TOKENS` 时注入"先 /compact 再重启"提示。
 **理由**：三重门（阈值/任务/后台）避免压缩打断进行中的多步/后台任务；回退保证真实 usage 缺失时仍能判定；重启提示减少重启后首轮全量重发。`hasBackgroundTask` 仅在 `PI_SESSION_ID` 可归属且 tmux 会话存活时生效（否则门惰性安全）。
+
+### [2026-09-22] 自动化整理：子包化 web-search/link + 系统提示补全 + knowledge-ingest 可移植
+**背景**：用户授权持续迁移并按便携化/模块化要求整理目录；同时修掉此前引入的缓存不友好注入。
+**决策**：
+1. `web-search` 拆分 `config/search/fetch/concurrency`、`link` 拆分 `types/config/net/card/guards/state/display` 并把 `link.ts` 更名 `protocol.ts`，两侧 `logic.ts` 改为 barrel（跨功能引用仍只走 `logic.ts`）。
+2. `context` 的 `before_agent_start` 补全压力分档（75%/90%）+ 委派/效率建议；重启提示改为**静态文本**（移除精确 token 数值，遵守"注入禁止精确数值"的缓存纪律）。
+3. `scripts/knowledge-ingest.mjs` 改为基于 `import.meta.url` 解析 ROOT 的可移植实现，条目 `environments:['all']` 跨设备可见；正式入库，脚本数 18→19。
+4. 新增 `deploy/systemd/pi-searxng.service`（原生 venv 托管）；`deploy/tmux`（终端配置）与 `pi-whisper.service` 按每环境独立/语音暂缓的既有口径不迁移。
+5. Best-of-N 的 LLM 集成不迁移：原项目 `judgeCandidates` 为随机占位、`bestOfN` 依赖外部编排；纯评分逻辑（parseJudgeScores/selectBest/shouldVerify）已在 `autopilot/run/verifier` 迁移。
+6. `docs-check.mjs`/`docs-freshness.mjs` 不迁移：与本仓库 `check-doc-links.mjs` 重叠，且其"元信息表/目录导航"模板与本项目文档风格不符，会产生大量误报。
+**理由**：在不引入 vendor 核心补丁风险的前提下完成目录模块化与闭环；未能闭环或属环境专属的项以决策记录明确边界。

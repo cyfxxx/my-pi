@@ -1,0 +1,26 @@
+[Unit]
+Description=my-pi SearXNG metasearch engine (native venv)
+Documentation=https://github.com/cyfxxx/my-pi
+# 等待网络就绪（WSL 重启时网卡初始化晚，避免 bind 失败）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 原生安装目录；用 scripts/setup-external.sh web 安装后即 /opt/searxng。
+# 如需自定义：sudo mkdir -p /etc/systemd/system/pi-searxng.service.d
+#             printf '[Service]\nEnvironment=SEARXNG_HOME=/your/path\n' > override.conf
+Environment=SEARXNG_HOME=/opt/searxng
+Environment=SEARXNG_SETTINGS_PATH=/opt/searxng/settings.yml
+Environment=SEARXNG_DEBUG=0
+Environment=PYTHONPATH=/opt/searxng
+WorkingDirectory=/opt/searxng
+# 与 scripts/setup-external.sh web 一致（wsgi、127.0.0.1:8889、2 worker）
+ExecStart=/opt/searxng/venv/bin/uvicorn searx.webapp:app --interface wsgi --host 127.0.0.1 --port 8889 --workers 2
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

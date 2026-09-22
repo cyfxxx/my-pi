@@ -64,7 +64,7 @@ import {
 import { snapshotBeforeCompact } from './budget/compression';
 import { appendUsage } from './usage-stats';
 
-export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE };
+
 
 export function register(pi: ExtensionAPI): void {
   const toolState = createToolLifecycleState();

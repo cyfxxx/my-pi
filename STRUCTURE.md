@@ -11,8 +11,9 @@ my-pi/
 ├── portable/            # my-pi 的运行时数据/配置（所有用户数据收敛于此，无 .pi 目录）
 ├── packs/               # 外部技能包仓库（迁移自 pi-tools，按需读取，不注入系统提示词）
 ├── docs/                # 项目文档（使用/开发/运维）
+├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 18 个运维脚本
+├── scripts/             # 19 个运维脚本
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -46,7 +47,7 @@ my-pi 的自定义代码。三层结构：
 - `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`（原子写）、`net-guard.ts`（SSRF 防护）
 - `features/`：每个功能必须包含 `logic.ts`（纯逻辑出口/barrel，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）；`__tests__/` 为 vitest 单测
   - 小功能直接把模块铺在功能根目录（如 `web-search/logic.ts`、`browser/impl.ts`）
-  - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`
+  - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`
   - 子包内互引用用相对路径；跨功能引用只走对方 `logic.ts`
 - `bootstrap.ts`：入口，组装所有功能
 - 另有 `package.json`、`tsconfig.json`（工作区与编译配置），`dist/`（构建产物，gitignored）
@@ -81,9 +82,10 @@ my-pi 的自定义代码。三层结构：
 - `001-branding.patch`：品牌化（`package.json` name/piConfig）
 - `002-local-pi-mods.patch`：本地 pi 源码改动（config 项目级 `.pi` 发现、secrets 脱敏、Google TOO_MANY_TOOL_CALLS、离线跳过 model-data 校验、tsconfig 排除 src/custom、packages/README）
 - `003-tab-completion-fix.patch`：`handleTabCompletion` 斜杠命令上下文统一走 `handleSlashCommandCompletion()`，使子命令参数补全在 Tab 时可见
+- `004-footer-tweaks.patch`：TUI footer 四项调整（实时上下文 token、双指标着色、CH 实时/会话命中率、`Σ/↑/↓` 字段与 `¥` 成本、>40% `⚠` 重启提示）
 
 ### `scripts/`
-共 18 个运维脚本：
+共 19 个运维脚本：
 
 - `build.sh`：构建 vendor/pi（vendor 缺失时自动引导）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `dev.sh`：开发模式运行
@@ -99,6 +101,7 @@ my-pi 的自定义代码。三层结构：
 - `pi-supervisor.sh` / `pi-source-build.sh`：崩溃自愈外壳与源码缓存构建
 - `daily-health.mjs`：每日健康检查（命中率/记忆库/种子失配/守门脏改）
 - `knowledge-fetch.py`：知识源抓取（落 `portable/memory/knowledge/`）
+- `knowledge-ingest.mjs`：知识订阅入库（零 LLM，`storeEntry` 内置去重）
 - `tool-stats-sync.mjs`：工具使用统计汇总（`usage.jsonl` → 跨设备计数）
 - `task-summarizer.mjs`：任务记录批量总结（游标聚合 → digest，`--spawn` 可选入库）
 

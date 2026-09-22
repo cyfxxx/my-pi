@@ -656,3 +656,12 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 新增 `context/budget/task-gate.ts`：环境常量（绝对阈值/重启阈值/压缩冷却/任务门开关）、`readEnvRatio`、`resolveContext`（真实 usage → provider token 回退）、`hasBackgroundTask`（读 tmux registry，按 `PI_SESSION_ID` 归属 + tmux 存活判定）。
 - `context/index.ts`：turn_end 改用 `resolveContext` 并加背景任务门；`compactDecider` 注入环境比例/绝对阈值/冷却；回合开始超 `RESTART_TOKENS` 注入"先 /compact 再重启"提示。
 - 新增 `task-gate.test.ts`（7 用例），context 套件 105 用例通过。
+
+## 自动化整理批次（第 40 批，自主执行）
+- 完成时间：2026-09-22
+- 目录子包化：`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`，两侧 `logic.ts` 改 barrel（golden/iso 通过）。
+- 系统提示补全：压力分档 + 委派/效率建议；重启提示改静态（缓存友好）；移除 `context/index.ts` 冗余 re-export。
+- 新增 `deploy/systemd/pi-searxng.service` 与 `deploy/README.md`。
+- `scripts/knowledge-ingest.mjs` 可移植化 + `environments=['all']`，正式入库（脚本数 18→19）；`packs/knowledge-fetch/EXPERIENCE.md` 入库并勾选待办。
+- 文档同步：`STRUCTURE.md`/`AGENTS.md` 更新子包列表、deploy、脚本数、补丁 004。
+- 测试：28 文件 297 用例；golden 七项全绿。
