@@ -52,6 +52,22 @@ audit() {
 
 snippet() { [ -f "$1" ] && tail -3 "$1" | tr '\n' ' ' | cut -c1-160 || echo ""; }
 
+# ── admin state（重启/切换会话请求，由 admin_* 工具写入）──
+export PI_ADMIN_STATE_FILE="${PI_ADMIN_STATE_FILE:-$AGENT_DIR/autopilot/state.json}"
+ADMIN_STATE_FILE="$PI_ADMIN_STATE_FILE"
+ACT=""; TARGET=""
+read_admin_action() {
+  ACT=""; TARGET=""
+  [ -f "$ADMIN_STATE_FILE" ] || return 0
+  local out
+  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang"].includes(s.action);process.stdout.write(ok?(s.action+"\t"+(s.targetSession||"")):"")}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
+  ACT="${out%%$'\t'*}"
+  case "$out" in *$'\t'*) TARGET="${out#*$'\t'}" ;; *) TARGET="" ;; esac
+}
+clear_admin_action() {
+  node -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
+}
+
 # ── 健康检查：核心模块可完整加载（无扩展）──
 health_check() {
   log "健康检查..."
@@ -125,16 +141,34 @@ fi
 RECOVERY_ROUNDS=0
 CONSECUTIVE_FAIL=0
 LAST_CLASS=""
+EXTRA_ARGS=()
 
 while true; do
   log "启动 Pi..."
   CRASH_LOG="/tmp/my-pi-crash-$$.log"
-  node "$CLI" "${ORIG_ARGS[@]}" 2>"$CRASH_LOG"
+  node "$CLI" "${ORIG_ARGS[@]}" "${EXTRA_ARGS[@]}" 2>"$CRASH_LOG"
   EXIT_CODE=$?
 
-  # 正常退出或用户中断：不重启
+  # 正常退出或用户中断：先看 admin state 是否请求重启/切换会话，否则退出
   if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ] || [ "$EXIT_CODE" -eq 143 ]; then
     reset_crash_count
+    read_admin_action
+    case "$ACT" in
+      restart|restart_hang)
+        log "admin 请求重启（$ACT），重新启动..."
+        clear_admin_action
+        EXTRA_ARGS=()
+        continue
+        ;;
+      switch_session)
+        if [ -n "$TARGET" ]; then
+          log "admin 请求切换会话: $TARGET"
+          clear_admin_action
+          EXTRA_ARGS=(--session "$TARGET")
+          continue
+        fi
+        ;;
+    esac
     exit "$EXIT_CODE"
   fi
 

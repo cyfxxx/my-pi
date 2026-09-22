@@ -3,13 +3,16 @@
  *
  * 迁移自 pi-tools `agent/extensions/pi-autopilot/{index,commands,tools}.ts`（核心）。
  * 提供任务调度存储/策略/遥测/失败自愈判定，`/auto` 与 `/schedule` 命令。
- * 后台执行循环/watchdog/verifier/seeds/notifications 已实现；未迁移：sessions（会话切换编排）与 Best-of-N 的 LLM 集成。
+ * 后台执行循环/watchdog/verifier/seeds/notifications/sessions 已实现；未迁移：Best-of-N 的 LLM 集成。
+ * 会话切换/重启：admin_* 工具写 portable/agent/autopilot/state.json，由 scripts/pi-supervisor.sh 消费后以 --session 重拉。
  */
 
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand, sendMessage } from '../../adapters/ui-adapter';
+import { listSessions, resolveSession } from '../../adapters/session-adapter';
+import { formatSessionList } from './store/sessions';
 import { syncSeedTasks } from './store/seeds';
 import { collectUnread, formatSummary, writeSeenTs } from './store/notifications';
 import {
@@ -28,6 +31,7 @@ import {
   currentModel,
   isLocalModel,
   readState,
+  writeRestartRequest,
   readTasks,
   listTasks,
   addTask,
@@ -113,6 +117,58 @@ export function register(pi: ExtensionAPI): void {
       const plan = planFailover(c.fallbackModels, cm.provider, cm.model);
       if (!plan.target) return `无法转移: ${plan.reason}`;
       return executeFailover(plan.target, plan.reason, !(args.execute === true));
+    },
+  });
+
+  // ── 工具：会话列表/切换、重启（admin 组）──
+  registerTool(pi, {
+    name: 'admin_list_sessions',
+    description: '列出会话文件（可按工作目录过滤），按修改时间倒序。',
+    parameters: {
+      cwd: { type: 'string', description: '工作目录（可选），不传时列出全部会话', optional: true },
+    },
+    execute: async (args) => {
+      const cwd = typeof args.cwd === 'string' && args.cwd.trim() ? args.cwd.trim() : undefined;
+      const rows = await listSessions(cwd);
+      return cwd && rows.length === 0 ? `(未找到会话 在 ${cwd})` : formatSessionList(rows);
+    },
+  });
+
+  registerTool(pi, {
+    name: 'admin_switch_session',
+    description: '切换到指定会话文件（按 sessionId 前缀或路径）。将写入重启请求并由 supervisor 以 --session 重新启动。',
+    parameters: {
+      target: { type: 'string', description: '会话 ID（支持前缀匹配）或 .jsonl 文件路径' },
+      reason: { type: 'string', description: '切换原因（可选）', optional: true },
+    },
+    execute: async (args, ctx) => {
+      const target = String(args.target ?? '').trim();
+      if (!target) return '缺少 target（会话 ID 前缀或路径）。';
+      const session = await resolveSession(target);
+      if (!session) return `未找到匹配的会话: ${target}`;
+      if (!ctx?.hasUI) {
+        return '无 UI 环境禁止直接切换会话（会重启 Agent）。请在 TUI 会话中执行，或设置 PI_AUTOPILOT_ALLOW_HEADLESS=1 显式放行。';
+      }
+      const confirmed = await ctx.confirm?.('切换会话', `将切换到会话 ${session.id}，需要重启 Agent。是否继续？`);
+      if (!confirmed) return '已取消会话切换';
+      const reason = typeof args.reason === 'string' ? args.reason : undefined;
+      writeRestartRequest('switch_session', { targetSession: session.path, reason: reason || `切换到会话 ${session.id}` });
+      ctx.shutdown?.();
+      return `正在切换到会话 ${session.id}...`;
+    },
+  });
+
+  registerTool(pi, {
+    name: 'admin_restart',
+    description: '重启 Agent 程序（写重启请求，由 supervisor 重新拉起；当前会话会自动保存）。如不需要重启请拒绝调用。',
+    parameters: {
+      reason: { type: 'string', description: '重启原因（可选）', optional: true },
+    },
+    execute: async (args, ctx) => {
+      const reason = typeof args.reason === 'string' ? args.reason : undefined;
+      writeRestartRequest('restart', { reason: reason || '手动重启' });
+      ctx?.shutdown?.();
+      return '已提交重启请求，Agent 即将重启。';
     },
   });
 

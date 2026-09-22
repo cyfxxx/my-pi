@@ -340,3 +340,8 @@
 **背景**：NEW 已有 token 预算截断（`budget.pruneToolOutput`），但缺 pi-tools `tool-truncation.ts` 的两项确定性健康逻辑：同一工具连续失败 3 次的熔断提示，以及错误输出的重复行折叠/超长行截断；且 `tool_result` 钩子此前截断后只返回单个 text 块，会丢弃图片等非文本块。
 **决策**：新增 `context/budget/tool-health.ts`（`updateFailStreak`/`dehydrateErrorOutput`/`rebuildTextContent`），在 `tool_result` 钩子接线：失败计数→熔断提示、错误脱水、`rebuildTextContent` 原位回写文本并保留非文本块。不迁移 ORIG 的字节级 `truncateToolContent`（与 token 预算截断重复）。
 **理由**：逐工具 `pruneToolOutput` 与中心钩子互补；熔断/脱水是低成本的无效重试抑制与 token 收敛；修复丢块是明确缺陷。
+
+### [2026-09-22] 迁移 autopilot 会话列表/切换与 admin 重启
+**背景**：pi-tools `pi-autopilot/sessions.ts` + `admin_*` 工具（列表/切换会话/重启）未迁移；NEW 的 admin state（`writeRestartRequest`）此前只写无人消费，且 `tool-adapter` 不向工具透传 ctx，无法做 UI 确认/主动关机。
+**决策**：① `tool-adapter` 增加 `ToolExecuteContext`（hasUI/confirm/notify/shutdown）并从 Pi ctx 提取；② 新增 `adapters/session-adapter.ts` 封装 vendor `SessionManager.list/listAll`（替代 ORIG 手写文件扫描，拿到 cwd/messageCount 等结构化字段）；③ `autopilot/store/sessions.ts` 纯格式化；④ autopilot 注册 `admin_list_sessions`/`admin_switch_session`/`admin_restart`（名称与 ORIG 一致，落入 admin 休眠组/核心）；⑤ `pi-supervisor.sh` 正常退出时消费 admin state，`restart` 重拉、`switch_session` 以 `--session <path>` 重拉并清理请求。
+**理由**：会话编排是 autopilot 运维核心；用 vendor 结构化 API 比手写扫描更稳；supervisor 消费请求是让 admin 工具真正生效的最后一环。

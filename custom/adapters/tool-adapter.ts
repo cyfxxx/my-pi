@@ -25,13 +25,26 @@ export interface ToolParameter {
 }
 
 /**
+ * 暴露给工具实现的运行时上下文（Pi ExtensionContext 的稳定子集）。
+ * features 的 index.ts 可用它做 UI 确认 / 主动关机 / 读取环境，不直接接触 Pi 类型。
+ */
+export interface ToolExecuteContext {
+  /** 是否处于交互 UI（headless 时为 false/undefined） */
+  hasUI?: boolean;
+  confirm?: (title: string, message: string) => Promise<boolean>;
+  notify?: (message: string, level?: string) => void;
+  /** 请求重启/退出（由 supervisor 消费 admin state 后决定是否重拉） */
+  shutdown?: () => void;
+}
+
+/**
  * 我们对工具的定义，与 Pi 的 API 解耦
  */
 export interface ToolDefinition {
   name: string;
   description: string;
   parameters: Record<string, ToolParameter>;
-  execute: (args: Record<string, unknown>) => Promise<string>;
+  execute: (args: Record<string, unknown>, ctx?: ToolExecuteContext) => Promise<string>;
   /** 可选：TUI 渲染回调（透传给 Pi；theme/context 不透明） */
   renderCall?: (args: Record<string, unknown>, theme: unknown, context: unknown) => unknown;
   renderResult?: (
@@ -68,6 +81,25 @@ function buildParameterSchema(parameters: Record<string, ToolParameter>): TSchem
   return Type.Object(properties, { additionalProperties: false });
 }
 
+/** 由 Pi 的 ExtensionContext 提取稳定子集（缺项安全降级） */
+function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
+  if (!piCtx || typeof piCtx !== 'object') return undefined;
+  const c = piCtx as {
+    hasUI?: boolean;
+    shutdown?: () => void;
+    ui?: {
+      confirm?: (title: string, message: string) => Promise<boolean>;
+      notify?: (message: string, level?: string) => void;
+    };
+  };
+  return {
+    hasUI: c.hasUI,
+    confirm: typeof c.ui?.confirm === 'function' ? (t, m) => c.ui!.confirm!(t, m) : undefined,
+    notify: typeof c.ui?.notify === 'function' ? (m, l) => c.ui!.notify!(m, l) : undefined,
+    shutdown: typeof c.shutdown === 'function' ? () => c.shutdown!() : undefined,
+  };
+}
+
 /**
  * 将我们的工具定义注册到 Pi
  */
@@ -77,8 +109,14 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
     label: def.name,
     description: def.description,
     parameters: buildParameterSchema(def.parameters),
-    execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-      const result = await def.execute(params);
+    execute: async (
+      _toolCallId: string,
+      params: Record<string, unknown>,
+      _signal?: unknown,
+      _onUpdate?: unknown,
+      piCtx?: unknown,
+    ) => {
+      const result = await def.execute(params, buildExecuteContext(piCtx));
       return {
         content: [{ type: 'text', text: result }],
       };

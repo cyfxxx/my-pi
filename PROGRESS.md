@@ -641,3 +641,12 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - 新增 `context/budget/tool-health.ts`（迁移自 pi-tools `tool-truncation.ts`）：`updateFailStreak`（连续失败 3 次熔断提示，成功清零、逐工具独立）、`dehydrateErrorOutput`（重复行折叠/超长行截断）、`rebuildTextContent`（保留非文本块）。
 - `context/index.ts` 的 `tool_result` 钩子接线：追加熔断/脱水提示；返回内容用 `rebuildTextContent` 原位回写，修复此前只返回单个 text 块导致图片等块丢失的问题。
 - 新增 `tool-health.test.ts`（10 用例），context 套件 101 用例通过。
+
+## autopilot 会话列表/切换 + admin 重启接线（第 38 批）
+- 完成时间：2026-09-22
+- `adapters/tool-adapter.ts`：新增 `ToolExecuteContext`（hasUI/confirm/notify/shutdown），execute 第二参透传给工具实现（此前只传 args）。
+- 新增 `adapters/session-adapter.ts`：封装 vendor `SessionManager.list/listAll` → `SessionRow`，`resolveSession` 按 id 前缀/路径解析。
+- 新增 `autopilot/store/sessions.ts`：`formatSessionList`/`sortByModified`（纯逻辑）。
+- `autopilot/index.ts`：注册 `admin_list_sessions`、`admin_switch_session`（UI 确认 + 写 switch_session 请求 + shutdown）、`admin_restart`；`check-features` 注册面同步。
+- `scripts/pi-supervisor.sh`：正常退出时读取 `portable/agent/autopilot/state.json`（`PI_ADMIN_STATE_FILE`），`restart`/`restart_hang` 重拉、`switch_session` 以 `--session <path>` 重拉，随后清理请求（5 分钟新鲜度窗口）。
+- 测试：autopilot 套件 37 用例；golden 七项全绿。
