@@ -25,6 +25,13 @@ import {
 import { recordTaskRecord } from './budget/task-record';
 import { buildPruneDumpRef, pruneRefsDir, PRUNE_REFS_RETENTION_DAYS } from './budget/prune-dump';
 import {
+  updateFailStreak,
+  dehydrateErrorOutput,
+  rebuildTextContent,
+  DEHYDRATE_HINT,
+  type TextBlockLike,
+} from './budget/tool-health';
+import {
   createState,
   tickThinkingLevel,
   proposeThinkingLevel,
@@ -52,6 +59,8 @@ export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE };
 
 export function register(pi: ExtensionAPI): void {
   const toolState = createToolLifecycleState();
+  // 连续失败熔断计数（进程内存态，成功即清零）
+  const failStreak = new Map<string, number>();
   const compactDecider = makeCompactDecider();
   const autoContinueGate = makeAutoContinueGate();
   let layeringApplied = false;
@@ -307,9 +316,19 @@ export function register(pi: ExtensionAPI): void {
         /* fail-open */
       }
       if (!text) return;
-      const pruned = pruneToolOutput(text, e.toolName ?? 'tool');
-      if (pruned === text) return;
-      return { content: [{ type: 'text', text: pruned }], details: e.details };
+      // 熔断：同一工具连续失败达阈值时追加提示；错误输出先确定性脱水
+      const { hint } = updateFailStreak(failStreak, name, !!e.isError);
+      let out = text;
+      const dehy = dehydrateErrorOutput(out);
+      if (dehy !== undefined) out = dehy + DEHYDRATE_HINT;
+      if (hint) out += hint;
+      const pruned = pruneToolOutput(out, name);
+      if (pruned === out && out === text) return;
+      // 保留非文本块（图片等），原位回写文本（修复此前只返回单个 text 块丢块的问题）
+      const content = Array.isArray(e.content)
+        ? rebuildTextContent(e.content as TextBlockLike[], pruned)
+        : [{ type: 'text' as const, text: pruned }];
+      return { content, details: e.details };
     },
   });
 
