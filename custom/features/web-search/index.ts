@@ -22,14 +22,14 @@ export function register(pi: ExtensionAPI): void {
     execute: async (args) => {
       const query = args.query as string;
       const maxResults = (args.maxResults as number) ?? 5;
-      // 端点解析：SEARXNG_URL > PI_WEB_TOOLKIT_SEARXNG_URL（pi-tools 兼容名）
-      const searxngUrl = resolveSearxngUrl();
-      if (!searxngUrl) {
-        // 未配置本地/远程 SearXNG 时自动降级为免配置 HTTP 搜索（Bing 直连）
-        return `[未配置 SearXNG，已用免配置 HTTP 搜索 fallback；如需本地实例见 scripts/setup-external.sh web]\n\n${await searchDirect(query, maxResults)}`;
-      }
+      // 端点解析：SEARXNG_URL > PI_WEB_TOOLKIT_SEARXNG_URL（pi-tools 兼容名）> 本地默认
+      const searxngUrl = resolveSearxngUrl() || 'http://127.0.0.1:8889';
       const config: SearchConfig = { searxng_url: searxngUrl, timeout: 15000 };
       const result = await searchWeb(config, query, { max_results: maxResults });
+      // SearXNG 不可达/无结果时自动降级为免配置 HTTP 搜索（Bing 直连）
+      if (/^搜索(失败|超时)|^未找到结果/.test(result)) {
+        return `[SearXNG 不可用（${searxngUrl}），已降级 HTTP 搜索]\n\n${await searchDirect(query, maxResults)}`;
+      }
       return result;
     },
   });

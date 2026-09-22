@@ -300,3 +300,13 @@
 **背景**：pi-tools `pi-context/auto-compact-controller.ts` 与 `task-summarizer.mjs` 依赖 `.usage-diag.jsonl`、task-record、thinking-level、warm-prefix、prune-dump 等一整条未迁移的数据/编排链。
 **决策**：本轮只保留已迁移的阈值判定器；快照/任务门控/思考档切换/暖前缀回放与技能草稿流水线暂不迁，在 PROGRESS 记录依赖缺口。
 **理由**：为对齐而引入整条数据链会使改动面远超收益，且与"逻辑可移植则移植、编排依赖则替代或标注"的既有口径一致。
+
+### [2026-09-22] web_search 三层端点解析 + 失败降级
+**背景**：本机无 docker，SearXNG 需原生部署；且所在网络对部分搜索引擎直连受限，SearXNG 可能返回空结果。
+**决策**：端点按 `SEARXNG_URL` → `PI_WEB_TOOLKIT_SEARXNG_URL` → 本地 `127.0.0.1:8889` 解析；当 SearXNG 返回失败/超时/未找到结果时，自动降级为 `web_fetch` 同源 HTTP 搜索（Bing），结果首行注明降级。
+**理由**：搜索是高频能力，本地实例是首选但不应成为单点；降级对用户可见，不静默改变语义。
+
+### [2026-09-22] 外部服务安装位置：SearXNG 用 /opt 而非 portable/
+**背景**：`check-isolation` 规定 `portable/` 不放运行时依赖（node/chromium/ffmpeg 等），且 `portable/` 禁符号链接。
+**决策**：SearXNG 原生装到 `/opt/searxng`（可用 `SEARXNG_HOME` 覆盖），由 `scripts/setup-external.sh web` 管理启动；工具 shim 写入 `portable/agent/bin` 用 exec 脚本而非 `ln -s`。
+**理由**：保持"portable/ 仅运行时数据"的边界与无符号链接约束，同时外部服务可复现安装。

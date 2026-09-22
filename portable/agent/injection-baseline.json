@@ -1,7 +1,7 @@
 {
-  "combined": "8e23a746fc80276ff385e6fb992fc02b38b554a2cb07f1fe7e53953046878c7f",
+  "combined": "fa0c7651535939c8fc1a260e5f7bfe6e54aa189924ddf3fdd8425b41ae838f3f",
   "files": {
     "portable/agent/APPEND_SYSTEM.md": "fe6fcccbfd15e05ff36b877c4d8c7f26c5445a2fef7a61fd4f9b3bee37b5bc09",
-    "portable/agent/AGENTS.md": "c71dca2c93317a026c32084343ada9fab8338e4e7fe7fa7ae336a8f258579a9a"
+    "portable/agent/AGENTS.md": "8e8a59cca860e50f6111b20b5fc0a57505e53def2e3dda7502a147232939dc3e"
   }
 }

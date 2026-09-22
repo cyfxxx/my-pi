@@ -42,12 +42,24 @@ setup_tmux() {
   else warn "未知包管理器，请手动安装 tmux"; fi
 }
 
+SEARXNG_HOME="${SEARXNG_HOME:-/opt/searxng}"
+
 setup_searxng() {
   if curl -s --max-time 3 http://127.0.0.1:8889/ >/dev/null 2>&1; then ok "SearXNG 已在 127.0.0.1:8889 运行"; return; fi
+  # 优先使用已原生安装的实例（无 docker 环境）
+  if [ -x "$SEARXNG_HOME/venv/bin/uvicorn" ]; then
+    info "启动本地 SearXNG（$SEARXNG_HOME）..."
+    ( cd "$SEARXNG_HOME" && SEARXNG_SETTINGS_PATH="$SEARXNG_HOME/settings.yml" \
+        setsid ./venv/bin/uvicorn searx.webapp:app --interface wsgi --host 127.0.0.1 --port 8889 \
+        </dev/null >>"$SEARXNG_HOME/searxng.log" 2>&1 & )
+    sleep 8
+    if curl -s --max-time 5 http://127.0.0.1:8889/ >/dev/null 2>&1; then ok "SearXNG 已启动（127.0.0.1:8889）"; else warn "SearXNG 启动失败，见 $SEARXNG_HOME/searxng.log"; fi
+    return
+  fi
   local runner=""
   command -v docker >/dev/null 2>&1 && runner=docker
   [ -z "$runner" ] && command -v podman >/dev/null 2>&1 && runner=podman
-  if [ -z "$runner" ]; then warn "未找到 docker/podman；无法自动启动 SearXNG"; info "参考 README「外部服务安装」或 docs/FAQ.md"; return; fi
+  if [ -z "$runner" ]; then warn "未找到 docker/podman 或本地 $SEARXNG_HOME；无法自动启动 SearXNG"; info "执行 $0 web 查看原生部署步骤"; return; fi
   $runner run -d --name searxng -p 8889:8080 searxng/searxng >/dev/null 2>&1 \
     && ok "SearXNG 容器已启动（8889）" \
     || warn "SearXNG 启动失败（容器名冲突？先 $runner rm -f searxng）"
@@ -82,8 +94,8 @@ status() {
 # SearXNG 原生部署（无 docker/podman 时，Termux/Linux 可用）
 setup_web() {
   if curl -s --max-time 3 http://127.0.0.1:8889/ >/dev/null 2>&1; then ok "SearXNG 已在 127.0.0.1:8889 运行"; return; fi
-  if have docker || have podman; then setup_searxng; return; fi
-  warn "无 docker/podman，提供原生 SearXNG 部署步骤（需网络与 python3）"
+  if have docker || have podman || [ -x "$SEARXNG_HOME/venv/bin/uvicorn" ]; then setup_searxng; return; fi
+  warn "无 docker/podman 且未原生安装，提供原生 SearXNG 部署步骤（需网络与 python3）"
   info "git clone --depth 1 https://github.com/searxng/searxng /opt/searxng"
   info "python3 -m venv /opt/searxng/venv && /opt/searxng/venv/bin/pip install -e /opt/searxng"
   info "SEARXNG_SETTINGS_PATH=/opt/searxng/searx/settings.yml /opt/searxng/venv/bin/uvicorn searx.webapp:app --interface wsgi --host 127.0.0.1 --port 8889"

@@ -574,3 +574,14 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - **daily-health 适配迁移**：新增 `scripts/daily-health.mjs`（确定性零 LLM）：24h 缓存命中率（`portable/memory/context/usage.jsonl`）、记忆库体积/条目、种子-任务失配、守门脚本未提交改动 → `结论=ok|alert`，追加 `portable/memory/logs/daily-health.log`；`scripts/scheduled-seeds.json` 重新加入 daily-health 种子。
 - **未迁移（记录口径）**：task-metrics/lesson-miner 的脚本版依赖 pi-tools `.usage-diag.jsonl`/`tool-events.jsonl`（NEW 无该数据源；教训挖掘已由 `/memory mine` 承载）；task-summarizer 批量取决于未迁移的 task-record→SKILL 草稿流水线；auto-compact 的压缩前快照/任务门控/思考档切换/暖前缀回放是耦合子系统，当前只迁了阈值判定器。以上如需再单独评估。
 - 验证：golden 七项全绿；vitest 21 文件 241 用例；`daily-health.mjs --print` 正常产出结论行。
+
+## 知识订阅迁移 + 外部服务安装（第 29 批）
+- 完成时间：2026-09-22
+- **knowledge-fetch 迁移**：新增 `scripts/knowledge-fetch.py`（迁移自 pi-tools，仅改数据落点：`PI_KNOWLEDGE_DIR` 或 `portable/memory/knowledge`），12 个官方源/RSS 零 LLM 抓取，标题 hash 去重；实测产出当日 `2026-09-22.md`（36 条）。`packs/knowledge-fetch` 技能已在库。`scheduled-seeds.json` 重新加入 `knowledge-subscribe` 种子（路径已改 NEW）。
+- **web_search 降级增强**：端点解析为 `SEARXNG_URL` > `PI_WEB_TOOLKIT_SEARXNG_URL` > 本地默认 `http://127.0.0.1:8889`；当 SearXNG 返回"失败/超时/未找到结果"时自动降级为免配置 HTTP 搜索（Bing），并在结果首行注明。
+- **外部服务安装（本机）**：
+  - `espeak-ng` 已 apt 安装（语音 TTS fallback 可用，`voice` 走 espeak-ng）
+  - SearXNG **原生安装并运行**：`/opt/searxng`（git clone + venv + `pip install -e .`），`settings.yml` 开启 json 格式，`uvicorn` 监听 `127.0.0.1:8889`（`setup-external.sh web` 可启动；本机搜索引擎直连受限时 web_search 自动降级）
+  - `setup-external.sh web` 优先复用 `/opt/searxng` 原生实例，`fd-rg` 用 exec shim
+- **仍未迁移**：`tool-stats-daily` 依赖 `tool-stats-sync.mjs`（工具计数聚合），暂不注册；whisper/faster-whisper 与 piper 模型未安装（重型/需模型下载）。
+- 验证：golden 七项全绿；vitest 21 文件 241 用例；SearXNG `/search?format=json` 返回 200。

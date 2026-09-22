@@ -1,7 +1,22 @@
 {
   "version": 1,
-  "note": "跨设备每日任务种子（git 入库共享）：各设备 pi-autopilot 启动/运行中对账，本地缺失同名任务则自动注册；已存在则跳过不覆盖本地修改。修改种子文件后 push，其他设备 pull 后 60s 内自动生效。未迁移的种子（knowledge-subscribe/tool-stats-daily）依赖 pi-tools 的 scripts/knowledge-fetch.py、tool-stats-sync.mjs，my-pi 尚未迁移这些脚本，故暂不注册。",
+  "note": "跨设备每日任务种子（git 入库共享）：各设备 pi-autopilot 启动/运行中对账，本地缺失同名任务则自动注册；已存在则跳过不覆盖本地修改。修改种子文件后 push，其他设备 pull 后 60s 内自动生效。未迁移的种子（tool-stats-daily）依赖 pi-tools 的 tool-stats-sync.mjs，my-pi 尚未迁移，故暂不注册。",
   "tasks": [
+    {
+      "name": "knowledge-subscribe",
+      "type": "cron",
+      "schedule": "20 8 * * *",
+      "prompt": "执行每日知识订阅（零 LLM 流程，渠道见 scripts/knowledge-fetch.py 与 packs/knowledge-fetch）：1) 运行 python3 scripts/knowledge-fetch.py 抓取各源最新内容；2) 若当日有新内容（portable/memory/knowledge/{{date}}.md），筛选 3-5 条真正有价值的条目（时效强/漏洞/重大新闻，排除过时教程与多源冗余），memory_search 查重后逐条 memory_store；3) 收尾写 portable/memory/knowledge/summary-{{date}}.md 概要（来源+一句话要点，无新内容则如实说明）；4) 将当日结果写入 portable/memory/daily-results/{{date}}-knowledge-<本机hostname>.md（3-5 行：新增条数与分区分布、入库条目标题、summary 路径；无新增也写一行'无新增'），git add 该文件 commit（message: 'knowledge: {{date}}'）后 push（推送冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。【提醒】需要修改订阅渠道/排查订阅不触发/调整过滤规则时，使用 packs/knowledge-fetch 技能。",
+      "useSubagent": true,
+      "notifyMain": true,
+      "waitForUserOnLocal": true,
+      "maxRunTime": 900,
+      "retries": 1,
+      "tags": [
+        "daily",
+        "knowledge"
+      ]
+    },
     {
       "name": "daily-review",
       "type": "cron",
