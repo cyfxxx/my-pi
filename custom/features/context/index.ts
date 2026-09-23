@@ -53,6 +53,7 @@ import {
 import { pruneToolResults, sweepPruneRefs } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
+import { createSpeedTracker, formatSpeed } from './budget/token-speed';
 import {
   ABSOLUTE_TOKENS,
   RESTART_TOKENS,
@@ -87,6 +88,8 @@ export function register(pi: ExtensionAPI): void {
   let compactedThisSettlement = false;
   let thinkState: ThinkLevelState | null = null;
   const thinkingAutoEnabled = process.env.PI_CONTEXT_THINKING_AUTO !== 'off';
+  const speedTracker = createSpeedTracker();
+  let lastSpeedUiAt = 0;
 
   // 注册命令：/context - 上下文预算查看
   registerCommand(pi, 'context', {
@@ -394,6 +397,40 @@ export function register(pi: ExtensionAPI): void {
       autoContinueGate.arm();
       compactDecider.markCompact();
       ctx.compact?.();
+    },
+  });
+
+  // 输出速度：turn_start 计时，message_update 实时估算，turn_end 用真实 output token 结算
+  registerHook(pi, {
+    event: 'turn_start',
+    handler: () => {
+      speedTracker.startTurn(Date.now());
+      lastSpeedUiAt = 0;
+    },
+  });
+
+  registerHook(pi, {
+    event: 'message_update',
+    handler: (event, ctx) => {
+      if (!ctx.hasUI) return;
+      const delta = (event as { assistantMessageEvent?: { type?: string; delta?: string } }).assistantMessageEvent;
+      if (delta?.type !== 'text_delta' && delta?.type !== 'thinking_delta') return;
+      speedTracker.addOutputChars(delta.delta?.length ?? 0);
+      const now = Date.now();
+      if (now - lastSpeedUiAt < 500) return;
+      lastSpeedUiAt = now;
+      const tps = speedTracker.liveSpeed(now);
+      if (tps !== null) ctx.ui.setStatus('tps', formatSpeed(tps));
+    },
+  });
+
+  registerHook(pi, {
+    event: 'turn_end',
+    handler: (event, ctx) => {
+      if (!ctx.hasUI) return;
+      const msg = (event as { message?: { usage?: { output?: number } } }).message;
+      const tps = speedTracker.finishTurn(msg?.usage?.output ?? 0, Date.now());
+      if (tps !== null) ctx.ui.setStatus('tps', formatSpeed(tps));
     },
   });
 

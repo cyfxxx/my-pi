@@ -19,6 +19,7 @@
 | `task-record.ts` | 每轮任务结构记录（JSONL） | `recordTaskRecord`、`loadTaskRecords` |
 | `task-gate.ts` | 压缩门控（背景任务/环境阈值/上下文回退） | `resolveContext`、`hasBackgroundTask`、`readEnvRatio` |
 | `tool-health.ts` | 连续失败熔断 + 错误输出脱水 | `updateFailStreak`、`dehydrateErrorOutput`、`rebuildTextContent` |
+| `token-speed.ts` | 输出速度（tokens/s）跟踪与格式化 | `createSpeedTracker`、`estimateTokensFromChars`、`formatSpeed` |
 
 ## 缓存纪律
 

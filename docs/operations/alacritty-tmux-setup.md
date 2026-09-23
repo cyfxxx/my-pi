@@ -33,7 +33,9 @@
 目标: 安装并优化 Alacritty + tmux。
 职责划分: **Alacritty** 负责界面渲染与基础交互, **tmux** 负责会话持久化与多任务管理。
 
-本节及以下全部配置、wrapper、tmux 插件均属于**本机终端环境**（用户 dotfile 与系统二进制），不属于 my-pi 仓库内容，也不在 `portable/` 目录下。
+本节及以下配置、wrapper、tmux 插件均属于**本机终端环境**（用户 dotfile 与系统二进制），不在 `portable/` 目录下。
+其中 tmux 配置已随仓库分发（`deploy/tmux/`：`tmux.conf`、`tmux-status.sh`、`status-loop.sh`），
+安装方式见 `deploy/README.md`；Alacritty wrapper 仍为本机专属。
 
 ---
 
@@ -136,10 +138,11 @@ shell 内执行 `hash -r` 刷新缓存。
 |---|---|
 | `~/.config/alacritty/alacritty.toml` | Alacritty 界面/字体/键位/回滚 |
 | `/usr/bin/alacritty` (wrapper) | 修复 WSLg Wayland 问题 + 启用 D3D12 GPU 加速 |
-| `~/.tmux.conf` | tmux 键位/状态栏/持久化插件 |
+| `~/.tmux.conf`（或 `~/.config/tmux/tmux.conf`） | tmux 键位/状态栏/持久化插件；由 `deploy/tmux/tmux.conf` 安装生成 |
 | `~/.bashrc` (末尾) | 自动进入 tmux 会话 |
 
-> 以上均为本机 dotfile 或系统路径，不随 my-pi 仓库同步，也不存放在 `portable/` 下。
+> Alacritty wrapper 与 `.bashrc` 为本机 dotfile/系统路径，不随 my-pi 仓库同步；
+> tmux 配置现由 `deploy/tmux/` 分发（安装见 `deploy/README.md`），状态文件落在 `~/.cache/my-pi-tmux`。
 
 ## 五、常用速查
 
