@@ -104,7 +104,9 @@ function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
  * 将我们的工具定义注册到 Pi
  */
 export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
-  const tool: PiToolDefinition = {
+  // 渲染回调的 theme/context 在本适配器内刻意视为不透明，执行器的返回形状也
+  // 由我们保证；故用类型断言桥接，避免引入 Pi 渲染类型的深层依赖。
+  const tool = {
     name: def.name,
     label: def.name,
     description: def.description,
@@ -116,22 +118,15 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
       _onUpdate?: unknown,
       piCtx?: unknown,
     ) => {
-      try {
-        const result = await def.execute(params as Record<string, unknown>, buildExecuteContext(piCtx));
-        return {
-          content: [{ type: 'text', text: result }],
-          details: undefined,
-        };
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        return {
-          content: [{ type: 'text', text: `Tool error: ${msg}` }],
-          details: undefined,
-        };
-      }
+      // 不吞异常：Pi 会捕获抛出的错误并标记 isError，模型才能感知工具失败。
+      const result = await def.execute(params as Record<string, unknown>, buildExecuteContext(piCtx));
+      return {
+        content: [{ type: 'text', text: result }],
+        details: undefined,
+      };
     },
     ...(def.renderCall ? { renderCall: def.renderCall } : {}),
     ...(def.renderResult ? { renderResult: def.renderResult } : {}),
-  };
+  } as unknown as PiToolDefinition;
   pi.registerTool(tool);
 }

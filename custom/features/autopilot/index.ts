@@ -126,7 +126,9 @@ export function register(pi: ExtensionAPI): void {
     },
     execute: async (args) => {
       const cwd = typeof args.cwd === 'string' && args.cwd.trim() ? args.cwd.trim() : undefined;
-      const rows = await listSessions(cwd);
+      const result = await listSessions(cwd);
+      if (!result.success) return `列出会话失败：${result.error ?? '未知错误'}`;
+      const rows = result.data ?? [];
       return cwd && rows.length === 0 ? `(未找到会话 在 ${cwd})` : formatSessionList(rows);
     },
   });
