@@ -7,78 +7,38 @@
  * 未迁移：ctx-lite 旧数据迁移（my-pi 无该历史）。
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import type {
   MemoryEntry,
   MemoryStore,
   MemoryStats,
-  SummaryEntry,
-  SummaryStore,
   MemoryAction,
 } from './types';
-import { getMemoryDir } from '../../../core/config';
 import { writeJSONSync } from '../../../core/atomic-write';
 import { scrubSecrets } from '../../../core/secrets';
+import { dataDir, ensureDir, readStoreFile } from './io';
+import { loadSummaries } from './summaries';
 
-export function dataDir(): string {
-  return process.env.PI_MEMORY_DIR || getMemoryDir();
-}
+export { dataDir };
+export * from './notes';
+export * from './summaries';
+
 export function entriesFile(): string {
   return join(dataDir(), 'entries.json');
-}
-export function notesFile(): string {
-  return join(dataDir(), 'notes.json');
-}
-export function summariesFile(): string {
-  return join(dataDir(), 'summaries.json');
 }
 export function checkpointsDir(): string {
   return join(dataDir(), 'checkpoints');
 }
 
 export const STORE_VERSION = 2;
-export const SUMMARY_VERSION = 1;
 const PRUNE_CONFIDENCE = 0.3;
 const PRUNE_DAYS = 30;
 const PRUNE_RECURRENCE = 2;
 const PRUNE_DAYS_LOW = 60;
-const MAX_SUMMARIES = 50;
-
-function ensureDir(): void {
-  const dir = dataDir();
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-}
-
-function readStoreFile<T>(file: string, kind: string): T | null {
-  try {
-    return JSON.parse(readFileSync(file, 'utf-8')) as T;
-  } catch (err) {
-    if (!existsSync(file)) return null;
-    const isParseError = err instanceof SyntaxError;
-    if (!isParseError) {
-      console.error(`[memory] ${kind} 读取失败（非解析错误，不备份）:`, err instanceof Error ? err.message : err);
-      return null;
-    }
-    backupCorruptFile(file, kind);
-    return null;
-  }
-}
 
 function readEntriesFile(): MemoryStore | null {
   return readStoreFile<MemoryStore>(entriesFile(), 'entries');
-}
-
-function backupCorruptFile(file: string, kind: string): void {
-  try {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backup = `${file}.corrupt-${stamp}`;
-    renameSync(file, backup);
-    console.error(`[memory] ${kind} 存储损坏（${file}）：已备份到 ${backup}，请人工检查恢复。`);
-  } catch (e) {
-    console.error(`[memory] ${kind} 存储损坏（${file}）且备份失败，原文件保持原位：`, e);
-  }
 }
 
 function sanitizeEntry(e: MemoryEntry): MemoryEntry {
@@ -87,24 +47,6 @@ function sanitizeEntry(e: MemoryEntry): MemoryEntry {
     title: scrubSecrets(e.title),
     content: scrubSecrets(e.content),
     tags: (e.tags ?? []).map((t) => scrubSecrets(t)),
-  };
-}
-
-function sanitizeSummary(s: SummaryEntry): SummaryEntry {
-  // 历史/损坏数据可能缺字段：逐字段兜底，避免 getStats/注入路径整体抛错。
-  const list = (v: unknown): string[] =>
-    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map((x) => scrubSecrets(x)) : [];
-  return {
-    ...s,
-    id: typeof s.id === 'string' ? s.id : '',
-    sessionId: typeof s.sessionId === 'string' ? s.sessionId : null,
-    ts: typeof s.ts === 'string' ? s.ts : '',
-    title: scrubSecrets(typeof s.title === 'string' ? s.title : ''),
-    fullText: scrubSecrets(typeof s.fullText === 'string' ? s.fullText : ''),
-    decisions: list(s.decisions),
-    facts: list(s.facts),
-    prefs: list(s.prefs),
-    lessons: list(s.lessons),
   };
 }
 
@@ -184,116 +126,6 @@ function readEntriesRaw(): MemoryEntry[] {
 
 export function activeEntries(entries: MemoryEntry[]): MemoryEntry[] {
   return entries.filter((e) => !e.deleted && !e.supersededBy);
-}
-
-// ── L2 会话摘要 ──
-
-export function loadSummaries(): SummaryEntry[] {
-  ensureDir();
-  const store = readStoreFile<SummaryStore>(summariesFile(), 'summaries');
-  if (!store || !Array.isArray(store.summaries)) return [];
-  return store.summaries.map(sanitizeSummary);
-}
-
-export function saveSummaries(summaries: SummaryEntry[]): void {
-  writeJSONSync(summariesFile(), { version: SUMMARY_VERSION, summaries } satisfies SummaryStore);
-}
-
-export function appendSummary(summary: SummaryEntry): SummaryEntry[] {
-  const all = loadSummaries();
-  const clean = sanitizeSummary(summary);
-  const existing = clean.sessionId ? all.findIndex((s) => s.sessionId === clean.sessionId) : -1;
-  if (existing >= 0) {
-    all[existing] = clean;
-  } else {
-    all.push(clean);
-  }
-  let trimmed = all.length > MAX_SUMMARIES ? all.slice(-MAX_SUMMARIES) : all;
-  try {
-    const fresh = readStoreFile<SummaryStore>(summariesFile(), 'summaries');
-    if (fresh && Array.isArray(fresh.summaries)) {
-      const seen = new Set(trimmed.map((s) => s.sessionId));
-      for (const d of fresh.summaries) {
-        if (d?.sessionId && !seen.has(d.sessionId)) trimmed.push(d);
-      }
-    }
-  } catch {
-    /* 读失败用内存态 */
-  }
-  if (trimmed.length > MAX_SUMMARIES) trimmed = trimmed.slice(-MAX_SUMMARIES);
-  saveSummaries(trimmed);
-  return trimmed;
-}
-
-// ── L0 工作笔记 ──
-
-function rawLoadNotes(): Record<string, string> {
-  return readStoreFile<Record<string, string>>(notesFile(), 'notes') || {};
-}
-
-function rawSaveNotes(notes: Record<string, string>): void {
-  const scrubbed: Record<string, string> = {};
-  for (const [k, v] of Object.entries(notes)) {
-    const cleanKey = k.startsWith('__ttl_') ? k : scrubSecrets(k);
-    scrubbed[cleanKey] = k.startsWith('__ttl_') ? v : scrubSecrets(v);
-  }
-  writeJSONSync(notesFile(), scrubbed);
-}
-
-export function updateNotes<T>(fn: (notes: Record<string, string>) => T): T {
-  const notes = rawLoadNotes();
-  const result = fn(notes);
-  rawSaveNotes(notes);
-  return result;
-}
-
-export function loadNotes(): Record<string, string> {
-  ensureDir();
-  const notes = rawLoadNotes();
-  const now = Date.now();
-  for (const key of Object.keys(notes)) {
-    const ttlKey = `__ttl_${key}`;
-    const ttl = notes[ttlKey];
-    if (ttl && new Date(ttl).getTime() <= now) {
-      delete notes[key];
-      delete notes[ttlKey];
-    }
-  }
-  return notes;
-}
-
-export function saveNotes(notes: Record<string, string>): void {
-  rawSaveNotes(notes);
-}
-
-/**
- * 删除已过期（TTL 到期）的工作笔记并落盘，返回删除条数。
- * loadNotes 只在内存视图中过滤，不会持久化；清理命令走这里才真正生效。
- */
-export function purgeExpiredNotes(): number {
-  const notes = rawLoadNotes();
-  const now = Date.now();
-  let removed = 0;
-  for (const key of Object.keys(notes)) {
-    const ttl = notes[`__ttl_${key}`];
-    const expires = ttl ? new Date(ttl).getTime() : NaN;
-    if (Number.isFinite(expires) && expires <= now) {
-      delete notes[key];
-      delete notes[`__ttl_${key}`];
-      removed++;
-    }
-  }
-  if (removed > 0) rawSaveNotes(notes);
-  return removed;
-}
-
-export function clearCompactionFlag(): void {
-  updateNotes((notes) => {
-    if (notes['_ctx.just_compacted']) {
-      delete notes['_ctx.just_compacted'];
-      delete notes['_ctx.compacted_at'];
-    }
-  });
 }
 
 export function getTotalSize(entries: MemoryEntry[]): number {

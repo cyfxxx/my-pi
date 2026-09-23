@@ -12,7 +12,10 @@
 | 文件 | 职责 |
 |------|------|
 | `index.ts` | 注册工具；输出截断标记 |
-| `logic.ts` | 全部逻辑：配置/注册表/会话探测/启动/读取/等待/清理 |
+| `logic.ts` | 纯逻辑 barrel |
+| `config.ts` | 配置/会话名/日志路径（`loadTmuxConfig`、`normalizeSessionName`） |
+| `session.ts` | tmux CLI 封装：探测/启动/读取/发送/等待 |
+| `registry.ts` | 会话注册表与 shutdown 清理 |
 
 ## 数据与配置（`portable/memory/`）
 
@@ -31,4 +34,5 @@
 ## 相关
 
 - 背景任务判定：`context/budget` 的 `hasBackgroundTask` 会只读本功能的注册表文件。
-- tmux 终端部署：[../../docs/operations/alacritty-tmux-setup.md](../../../docs/operations/alacritty-tmux-setup.md)
+- 终端配置（键位/状态栏）：`deploy/tmux/`，安装见 [../../../deploy/README.md](../../../deploy/README.md)。
+- tmux 终端部署：[../../../docs/operations/alacritty-tmux-setup.md](../../../docs/operations/alacritty-tmux-setup.md)
