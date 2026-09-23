@@ -50,6 +50,9 @@ portable/agent/*
 # 子代理角色目录（pi 的 agentDir/agents，随仓库分发）
 !portable/agent/agents/
 !portable/agent/agents/**
+# 模式人设目录（--append-system-prompt 追加文件，随仓库分发）
+!portable/agent/modes/
+!portable/agent/modes/**
 portable/memory/*
 !portable/memory/.gitkeep
 # 工具使用计数（跨设备共享的精简聚合，几 KB；原始 usage.jsonl 仍不入库）
@@ -65,6 +68,9 @@ data/plans/
 
 # 备份目录
 *.bak.*
+
+# 加密同步的本地备份（密文与清单仍入库）
+sync/.local-backup-*.tgz
 
 # vendor/pi 独立 git 仓库（上游 pi 源码，不纳入主仓库）
 vendor/pi/

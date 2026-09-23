@@ -1,8 +1,9 @@
 /**
  * Mode Feature — 入口（只通过 adapters 与 Pi 交互）
  *
- * 迁移自 pi-tools `agent/extensions/pi-mode/{index,commands}.ts`。
- * 模式配置读写 portable/agent/modes.json；运行时改思考级别，其余变更需重启。
+ * 模式 = 启动档位：功能白名单 / 思考档位 / 人设追加 / 记忆命名空间。
+ * full、minimal 为代码内固定的锁定模式；roleplay 等自定义模式在 modes.json。
+ * 功能与人设变更需重启（由 supervisor 消费 modes.json 后重拉），思考档位即时生效。
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
@@ -16,8 +17,11 @@ import {
   setCurrentMode,
   listModeNames,
   getDefaultMode,
+  isLockedMode,
+  resolveEffectiveMode,
+  getEffectiveModeConfig,
   applyModeRuntime,
-  needsRestart,
+  modeFeaturesLabel,
 } from './logic';
 
 const MODE_HELP = `用法:
@@ -26,19 +30,19 @@ const MODE_HELP = `用法:
   /mode <name>       切换到指定模式
   /mode help         显示本帮助
 
-可用模式:
-  full    完整模式 - 所有扩展和技能可用
-  light   轻量模式 - 只保留搜索、计划模式和基础工具
-  quick   极简模式 - 只保留内置工具，无扩展无技能
+模式:
+  full      完整模式 - 全部功能（开发项目，固定）
+  minimal   极简模式 - 仅内置工具（测试/修复，固定）
+  roleplay  角色扮演 - 仅 web-search + 隔离记忆（自定义）
 
 注意:
-  扩展/技能/系统提示词变更需要重启 pi 才能生效。
-  思考级别可立即生效。
-
-自定义模式:
-  编辑 portable/agent/modes.json 添加自定义模式配置。`;
+  功能 / 人设 / 记忆命名空间的变更需重启 pi 才能生效；思考档位可立即生效。
+  自定义模式在 portable/agent/modes.json 中维护（full/minimal 由代码锁定）。`;
 
 export function register(pi: ExtensionAPI): void {
+  const activeMode = resolveEffectiveMode();
+  const activeConfig = getEffectiveModeConfig();
+
   registerCommand(pi, 'mode', {
     description: '查看/切换当前模式',
     getArgumentCompletions: (prefix) => {
@@ -66,11 +70,11 @@ export function register(pi: ExtensionAPI): void {
         const modes = loadModes();
         const lines: string[] = ['可用模式:', ''];
         for (const [name, config] of Object.entries(modes.modes)) {
-          const current = name === modes.current ? ' (当前)' : '';
-          const extCount = config.extensions.filter((e) => !e.startsWith('!')).length;
-          const skillCount = config.skills.filter((s) => !s.startsWith('!') && !s.startsWith('-')).length;
-          lines.push(`  ${name}${current}: ${config.description}`);
-          lines.push(`    覆盖: ${extCount} 扩展, ${skillCount} 技能${needsRestart(config) ? ' [需重启]' : ''}`);
+          const marks: string[] = [];
+          if (name === modes.current) marks.push('当前');
+          if (isLockedMode(name)) marks.push('固定');
+          lines.push(`  ${name}${marks.length ? ` (${marks.join('/')})` : ''}: ${config.description}`);
+          lines.push(`    ${modeFeaturesLabel(config)}`);
         }
         lines.push('', '使用 /mode <name> 切换模式');
         ctx.ui.notify(lines.join('\n'), 'info');
@@ -81,7 +85,7 @@ export function register(pi: ExtensionAPI): void {
         const currentName = getCurrentMode();
         const config = getModeConfig(currentName);
         ctx.ui.notify(
-          `当前模式: ${currentName}\n描述: ${config?.description || '未知'}\n默认模式: ${getDefaultMode()}\n\n使用 /mode <name> 切换，/mode list 查看全部，/mode help 查看帮助`,
+          `当前模式: ${currentName}\n描述: ${config?.description || '未知'}\n默认模式: ${getDefaultMode()}\n本进程生效: ${activeMode}\n\n使用 /mode <name> 切换，/mode list 查看全部，/mode help 查看帮助`,
           'info',
         );
         return;
@@ -95,7 +99,7 @@ export function register(pi: ExtensionAPI): void {
 
       const currentThinking = getThinkingLevel(pi);
       setCurrentMode(subcmd);
-      const result = applyModeRuntime(config, currentThinking);
+      const result = applyModeRuntime(config, activeConfig, currentThinking);
 
       if (result.thinkingChanged && config.thinking) {
         try {
@@ -107,6 +111,7 @@ export function register(pi: ExtensionAPI): void {
 
       const lines: string[] = [`已切换到模式: ${subcmd}`];
       if (config.description) lines.push(`描述: ${config.description}`);
+      lines.push(modeFeaturesLabel(config));
       if (result.needsRestart) {
         lines.push('', '以下配置将在重启 pi 后生效:');
         for (const change of result.changes) lines.push(`  - ${change}`);
@@ -124,11 +129,8 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'session_start',
     handler: async (_event, ctx) => {
-      const modeName = process.env.PI_AGENT_MODE || getCurrentMode();
-      if (!modeName || modeName === 'full') return;
-      const config = getModeConfig(modeName);
-      if (!config || !ctx.hasUI) return;
-      ctx.ui.notify(`[模式] ${modeName}: ${config.description}`, 'info');
+      if (activeMode === 'full' || !ctx.hasUI) return;
+      ctx.ui.notify(`[模式] ${activeMode}: ${activeConfig.description}`, 'info');
     },
   });
 }

@@ -72,6 +72,17 @@ export function getMemoryDir(): string {
   return envDir ? resolve(envDir) : join(getPortableRoot(), 'memory');
 }
 
+/**
+ * 记忆命名空间（mode 隔离用）。由启动器 / bootstrap 从 modes.json 注入，
+ * 只允许 `[A-Za-z0-9_-]+`，空串表示默认（共享）命名空间。
+ * 仅 memory 功能据此把长期记忆落到 `<memoryDir>/<namespace>/`。
+ */
+export function getMemoryNamespace(): string {
+  const ns = process.env.PI_MEMORY_NAMESPACE;
+  if (!ns) return '';
+  return /^[A-Za-z0-9_-]+$/.test(ns) ? ns : '';
+}
+
 export function getVendorPiDir(): string {
   return join(getProjectRoot(), 'vendor', 'pi');
 }

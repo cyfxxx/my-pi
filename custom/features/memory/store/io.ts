@@ -5,10 +5,14 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
-import { getMemoryDir } from '../../../core/config';
+import { join } from 'node:path';
+import { getMemoryDir, getMemoryNamespace } from '../../../core/config';
 
+/** 记忆数据目录：<memoryDir>[/<namespace>]。命名空间由 mode 隔离注入（roleplay 等）。 */
 export function dataDir(): string {
-  return process.env.PI_MEMORY_DIR || getMemoryDir();
+  const base = process.env.PI_MEMORY_DIR || getMemoryDir();
+  const ns = getMemoryNamespace();
+  return ns ? join(base, ns) : base;
 }
 
 export function ensureDir(): void {

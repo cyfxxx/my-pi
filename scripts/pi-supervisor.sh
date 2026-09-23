@@ -34,6 +34,33 @@ FIX_TIMEOUT="${PI_FIX_TIMEOUT:-240}"
 export PI_CODING_AGENT_DIR="$AGENT_DIR"
 export PI_MEMORY_DIR="$ROOT/portable/memory"
 
+# ── 模式（modes.json）→ 环境与启动参数 ──
+# 每轮启动前重解析：注入记忆命名空间、按模式附加人设（--append-system-prompt）。
+# 功能过滤由 bootstrap.ts 读取同一文件完成；此处不导出 PI_AGENT_MODE，
+# 以免 supervisor 环境把首轮模式固化、导致 /mode 切换后无法刷新。
+MODE_ARGS=()
+apply_mode() {
+  MODE_ARGS=()
+  local out mode ns ap file
+  out=$(node -e '
+const fs=require("fs");
+let mode=process.env.PI_AGENT_MODE||"";
+let ns="",ap="";
+try{
+  const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+  if(!mode) mode=j.current||j.default||"full";
+  const cfg=(j.modes&&j.modes[mode])||null;
+  if(cfg){ ns=cfg.memoryNamespace||""; ap=cfg.appendPrompt||""; }
+}catch(e){ if(!mode) mode="full"; }
+process.stdout.write(mode+"\t"+ns+"\t"+ap);
+' "$AGENT_DIR/modes.json" 2>/dev/null)
+  IFS=$'\t' read -r mode ns ap <<<"$out"
+  export PI_MEMORY_NAMESPACE="$ns"
+  if [ -n "$ap" ] && [ -f "$AGENT_DIR/$ap" ]; then
+    MODE_ARGS=(--append-system-prompt "$AGENT_DIR/$ap")
+  fi
+}
+
 log() { echo "[supervisor] $*" >&2; }
 mkdir -p "$RECOVERY_DIR"
 
@@ -130,7 +157,8 @@ ensure_cache_build() {
 ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" "$@")
 
 if [ "${MY_PI_NO_SUPERVISOR:-0}" = "1" ]; then
-  exec node "$CLI" "${ORIG_ARGS[@]}"
+  apply_mode
+  exec node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}"
 fi
 
 if [ ! -f "$CLI" ]; then
@@ -144,9 +172,10 @@ LAST_CLASS=""
 EXTRA_ARGS=()
 
 while true; do
+  apply_mode
   log "启动 Pi..."
   CRASH_LOG="/tmp/my-pi-crash-$$.log"
-  node "$CLI" "${ORIG_ARGS[@]}" "${EXTRA_ARGS[@]}" 2>"$CRASH_LOG"
+  node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}" "${EXTRA_ARGS[@]}" 2>"$CRASH_LOG"
   EXIT_CODE=$?
 
   # 正常退出或用户中断：先看 admin state 是否请求重启/切换会话，否则退出

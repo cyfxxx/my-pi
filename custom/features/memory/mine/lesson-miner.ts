@@ -7,9 +7,9 @@
  */
 
 import { join } from 'node:path';
-import { getMemoryDir } from '../../../core/config';
 import { readJSONL } from '../../../core/fs-json';
 import { truncateChars } from '../../../core/text';
+import { dataDir } from '../store/io';
 import { computeContentHash } from '../store/storage';
 import type { MemoryEntry, MemoryCategory } from '../store/types';
 
@@ -24,7 +24,7 @@ export interface InterventionRecordLike {
 }
 
 export function interventionsFile(): string {
-  return process.env.PI_INTERVENTIONS_FILE || join(process.env.PI_MEMORY_DIR || getMemoryDir(), 'interventions.jsonl');
+  return process.env.PI_INTERVENTIONS_FILE || join(dataDir(), 'interventions.jsonl');
 }
 
 export function readInterventionRecords(file = interventionsFile()): InterventionRecordLike[] {

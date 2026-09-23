@@ -13,6 +13,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { defineFeature, registerAll } from './core/registry';
+import { resolveEffectiveMode, getEffectiveModeConfig, isFeatureEnabled } from './features/mode/logic';
 import { register as registerWebSearch } from './features/web-search';
 import { register as registerContext } from './features/context';
 import { register as registerLink } from './features/link';
@@ -43,5 +44,14 @@ const FEATURES = [
 ];
 
 export default function bootstrap(pi: ExtensionAPI): void {
-  registerAll(pi, FEATURES);
+  // 模式 = 启动档位：据此过滤注册的功能，并注入记忆命名空间。
+  const mode = resolveEffectiveMode();
+  const config = getEffectiveModeConfig();
+  if (!process.env.PI_AGENT_MODE) process.env.PI_AGENT_MODE = mode;
+  if (config.memoryNamespace && !process.env.PI_MEMORY_NAMESPACE) {
+    process.env.PI_MEMORY_NAMESPACE = config.memoryNamespace;
+  }
+  // mode 功能始终注册（否则极简模式下无法切回）
+  const enabled = FEATURES.filter((f) => f.name === 'mode' || isFeatureEnabled(f.name, config));
+  registerAll(pi, enabled);
 }
