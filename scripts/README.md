@@ -41,6 +41,7 @@
 | `knowledge-ingest.mjs` | 知识订阅入库（零 LLM，`storeEntry` 内置去重） |
 | `tool-stats-sync.mjs` | 工具使用统计汇总（`usage.jsonl` → 跨设备计数） |
 | `task-summarizer.mjs` | 任务记录批量总结（游标聚合 → digest，`--spawn` 可选入库） |
+| `sync-memory.sh` | 长期记忆/选定会话的 age 加密同步（`init/push/pull/status`，密文落 `sync/`） |
 
 ## 相关
 
