@@ -1,0 +1,15 @@
+# my-pi 加密同步清单：每行一个相对仓库根的路径（明文，不会入库）。
+# 长期记忆：
+portable/memory/entries.json
+portable/memory/summaries.json
+portable/memory/notes.json
+# 隔离命名空间记忆（如 roleplay）：
+portable/memory/roleplay/entries.json
+portable/memory/roleplay/summaries.json
+portable/memory/roleplay/notes.json
+# 选定会话（最近 5 条；增删自行编辑，用 bash scripts/sync-memory.sh push 生效）：
+portable/agent/sessions/--root-my-pi--/2026-09-23T04-31-46-987Z_01a0cc88-b729-7618-96c7-534a2718b53a.jsonl
+portable/agent/sessions/--root-my-pi--/2026-09-22T14-22-21-098Z_01a0c97f-09a5-7384-b6bf-c97bee98b49c.jsonl
+portable/agent/sessions/--root-my-pi--/2026-09-22T13-55-45-413Z_01a0c966-b084-7372-891f-b24f71dd63e5.jsonl
+portable/agent/sessions/--root-my-pi--/2026-09-22T13-49-14-744Z_01a0c960-ba77-70ef-9feb-26664bb49022.jsonl
+portable/agent/sessions/--root-my-pi--/2026-09-22T11-46-31-763Z_01a0c8f0-60d2-7488-9c26-a1780125d582.jsonl
