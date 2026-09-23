@@ -48,6 +48,12 @@ export type CustomMessageRenderer<T = unknown> = MessageRenderer<T>;
  * 注册自定义命令
  */
 export function registerCommand(pi: ExtensionAPI, name: string, options: CommandOptions): void {
+  // 检查命令是否已注册，避免静默覆盖
+  const registeredCommands = pi.commands as { isRegistered?: (name: string) => boolean };
+  if (typeof registeredCommands.isRegistered === 'function' && registeredCommands.isRegistered(name)) {
+    throw new Error(`Command '${name}' is already registered`);
+  }
+
   pi.registerCommand(name, {
     description: options.description,
     getArgumentCompletions: options.getArgumentCompletions,
@@ -59,6 +65,12 @@ export function registerCommand(pi: ExtensionAPI, name: string, options: Command
  * 注册键盘快捷键
  */
 export function registerShortcut(pi: ExtensionAPI, shortcut: KeyId, options: ShortcutOptions): void {
+  // 检查快捷键是否已注册，避免静默覆盖
+  const registeredShortcuts = pi.shortcuts as { isRegistered?: (shortcut: KeyId) => boolean };
+  if (typeof registeredShortcuts.isRegistered === 'function' && registeredShortcuts.isRegistered(shortcut)) {
+    throw new Error(`Shortcut '${shortcut}' is already registered`);
+  }
+
   pi.registerShortcut(shortcut, {
     description: options.description,
     handler: options.handler,

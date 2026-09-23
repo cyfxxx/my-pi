@@ -31,6 +31,11 @@ export interface HookHandler {
  * 注册一个钩子
  */
 export function registerHook(pi: ExtensionAPI, hook: HookHandler): void {
+  // 检查 pi.on 是否为函数
+  if (typeof pi.on !== 'function') {
+    throw new TypeError('pi.on is not a function; cannot register hook');
+  }
+
   // Pi 的 on() 是逐事件重载；这里收窄为受约束的 HookEvent，
   // 事件名的有效性由 ExtensionEvent['type'] 在编译期保证。
   const on = pi.on as (event: HookEvent, handler: (event: unknown, ctx: ExtensionContext) => unknown) => void;

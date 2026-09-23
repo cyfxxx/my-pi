@@ -8,7 +8,7 @@
 科技数码、生活热点、重要新闻。渠道与频率可在 SOURCES / 调度处调整。
 """
 import json, urllib.request, urllib.parse, os, sys, re, html, hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # my-pi 适配：运行时数据收敛到 portable/，可用 PI_KNOWLEDGE_DIR 覆盖
@@ -85,7 +85,8 @@ def src_cisa():
 
 
 def src_github():
-    d = json.loads(fetch('https://api.github.com/advisories?updated=%3E2026-01-01'))
+    cutoff = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    d = json.loads(fetch(f'https://api.github.com/advisories?updated=%3E{cutoff}'))
     out = []
     for a in d:
         cid = a.get('cve_id') or a.get('ghsa_id') or ''

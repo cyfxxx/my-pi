@@ -32,7 +32,10 @@ function getPiInvocation(args: string[]): { command: string; args: string[] } {
     return { command: process.execPath, args: [currentScript, ...args] };
   }
   const execName = path.basename(process.execPath).toLowerCase();
-  if (!/^(node|bun)(\.exe)?$/.test(execName)) return { command: process.execPath, args };
+  if (!/^(node|bun)(\.exe)?$/.test(execName)) {
+    // 非 node/bun 时：确保 args 包含脚本路径（即使 currentScript 为空）
+    return { command: process.execPath, args: [...(currentScript ? [currentScript] : []), ...args] };
+  }
   return { command: 'pi', args };
 }
 

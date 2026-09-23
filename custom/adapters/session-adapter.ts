@@ -54,12 +54,27 @@ function toRow(s: PiSessionInfo): SessionRow {
 }
 
 /** 列出会话：给 cwd 时仅该工作目录，否则全部（按修改时间倒序由调用方处理） */
-export async function listSessions(cwd?: string): Promise<SessionRow[]> {
+export interface ListSessionsResult {
+  success: boolean;
+  data?: SessionRow[];
+  error?: string;
+}
+
+/**
+ * 列出会话
+ *
+ * 返回结构化结果，包含成功状态、数据或错误信息。
+ * 调用方可据此区分“正常无会话”与“发生真实错误”。
+ */
+export async function listSessions(cwd?: string): Promise<ListSessionsResult> {
   try {
     const list = cwd ? await SessionManager.list(cwd) : await SessionManager.listAll();
-    return (list as PiSessionInfo[]).map(toRow);
-  } catch {
-    return [];
+    const data = (list as PiSessionInfo[]).map(toRow);
+    return { success: true, data };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Failed to list sessions:', msg);
+    return { success: false, error: msg };
   }
 }
 
@@ -67,7 +82,9 @@ export async function listSessions(cwd?: string): Promise<SessionRow[]> {
 export async function resolveSession(target: string): Promise<SessionRow | null> {
   const t = target.trim();
   if (!t) return null;
-  const all = await listSessions();
+  const result = await listSessions();
+  if (!result.success || !result.data) return null;
+  const all = result.data;
   const byId = all.find((s) => s.id && s.id.startsWith(t));
   if (byId) return byId;
   const byPath = all.find((s) => s.path === t || s.path.endsWith('/' + t));

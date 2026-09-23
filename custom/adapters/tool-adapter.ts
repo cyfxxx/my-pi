@@ -104,7 +104,7 @@ function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
  * 将我们的工具定义注册到 Pi
  */
 export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
-  const tool = {
+  const tool: PiToolDefinition = {
     name: def.name,
     label: def.name,
     description: def.description,
@@ -112,17 +112,26 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
     execute: async (
       _toolCallId: string,
       params: Record<string, unknown>,
-      _signal?: unknown,
+      _signal?: AbortSignal,
       _onUpdate?: unknown,
       piCtx?: unknown,
     ) => {
-      const result = await def.execute(params, buildExecuteContext(piCtx));
-      return {
-        content: [{ type: 'text', text: result }],
-      };
+      try {
+        const result = await def.execute(params as Record<string, unknown>, buildExecuteContext(piCtx));
+        return {
+          content: [{ type: 'text', text: result }],
+          details: undefined,
+        };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          content: [{ type: 'text', text: `Tool error: ${msg}` }],
+          details: undefined,
+        };
+      }
     },
     ...(def.renderCall ? { renderCall: def.renderCall } : {}),
     ...(def.renderResult ? { renderResult: def.renderResult } : {}),
-  } as unknown as PiToolDefinition;
+  };
   pi.registerTool(tool);
 }
