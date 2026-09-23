@@ -13,7 +13,7 @@
 | 技能包 | `packs/` | 外部技能包（按需读取，不注入系统提示词） |
 | 项目文档 | `docs/` | 项目文档（存在时收录） |
 | 跟踪配置 | `portable/agent/settings.json` | 主配置：provider、model、extension 设置、skills 覆盖列表（**注意：属每环境独立项，见"按需包含"**） |
-| 跟踪配置 | `portable/agent/AGENTS.md` | Pi 全局约定（开发规范索引指向此文件） |
+| 跟踪配置 | `portable/agent/AGENTS.md` | Pi 全局约定（开发规范正文，唯一注入的 AGENTS.md） |
 | 跟踪配置 | `portable/agent/APPEND_SYSTEM.md` | 追加系统提示词 |
 | 跟踪配置 | `portable/agent/keybindings.json` | pi 用户级键位配置 |
 | 技能 | `portable/agent/skills/*/` | 所有已安装技能（SKILL.md 及附属文件，如 `references/`） |

@@ -24,7 +24,7 @@ bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
 
 ```text
 组A: README.md/STRUCTURE.md/PROGRESS.md/DECISIONS.md + docs/ —— 对照实际目录树/脚本清单/功能清单/git log
-组B: AGENTS.md + portable/agent/AGENTS.md + APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
+组B: portable/agent/AGENTS.md（唯一注入）+ APPEND_SYSTEM.md —— 对照 custom/features/、package.json scripts、patches/ 清单
 组C: custom/ 各模块注释与文档 vs 源码 —— grep 注册工具名/process.env 读取/配置键
 组D: packs/INDEX.md + packs/*/SKILL.md vs 实际 packs/ 目录
 ```

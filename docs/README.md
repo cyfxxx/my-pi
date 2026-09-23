@@ -50,8 +50,7 @@
 |------|------|
 | [README.md](../README.md) | 项目总览与快速开始 |
 | [STRUCTURE.md](../STRUCTURE.md) | 目录结构说明 |
-| [AGENTS.md](../AGENTS.md) | 开发规范索引 |
-| [../portable/agent/AGENTS.md](../portable/agent/AGENTS.md) | Pi 运行时环境描述、分层架构、关键约定、验证命令 |
+| [../portable/agent/AGENTS.md](../portable/agent/AGENTS.md) | 开发规范与环境描述（唯一注入的 AGENTS.md） |
 | [PROGRESS.md](../PROGRESS.md) | 迁移与架构修复进度 |
 | [DECISIONS.md](../DECISIONS.md) | 架构决策记录 |
 
