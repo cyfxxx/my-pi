@@ -37,6 +37,10 @@ export interface ToolExecuteContext {
   shutdown?: () => void;
   /** 当前会话文件绝对路径（重启时显式传给 supervisor 作 --session，避免续错会话） */
   sessionFile?: string;
+  /** 当前会话实时模型（子代理等据此继承主会话模型；未配置时 features 自行降级） */
+  model?: { id?: string; provider?: string };
+  /** 当前工作目录（缺省时 features 回退 process.cwd()） */
+  cwd?: string;
 }
 
 /**
@@ -89,18 +93,26 @@ function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
   const c = piCtx as {
     hasUI?: boolean;
     shutdown?: () => void;
+    cwd?: string;
+    model?: { id?: string; provider?: string };
     sessionManager?: { getSessionFile?: () => string | undefined };
     ui?: {
       confirm?: (title: string, message: string) => Promise<boolean>;
       notify?: (message: string, level?: string) => void;
     };
   };
+  const model =
+    c.model && (typeof c.model.id === 'string' || typeof c.model.provider === 'string')
+      ? { id: c.model.id, provider: c.model.provider }
+      : undefined;
   return {
     hasUI: c.hasUI,
     confirm: typeof c.ui?.confirm === 'function' ? (t, m) => c.ui!.confirm!(t, m) : undefined,
     notify: typeof c.ui?.notify === 'function' ? (m, l) => c.ui!.notify!(m, l) : undefined,
     shutdown: typeof c.shutdown === 'function' ? () => c.shutdown!() : undefined,
     sessionFile: typeof c.sessionManager?.getSessionFile === 'function' ? c.sessionManager.getSessionFile() : undefined,
+    model,
+    cwd: typeof c.cwd === 'string' ? c.cwd : undefined,
   };
 }
 

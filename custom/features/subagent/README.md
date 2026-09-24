@@ -20,7 +20,18 @@
 
 - 角色定义：`portable/agent/agents/*.md`（frontmatter + 提示词，随仓库分发）。
 - 活跃计划：`portable/memory/plans/<plan>/plan.md`（若存在则并入提示词）。
-- settings.json：读取 provider 配置判断是否本地模型（`currentProviderIsLocal`）。
+- settings.json：仅在拿不到会话实时 provider 时回退读取，判断是否本地模型（`currentProviderIsLocal`）。
+
+## 模型选择
+
+子代理模型优先级（高 → 低），由 `core/runner.ts` 的 `resolveModelId` 解析：
+
+1. 调用级 `model`（工具参数 `model`，或 tasks/chain 每项的 `model`）——主模型可为子任务挑模型；
+2. agent `.md` frontmatter 的 `model:`——角色固定；
+3. 主会话实时模型 `ctx.model`（`provider/id`）——**默认继承**，无则不传；
+4. 都不满足时不传 `--model`，子进程用 settings.json 默认（`freellmapi/auto`）。
+
+`tool-adapter` 从 Pi `ExtensionContext` 提取 `model`/`cwd` 注入 `ToolExecuteContext`；并发上限按会话实时 provider 判定是否本地。
 
 ## 并发与安全
 

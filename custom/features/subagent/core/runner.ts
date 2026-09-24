@@ -13,7 +13,19 @@ import type { SingleResult, SubagentDetails, OnUpdateCallback } from './types';
 import { getFinalOutput, resolveAgentTools, buildAgentPrompt, scheduleKillChain, calculateContextTokens } from './helpers';
 import { getMemoryDir } from '../../../core/config';
 
-function resolveModelId(agentModel: string | undefined, currentModel: { id?: string; provider?: string } | undefined): string | undefined {
+/**
+ * 子代理模型优先级（高 → 低）：
+ *   1. `overrideModel` — 调用级显式指定（主模型可为本次子任务挑模型）
+ *   2. `agentModel`   — agent `.md` frontmatter 的 `model:`（角色固定）
+ *   3. `currentModel` — 主会话实时模型（默认继承）
+ *   4. 都为空 → 不传 `--model`，子进程用 settings.json 默认
+ */
+export function resolveModelId(
+  agentModel: string | undefined,
+  overrideModel: string | undefined,
+  currentModel: { id?: string; provider?: string } | undefined,
+): string | undefined {
+  if (overrideModel) return overrideModel;
   if (agentModel) return agentModel;
   if (currentModel?.id && currentModel?.provider) return `${currentModel.provider}/${currentModel.id}`;
   return undefined;
@@ -71,9 +83,10 @@ export async function runSubprocessAgent(
   onUpdate: OnUpdateCallback | undefined,
   makeDetails: (results: SingleResult[]) => SubagentDetails,
   currentModel?: { id?: string; provider?: string },
+  overrideModel?: string,
 ): Promise<SingleResult> {
   const args: string[] = ['--mode', 'json', '-p', '--no-session', '--no-extensions'];
-  const resolvedModel = resolveModelId(agent.model, currentModel);
+  const resolvedModel = resolveModelId(agent.model, overrideModel, currentModel);
   if (resolvedModel) args.push('--model', resolvedModel);
   const effectiveTools = resolveAgentTools(agent);
   if (effectiveTools && effectiveTools.length > 0) args.push('--tools', effectiveTools.join(','));
@@ -240,6 +253,7 @@ export async function runSingleAgent(
   onUpdate: OnUpdateCallback | undefined,
   makeDetails: (results: SingleResult[]) => SubagentDetails,
   currentModel?: { id?: string; provider?: string },
+  overrideModel?: string,
 ): Promise<SingleResult> {
   const agent = agents.find((a) => a.name === agentName);
   if (!agent) {
@@ -259,7 +273,8 @@ export async function runSingleAgent(
       onUpdate,
       makeDetails,
       currentModel,
+      overrideModel,
     );
   }
-  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel);
+  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel);
 }

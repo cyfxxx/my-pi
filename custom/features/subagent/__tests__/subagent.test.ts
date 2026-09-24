@@ -19,6 +19,7 @@ import {
   getMaxParallelTasks,
 } from '../core/helpers';
 import type { SingleResult } from '../core/types';
+import { resolveModelId } from '../core/runner';
 
 describe('parseFrontmatter', () => {
   it('解析 name/description/tools/readonly', () => {
@@ -149,5 +150,26 @@ describe('mapWithConcurrencyLimit', () => {
 describe('Termux 限制', () => {
   it('getMaxParallelTasks 为正整数', () => {
     expect(getMaxParallelTasks()).toBeGreaterThan(0);
+  });
+});
+
+describe('resolveModelId 模型优先级', () => {
+  const session = { id: 'deepseek-flash', provider: 'deepseek' };
+
+  it('调用级 model 最高优先', () => {
+    expect(resolveModelId('role/model', 'call/model', session)).toBe('call/model');
+  });
+
+  it('无调用级时用 agent frontmatter model', () => {
+    expect(resolveModelId('role/model', undefined, session)).toBe('role/model');
+  });
+
+  it('都未指定时继承主会话模型 provider/id', () => {
+    expect(resolveModelId(undefined, undefined, session)).toBe('deepseek/deepseek-flash');
+  });
+
+  it('无会话模型时返回 undefined（交给 settings 默认）', () => {
+    expect(resolveModelId(undefined, undefined, undefined)).toBeUndefined();
+    expect(resolveModelId(undefined, undefined, { id: 'x' })).toBeUndefined();
   });
 });

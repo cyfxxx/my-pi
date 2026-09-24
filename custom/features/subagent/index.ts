@@ -37,8 +37,9 @@ interface ThemeLike {
   bold: (text: string) => string;
 }
 
-/** 读取 settings.json 的 defaultProvider 判断当前是否本地推理（决定并发上限） */
-function currentProviderIsLocal(): boolean {
+/** 判断当前是否本地推理（决定并发上限）：优先会话实时 provider，回退 settings.json 默认 */
+function currentProviderIsLocal(sessionProvider?: string): boolean {
+  if (sessionProvider) return isLocalProvider(sessionProvider);
   try {
     const raw = JSON.parse(readFileSync(join(getAgentDir(), 'settings.json'), 'utf-8')) as { defaultProvider?: string };
     return isLocalProvider(raw.defaultProvider);
@@ -51,18 +52,31 @@ export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
     name: 'subagent',
     description:
-      '将任务委派给隔离子代理（独立上下文窗口）。模式：single（task，可选 agent）、parallel（tasks 数组）、chain（顺序步骤，用 {previous} 引用上一步输出）。可用 agent: scout/worker/reviewer。',
+      '将任务委派给隔离子代理（独立上下文窗口）。模式：single（task，可选 agent）、parallel（tasks 数组）、chain（顺序步骤，用 {previous} 引用上一步输出）。可用 agent: scout/worker/reviewer。子代理默认继承主会话模型；可用 model 参数（provider/model 或 provider/id）为本次调用或单个任务指定模型。',
     parameters: {
       agent: { type: 'string', description: 'single 模式的 agent 名（可选，默认通用）', optional: true },
       task: { type: 'string', description: 'single 模式的任务', optional: true },
-      tasks: { type: 'json', description: 'parallel：[{agent, task, cwd?}] 数组', optional: true },
-      chain: { type: 'json', description: 'chain：[{agent, task, cwd?}] 数组，task 可含 {previous}', optional: true },
+      tasks: {
+        type: 'json',
+        description: 'parallel：[{agent, task, cwd?, model?}] 数组',
+        optional: true,
+      },
+      chain: {
+        type: 'json',
+        description: 'chain：[{agent, task, cwd?, model?}] 数组，task 可含 {previous}',
+        optional: true,
+      },
       agentScope: { type: 'string', enum: ['user', 'project', 'both'], description: 'agent 目录范围，默认 user', optional: true },
-      cwd: { type: 'string', description: 'single 模式工作目录', optional: true },
+      model: {
+        type: 'string',
+        description: '本次调用的默认模型（provider/model 或 provider/id）；单个 task/chain 项的 model 优先于此',
+        optional: true,
+      },
     },
-    execute: async (raw) => {
+    execute: async (raw, ctx) => {
       const params = raw as unknown as SubagentToolParams;
-      const cwd = process.cwd();
+      const currentModel = ctx?.model;
+      const cwd = ctx?.cwd ?? process.cwd();
       const agentScope: AgentScope = params.agentScope ?? 'user';
       const discovery = discoverAgents(cwd, agentScope);
       const agents = discovery.agents;
@@ -89,7 +103,7 @@ export function register(pi: ExtensionAPI): void {
         for (let i = 0; i < params.chain.length; i++) {
           const step = params.chain[i];
           const taskWithContext = applyPreviousPlaceholder(step.task ?? '', previousOutput);
-          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'));
+          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'), currentModel, step.model ?? params.model);
           results.push(result);
           if (isFailedResult(result)) {
             return `Chain stopped at step ${i + 1} (${step.agent ?? 'default'}): ${getResultOutput(result)}`;
@@ -103,8 +117,8 @@ export function register(pi: ExtensionAPI): void {
         if (params.tasks.length > getMaxParallelTasks()) {
           return `Too many parallel tasks (${params.tasks.length}). Max is ${getMaxParallelTasks()}${isTermuxEnv() ? ' (Termux 环境限制)' : ''}.`;
         }
-        const results = await mapWithConcurrencyLimit(params.tasks, getMaxConcurrency(currentProviderIsLocal()), async (t, _index, internalSignal) =>
-          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel')),
+        const results = await mapWithConcurrencyLimit(params.tasks, getMaxConcurrency(currentProviderIsLocal(currentModel?.provider)), async (t, _index, internalSignal) =>
+          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel'), currentModel, t.model ?? params.model),
         );
         const successCount = results.filter((r) => !isFailedResult(r)).length;
         const summaries = results.map((r) => {
@@ -118,7 +132,7 @@ export function register(pi: ExtensionAPI): void {
       if (params.task) {
         const riskLevel = classifyTaskRisk(params.task);
         const riskHint = riskLevel !== '1σ' ? ` [risk=${riskLevel}]` : '';
-        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'));
+        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'), currentModel, params.model);
         if (isFailedResult(result)) {
           return `Agent ${result.stopReason || 'failed'}${riskHint}: ${getResultOutput(result)}`;
         }

@@ -40,11 +40,21 @@ export type OnUpdateCallback = (partial: { content: { type: 'text'; text: string
 
 export type RiskLevel = '1σ' | '2σ' | '3σ';
 
+export interface SubagentTaskItem {
+  agent?: string;
+  task: string;
+  cwd?: string;
+  /** 本次子任务显式使用的模型（provider/model 或 provider/id），覆盖 agent/会话默认 */
+  model?: string;
+}
+
 export interface SubagentToolParams {
   agent?: string;
   task?: string;
-  tasks?: { agent?: string; task: string; cwd?: string }[];
-  chain?: { agent?: string; task: string; cwd?: string }[];
+  tasks?: SubagentTaskItem[];
+  chain?: SubagentTaskItem[];
   agentScope?: AgentScope;
   cwd?: string;
+  /** 单次调用默认模型；tasks/chain 项的 model 优先级更高 */
+  model?: string;
 }
