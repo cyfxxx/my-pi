@@ -66,7 +66,8 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-st
 
 - **上游隔离**：`vendor/pi/` 不直接修改，改动通过 `patches/` 记录。
 - **接口隔离**：Pi API 只出现在 `custom/adapters/`。
-- **缓存友好**：system prompt 注入禁止时间戳/精确数值。
+- **缓存友好**：system prompt 注入禁止时间戳/精确数值；压力提示按档位固定文案（<75% 不注入、≥75%/≥90% 用固定文本）；token 估算统一用 `features/context/budget/budget.ts` 的 `estimateTokens`。
+- **后台任务（禁止阻塞前台）**：长任务用 `tmux_run` 启动，**启动后立即结束回合**，不同轮内不等待；同轮内禁止 `tmux_wait`，确需等待只用 `pattern=` 匹配且 `timeout≤60s`。会话结束后由 `features/tmux/watcher.ts` 自动注入通知并触发新回合（不必等用户下一条消息）。子代理（`subagent`）是同步阻塞的，只适合必须立即拿到结果的短任务。
 - **git 提交**：暂存显式路径，只提交本次会话更改的文件；不提交 `auth.json` 等敏感配置。
 
 ## 验证与命令
