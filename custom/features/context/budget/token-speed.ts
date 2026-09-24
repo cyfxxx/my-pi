@@ -22,6 +22,15 @@ export function formatSpeed(tps: number): string {
   return tps < 10 ? `${tps.toFixed(1)} tok/s` : `${Math.round(tps)} tok/s`;
 }
 
+/**
+ * 紧凑速度标记（用于并入 footer stats 行）：`⇅` 前缀 + 数值，省略单位后缀，
+ * 与 stats 行 `Σ/↑/↓/CH` 的符号风格保持一致。
+ */
+export function formatSpeedCompact(tps: number): string {
+  if (!Number.isFinite(tps) || tps <= 0) return '⇅0';
+  return tps < 10 ? `⇅${tps.toFixed(1)}` : `⇅${Math.round(tps)}`;
+}
+
 export function createSpeedTracker(charsPerToken = 4): SpeedTracker {
   let startedAt: number | null = null;
   let chars = 0;

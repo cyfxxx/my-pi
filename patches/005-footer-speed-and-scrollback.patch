@@ -1,0 +1,58 @@
+diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
+index 5171a8777..5db6d8817 100644
+--- a/packages/coding-agent/src/modes/interactive/components/footer.ts
++++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
+@@ -147,6 +147,11 @@ export class FooterComponent implements Component {
+ 			statsParts.push(`CH${hitRates.join("/")}%`);
+ 		}
+ 
++		// Patch (005-footer-speed-and-scrollback): 输出速度并入 stats 行——与 token 指标同类，
++		// 沿用 dim 风格；此前它作为独立 status 行且未 dim，与上下两行视觉不一致。
++		const speedStatus = this.footerData.getExtensionStatuses().get("tps");
++		if (speedStatus) statsParts.push(sanitizeStatusText(speedStatus));
++
+ 		// Kimi Coding is subscription-backed despite using API-key authentication.
+ 		const usingSubscription = state.model
+ 			? state.model.provider === "kimi-coding" || this.session.modelRuntime.isUsingSubscription(state.model.provider)
+@@ -266,15 +271,17 @@ export class FooterComponent implements Component {
+ 		const pwdLine = truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "..."));
+ 		const lines = [pwdLine, dimStatsLeft + dimRemainder];
+ 
+-		// Add extension statuses on a single line, sorted by key alphabetically
++		// Add extension statuses on a single line, sorted by key alphabetically.
++		// Patch (005-footer-speed-and-scrollback): "tps" 已并入 stats 行，这里排除；
++		// 其余状态行统一 dim，与 footer 其余内容保持一致。
+ 		const extensionStatuses = this.footerData.getExtensionStatuses();
+-		if (extensionStatuses.size > 0) {
+-			const sortedStatuses = Array.from(extensionStatuses.entries())
+-				.sort(([a], [b]) => a.localeCompare(b))
+-				.map(([, text]) => sanitizeStatusText(text));
+-			const statusLine = sortedStatuses.join(" ");
+-			// Truncate to terminal width with dim ellipsis for consistency with footer style
+-			lines.push(truncateToWidth(statusLine, width, theme.fg("dim", "...")));
++		const otherStatuses = Array.from(extensionStatuses.entries())
++			.filter(([key]) => key !== "tps")
++			.sort(([a], [b]) => a.localeCompare(b))
++			.map(([, text]) => sanitizeStatusText(text));
++		if (otherStatuses.length > 0) {
++			const statusLine = otherStatuses.join(" ");
++			lines.push(truncateToWidth(theme.fg("dim", statusLine), width, theme.fg("dim", "...")));
+ 		}
+ 
+ 		return lines;
+diff --git a/packages/tui/src/tui-main-screen.ts b/packages/tui/src/tui-main-screen.ts
+index c079dd776..4af8ad771 100644
+--- a/packages/tui/src/tui-main-screen.ts
++++ b/packages/tui/src/tui-main-screen.ts
+@@ -280,7 +280,10 @@ export class TuiMainScreen extends TuiBase implements TUI {
+ 			output.append("\x1b[?2026h"); // Begin synchronized output
+ 			if (clear) {
+ 				output.append(this.deleteKittyImages(this.previousKittyImageIds));
+-				output.append("\x1b[2J\x1b[H\x1b[3J"); // Clear screen, home, then clear scrollback
++				// Patch (005-footer-speed-and-scrollback): 只清视口，不清 scrollback（去 3J）。
++				// regular 模式下宽度变化/内容收缩会走 fullRender(true)，原先连 scrollback 一起清掉，
++				// 用户无法向上滚动回顾历史。
++				output.append("\x1b[2J\x1b[H"); // Clear screen and home (keep scrollback)
+ 			}
+ 			for (let i = 0; i < newLines.length; i++) {
+ 				if (i > 0) output.append("\r\n");

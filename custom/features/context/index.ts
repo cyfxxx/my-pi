@@ -53,7 +53,7 @@ import {
 import { pruneToolResults, sweepPruneRefs } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
-import { createSpeedTracker, formatSpeed } from './budget/token-speed';
+import { createSpeedTracker, formatSpeedCompact } from './budget/token-speed';
 import {
   ABSOLUTE_TOKENS,
   RESTART_TOKENS,
@@ -403,9 +403,11 @@ export function register(pi: ExtensionAPI): void {
   // 输出速度：turn_start 计时，message_update 实时估算，turn_end 用真实 output token 结算
   registerHook(pi, {
     event: 'turn_start',
-    handler: () => {
+    handler: (_event, ctx) => {
       speedTracker.startTurn(Date.now());
       lastSpeedUiAt = 0;
+      // 新一轮开始清掉上一轮的终值，避免空闲时把旧速度误读为当前速度
+      if (ctx.hasUI) ctx.ui.setStatus('tps', undefined);
     },
   });
 
@@ -420,7 +422,7 @@ export function register(pi: ExtensionAPI): void {
       if (now - lastSpeedUiAt < 500) return;
       lastSpeedUiAt = now;
       const tps = speedTracker.liveSpeed(now);
-      if (tps !== null) ctx.ui.setStatus('tps', formatSpeed(tps));
+      if (tps !== null) ctx.ui.setStatus('tps', formatSpeedCompact(tps));
     },
   });
 
@@ -430,7 +432,7 @@ export function register(pi: ExtensionAPI): void {
       if (!ctx.hasUI) return;
       const msg = (event as { message?: { usage?: { output?: number } } }).message;
       const tps = speedTracker.finishTurn(msg?.usage?.output ?? 0, Date.now());
-      if (tps !== null) ctx.ui.setStatus('tps', formatSpeed(tps));
+      if (tps !== null) ctx.ui.setStatus('tps', formatSpeedCompact(tps));
     },
   });
 
