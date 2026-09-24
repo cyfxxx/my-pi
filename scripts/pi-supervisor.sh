@@ -84,12 +84,12 @@ export PI_ADMIN_STATE_FILE="${PI_ADMIN_STATE_FILE:-$AGENT_DIR/autopilot/state.js
 ADMIN_STATE_FILE="$PI_ADMIN_STATE_FILE"
 ACT=""; TARGET=""
 read_admin_action() {
-  ACT=""; TARGET=""
+  ACT=""; TARGET=""; PROV=""; MODEL=""
   [ -f "$ADMIN_STATE_FILE" ] || return 0
   local out
-  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang"].includes(s.action);process.stdout.write(ok?(s.action+"\t"+(s.targetSession||"")):"")}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
-  ACT="${out%%$'\t'*}"
-  case "$out" in *$'\t'*) TARGET="${out#*$'\t'}" ;; *) TARGET="" ;; esac
+  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);process.stdout.write(ok?[s.action,s.targetSession||"",s.targetProvider||"",s.targetModel||""].join("\t"):"")}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
+  [ -n "$out" ] || return 0
+  IFS=$'\t' read -r ACT TARGET PROV MODEL <<<"$out"
 }
 clear_admin_action() {
   node -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
@@ -186,8 +186,25 @@ while true; do
       restart|restart_hang)
         log "admin 请求重启（$ACT），重新启动..."
         clear_admin_action
-        EXTRA_ARGS=()
+        # 显式 --session 恢复当前会话，不再依赖「最近修改会话」推断
+        if [ -n "$TARGET" ]; then
+          log "恢复会话: $TARGET"
+          EXTRA_ARGS=(--session "$TARGET")
+        else
+          EXTRA_ARGS=()
+        fi
         continue
+        ;;
+      set_model)
+        if [ -n "$PROV" ] && [ -n "$MODEL" ]; then
+          log "admin 请求切换模型: $PROV/$MODEL"
+          clear_admin_action
+          EXTRA_ARGS=(--provider "$PROV" --model "$MODEL")
+          if [ -n "$TARGET" ]; then
+            EXTRA_ARGS+=(--session "$TARGET")
+          fi
+          continue
+        fi
         ;;
       switch_session)
         if [ -n "$TARGET" ]; then

@@ -35,6 +35,8 @@ export interface ToolExecuteContext {
   notify?: (message: string, level?: string) => void;
   /** 请求重启/退出（由 supervisor 消费 admin state 后决定是否重拉） */
   shutdown?: () => void;
+  /** 当前会话文件绝对路径（重启时显式传给 supervisor 作 --session，避免续错会话） */
+  sessionFile?: string;
 }
 
 /**
@@ -87,6 +89,7 @@ function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
   const c = piCtx as {
     hasUI?: boolean;
     shutdown?: () => void;
+    sessionManager?: { getSessionFile?: () => string | undefined };
     ui?: {
       confirm?: (title: string, message: string) => Promise<boolean>;
       notify?: (message: string, level?: string) => void;
@@ -97,6 +100,7 @@ function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
     confirm: typeof c.ui?.confirm === 'function' ? (t, m) => c.ui!.confirm!(t, m) : undefined,
     notify: typeof c.ui?.notify === 'function' ? (m, l) => c.ui!.notify!(m, l) : undefined,
     shutdown: typeof c.shutdown === 'function' ? () => c.shutdown!() : undefined,
+    sessionFile: typeof c.sessionManager?.getSessionFile === 'function' ? c.sessionManager.getSessionFile() : undefined,
   };
 }
 

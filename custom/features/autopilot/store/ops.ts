@@ -347,9 +347,15 @@ export function planFailover(chain: FallbackModel[], currentProvider: string, cu
   return { target, reason: `${currentProvider}/${currentModel} → ${target.provider}/${target.model}` };
 }
 
-export function executeFailover(target: FallbackModel, reason: string, dryRun: boolean): string {
+export function executeFailover(
+  target: FallbackModel,
+  reason: string,
+  dryRun: boolean,
+  sessionFile?: string,
+): string {
   if (dryRun) return `[dry-run] 将执行: 切换模型 ${target.provider}/${target.model} 并重启\n原因: ${reason}`;
   writeRestartRequest('set_model', {
+    targetSession: sessionFile,
     targetProvider: target.provider,
     targetModel: target.model,
     reason: `failover: ${reason}`,

@@ -108,12 +108,12 @@ export function register(pi: ExtensionAPI): void {
     parameters: {
       execute: { type: 'boolean', description: 'true 时实际写入切换请求（默认 false 仅预览）', optional: true },
     },
-    execute: async (args) => {
+    execute: async (args, ctx) => {
       const c = readAutopilotConfig();
       const cm = currentModel();
       const plan = planFailover(c.fallbackModels, cm.provider, cm.model);
       if (!plan.target) return `无法转移: ${plan.reason}`;
-      return executeFailover(plan.target, plan.reason, !(args.execute === true));
+      return executeFailover(plan.target, plan.reason, !(args.execute === true), ctx?.sessionFile);
     },
   });
 
@@ -165,7 +165,9 @@ export function register(pi: ExtensionAPI): void {
     },
     execute: async (args, ctx) => {
       const reason = typeof args.reason === 'string' ? args.reason : undefined;
-      writeRestartRequest('restart', { reason: reason || '手动重启' });
+      // 显式带上当前会话：supervisor 用 --session 重拉，不依赖「最近会话」推断
+      // （多会话并存/子代理会话更新时间更晚时会续错会话）。
+      writeRestartRequest('restart', { targetSession: ctx?.sessionFile, reason: reason || '手动重启' });
       ctx?.shutdown?.();
       return '已提交重启请求，Agent 即将重启。';
     },

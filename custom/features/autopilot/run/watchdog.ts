@@ -95,10 +95,18 @@ export function isHanging(maxIdleMinutes: number, now: number = Date.now()): boo
 }
 
 /** 触发挂死恢复：写重启请求并返回是否触发 */
-export function triggerHangRecovery(maxIdleMinutes: number, now: number = Date.now()): boolean {
+export function triggerHangRecovery(
+  maxIdleMinutes: number,
+  now: number = Date.now(),
+  sessionFile?: string,
+): boolean {
   if (!isHanging(maxIdleMinutes, now)) return false;
   const idleMinutes = Math.round((now - lastActivity) / 60000);
-  writeRestartRequest('restart_hang', { reason: `会话挂死（${idleMinutes} 分钟无活动）` });
+  // 优先用调用方传入的当前会话；否则回退到最近修改的会话文件（可能选错，但优于不带）
+  writeRestartRequest('restart_hang', {
+    targetSession: sessionFile ?? latestSessionFile() ?? undefined,
+    reason: `会话挂死（${idleMinutes} 分钟无活动）`,
+  });
   return true;
 }
 
