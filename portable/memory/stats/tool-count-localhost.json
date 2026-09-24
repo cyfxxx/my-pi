@@ -1,16 +1,16 @@
 {
   "device": "localhost",
-  "generatedAt": "2026-09-24T14:12:27.612Z",
+  "generatedAt": "2026-09-24T14:12:55.869Z",
   "windowDays": 30,
-  "totalCalls": 352,
+  "totalCalls": 359,
   "tools": {
     "read": {
-      "calls": 61,
+      "calls": 62,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068800068,
-      "lastTs": 1790258894467
+      "lastTs": 1790259148939
     },
     "find": {
       "calls": 1,
@@ -61,12 +61,12 @@
       "lastTs": 1790258899541
     },
     "bash": {
-      "calls": 231,
+      "calls": 237,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810163,
-      "lastTs": 1790259143811
+      "lastTs": 1790259170831
     },
     "memory_search": {
       "calls": 2,
