@@ -1,16 +1,16 @@
 {
   "device": "localhost",
-  "generatedAt": "2026-09-22T23:39:54.323Z",
+  "generatedAt": "2026-09-24T14:12:27.612Z",
   "windowDays": 30,
-  "totalCalls": 27,
+  "totalCalls": 352,
   "tools": {
     "read": {
-      "calls": 1,
+      "calls": 61,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068800068,
-      "lastTs": 1790068800068
+      "lastTs": 1790258894467
     },
     "find": {
       "calls": 1,
@@ -53,28 +53,28 @@
       "lastTs": 1790068810069
     },
     "edit": {
-      "calls": 1,
+      "calls": 30,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810151,
-      "lastTs": 1790068810151
+      "lastTs": 1790258899541
     },
     "bash": {
-      "calls": 1,
+      "calls": 231,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810163,
-      "lastTs": 1790068810163
+      "lastTs": 1790259143811
     },
     "memory_search": {
-      "calls": 1,
+      "calls": 2,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068815587,
-      "lastTs": 1790068815587
+      "lastTs": 1790257798054
     },
     "memory_store": {
       "calls": 1,
@@ -101,12 +101,12 @@
       "lastTs": 1790068819646
     },
     "todo": {
-      "calls": 3,
+      "calls": 4,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068826204,
-      "lastTs": 1790068875916
+      "lastTs": 1790143344523
     },
     "voice_transcribe": {
       "calls": 1,
@@ -149,12 +149,12 @@
       "lastTs": 1790068838788
     },
     "subagent": {
-      "calls": 1,
+      "calls": 4,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068870686,
-      "lastTs": 1790068870686
+      "lastTs": 1790139210267
     },
     "enable_tool": {
       "calls": 3,
@@ -179,6 +179,14 @@
       "cacheWrite": 0,
       "firstTs": 1790077183203,
       "lastTs": 1790086958052
+    },
+    "admin_restart": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1790258998965,
+      "lastTs": 1790258998965
     }
   }
 }
