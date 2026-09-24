@@ -73,7 +73,7 @@ if [ -d "$VENDOR_PI/.git" ]; then
   if [ "$FIX" = "1" ]; then
     NEED=0; for p in "$ROOT"/patches/*.patch; do
       [ -e "$p" ] || continue
-      git -C "$VENDOR_PI" apply --check --reverse "$p" >/dev/null 2>&1 || NEED=1
+      vendor_patch_applied "$VENDOR_PI" "$p" || git -C "$VENDOR_PI" apply --check --reverse "$p" >/dev/null 2>&1 || NEED=1
     done
     if [ "$NEED" = "1" ]; then maybe_fix; vendor_apply_patches "$ROOT" "$VENDOR_PI" 1 || bad "补丁应用失败"; fi
   fi
@@ -93,13 +93,32 @@ fi
 echo "[4] 构建产物"
 if [ -f "$CLI" ]; then
   ok "dist/cli.js 存在"
-  NEWEST_SRC="$(find "$VENDOR_PI/packages" -path '*/node_modules' -prune -o -path '*/dist' -prune -o -name '*.ts' -newer "$CLI" -print 2>/dev/null | head -1)"
-  if [ -n "$NEWEST_SRC" ]; then
-    if [ "$FIX" = "1" ]; then maybe_fix; PI_SKIP_ROOT_INSTALL=1 bash "$ROOT/scripts/build.sh" && ok "dist 已重建" || bad "重建失败"; else
-      warn "dist 可能过期（源码较新：$NEWEST_SRC；PI_SKIP_ROOT_INSTALL=1 bash scripts/build.sh）"
+  # 优先用构建戳（build.sh 写入：HEAD + 工作树改动哈希）比对；
+  # 不用源码 mtime——patch 应用 / git checkout 会 touch 源文件，导致必然误报。
+  STAMP="$VENDOR_PI/packages/coding-agent/dist/.build-stamp"
+  HEAD_SHA="$(git -C "$VENDOR_PI" rev-parse HEAD 2>/dev/null)"
+  DIRTY="$(git -C "$VENDOR_PI" status --porcelain 2>/dev/null)"
+  CUR_DIRTY="$(printf '%s' "$DIRTY" | sha256sum 2>/dev/null | cut -c1-16)"
+  STALE_REASON=""
+  if [ -f "$STAMP" ]; then
+    ST_SHA="$(sed -n '1p' "$STAMP" 2>/dev/null)"
+    ST_DIRTY="$(sed -n '2p' "$STAMP" 2>/dev/null)"
+    if [ -z "$HEAD_SHA" ]; then
+      warn "无法读取 vendor/pi HEAD，跳过构建戳比对"
+    elif [ "$ST_SHA" != "$HEAD_SHA" ] || [ "$ST_DIRTY" != "$CUR_DIRTY" ]; then
+      STALE_REASON="构建戳 ${ST_SHA:0:9} ≠ 当前 ${HEAD_SHA:0:9}（或 vendor/pi 工作树与构建时不一致）"
     fi
+  elif [ -n "$DIRTY" ]; then
+    STALE_REASON="vendor/pi 工作树有未提交改动且无构建戳"
+  fi
+  if [ -n "$STALE_REASON" ]; then
+    if [ "$FIX" = "1" ]; then maybe_fix; PI_SKIP_ROOT_INSTALL=1 bash "$ROOT/scripts/build.sh" && ok "dist 已重建" || bad "重建失败"; else
+      warn "dist 可能过期（$STALE_REASON；PI_SKIP_ROOT_INSTALL=1 bash scripts/build.sh）"
+    fi
+  elif [ -f "$STAMP" ]; then
+    ok "dist 与源码同步（stamp ${HEAD_SHA:0:9}）"
   else
-    ok "dist 与源码同步"
+    ok "dist 存在（无构建戳，跳过比对；下次 build.sh 后生成）"
   fi
 else
   if [ "$FIX" = "1" ]; then maybe_fix; PI_SKIP_ROOT_INSTALL=1 bash "$ROOT/scripts/build.sh" && ok "dist 已构建" || bad "构建失败"; else

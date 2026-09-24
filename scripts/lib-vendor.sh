@@ -87,13 +87,27 @@ vendor_apply_patches() {
   [ "$failed" -eq 0 ]
 }
 
+# 判断补丁是否已应用（优先看提交历史）。
+# 必要性：顺序叠加的多个补丁可能改动同一文件的相邻区域，此时早期补丁的
+# `git apply --reverse --check` 会因上下文已被后续补丁改写而失败（误判为“状态未知”）。
+# vendor_apply_patches 提交的信息为 `local: <补丁名>`，可据此可靠判定。
+# 用法：vendor_patch_applied <vendor> <patch-file>
+vendor_patch_applied() {
+  local vendor="$1" patch="$2" base subject
+  base="$(basename "$patch")"
+  subject="local: ${base%.patch}"
+  git -C "$vendor" log --format=%s -n 500 2>/dev/null | grep -qxF "$subject"
+}
+
 # 报告补丁状态（只读）。用法：vendor_patch_status <root> <vendor>
 vendor_patch_status() {
   local root="$1" vendor="$2" patch base bad=0
   shopt -s nullglob
   for patch in "$root"/patches/*.patch; do
     base="$(basename "$patch")"
-    if git -C "$vendor" apply --check --reverse "$patch" >/dev/null 2>&1; then
+    if vendor_patch_applied "$vendor" "$patch"; then
+      echo "  ✓ 已应用：$base"
+    elif git -C "$vendor" apply --check --reverse "$patch" >/dev/null 2>&1; then
       echo "  ✓ 已应用：$base"
     elif git -C "$vendor" apply --check "$patch" >/dev/null 2>&1; then
       echo "  ⚠ 未应用：$base（运行 bash scripts/doctor.sh --fix 或 scripts/build.sh）"

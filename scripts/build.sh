@@ -144,6 +144,16 @@ else
   CLI="$VENDOR_PI/packages/coding-agent/dist/cli.js"
   [ -f "$CLI" ] || { echo "✗ 构建产物缺失：$CLI" >&2; exit 1; }
   echo "✓ 构建产物：$CLI"
+
+  # 构建戳：记录本次构建对应的 vendor/pi 内容标识（HEAD + 工作树改动哈希）。
+  # doctor.sh 用它替代源码 mtime 比对（patch 应用/checkout 会 touch 源文件导致误报）。
+  # dist/ 已被 vendor/pi/.gitignore 忽略，戳文件不会污染 git 状态。
+  STAMP="$VENDOR_PI/packages/coding-agent/dist/.build-stamp"
+  {
+    git -C "$VENDOR_PI" rev-parse HEAD 2>/dev/null || echo unknown
+    git -C "$VENDOR_PI" status --porcelain 2>/dev/null | sha256sum | cut -c1-16
+  } > "$STAMP"
+  echo "✓ 构建戳：$STAMP"
 fi
 
 # ── 5. 可选：fd/rg shim ──
