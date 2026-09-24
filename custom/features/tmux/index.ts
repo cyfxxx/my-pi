@@ -8,6 +8,9 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
+import { sendMessage } from '../../adapters/ui-adapter';
+import { createCompletionWatcher, NOTIFY_CUSTOM_TYPE } from './watcher';
+import type { WatcherHandle } from './watcher';
 import {
   loadTmuxConfig,
   normalizeSessionName,
@@ -21,6 +24,7 @@ import {
   loadRegistry,
   registerSession,
   unregisterSession,
+  hasSession,
   removeLog,
   shutdownCleanup,
   tmuxMissingError,
@@ -29,6 +33,18 @@ import type { TmuxConfig } from './logic';
 
 export function register(pi: ExtensionAPI): void {
   const cfg: TmuxConfig = loadTmuxConfig();
+  // 完成自动唤醒：tmux 会话结束后注入通知并触发新回合（实现见 ./watcher）
+  const handles = new Map<string, WatcherHandle>();
+  const watcher = createCompletionWatcher({
+    hasSession: (name) => hasSession(cfg, name),
+    notify: async (text) => {
+      sendMessage(pi, { customType: NOTIFY_CUSTOM_TYPE, content: text, display: true }, { triggerTurn: true });
+    },
+    onDone: (name) => {
+      handles.delete(name);
+      unregisterSession(name);
+    },
+  });
 
   const fail = (e: unknown): string => {
     const msg = e instanceof Error ? e.message : String(e);
@@ -56,6 +72,9 @@ export function register(pi: ExtensionAPI): void {
             createdAt: new Date().toISOString(),
             owner: process.env.PI_SESSION_ID || undefined,
           });
+          // 注册完成自动唤醒：会话结束即通知并触发新回合（不必等用户下轮才发现结果）
+          handles.get(res.name)?.stop();
+          handles.set(res.name, watcher.watch(res.name, res.logPath, true));
           return `已在 tmux 会话 ${res.name} 后台启动。\n日志: ${res.logPath}\n用 tmux_read 查看输出，tmux_wait 等待完成。`;
         }
         return `会话 ${res.name} 已存在，未重复启动。日志: ${res.logPath}`;
@@ -98,6 +117,8 @@ export function register(pi: ExtensionAPI): void {
       try {
         const name = normalizeSessionName(args.name as string, cfg.prefix);
         const out = await readOutput(cfg, name, (args.lines as number) ?? cfg.defaultLines);
+        // 用户已人工查看：该会话完成时不再重复通知
+        watcher.ack(name);
         return out.truncated ? `${out.text}\n\n[输出已截断]` : out.text || '(无输出)';
       } catch (e) {
         return fail(e);
@@ -137,6 +158,9 @@ export function register(pi: ExtensionAPI): void {
     execute: async (args) => {
       try {
         const name = normalizeSessionName(args.name as string, cfg.prefix);
+        // 主动结束：丢弃监听器与待发通知
+        handles.get(name)?.stop();
+        handles.delete(name);
         await killSession(cfg, name);
         unregisterSession(name);
         if (args.remove_log) removeLog(cfg, name);
@@ -174,6 +198,9 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'session_shutdown',
     handler: async () => {
+      // 完成唤醒监听器随会话结束清理（定时器已 unref，这里显式停止防跨会话残留）
+      watcher.stopAll();
+      handles.clear();
       try {
         const reg = loadRegistry();
         const sessions = await listSessions(cfg);

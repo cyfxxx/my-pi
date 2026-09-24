@@ -26,6 +26,15 @@
 
 环境变量：`PI_TMUX_BIN`、`PI_TMUX_PREFIX`、`PI_TMUX_LINES`、`PI_TMUX_TIMEOUT_SEC`、`PI_SESSION_ID`。
 
+## 完成自动唤醒
+
+`tmux_run` 启动的会话由 `watcher.ts` 轮询监听（5s 间隔，定时器 `unref`）：会话结束后注入通知消息并触发新回合，
+主会话据此 `tmux_read` 收尾，不必等用户下一条消息。要点：
+
+- 同轮完成的多个会话在 5s 合并窗口内合成一条汇总通知（防积压）
+- `tmux_read` 成功读取即 `ack`，该会话完成时不再通知；`tmux_stop` 丢弃待发通知
+- `watcher.ts` 为纯逻辑（`hasSession`/`notify`/`onDone` 依赖注入），接线在 `index.ts`
+
 ## 约定
 
 - 只管理带 `SESSION_PREFIX` 前缀、且被登记为本 pi 会话（`isPiSession`）的 tmux 会话，不干扰用户手动会话。

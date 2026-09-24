@@ -14,6 +14,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
+import { checkToolCall } from './shadow-review';
 import { registerCommand } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
@@ -67,6 +68,10 @@ export function register(pi: ExtensionAPI): void {
           name: e.toolName ?? 'unknown',
           brief: trunc(oneLine(e.args), TOOL_BRIEF_TRUNC),
         });
+        // 影子审查：确定性规则静默记录（checkToolCall 内部落盘；只记录、不拦截、不进入上下文）
+        if (e.toolName && e.args && typeof e.args === 'object') {
+          checkToolCall(e.toolName, e.args as Record<string, unknown>);
+        }
         if (currentRun.tools.length > TOOLS_TRACK_MAX) {
           currentRun.tools = currentRun.tools.slice(-TOOLS_TRACK_MAX);
         }

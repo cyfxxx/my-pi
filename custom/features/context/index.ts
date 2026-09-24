@@ -67,6 +67,12 @@ import {
   hasBackgroundTask,
 } from './budget/task-gate';
 import { snapshotBeforeCompact } from './budget/compression';
+import {
+  createWarmPrefixState,
+  saveMainRequestPayload,
+  buildReplayedPayload,
+  isSummarizationMessage,
+} from './budget/warm-prefix';
 import { appendUsage } from './usage-stats';
 
 
@@ -81,6 +87,11 @@ export function register(pi: ExtensionAPI): void {
     absoluteTokens: ABSOLUTE_TOKENS,
   });
   const autoContinueGate = makeAutoContinueGate();
+  // 暖前缀重放（deepseek/qwen/gemini 等自动前缀缓存模型）：保存主请求 payload，压缩摘要请求
+  // 时复用同一前缀（含 tools），使摘要请求命中前缀缓存——压缩一次要求代几十 K token 全量
+  // 未命中（$0.15/M），重放后大部分转为 cacheRead（$0.003/M）。
+  const warmState = createWarmPrefixState();
+  warmState.compactWarmAllowed = true;
   const fallbackContextWindow = (() => {
     const n = Number(process.env.PI_CONTEXT_WINDOW_FALLBACK);
     return Number.isFinite(n) && n > 0 ? n : 1_000_000;
@@ -429,6 +440,23 @@ export function register(pi: ExtensionAPI): void {
     event: 'input',
     handler: () => {
       lastUserActivityTs = Date.now();
+    },
+  });
+
+  // 请求发出前：非摘要请求→记录为暖前缀；摘要请求→重放已记录前缀（返回新 payload 即替换）
+  registerHook(pi, {
+    event: 'before_provider_request',
+    handler: (event, ctx) => {
+      const payload = (event as { payload?: { messages?: unknown[]; tools?: unknown } }).payload;
+      if (!payload || !Array.isArray(payload.messages) || payload.messages.length === 0) return;
+      const modelKey = (ctx as { model?: { id?: string } }).model?.id ?? '';
+      const last = payload.messages[payload.messages.length - 1] as { role?: string; content?: unknown };
+      if (isSummarizationMessage(last)) {
+        const replayed = buildReplayedPayload(warmState, payload.messages, payload);
+        return replayed ?? undefined;
+      }
+      saveMainRequestPayload(warmState, modelKey, payload.messages, payload.tools);
+      return undefined;
     },
   });
 
