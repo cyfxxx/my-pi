@@ -1,0 +1,62 @@
+diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
+index 5db6d8817..59e64492c 100644
+--- a/packages/coding-agent/src/modes/interactive/components/footer.ts
++++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
+@@ -87,6 +87,7 @@ export class FooterComponent implements Component {
+ 		// Calculate cumulative usage from ALL session entries (not just post-compaction messages)
+ 		const usageTotals = createUsageTotals();
+ 		let latestCacheHitRate: number | undefined;
++		const recentTurnUsage: Array<{ promptTokens: number; cacheRead: number }> = [];
+ 
+ 		for (const entry of this.session.sessionManager.getEntries()) {
+ 			if (entry.type === "usage") {
+@@ -98,6 +99,7 @@ export class FooterComponent implements Component {
+ 					entry.message.usage.input + entry.message.usage.cacheRead + entry.message.usage.cacheWrite;
+ 				latestCacheHitRate =
+ 					latestPromptTokens > 0 ? (entry.message.usage.cacheRead / latestPromptTokens) * 100 : undefined;
++				recentTurnUsage.push({ promptTokens: latestPromptTokens, cacheRead: entry.message.usage.cacheRead });
+ 			} else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
+ 				addUsageToTotals(usageTotals, entry.message.usage);
+ 			} else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
+@@ -134,16 +136,23 @@ export class FooterComponent implements Component {
+ 		if (sessionPromptTotal > 0) statsParts.push(`Σ${formatTokens(sessionPromptTotal)}`);
+ 		if (usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
+ 		if (usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
+-		// Patch (004-footer-tweaks): CH 实时/会话双命中率（左=最近一轮，右=会话累计）。
+-		const sessionCacheHitRate =
+-			sessionPromptTotal > 0 ? (usageTotals.cacheRead / sessionPromptTotal) * 100 : undefined;
++		// Patch (006-footer-cost-and-cache-window): CH 左=最近一轮，右=最近 20 轮滑动窗口。
++		// 会话累计值被早期未命中轮次稀释（重启/压缩后首轮全量重发），长期停在 95% 附近，
++		// 无法反映当前缓存健康状况；滑动窗口对应当前上下文规模，健康时应稳定在 99%+。
++		const CACHE_WINDOW_TURNS = 20;
++		const cacheWindow = recentTurnUsage.slice(-CACHE_WINDOW_TURNS);
++		const windowPromptTokens = cacheWindow.reduce((sum, turn) => sum + turn.promptTokens, 0);
++		const windowCacheHitRate =
++			windowPromptTokens > 0
++				? (cacheWindow.reduce((sum, turn) => sum + turn.cacheRead, 0) / windowPromptTokens) * 100
++				: undefined;
+ 		if (
+ 			(usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) &&
+-			(latestCacheHitRate !== undefined || sessionCacheHitRate !== undefined)
++			(latestCacheHitRate !== undefined || windowCacheHitRate !== undefined)
+ 		) {
+ 			const hitRates = [];
+ 			if (latestCacheHitRate !== undefined) hitRates.push(latestCacheHitRate.toFixed(1));
+-			if (sessionCacheHitRate !== undefined) hitRates.push(sessionCacheHitRate.toFixed(1));
++			if (windowCacheHitRate !== undefined) hitRates.push(windowCacheHitRate.toFixed(1));
+ 			statsParts.push(`CH${hitRates.join("/")}%`);
+ 		}
+ 
+@@ -157,8 +166,10 @@ export class FooterComponent implements Component {
+ 			? state.model.provider === "kimi-coding" || this.session.modelRuntime.isUsingSubscription(state.model.provider)
+ 			: false;
+ 		if (usageTotals.cost || usingSubscription) {
+-			// Patch (004-footer-tweaks): 成本换算人民币（usageTotals.cost 为 USD；改汇率编辑下一行）。
+-			const CNY_PER_USD = 6.77;
++			// Patch (006-footer-cost-and-cache-window): 成本换算人民币（usageTotals.cost 为 USD）。
++			// 汇率可用 PI_CNY_PER_USD 覆盖（默认 7.05）。
++			const configuredRate = Number(process.env.PI_CNY_PER_USD);
++			const CNY_PER_USD = Number.isFinite(configuredRate) && configuredRate > 0 ? configuredRate : 7.05;
+ 			const costStr = `¥${(usageTotals.cost * CNY_PER_USD).toFixed(2)}${usingSubscription ? " (sub)" : ""}`;
+ 			statsParts.push(costStr);
+ 		}

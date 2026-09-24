@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readEnvRatio, resolveContext, hasBackgroundTask } from '../budget/task-gate';
+import { passesIdleGate } from '../logic';
 
 let dir: string;
 
@@ -65,5 +66,33 @@ describe('hasBackgroundTask', () => {
     process.env.PI_SESSION_ID = 'sess-1';
     writeFileSync(process.env.PI_TMUX_REGISTRY!, JSON.stringify({ sessions: { a: { owner: 'other', name: 'x' } } }));
     expect(hasBackgroundTask()).toBe(false);
+  });
+});
+
+describe('passesIdleGate（压缩门3：空闲判定）', () => {
+  const now = 1_000_000_000;
+
+  it('idleMs<=0 时关闭该门', () => {
+    expect(passesIdleGate({ idleMs: 0, lastUserActivityTs: now - 1, taskDoneAt: 0, now })).toBe(true);
+  });
+
+  it('无活动记录时放行（不阻塞首次压缩）', () => {
+    expect(passesIdleGate({ idleMs: 600_000, lastUserActivityTs: 0, taskDoneAt: 0, now })).toBe(true);
+  });
+
+  it('用户刚输入过 → 不压缩', () => {
+    expect(passesIdleGate({ idleMs: 600_000, lastUserActivityTs: now - 60_000, taskDoneAt: 0, now })).toBe(false);
+  });
+
+  it('任务刚结束 → 不压缩（取用户/任务两者较晚者）', () => {
+    expect(
+      passesIdleGate({ idleMs: 600_000, lastUserActivityTs: now - 900_000, taskDoneAt: now - 1_000, now }),
+    ).toBe(false);
+  });
+
+  it('静默满 IDLE_MS → 放行', () => {
+    expect(
+      passesIdleGate({ idleMs: 600_000, lastUserActivityTs: now - 600_000, taskDoneAt: now - 900_000, now }),
+    ).toBe(true);
   });
 });

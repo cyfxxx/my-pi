@@ -1,8 +1,8 @@
 /**
  * 压缩三重门限与上下文解析（迁移自 pi-tools `pi-context/{task-gate,context-resolver}.ts`）
  *
- * 门：阈值（auto-compact.ts）+ 进行中计划任务 + 本会话后台任务（tmux）+ 冷却。
- * 本模块提供后两门的信号与阈值环境变量，纯逻辑 + 只读本地文件/进程。
+ * 门：阈值（auto-compact.ts）+ 进行中计划任务 + 本会话后台任务（tmux）+ 空闲门（IDLE_MS）+ 冷却。
+ * 本模块提供各门的信号与阈值环境变量，纯逻辑 + 只读本地文件/进程。
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -21,6 +21,17 @@ export const ABSOLUTE_TOKENS = envNum('PI_CONTEXT_ABSOLUTE_TOKENS', 256_000);
 export const RESTART_TOKENS = envNum('PI_CONTEXT_RESTART_TOKENS', 100_000);
 /** 压缩冷却（默认 10 分钟） */
 export const COMPACT_COOLDOWN_MS = envNum('PI_CONTEXT_COMPACT_COOLDOWN_MS', 10 * 60_000);
+/**
+ * 空闲门限（默认 10 分钟）：距用户上次输入或任务完成不足该时长时**不**自动压缩。
+ * 与阈值/任务门同属原实现的压缩三重门；活跃工作时压缩会打断思路，且压缩本身会让前缀缓存
+ * 整体失效（下一轮全量未命中）。`PI_CONTEXT_IDLE_MS=0` 关闭此门。
+ */
+export const IDLE_MS = (() => {
+  const raw = process.env.PI_CONTEXT_IDLE_MS;
+  if (raw === undefined || raw.trim() === '') return 10 * 60_000;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 10 * 60_000;
+})();
 /** 任务门开关（PI_CONTEXT_TASK_GATE=off 关闭） */
 export const TASK_GATE = process.env.PI_CONTEXT_TASK_GATE !== 'off';
 

@@ -27,6 +27,23 @@ export function extractUserRequest(messages: readonly unknown[], maxLen = 200): 
 
 // ── 压缩任务门（门1）：有进行中的计划任务时不自动压缩 ──
 
+/**
+ * 压缩空闲门（门3）：距用户上次输入或任务完成不足 IDLE_MS 时不允许自动压缩。
+ * 原实现见 pi-tools `pi-context/auto-compact-controller.ts`（IDLE_MS 默认 10 分钟）。
+ * `idleMs <= 0` 关闭该门；两个活动时刻均无记录（0）时视为通过，不阻塞。
+ */
+export function passesIdleGate(params: {
+  idleMs: number;
+  lastUserActivityTs: number;
+  taskDoneAt: number;
+  now: number;
+}): boolean {
+  if (params.idleMs <= 0) return true;
+  const lastActivity = Math.max(params.lastUserActivityTs, params.taskDoneAt);
+  if (lastActivity <= 0) return true;
+  return params.now - lastActivity >= params.idleMs;
+}
+
 export function hasInProgressTask(tasks: readonly { status: string }[]): boolean {
   return tasks.some((t) => t.status === 'in_progress');
 }

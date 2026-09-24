@@ -1,30 +1,152 @@
-# context/budget — 上下文预算与收敛
+# context/budget/warm-prefix — 暖前缀重放
 
-`context` 的预算子包：token 记账、剪枝、压缩、工具分层、thinking 档位、任务记账与门控。
-全部为纯逻辑（零 Pi 依赖），由 `../index.ts` 的钩子驱动。
+迁移自 pi-tools `agent/extensions/pi-context/warm-prefix-replay.ts` 的纯逻辑部分。
 
-## 文件
+## 职责
 
-| 文件 | 职责 | 主要导出 |
-|------|------|----------|
-| `budget.ts` | 预算总量/上下文窗口/工具用量/输出预算/缓存统计 | `setTotalBudget`、`setContextWindow`、`setCompactThreshold`、`recordToolUsage`、`getBudgetReport`、`getTokenPressureTag`、`estimateTokens`、`truncateByTokens`、`recordOutput`、`pruneToolOutput`、`recordCacheUsage`、`getCacheStats` |
-| `prune.ts` | 消息级剪枝（thinking / tool_result）、擦除标记与 ref、清理 | `pruneMessageText`、`pruneToolResults`、`pruneThinkingBudget`、`sweepPruneRefs`、`isPrunedMessage` |
-| `auto-compact.ts` | 压缩阈值决策与自动继续门 | `computeCompactThreshold`、`makeCompactDecider`、`makeAutoContinueGate` |
-| `compression.ts` | 压缩前快照、JSON 收缩、快照清理 | `snapshotBeforeCompact`、`compactJson`、`pruneSnapshots` |
-| `output-archive.ts` | 大工具输出落盘 + 占位 stub | `archiveOutput`、`archivedStub`、`archiveDir` |
-| `prune-dump.ts` | 擦除原文落盘 ref（可回溯） | `buildPruneDumpRef`、`pruneRefsDir` |
-| `tool-groups.ts` | 工具分组与休眠组定义 | `CORE_TOOLS`、`SLEEPING_GROUPS`、`computeActiveTools`、`buildSleepingSummary` |
-| `tool-layering.ts` | 按需加载（休眠组启用） | `applyToolLayering`、`dormantToolsActive`、`enableGroup`、`buildToolsReport` |
-| `thinking-level.ts` | thinking 档位自适应切档 + 审计 | `inferTaskType`、`tickThinkingLevel`、`proposeThinkingLevel`、`recordLevelChange`、`loadLevelChanges` |
-| `task-record.ts` | 每轮任务结构记录（JSONL） | `recordTaskRecord`、`loadTaskRecords` |
-| `task-gate.ts` | 压缩门控（背景任务/环境阈值/上下文回退） | `resolveContext`、`hasBackgroundTask`、`readEnvRatio` |
-| `tool-health.ts` | 连续失败熔断 + 错误输出脱水 | `updateFailStreak`、`dehydrateErrorOutput`、`rebuildTextContent` |
-| `token-speed.ts` | 输出速度（tokens/s）跟踪与格式化 | `createSpeedTracker`、`estimateTokensFromChars`、`formatSpeed`、`formatSpeedCompact` |
+处理特定模型（deepseek/qwen/kimi/moonshot/glm/zhipu/doubao/gemini/gpt/o1）的暖前缀重放逻辑：
+
+1. **状态管理**：追踪最后模型、请求 payload、压缩暖前缀允许状态
+2. **模型匹配**：识别需要重放前缀的模型
+3. **摘要检测**：识别 `<conversation>` 标签的摘要消息
+4. **前缀提取**：从摘要消息中提取 tail 内容
+5. **重放判定**：判断是否需要重放前缀，并构建完整请求
+6. **暖前缀提供**：为压缩操作提供暖前缀数据
+
+## 纯逻辑 API
+
+### 类型
+
+```typescript
+interface WarmPrefixState {
+  lastModelKey: string;
+  lastRequestPayload: { messages: unknown[]; tools?: unknown } | null;
+  compactWarmAllowed: boolean;
+}
+```
+
+### 工厂函数
+
+- `createWarmPrefixState()` - 创建初始状态
+
+### 检测函数
+
+- `needsWarmPrefix(modelKey: string): boolean` - 检查模型是否需要重放前缀
+- `isSummarizationMessage(message: { role?: string; content?: unknown }): boolean` - 检查是否为摘要消息
+- `canReplayWarmPrefix(state, modelKey, messages): boolean` - 检查是否可以重放前缀
+- `canProvideWarmPrefix(state, modelKey): boolean` - 检查是否可以提供暖前缀数据
+
+### 提取函数
+
+- `extractMessageText(content: unknown): string` - 从消息内容中提取文本
+- `extractTailFromSummarization(content: string): string | null` - 从摘要中提取 tail
+
+### 构建函数
+
+- `buildReplayedPayload(state, messages, payload): Record<string, unknown> | null` - 构建重放后的完整请求
+- `buildWarmPrefixData(state): { systemPrompt: string; tools: unknown; messages: unknown[] } | null` - 构建暖前缀数据
+
+### 状态更新函数
+
+- `saveMainRequestPayload(state, modelKey, messages, tools?)` - 保存主请求 payload
+- `updateCompactWarmAllowed(state, reason, contextWindow, tokensBefore)` - 更新压缩暖前缀允许状态
+
+### 常量
+
+- `AUTO_PREFIX_CACHE_RE` / `AUTO_PREFIX_CACHE_REGEX` - 需要重放前缀的模型正则
+- `CONV_TAG_RE` / `CONV_TAG_REGEX` - 摘要标签正则
+- `MIN_TAIL_LENGTH` - 最小 tail 长度阈值
+
+## 使用方式
+
+### 在适配器层接线
+
+```typescript
+// 在 custom/adapters/ 创建 warm-prefix-adapter.ts
+
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import {
+  createWarmPrefixState,
+  needsWarmPrefix,
+  saveMainRequestPayload,
+  buildReplayedPayload,
+  updateCompactWarmAllowed,
+  buildWarmPrefixData,
+  canProvideWarmPrefix,
+} from '../features/context/budget/warm-prefix';
+
+export function registerWarmPrefix(pi: ExtensionAPI): void {
+  const state = createWarmPrefixState();
+
+  // 1. 在 before_provider_request 钩子中保存主请求并重放前缀
+  pi.on('before_provider_request', async (event) => {
+    const payload = event.payload as { messages?: unknown[]; tools?: unknown };
+    const modelKey = event.model?.id ?? '';
+    const msgs = payload?.messages;
+
+    if (!Array.isArray(msgs) || msgs.length === 0) return undefined;
+
+    // 保存主请求（非摘要消息时）
+    const last = msgs[msgs.length - 1] as { role?: string; content?: unknown };
+    const isSummary = last.role === 'user' && 
+      typeof last.content === 'string' && 
+      /<conversation>/.test(last.content);
+    
+    if (!isSummary) {
+      saveMainRequestPayload(state, modelKey, msgs, payload.tools);
+      return undefined;
+    }
+
+    // 重放前缀
+    const replayed = buildReplayedPayload(state, msgs, payload);
+    return replayed ?? undefined;
+  });
+
+  // 2. 在 session_before_compact 钩子中更新压缩暖前缀允许状态
+  pi.on('session_before_compact', (event, ctx) => {
+    const w = ctx.model?.contextWindow ?? 0;
+    updateCompactWarmAllowed(
+      state,
+      event.reason,
+      w,
+      event.preparation.tokensBefore,
+    );
+  });
+
+  // 3. 注册暖前缀提供器（如 Pi 支持）
+  (async () => {
+    try {
+      const piAgent = await import('@earendil-works/pi-coding-agent');
+      const setCompactionWarmPrefixProvider = (piAgent as any).setCompactionWarmPrefixProvider;
+      if (typeof setCompactionWarmPrefixProvider === 'function') {
+        setCompactionWarmPrefixProvider(() => {
+          if (!canProvideWarmPrefix(state, state.lastModelKey)) return null;
+          return buildWarmPrefixData(state);
+        });
+      }
+    } catch {
+      // 补丁未应用时静默降级
+    }
+  })();
+}
+```
+
+### 在 bootstrap 中注册
+
+```typescript
+// 在 custom/bootstrap.ts 中
+import { registerWarmPrefix } from './adapters/warm-prefix-adapter';
+
+registerWarmPrefix(pi);
+```
 
 ## 缓存纪律
 
-注入相关文本保持稳定前缀，不注入精确 token 数值；压缩/压力提示为静态文本。
+- 所有正则表达式为常量，保证稳定性
+- 不注入时间戳或精确数值
+- 状态管理通过明确的接口进行
 
 ## 相关
 
 - 上层：[../README.md](../README.md)
+- 预算模块：[budget.ts](./budget.ts)

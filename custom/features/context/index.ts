@@ -21,6 +21,7 @@ import {
   LOW_PRESSURE_DELEGATION,
   FULL_DELEGATION_ADVICE,
   hasInProgressTask,
+  passesIdleGate,
   extractUserRequest,
 } from './logic';
 import { recordTaskRecord } from './budget/task-record';
@@ -54,10 +55,12 @@ import { pruneToolResults, sweepPruneRefs } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
 import { createSpeedTracker, formatSpeedCompact } from './budget/token-speed';
+import { recordUsage } from './usage-diag/diag';
 import {
   ABSOLUTE_TOKENS,
   RESTART_TOKENS,
   COMPACT_COOLDOWN_MS,
+  IDLE_MS,
   TASK_GATE,
   readEnvRatio,
   resolveContext,
@@ -90,6 +93,10 @@ export function register(pi: ExtensionAPI): void {
   const thinkingAutoEnabled = process.env.PI_CONTEXT_THINKING_AUTO !== 'off';
   const speedTracker = createSpeedTracker();
   let lastSpeedUiAt = 0;
+  // 门3（空闲判定）状态：用户上次输入时刻、任务忙→闲的转折时刻、上轮任务是否忙
+  let lastUserActivityTs = 0;
+  let taskDoneAt = 0;
+  let taskBusyPrev: boolean | null = null;
 
   // 注册命令：/context - 上下文预算查看
   registerCommand(pi, 'context', {
@@ -386,11 +393,27 @@ export function register(pi: ExtensionAPI): void {
       setContextWindow(resolved.window);
       setUsedTokens(resolved.tokens);
       // 门1：有进行中的计划任务时不自动压缩（PI_CONTEXT_TASK_GATE=off 可关）
-      if (TASK_GATE && hasInProgressTask(getTodos())) return;
-      // 门2b：本会话仍有后台任务（tmux）时不自动压缩
+      // 同时追踪任务忙→闲转折点，供门3（空闲判定）使用
+      const taskBusy = TASK_GATE && hasInProgressTask(getTodos());
+      if (taskBusyPrev === true && !taskBusy) taskDoneAt = Date.now();
+      taskBusyPrev = taskBusy;
+      if (taskBusy) return;
+      // 门2：本会话仍有后台任务（tmux）时不自动压缩
       if (hasBackgroundTask()) return;
       const decision = compactDecider.decide(resolved.tokens, resolved.window);
       if (!decision.shouldCompact) return;
+      // 门3：距用户上次输入或任务完成不足 IDLE_MS 不压缩（活跃工作时压缩会打断思路，
+      // 且压缩使前缀缓存整体失效、下一轮全量未命中）。PI_CONTEXT_IDLE_MS=0 可关。
+      if (
+        !passesIdleGate({
+          idleMs: IDLE_MS,
+          lastUserActivityTs,
+          taskDoneAt,
+          now: Date.now(),
+        })
+      ) {
+        return;
+      }
       // 压缩前快照（保留最近 8 份/7 天，失败不阻塞压缩）
       snapshotBeforeCompact(lastContextMessages, resolved.tokens, decision.threshold, 'threshold');
       compactedThisSettlement = true;
@@ -401,6 +424,14 @@ export function register(pi: ExtensionAPI): void {
   });
 
   // 输出速度：turn_start 计时，message_update 实时估算，turn_end 用真实 output token 结算
+  // 用户输入：记录活动时刻（门3 空闲判定用；工具续轮不触发此事件）
+  registerHook(pi, {
+    event: 'input',
+    handler: () => {
+      lastUserActivityTs = Date.now();
+    },
+  });
+
   registerHook(pi, {
     event: 'turn_start',
     handler: (_event, ctx) => {
@@ -429,9 +460,42 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'turn_end',
     handler: (event, ctx) => {
+      const msg = (event as {
+        message?: {
+          usage?: {
+            input?: number;
+            output?: number;
+            cacheRead?: number;
+            cacheWrite?: number;
+            reasoning?: number;
+            totalTokens?: number;
+          };
+        };
+      }).message;
+      const usage = msg?.usage;
+      // 每轮用量落盘（headless 也记录）：用于定位 token 消耗大头（input 未命中/cacheRead/output）
+      if (usage) {
+        try {
+          const input = usage.input ?? 0;
+          const cacheRead = usage.cacheRead ?? 0;
+          const cacheWrite = usage.cacheWrite ?? 0;
+          const output = usage.output ?? 0;
+          recordUsage({
+            ts: Date.now(),
+            input,
+            cacheRead,
+            cacheWrite,
+            output,
+            reasoning: usage.reasoning ?? 0,
+            total: usage.totalTokens ?? input + cacheRead + cacheWrite + output,
+            contextTokens: ctx.getContextUsage?.()?.tokens ?? 0,
+          });
+        } catch {
+          /* 诊断记录失败不影响回合 */
+        }
+      }
       if (!ctx.hasUI) return;
-      const msg = (event as { message?: { usage?: { output?: number } } }).message;
-      const tps = speedTracker.finishTurn(msg?.usage?.output ?? 0, Date.now());
+      const tps = speedTracker.finishTurn(usage?.output ?? 0, Date.now());
       if (tps !== null) ctx.ui.setStatus('tps', formatSpeedCompact(tps));
     },
   });
