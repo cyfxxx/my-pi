@@ -136,6 +136,26 @@ export function getDiagFile(): string {
   return process.env.PI_USAGE_DIAG_FILE || defaultDiagFile();
 }
 
+/** 读取诊断文件为 JSONL 行（跳过损坏行；文件不存在时返回空） */
+export function loadDiagLines(): DiagLine[] {
+  const file = getDiagFile();
+  try {
+    if (!existsSync(file)) return [];
+    const out: DiagLine[] = [];
+    for (const line of readFileSync(file, 'utf-8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        out.push(JSON.parse(line) as DiagLine);
+      } catch {
+        /* 跳过损坏行 */
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 function rotateIfNeeded(): void {
   linesSinceCheck++;
   if (linesSinceCheck < CHECK_EVERY) return;

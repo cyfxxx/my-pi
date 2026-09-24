@@ -25,9 +25,23 @@ readonly: true
 ## 相关文件
 列出精确行号范围：
 1. `path/to/file.ts` (第 10-50 行) - 内容说明
+2. `path/to/other.ts` (第 100-150 行) - 内容说明
+3. ...
 
 ## 关键代码
-关键类型、接口、函数。
+关键类型、接口、函数：
+
+```typescript
+interface Example {
+  // 文件中的实际代码
+}
+```
+
+```typescript
+function keyFunction() {
+  // 实际实现
+}
+```
 
 ## 架构说明
 各模块如何关联。

@@ -55,7 +55,7 @@ import { pruneToolResults, sweepPruneRefs } from './budget/prune';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
 import { createSpeedTracker, formatSpeedCompact } from './budget/token-speed';
-import { recordUsage } from './usage-diag/diag';
+import { recordUsage, loadDiagLines, formatUsageSummary } from './usage-diag/diag';
 import {
   ABSOLUTE_TOKENS,
   RESTART_TOKENS,
@@ -110,6 +110,16 @@ export function register(pi: ExtensionAPI): void {
   let taskBusyPrev: boolean | null = null;
 
   // 注册命令：/context - 上下文预算查看
+  // 命令：/usage-diag — 会话用量诊断汇总（不进 LLM 上下文）
+  registerCommand(pi, 'usage-diag', {
+    description: '显示会话 LLM 用量诊断（每轮 input/缓存/输出汇总）',
+    handler: async (_args, ctx) => {
+      const content = formatUsageSummary(loadDiagLines());
+      ctx?.ui?.notify?.(`usage-diag: ${content.split('\n').length} 行，已发送到聊天（不进 LLM 上下文）。`, 'info');
+      sendMessage(pi, { customType: 'usage-diag', content, display: true }, { triggerTurn: false });
+    },
+  });
+
   registerCommand(pi, 'context', {
     description: '查看上下文预算与 token 用量',
     getArgumentCompletions: (prefix) => {
