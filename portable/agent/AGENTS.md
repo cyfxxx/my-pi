@@ -1,6 +1,6 @@
 # my-pi 项目环境描述
 
-my-pi 是基于 pi 框架的私人 AI 助手（硬分叉）。本目录 `portable/agent/` 是 **pi 的运行时根目录（agentDir，由 `PI_CODING_AGENT_DIR` 指向）**。按 pi 的 agentDir 约定，这里除配置外还承载**技能（`skills/`）、会话（`sessions/`）与安装的扩展（`extensions/`、`npm/`、`git/`）**。
+my-pi 是基于 pi 框架的私人 AI 助手（硬分叉）。本目录 `portable/agent/` 是 **pi 的运行时根目录（agentDir，由 `PI_CODING_AGENT_DIR` 指向）**。按 pi 的 agentDir 约定，这里除配置外还承载**技能（`skills/`）、会话（`sessions/`），以及第三方扩展安装位（`extensions/`、`npm/`、`git/`——当前未安装任何第三方扩展，故这三个目录不存在，安装时由 pi 自动创建）**。
 
 边界是：**my-pi 自身的代码不放此处**（代码在 `custom/`，改动经 `adapters/` 接入），此处也不放任何符号链接。
 
@@ -49,7 +49,7 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-st
 
 - 技能：`portable/agent/skills/`（= `agentDir/skills`，随仓库分发）；`settings.json` 的 `"skills"` 数组是相对 `agentDir` 的覆盖模式（如 `+skills/pi-backup/SKILL.md`）
 - 会话：`portable/agent/sessions/<转义 cwd>/*.jsonl`
-- 第三方扩展：`portable/agent/extensions/`（自动发现）或 `./my-pi.sh install` 装入 `portable/agent/{npm,git}/`
+- 第三方扩展：`portable/agent/extensions/`（自动发现）或 `./my-pi.sh install` 装入 `portable/agent/{npm,git}/`；三者均为按需目录，未安装扩展时不出现
 - 自定义功能数据：`portable/memory/`（`PI_MEMORY_DIR`；工具输出归档走 `PI_OUTPUT_ARCHIVE_DIR`，默认 `portable/memory/tool-outputs/`）
 
 运行时数据全部收敛到 `portable/`，实现便携（U 盘即插即用，无符号链接）。
