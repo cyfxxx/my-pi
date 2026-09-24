@@ -16,8 +16,9 @@ import type {
   FallbackModel,
   Task,
   TelemetryEntry,
+  VerifierConfig,
 } from '../types';
-import { TELEMETRY_LIMIT, defaultAutopilotConfig } from '../types';
+import { TELEMETRY_LIMIT, defaultAutopilotConfig, defaultVerifierConfig } from '../types';
 
 // ── settings / models ──
 
@@ -84,6 +85,24 @@ function numericFields(src: unknown, keys: string[]): Record<string, number> {
   return out;
 }
 
+/** 验证器配置解析：非法字段回退默认；非对象/缺省返回 undefined（表示未配置验证） */
+function parseVerifierConfig(raw: unknown): VerifierConfig | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const def = defaultVerifierConfig();
+  const clampNum = (v: unknown, lo: number, hi: number, fallback: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
+  return {
+    enabled: typeof r.enabled === 'boolean' ? r.enabled : def.enabled,
+    nCandidates: clampNum(r.nCandidates, 2, 5, def.nCandidates),
+    verifyAfter: clampNum(r.verifyAfter, 0, Number.MAX_SAFE_INTEGER, def.verifyAfter),
+    threshold: clampNum(r.threshold, 0, 1, def.threshold),
+    maxCostPerVerify: clampNum(r.maxCostPerVerify, 0, Number.MAX_SAFE_INTEGER, def.maxCostPerVerify),
+    logLevel: r.logLevel === 'none' || r.logLevel === 'summary' || r.logLevel === 'full' ? r.logLevel : def.logLevel,
+    ...(typeof r.judgePrompt === 'string' && r.judgePrompt ? { judgePrompt: r.judgePrompt } : {}),
+  };
+}
+
 export function readAutopilotConfig(): ReturnType<typeof defaultAutopilotConfig> {
   const base = defaultAutopilotConfig();
   for (const p of candidatePaths(process.env.PI_AUTOPILOT_CONFIG, 'config.json', '.pi-autopilot-config.json')) {
@@ -109,6 +128,7 @@ export function readAutopilotConfig(): ReturnType<typeof defaultAutopilotConfig>
           ...base.policy,
           ...numericFields(raw.policy, ['failoverAfter', 'suspendAfter', 'timeoutFactor', 'maxFailovers', 'verifyAfter']),
         },
+        verifier: parseVerifierConfig(raw.verifier),
       };
     } catch {
       /* 试下一个候选路径 */

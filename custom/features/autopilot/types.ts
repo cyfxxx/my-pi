@@ -82,6 +82,8 @@ export interface AutopilotConfig {
   requeueOnRestart: boolean;
   budget: AutopilotBudget;
   policy: AutopilotPolicy;
+  /** LLM-as-a-Verifier 配置（可选，不配置则不启用验证） */
+  verifier?: VerifierConfig;
 }
 
 export interface TelemetryEntry {

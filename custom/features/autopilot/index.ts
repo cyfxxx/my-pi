@@ -58,6 +58,9 @@ import {
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
 import { runTaskOnce } from './run/runner';
+import { registerAdminTools } from './tools/admin-tools';
+import { registerScheduleTool } from './tools/schedule-tool';
+import { registerVerifyTools } from './tools/verify-tools';
 
 function fmtTask(t: Task): string {
   const flag = t.enabled ? '●' : '○';
@@ -67,6 +70,10 @@ function fmtTask(t: Task): string {
 }
 
 export function register(pi: ExtensionAPI): void {
+  // ── 工具：admin（状态/模型/配置）、autopilot_policy、schedule_task、verify_* ──
+  registerAdminTools(pi);
+  registerScheduleTool(pi);
+  registerVerifyTools(pi);
 
   // ── 工具：状态/统计/失败转移 ──
   registerTool(pi, {

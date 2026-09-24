@@ -41,6 +41,12 @@ export interface ToolExecuteContext {
   model?: { id?: string; provider?: string };
   /** 当前工作目录（缺省时 features 回退 process.cwd()） */
   cwd?: string;
+  /** 单选（ask_user / plan_exit 等用）；pi 未提供时 undefined */
+  select?: (title: string, options: string[]) => Promise<string | undefined>;
+  /** 多行文本输入（ask_user 的「其他」分支）；pi 未提供时 undefined */
+  editor?: (title: string, prefill?: string) => Promise<string | undefined>;
+  /** 本轮工具调用的中止信号（ctx_exec 等长任务用；pi 未提供时为 undefined） */
+  signal?: AbortSignal;
 }
 
 /**
@@ -88,7 +94,7 @@ function buildParameterSchema(parameters: Record<string, ToolParameter>): TSchem
 }
 
 /** 由 Pi 的 ExtensionContext 提取稳定子集（缺项安全降级） */
-function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
+function buildExecuteContext(piCtx: unknown, signal?: AbortSignal): ToolExecuteContext | undefined {
   if (!piCtx || typeof piCtx !== 'object') return undefined;
   const c = piCtx as {
     hasUI?: boolean;
@@ -99,6 +105,8 @@ function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
     ui?: {
       confirm?: (title: string, message: string) => Promise<boolean>;
       notify?: (message: string, level?: string) => void;
+      select?: (title: string, options: string[]) => Promise<string | undefined>;
+      editor?: (title: string, prefill?: string) => Promise<string | undefined>;
     };
   };
   const model =
@@ -112,6 +120,9 @@ function buildExecuteContext(piCtx: unknown): ToolExecuteContext | undefined {
     shutdown: typeof c.shutdown === 'function' ? () => c.shutdown!() : undefined,
     sessionFile: typeof c.sessionManager?.getSessionFile === 'function' ? c.sessionManager.getSessionFile() : undefined,
     model,
+    select: typeof c.ui?.select === 'function' ? (t, o) => c.ui!.select!(t, o) : undefined,
+    editor: typeof c.ui?.editor === 'function' ? (t, p) => c.ui!.editor!(t, p) : undefined,
+    signal,
     cwd: typeof c.cwd === 'string' ? c.cwd : undefined,
   };
 }
@@ -135,7 +146,7 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
       piCtx?: unknown,
     ) => {
       // 不吞异常：Pi 会捕获抛出的错误并标记 isError，模型才能感知工具失败。
-      const result = await def.execute(params as Record<string, unknown>, buildExecuteContext(piCtx));
+      const result = await def.execute(params as Record<string, unknown>, buildExecuteContext(piCtx, _signal));
       return {
         content: [{ type: 'text', text: result }],
         details: undefined,

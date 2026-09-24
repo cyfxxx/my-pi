@@ -9,6 +9,8 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
+import { runAskUser } from './core/ask-user';
+import type { AskUserParams } from './core/ask-user';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   registerCommand,
@@ -102,6 +104,66 @@ export function register(pi: ExtensionAPI): void {
     }
     appendEntry(pi, 'plan-mode', { enabled, timestamp: Date.now() });
   };
+
+  // ── ask_user（向用户提问取回选择）──
+  registerTool(pi, {
+    name: 'ask_user',
+    description:
+      '向用户提问并获取选择回答。当需要用户决策、确认下一步操作、或获取用户偏好时使用。返回所选选项标签，或用户输入的补充说明（以「其他:」开头）。',
+    parameters: {
+      question: { type: 'string', description: '问题内容' },
+      header: { type: 'string', description: '简短标签（显示在选择器标题）', optional: true },
+      options: { type: 'json', description: '选项数组（至少 2 个）：[{label, description?}]' },
+      multiple: { type: 'boolean', description: '是否允许多选（默认 false）', optional: true },
+    },
+    execute: async (params, ctx) => {
+      if (!ctx?.select || !ctx?.editor) return 'Error: 当前环境不支持交互式提问（无 UI）';
+      const options = Array.isArray(params.options) ? (params.options as AskUserParams['options']) : [];
+      return runAskUser(
+        { select: ctx.select, editor: ctx.editor },
+        {
+          question: params.question as string,
+          header: params.header as string | undefined,
+          options,
+          multiple: params.multiple as boolean | undefined,
+        },
+      );
+    },
+  });
+
+  // ── plan_enter / plan_exit（模型侧计划模式切换，与 /plan enter|exit 等价）──
+  registerTool(pi, {
+    name: 'plan_enter',
+    description:
+      '进入计划模式（只读探索）：禁用 edit/write/bash，可安全调研后制定计划。已在计划模式时无操作。',
+    parameters: {},
+    execute: async (_params, ctx) => {
+      if (planModeEnabled) return '已在计划模式（只读）。';
+      applyPlanMode(true);
+      ctx?.notify?.('规划模式已启用（模型主动）。');
+      return '已进入计划模式（只读）。用 read/bash/grep 探索后，可调用 plan_exit 退出（需用户确认）。';
+    },
+  });
+
+  registerTool(pi, {
+    name: 'plan_exit',
+    description:
+      '请求退出计划模式，恢复执行权限。退出需用户确认：弹选择器后确认生效，取消则保持计划模式。不在计划模式时无操作。',
+    parameters: {},
+    execute: async (_params, ctx) => {
+      if (!planModeEnabled) return '不在计划模式。';
+      const choice = ctx?.select
+        ? await ctx.select('模型请求退出计划模式（恢复编辑权限）？', ['确认退出', '取消（继续计划模式）'])
+        : undefined;
+      if (choice !== '确认退出') {
+        ctx?.notify?.('已取消退出计划模式，保持只读。');
+        return '用户取消了退出请求，继续保持计划模式（只读）。等待用户输入。';
+      }
+      applyPlanMode(false);
+      ctx?.notify?.('规划模式已禁用（用户确认）。完整权限已恢复。');
+      return '用户已确认退出计划模式，恢复完整权限。';
+    },
+  });
 
   // ── todo 工具 ──
   registerTool(pi, {

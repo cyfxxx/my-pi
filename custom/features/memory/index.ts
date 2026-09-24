@@ -13,6 +13,9 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { randomUUID } from 'node:crypto';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
+import { registerNotesTools } from './tools/notes-tools';
+import { registerCheckpointTools } from './tools/checkpoint-tools';
+import { registerExecTool } from './tools/exec-tool';
 import { registerCommand } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
@@ -51,6 +54,13 @@ import {
 import type { MemoryCategory, MemoryEntry, RuntimeEnv } from './logic';
 
 export function register(pi: ExtensionAPI): void {
+  // ── ctx_note / ctx_list（便笺，跨压缩存活）──
+  registerNotesTools(pi);
+  // ── ctx_snap（便笺检查点）──
+  registerCheckpointTools(pi);
+  // ── ctx_exec（子进程执行代码，仅 stdout 入上下文）──
+  registerExecTool(pi);
+
   // ── memory_store ──
   registerTool(pi, {
     name: 'memory_store',

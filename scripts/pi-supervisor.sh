@@ -189,6 +189,9 @@ while true; do
     fi
   fi
 
+  # 每轮重置：防上一轮的 --provider/--model/--session 残留累积（对应原 wrapper 的
+  # 「Reset extra args each iteration to avoid accumulation」）
+  EXTRA_ARGS=()
   apply_mode
   log "启动 Pi..."
   CRASH_LOG="/tmp/my-pi-crash-$$.log"
@@ -203,12 +206,15 @@ while true; do
       restart|restart_hang)
         log "admin 请求重启（$ACT），重新启动..."
         clear_admin_action
-        # 显式 --session 恢复当前会话，不再依赖「最近修改会话」推断
+        # 优先 --session 精确恢复当前会话；缺失时回退 --continue 恢复最近会话。
+        # 绝不能空参启动：空参会让 pi 新建会话（每次都要手动恢复的根因；
+        # 原项目 pi-wrapper.sh 的重启分支同样以 --continue 兜底）。
         if [ -n "$TARGET" ]; then
           log "恢复会话: $TARGET"
           EXTRA_ARGS=(--session "$TARGET")
         else
-          EXTRA_ARGS=()
+          log "未指定会话，回退 --continue 恢复最近会话"
+          EXTRA_ARGS=(--continue)
         fi
         continue
         ;;
@@ -219,6 +225,8 @@ while true; do
           EXTRA_ARGS=(--provider "$PROV" --model "$MODEL")
           if [ -n "$TARGET" ]; then
             EXTRA_ARGS+=(--session "$TARGET")
+          else
+            EXTRA_ARGS+=(--continue)
           fi
           continue
         fi
@@ -228,8 +236,12 @@ while true; do
           log "admin 请求切换会话: $TARGET"
           clear_admin_action
           EXTRA_ARGS=(--session "$TARGET")
-          continue
+        else
+          log "切换会话缺少目标，回退 --continue"
+          clear_admin_action
+          EXTRA_ARGS=(--continue)
         fi
+        continue
         ;;
     esac
     exit "$EXIT_CODE"
