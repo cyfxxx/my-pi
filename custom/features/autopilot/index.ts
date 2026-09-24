@@ -58,6 +58,7 @@ import {
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
 import { runTaskOnce } from './run/runner';
+import { sendWebhook } from './store/webhook';
 import { registerAdminTools } from './tools/admin-tools';
 import { registerScheduleTool } from './tools/schedule-tool';
 import { registerVerifyTools } from './tools/verify-tools';
@@ -437,6 +438,10 @@ export function register(pi: ExtensionAPI): void {
           errClass: r.result === 'failed' ? classifyError(r.stderr || r.output, r.exitCode) : null,
         });
         await updateTaskAfterRun(task.id, r.result, r.output, r.durationMs);
+        // 完成通知：任务显式开启 notifyOnCompletion 且配了 webhookUrl/PI_SCHEDULER_WEBHOOK 时发送
+        if (task.notifyOnCompletion) {
+          void sendWebhook(task, r.result, r.output);
+        }
         if (r.result === 'failed') {
           const errClass = classifyError(r.stderr || r.output, r.exitCode);
           const decision = decide(task, errClass, c.policy, c.fallbackModels, {

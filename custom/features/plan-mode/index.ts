@@ -10,6 +10,7 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { runAskUser } from './core/ask-user';
+import { renderPlanFile, writePlanFile, cleanupOldPlans, restoreStateFromPlans, listPlans } from './core/plans';
 import type { AskUserParams } from './core/ask-user';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
@@ -71,6 +72,7 @@ const PLAN_USAGE = [
   '/plan exit             退出规划模式（保留任务）',
   '/plan resume           退出并继续未完成计划',
   '/plan todos            按状态分组显示计划任务',
+  '/plan plans            列出历史计划文件（plan.md）',
   '/plan clear            清空所有计划任务',
   '/plan help             显示本帮助（Ctrl+Alt+P 切换）',
 ].join('\n');
@@ -81,6 +83,26 @@ export function register(pi: ExtensionAPI): void {
   // 以免抹掉进入前用户/其他 feature 已禁用的工具。
   let savedActiveTools: string[] | null = null;
   const overlay = new TodoOverlay();
+  // 计划落盘：任务状态变化时同步 plan-<ts>/plan.md（供重启后磁盘恢复）
+  let planStamp = Date.now();
+  const syncPlanToFile = (): void => {
+    try {
+      const st = getState();
+      if (st.tasks.length === 0) return;
+      writePlanFile(planStamp, renderPlanFile(st.tasks, st.nextId));
+      cleanupOldPlans();
+    } catch {
+      /* 落盘失败不影响任务操作 */
+    }
+  };
+  // 重启兜底：内存无任务时从最新「未完成且在 7 天内」的计划恢复
+  if (getState().tasks.length === 0) {
+    const restored = restoreStateFromPlans();
+    if (restored) {
+      commitState(restored.state);
+      planStamp = restored.ts;
+    }
+  }
 
   const restoreAllTools = (): void => {
     if (savedActiveTools) {
@@ -187,6 +209,7 @@ export function register(pi: ExtensionAPI): void {
       }
       const result = applyTaskMutation(getState(), action, params as TaskMutationParams);
       commitState(result.state);
+      syncPlanToFile();
       try {
         overlay.update();
       } catch {
@@ -206,6 +229,7 @@ export function register(pi: ExtensionAPI): void {
         { value: 'exit', label: 'exit', description: '退出规划模式（保留任务）' },
         { value: 'resume', label: 'resume', description: '退出并继续未完成计划' },
         { value: 'todos', label: 'todos', description: '按状态分组显示计划任务' },
+        { value: 'plans', label: 'plans', description: '列出历史计划文件（plan.md）' },
         { value: 'clear', label: 'clear', description: '清空所有计划任务' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
@@ -234,6 +258,16 @@ export function register(pi: ExtensionAPI): void {
         if (planModeEnabled) applyPlanMode(false);
         overlay.update();
         ctx.ui.notify('计划模式已禁用。完整访问已恢复。', 'info');
+        return;
+      }
+      if (sub === 'plans') {
+        const plans = listPlans();
+        if (plans.length === 0) {
+          ctx.ui.notify('暂无历史计划（任务变化时自动落盘到 <memoryDir>/plans/plan-<ts>/plan.md）。', 'info');
+          return;
+        }
+        const lines = plans.map((p) => `  ${new Date(p.ts).toISOString()}  ${p.path}`).join('\n');
+        ctx.ui.notify(`历史计划（${plans.length}）：\n${lines}`, 'info');
         return;
       }
       if (sub === 'clear') {
