@@ -156,6 +156,11 @@ ensure_cache_build() {
 # ── 主循环 ──
 ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" "$@")
 
+# 脚本自重载：保存原始参数与当前脚本哈希，供主循环检测变更后 exec 自身。
+USER_ARGS=("$@")
+SELF="${BASH_SOURCE[0]}"
+SELF_HASH="$(sha256sum "$SELF" 2>/dev/null | cut -c1-16)"
+
 if [ "${MY_PI_NO_SUPERVISOR:-0}" = "1" ]; then
   apply_mode
   exec node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}"
@@ -172,6 +177,18 @@ LAST_CLASS=""
 EXTRA_ARGS=()
 
 while true; do
+  # supervisor 脚本自身变更检测：改脚本后无需手工重跑 my-pi.sh，
+  # pi 退出回到主循环时自动 exec 载入新脚本（此时 pi 未运行，不会中断会话）。
+  NOW_HASH="$(sha256sum "$SELF" 2>/dev/null | cut -c1-16)"
+  if [ -n "$NOW_HASH" ] && [ -n "$SELF_HASH" ] && [ "$NOW_HASH" != "$SELF_HASH" ]; then
+    log "supervisor 脚本已更新（$SELF_HASH → $NOW_HASH），重载自身"
+    if [ "${#USER_ARGS[@]}" -gt 0 ]; then
+      exec bash "$SELF" "${USER_ARGS[@]}"
+    else
+      exec bash "$SELF"
+    fi
+  fi
+
   apply_mode
   log "启动 Pi..."
   CRASH_LOG="/tmp/my-pi-crash-$$.log"
