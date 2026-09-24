@@ -93,6 +93,8 @@ export function readAutopilotConfig(): ReturnType<typeof defaultAutopilotConfig>
         enabled: typeof raw.enabled === 'boolean' ? raw.enabled : base.enabled,
         maxIdleMinutes: positiveNum(raw.maxIdleMinutes, base.maxIdleMinutes),
         requeueOnRestart: typeof raw.requeueOnRestart === 'boolean' ? raw.requeueOnRestart : base.requeueOnRestart,
+        watchdogAutoRestart:
+          typeof raw.watchdogAutoRestart === 'boolean' ? raw.watchdogAutoRestart : base.watchdogAutoRestart,
         fallbackModels: Array.isArray(raw.fallbackModels)
           ? (raw.fallbackModels as typeof base.fallbackModels)
           : base.fallbackModels,

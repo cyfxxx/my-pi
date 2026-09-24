@@ -50,6 +50,8 @@ import {
   setTurnBusy,
   setBackgroundBusy,
   isHanging,
+  isStuckTurn,
+  triggerHangRecovery,
   resetWatchdogState,
   collectMetrics,
   formatMetrics,
@@ -449,8 +451,48 @@ export function register(pi: ExtensionAPI): void {
   };
 
   let hangNotified = false;
+  let hangRecovering = false;
   const checkHang = (ctx: ExtensionContext): void => {
     const c = readAutopilotConfig();
+
+    // 回合卡死（busyTurn 超过 2×maxIdleMinutes 仍无活动）：这是「真卡住」，不是用户空闲。
+    // 仅在此时按配置自动请求重启；会话由 supervisor 以 --session 恢复。
+    if (isStuckTurn(c.maxIdleMinutes)) {
+      if (c.watchdogAutoRestart && !hangRecovering) {
+        let sessionFile: string | undefined;
+        try {
+          sessionFile = ctx.sessionManager.getSessionFile();
+        } catch {
+          /* stale ctx */
+        }
+        if (triggerHangRecovery(c.maxIdleMinutes, Date.now(), sessionFile)) {
+          hangRecovering = true;
+          try {
+            if (ctx.hasUI) {
+              ctx.ui.notify('autopilot: 回合卡死超过宽限期，已请求重启恢复（会话自动恢复）', 'warning');
+            }
+          } catch {
+            /* stale ctx */
+          }
+          ctx.shutdown?.();
+          return;
+        }
+      }
+      if (!hangNotified) {
+        hangNotified = true;
+        try {
+          if (ctx.hasUI) {
+            ctx.ui.notify(`autopilot: 回合卡死超过 ${c.maxIdleMinutes * 2} 分钟，建议手动重启`, 'warning');
+          }
+        } catch {
+          /* stale ctx */
+        }
+      }
+      return;
+    }
+    hangNotified = false;
+
+    // 其余挂死信号（含长时间空闲）仅提示，不自动重启：避免惩罚用户正常离开。
     if (isHanging(c.maxIdleMinutes)) {
       if (!hangNotified) {
         hangNotified = true;

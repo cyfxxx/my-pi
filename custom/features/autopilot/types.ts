@@ -77,6 +77,8 @@ export interface AutopilotConfig {
   enabled: boolean;
   fallbackModels: FallbackModel[];
   maxIdleMinutes: number;
+  /** 回合卡死超过宽限期时自动请求重启恢复（默认 true）；用户单纯空闲不触发 */
+  watchdogAutoRestart: boolean;
   requeueOnRestart: boolean;
   budget: AutopilotBudget;
   policy: AutopilotPolicy;
@@ -121,6 +123,7 @@ export function defaultAutopilotConfig(): AutopilotConfig {
     enabled: true,
     fallbackModels: [],
     maxIdleMinutes: 180,
+    watchdogAutoRestart: true,
     requeueOnRestart: true,
     budget: { maxRunsPerDay: 50, maxCostPerDay: 0 },
     policy: { failoverAfter: 2, suspendAfter: 5, timeoutFactor: 2 },

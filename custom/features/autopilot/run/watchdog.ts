@@ -75,10 +75,26 @@ function latestSessionFile(): string | null {
   return best;
 }
 
+/** 回合进行中的宽限期（毫秒）：超过它仍未结束且无活动，视为卡死。 */
+function busyGraceMs(maxIdleMinutes: number): number {
+  return maxIdleMinutes * 60 * 1000 * BUSY_GRACE_MULTIPLIER;
+}
+
+/**
+ * 回合进行中（busyTurn）超过宽限期仍无活动。
+ * 与「用户空闲」严格区分：空闲时 busyTurn=false，此处返回 false，因此不会因为
+ * 用户离开而触发自动重启；只有回合真的卡住才成立。
+ */
+export function isStuckTurn(maxIdleMinutes: number, now: number = Date.now()): boolean {
+  if (maxIdleMinutes <= 0) return false;
+  if (backgroundBusy) return false;
+  return busyTurn && busySince > 0 && now - busySince > busyGraceMs(maxIdleMinutes);
+}
+
 export function isHanging(maxIdleMinutes: number, now: number = Date.now()): boolean {
   if (maxIdleMinutes <= 0) return false;
   if (backgroundBusy) return false;
-  if (busyTurn && busySince > 0 && now - busySince <= maxIdleMinutes * 60 * 1000 * BUSY_GRACE_MULTIPLIER) {
+  if (busyTurn && busySince > 0 && now - busySince <= busyGraceMs(maxIdleMinutes)) {
     return false;
   }
   const idle = now - lastActivity;
