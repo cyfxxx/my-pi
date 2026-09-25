@@ -26,7 +26,7 @@ patches/
 | 补丁 | 作用 | 目标 |
 |------|------|------|
 | `001-branding.patch` | 将上游 monorepo 名称改为 `my-pi` 并写入 `piConfig` | `vendor/pi/package.json` |
-| `002-local-pi-mods.patch` | 本地 pi 源码改动：项目级 `.pi` 发现、secrets 脱敏、Google `TOO_MANY_TOOL_CALLS`、离线跳过 model-data 校验、tsconfig 排除 `src/custom`、`packages/README.md` | `vendor/pi/packages/**` |
+| `002-local-pi-mods.patch` | 本地 pi 源码改动：项目级 `.pi` 发现、secrets 脱敏、离线跳过 model-data 校验、tsconfig 排除 `src/custom`、`packages/README.md` | `vendor/pi/packages/**` |
 | `003-tab-completion-fix.patch` | `handleTabCompletion` 斜杠命令上下文统一走 `handleSlashCommandCompletion()`，使 `/voice`、`/plan` 等子命令参数补全在 Tab 时可见（对应 pi-tools `patch-tab-arg-completion.mjs`） | `vendor/pi/packages/tui/src/components/editor.ts` |
 | `004-footer-tweaks.patch` | footer 增强（合并 pi-tools 四个 dist 补丁）：实时上下文 token 显示+双指标着色（黄=压缩参考线 `PI_CONTEXT_ABSOLUTE_TOKENS` 默认 256K，红=超窗口 80%）；CH 实时/会话双命中率；`Σ/↑/↓` 字段与人民币成本；>40% 窗口追加 `⚠` 重启提示 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `005-footer-speed-and-scrollback.patch` | ① 输出速度（status key `tps`）并入 footer stats 行并沿用 dim 风格（此前为独立未着色行），其余扩展状态行统一 dim；② regular 模式 `fullRender(true)` 去掉 `ESC[3J`，宽度变化/内容收缩不再清空 scrollback（解决工作过程中无法向上滚动查看历史） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts`、`vendor/pi/packages/tui/src/tui-main-screen.ts` |

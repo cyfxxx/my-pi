@@ -736,3 +736,194 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
   - 子包：`context/budget`、`autopilot/{store,run}`、`memory/{store,recall,mine}`、`plan-mode/{core,ui}`、`subagent/{core,ui}`、`voice/{audio,stt}`。
 - 更新：`custom/README.md`（刷新结构 + 分层链接）、`STRUCTURE.md`（新增「目录内文档」）、`docs/README.md`（目录内文档索引）。
 - 验证：`check-doc-links` 扫描 md 由 42 → 70 且全绿；golden 七项全绿（32 文件 315 用例）。
+
+---
+
+## 第 46 批起（2026-09-23 ~ 09-25，补记）
+
+第 45 批之后有 27 个提交未记入本文件，此处补记波次（详见 `git log 10322227c..HEAD`）：
+
+- **审计修复**：HIGH/MEDIUM 审计问题修复；修正引入的类型/运行时回归；合并重复注入的 AGENTS.md（启动去重）。
+- **模式改档位**：`mode` 由 `full/light/quick` 预设重构为代码内固定 `full`/`minimal` + JSON 可选 `roleplay`（新 schema `features/appendPrompt/memoryNamespace`）。
+- **同步与记忆**：age 加密同步长期记忆/选定会话（`sync/`）；恢复记忆入库。
+- **迁移补齐**：`usage-diag`、`warm-prefix`、tmux 完成唤醒与影子审查、tmux 终端配置、TUI 输出速度、`ctx_*`/`ask_user`/`plan_*`/`admin_*`/`autopilot_policy`/`schedule_task`/`verify_*` 共 17 个工具、`/usage-diag` 命令、plan-mode 计划落盘（`plan.md` + 磁盘恢复）与调度完成 webhook、scout agent 输出格式指导、subagent `overrideModel` 与模型继承。
+- **自愈与重建**：supervisor 脚本变更自动重载、挂死自动恢复（仅回合卡死时重启）、重启/切模型显式恢复当前会话、build/doctor 用构建戳与提交历史判定 dist/补丁状态。
+
+## 迁移完整性审计（第 47 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- 对照 pi-tools 本地克隆（`848d53a`）做分层审计：文件清单（2281 vs 1173）、`diff -r`/结构化 JSON、注册面集合差、模块导出符号核对、运行守门。
+- **注册面结论**：pi-tools 61 工具/10 命令无一缺失；my-pi 为超集（新增 `voice_transcribe/speak/record` 三个工具与 `/context`）；packs 863/863 逐字节齐备；agentDir 配置、23 个技能文件齐备。
+- **修复 7 个确证缺陷**：
+  1. `webhook.test.ts` 非法 `TaskType: 'prompt'` → `'cron'`（`tsc` 由红转绿）。
+  2. `check-features.sh` 补丁判定改用 `lib-vendor.sh` 的 `vendor_patch_applied`（提交历史），修掉顺序叠加补丁 004 的假失败。
+  3. `golden-tasks.sh` 步骤 5 同步该判定。
+  4. `injection-baseline.json` 按 AGENTS.md 有意改动刷新。
+  5. **P0**：`pi-supervisor.sh` 对 `install/remove/uninstall/list/update` 直通 `node "$CLI" "$@"`，修复 `--extension` 抢占 argv[0] 导致 `./my-pi.sh install/list` 不可用。
+  6. 取消悬挂的 `core.hooksPath=.husky/_`。
+  7. `check-features.sh` 注册面清单补全（漏检 18 工具/1 命令）；并修文档陈旧（脚本数、补丁清单、模式取值、docs 计数、`patch-all-zh.mjs` 的 `PI_DIR`、searxng 品牌名）。
+- **验证**：`bash scripts/golden-tasks.sh` 七项全绿（43 文件 482 用例）；`./my-pi.sh list` 实测 exit 0。
+- **报告**：[docs/development/MIGRATION-AUDIT.md](docs/development/MIGRATION-AUDIT.md)（含未修缺口的优先级与修复建议）。
+- **未修缺口（待办）**：语音服务脚本缺失致 `voice_transcribe` 不可用（G1）；压缩暖前缀上游补丁缺失致现有回放为死代码（G3）；记忆 LLM 提取与 `session_before_compact` 钩子未迁移、手动压缩无快照（G2）；rescue-prompt 内容未迁移（G4）；`daily-review` 种子提示词精简（G5）；通知类配置未迁移（G6）；`pi-supervisor.sh` 零测试、Windows 便携部署无决策记录（G7）。
+
+## 成本审计：压缩门恒假 + 注入位移（第 48 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **触发**：用户反馈同模型/同思考档下 my-pi 费用接近 deepseekharness 的 2 倍。
+- **实测对照**（同一模型价目估算；harness 130 请求 vs my-pi 主会话 159 请求）：
+  费用 $0.774 → $1.566（**2.02x**）；prompt 计费量 23.75M → 43.01M（1.81x）；平均上下文 182,722 → 271,428（1.49x）；起始上下文 8,250 → 179,746（21.8x）；未命中 input 205,456 → 1,136,626（5.53x）。增量分解：**65% 平均上下文更大、33% 整段缓存失效**、2% 输出。
+- **根因**：
+  1. **压缩空闲门（门3）恒不过**：判定点只有 `turn_end`，而它总是紧跟一次用户输入，`now - lastUserActivityTs` 恒为本回合耗时（秒级）< 10 分钟 → 实测 10 小时 / 341K 上下文会话**零压缩**。
+  2. **记忆注入位移**：每轮重建注入消息（旧注入被移除 + 新注入追加），叠加 `_preparePromptAndToolLoadout` 的更新消息被 unshift 到最前 → 单次 170K–316K 全价重算（6 次）。
+  3. 长生命周期会话 + `--continue` 恢复把大上下文反复带回。
+- **修复**：
+  1. `budget/task-gate.ts`：`PI_CONTEXT_IDLE_MS` 默认 **0（关闭门3）**；`logic.ts` 新增 `passesIdleGateAtTurnEnd`（按"回合开始前的空闲"或"本回合已持续 ≥ IDLE_MS"判定），`context/index.ts` 的 `input` 钩子捕获 `preTurnIdleAnchor`。
+  2. `memory/recall/inject.ts` 新增 `shouldInjectMemory`：注入块未变则不重插；`session_compact` 时重置。
+  3. 新增 `budget/prefix-fingerprint.ts` + `before_provider_request` 接线：逐请求对 system/tools/消息头/总序列分段哈希，落 `logs/prefix-fingerprints.jsonl`（轮转 1MB），`/context fingerprint` 可查；`PI_PREFIX_FINGERPRINT=off` 关闭。
+- **回放估算**：同一会话开启压缩（阈值 256K）后 prompt 费用 $1.602 → $0.630（**-61%**），低于 harness 的 $0.774；阈值 150K 可到 -72%。
+  - **更正（同日，价目修正）**：上述估算按 `cacheRead = input/10`。核对 `models.json` override 后真实比例为 **1/50**（input 0.15 / cacheRead 0.003 / output 0.60 per M）→ 压缩自身开销约 $0.038/次、省下的命中 token 仅约 $0.0007/请求，**回本需约 55 个后续请求**。压缩不再是主要收益来源；免费擦除才是。按正确价目：my-pi $0.408 vs harness $0.184（2.22x），增量分解为**未命中 64% / 命中 24% / 输出 11%**。
+- **验证**：新增/扩展单测（`passesIdleGateAtTurnEnd` 6 例、`prefix-fingerprint` 12 例、`shouldInjectMemory` 1 例）；`tsc` 通过；vitest **44 文件 502 用例**；golden 七项全绿；headless 冒烟实测写出前缀指纹（`system`/`tools`/`head` 三段均有值）。
+- **决策记录**：[DECISIONS.md](DECISIONS.md) `[2026-09-25] 成本审计…`；功能文档：[custom/features/context/README.md](custom/features/context/README.md)。
+
+## 上下文管理对比 DSH：让确定性擦除生效（第 49 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **对比对象**：DeepSeek Harness（DSH 0.1.5-rc.2）的上下文管理包（`dsh-compaction-basic`/`dsh-compaction-tool-result-pruner`/`dsh-spill-policy`/`dsh-tool-fs`/`dsh-llm-deepseek` 等）。逐条证据见 [docs/development/DSH-CONTEXT-AUDIT.md](docs/development/DSH-CONTEXT-AUDIT.md)，对比结论见 [docs/development/CONTEXT-MANAGEMENT-COMPARISON.md](docs/development/CONTEXT-MANAGEMENT-COMPARISON.md)。
+- **实测构成**（10 小时 / 341K 上下文会话）：`assistant:thinking` **155,142（50.1%）**、`toolResult` **143,410（46.3%）**、assistant text 10,950、user 389。
+- **发现 my-pi 的擦除层大半没生效**：
+  1. `pruneThinkingBudget` **无任何调用者**（thinking 占上下文一半）。
+  2. `pruneToolResults` 阈值 120K/80K 过高，该会话中**从未触发**（`[pruned:` 出现 0 次），回收全压在有损的写入时截断上（308/562 条被截断，后期工具输出均值 155 token）。
+  3. `read` 也受全会话 20K 输出预算约束 → 预算耗尽后 read 只剩 300 token，`output-archive` 的"凭路径读回原文"失效。
+- **DSH 对照**：压缩阈值 0.8×窗口（1e6 → 800K，实测不触发）；工具输出四级阶梯（read 2000 行/50KB → spill >50KB 可恢复且排除 read → 压缩触发后才做 8,192 字符中段裁剪 → 摘要压缩）；**无 thinking 专用回收**。即 my-pi 的擦除机制是 DSH 的超集，问题在接线与阈值。
+- **修复**：
+  1. 接通 thinking 擦除：`context` 钩子调用 `pruneThinkingBudget`，保留 64K（`PI_CONTEXT_KEEP_THINKING_TOKENS`）。
+  2. 工具擦除阈值 120K/80K → **60K/30K**（`PI_CONTEXT_PRUNE_PROTECT_TOKENS`/`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`）。
+  3. `read` 豁免会话输出预算（只受单次 5K 上限），恢复归档可读回；新增 `PI_CONTEXT_OUTPUT_BUDGET_TOKENS`。
+  4. 固定顺序"先擦除、后压缩"（擦除无 LLM 调用，压缩要发全价摘要）。
+  5. 压力分档改以**压缩阈值**为基准（`setCompactThreshold` 此前从未被调用，分档按窗口算 → 1M 窗口下模型在 256K 压缩前收不到预警）；`getBudgetReport` 加 `budgetBase`/`pressureRatio`。
+  6. 易变运行时提示（压力档/休眠工具摘要/重启提示）移出 system prompt，改为 `my-pi-context-advice` 消息且**仅变化时追加**（append-only），system prompt 只留静态常量 → 消除"前缀最前处变化 → 整段缓存失效"。
+  7. 归档目录加清理：新增 `sweepArchive`（14 天/200MB、递归两层），`session_start` 执行（此前 442 文件/2.8MB 无上限）。
+  8. 截断改为**头+尾**保留（`truncateHeadTail`，头 40%/尾 60%）：命令/测试的错误在尾部。
+- **实测效果**（用真实会话消息序列忠实复刻两套擦除算法）：thinking 155,142 → 63,883；其它文本 154,749 → 79,966（擦除 248 条 / 回收 75,279）；**合计 309,891 → 143,849（-53.6%）**，零额外 LLM 调用。
+- **仍待办**：压缩摘要暖前缀重放仍是死代码（补丁点已定位在 `core/sdk.ts` 的 `buildRequestOptions`，但需改 vendor 关键路径，收益因擦除生效而下降）；subagent 缺 fork（KV 复用）模式；压缩阈值是否降到 150K 待观察。
+- **验证**：vitest **44 文件 509 用例**（新增 `read` 豁免、`truncateHeadTail`/`tailByTokens`、`sweepArchive` 按龄/按量、压力基准阈值分母 + 回退窗口等用例）；`tsc` 通过；golden 七项全绿；headless 冒烟确认易变段已变为消息（msgs 3→4）且 `system` 指纹不再含易变段。
+
+## 价目修正与失效归因基建（第 50 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **价目修正（重要）**：前几轮成本估算误用 `cacheRead = input/10`。核对 `portable/agent/models.json` 的 `modelOverrides.deepseek-flash.cost`（`provider-composer.ts:466-490` 确认 override 生效）后，真实比例为
+  **input 0.15 / cacheRead 0.003 / output 0.60（$ / M）→ cacheRead 仅为 input 的 1/50、output 为 4x**。
+  按正确价目：my-pi **$0.408** vs harness **$0.184（2.22x）**；增量分解 **未命中 64% / 命中上下文 24% / 输出 11%**。
+  因此**优先级重排**为：① 消除/缩小整段失效 ② 免费擦除压小上下文 ③ 控制输出/推理 ④ 压缩（保守）。
+- **作废先前结论**：第 48 批"开启压缩可省 61%、12 个请求回本"按 1/10 比例得出，**不成立**。正确结论：压缩一次 256K 自身开销约 $0.038，省下的命中 token 仅约 $0.0007/请求 → **回本需约 55 个后续请求**；压缩保留为高阈值/长会话下的兜底，不再是主要收益来源。已在 `DECISIONS.md` 与本文档加更正。
+- **擦除收益仍成立**：上下文 -53.6% 后该会话费用约 **$0.408 → $0.247（-40%）**，相对 harness 由 2.22x 降至约 **1.35x**；零 LLM 成本，无需回本计算。
+- **失效归因基建**：指纹记录新增 `sinceLastMs`（距上一条请求的间隔），并在 `formatFingerprint`/`/context fingerprint` 展示。下次出现整段失效可直接判定"是否空闲后失效 + 变化段是 system/tools/head"。
+- **已排除的失效成因**：会话日志中 `model_change`/`thinking_level_change`/`compaction` 事件均不在 6 次失效附近（最近者早 3 小时以上）；DSH 侧有 **485s（8 分钟）空闲后仍命中**的实例，说明**不是 provider 的纯 TTL**。剩余成因需靠 `sinceLastMs` + `changed` 在后续会话中归因。
+- **验证**：vitest **44 文件 510 用例**（新增 `sinceLastMs` 用例）；`tsc` 通过；golden 七项全绿。
+
+## 长期维护基建：死导出 / 注册面 / 钩子 / 补丁行为 / vendor 归档（第 51 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **触发**：用户问"长期开发有什么潜在问题"。审计确认主要风险是**缺少发现问题的手段**，而非设计缺陷。
+- **新增守门（均不改运行行为）**：
+  1. `scripts/check-dead-exports.mjs` + `dead-exports-allowlist.txt`：扫描 `custom/` **28 个无任何引用的导出**（`getUrgencyHint`/`getTokenPressureTag`/`setTotalBudget`/`recordCacheUsage`、`isTurnBusy`/`isBackgroundBusy`/`lastActivityTs`、`replaceState`/`getNextId`、`searchEntries`/`isInjectionBlock`、`batchFetch` 等），白名单登记为**棘轮**，禁止新增。只剥注释不剥字符串/模板（剥离模板插值会误报 `truncateContent`）。
+  2. `scripts/gen-registrations.mjs` + `scripts/registration-baseline.json`：注册面（工具 64 / 命令 11 / 快捷键 2）改为**从代码生成基线**，`check-features.sh` 对照基线；变更需显式 `--update`。替换原先手写清单（曾漂移 18 个工具）。
+  3. `.githooks/{pre-commit,pre-push}` + `scripts/install-hooks.sh`：pre-commit 跑 `golden --fast`（新增开关，跳过 tsc/vitest），pre-push 跑全量。此前 `.github/` 已删且 `hooksPath` 悬空，提交时守门实际失效。
+  4. `scripts/check-patches-behavior.mjs`：断言补丁关键符号/自标记仍在 vendor 源码（004/005/006 用自带 `Patch (…)` 标记，001/002/003 用显式符号表），补"应用成功≠行为还在"。
+  5. `scripts/vendor-bundle.sh` + `doctor.sh` 告警：归档 PINNED_COMMIT（实测 66MB，`git bundle` 需 ref，裸 SHA 会报 empty bundle）；bundle 不入库（`.gitignore` 忽略 `vendor/*.bundle`）。
+- **golden 步骤**：9 项（隔离 / 功能注册面 / 死导出 / tsc / vitest / 补丁状态 / 补丁行为 / 注入面 / 文档链接）；`--fast` 跳过 tsc+vitest。
+- **验证**：`bash scripts/golden-tasks.sh` 九项全绿；`git hook run pre-commit` 实测通过；`vendor bundle verify` 报 "complete history"；文档同步（STRUCTURE 脚本数 21→26、`scripts/README.md`、`AGENTS.md` 命令块、DECISIONS 决策）。
+- **仍未做（记录）**：`sync-memory.sh` 缺 `verify` 子命令（age 私钥遗失即记忆不可解，是数据资产单点）；`pi-supervisor.sh` 仍无行为测试；Windows 平台范围未写入决策。
+
+## 数据资产自检 / supervisor 测试 / 平台范围（第 52 批，2026-09-25）
+
+- 完成时间：2026-09-25（做完第 51 批记录的三项待办）
+- **`sync-memory.sh verify`**：新增子命令，校验「密文可解密 + `age.pub` 与私钥一致 + 清单一致 + JSON 有效」；`--no-key` 仅查密文完整性。`init`/`status` 增加**密钥指纹**（换机时核对备份的私钥是否正确）。`SYNC_DIR` 支持 `MY_PI_SYNC_DIR` 覆盖以便测试。
+  - **立刻发现问题**：`verify` 报本地存在的 `summaries.json`/`notes.json` 不在密文中 → **2026-09-23 推送的备份已过期**（`doctor` 现已把它列为警告）。待用户 `push` 后提交密文。
+  - 过程中修正了本门自身的误报：清单里本地不存在的条目（push 会跳过）原先被当作缺失，现改为仅提示。
+  - `doctor.sh` 新增 `[11] 加密同步`（密文/私钥/verify 结果，只告警不阻断）。
+- **supervisor 行为测试**：`scripts/test-supervisor.sh`（库模式 source，`MY_PI_SUPERVISOR_LIB=1` 在函数定义后即返回，不进主循环），**23 项**覆盖崩溃分类（transient/external/pi_self、ANSI 色码剥离、优先级）与 admin state 解析（新鲜度窗口、字段、坏 JSON、clear 保留其它字段）。
+  - **测出并修复一个真实 bug**：`IFS=$'\t'` 会折叠连续 tab（TAB 属空白），使中间字段为空时整体错位——`set_model` 请求缺 `targetSession` 时 `PROV` 拿到 model、`MODEL` 为空，重启会带错 provider/model。改用 US（`\x1f`）分隔；`apply_mode` 的同类写法一并修正。
+  - 接入 golden 第 10 步。
+- **平台范围写入决策**：`DECISIONS.md` 新增「平台范围：Linux/Termux 为主，Windows 原生便携部署不再支持」，`STRUCTURE.md` 新增「平台支持」。核实主仓库除 `packs/` 外已无 `.ps1/.bat/.cmd`。
+- **计数同步**：脚本 26→**27**（`STRUCTURE.md`/`AGENTS.md`/`scripts/README.md`）；golden 步骤 9→**10**（`--smoke` 时 11）。
+- **验证**：golden 十项全绿；`test-supervisor.sh` 23 项通过；`sync-memory.sh verify` 正确区分"本地不存在"与"备份缺失"；`doctor` 24 正常 / 1 警告 / 0 异常。
+
+## 语音服务脚本随仓库分发（G1 修复，第 53 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **背景**：迁移审计的 P0 缺口 G1——`voice_transcribe` 必然失败，因为 `config.ts` 的两个默认脚本路径
+  （`portable/memory/voice/pi-whisper.sh`、`pi-sherpa.sh`）下从来没有脚本（pi-tools 由 `rebuild.sh` 安装到 `~/.pi/scripts/`，my-pi 无此步骤）。
+- **修复**：
+  1. 4 个脚本入 `custom/features/voice/scripts/`（`pi-whisper.sh`/`whisper-server.py`/`pi-sherpa.sh`/`pi-sherpa-server.py`），随仓库分发。
+  2. 路径按脚本位置解析：`PI_HOME` = `SCRIPT_DIR` 上溯 4 层；配置读 `<agentDir>/pi-voice.json`；
+     日志/pid 落 `portable/memory/logs/voice/{whisper,sherpa}/`；`SERVER` 同目录；venv 仍可 env 覆盖。
+  3. `config.ts` 新增 `voiceScriptsDir()`；默认路径改指该目录；`stt/transcription.ts` 的 `bash <script> start` 调用面无需改动。
+  4. `diagnostics.ts` 指引、`setup-external.sh whisper`、`voice/README.md` 同步更新。
+  5. **`custom/.gitignore` 放行** `features/voice/scripts/`（原 `scripts/` 规则会把它们 ignore 掉，fresh clone 仍缺）；
+     `check-features.sh` 新增"脚本存在且未被 ignore"守门，正是这次踩到的坑。
+- **验证**：
+  - `bash -n`、`python3 -m py_compile` 通过；新增回归测试（默认路径存在 + 可执行 + 服务端同目录）→ vitest **44 文件 512 用例**。
+  - 端到端：本机 `/opt/pi-whisper/venv` 已存在，`pi-whisper.sh start` 启动成功并加载模型，
+    `GET /health` → `{"ok":true,"model":"base","device":"cpu"}`，随后 `stop` 恢复原状。
+- **仍未做**：faster-whisper / sherpa-onnx 的 venv 与模型仍属外部依赖（`setup-external.sh whisper` 给步骤）；
+  迁移审计 G3（暖前缀补丁）/G2（记忆提取）/G4（rescue prompt）仍开放。
+- **文档**：`docs/development/MIGRATION-AUDIT.md` 的 G1 与行动清单标记为已修复。
+
+## G2 快照缺口 / G4 救援 playbook / vitest 门抖动（第 54 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **G2（快照部分）**：`context` 新增 `session_before_compact` 钩子 → 手动 `/compact` 与 pi 内置溢出压缩也会写压缩前快照
+  （此前只有自动阈值路径会写）；`snapshotDoneForCompact` 标记避免与自动路径重复；`reason` 增加 `'manual'`。
+  LLM 会话提取经评估**不迁移**（额外 LLM 调用 + 已有零增量替代：压缩摘要落盘 / `task-summarizer` / `/memory mine`）。
+- **G4**：新增 `portable/agent/recovery/rescue-prompt.md`（按 my-pi 事实重写：`vendor/pi` 只读、改动走 `patches/`、
+  好 pi 在 `recovery/cache/dist/cli.js`、`scripts/build.sh` 回退、`doctor.sh` + `golden --fast` 验证、`memory/` 不可删、不提交），
+  `run_fix_pi` 以 `--append-system-prompt` 追加；`.gitignore` 放行该文件（`recovery/` 其余运行数据仍忽略）。
+- **修复门抖动**：vitest 偶发 `Projects "" and "" have different 'maxWorkers' but same 'sequence.groupOrder'`
+  导致 `Test Files no tests / Errors 1`（golden 假红，pre-commit 会误拦）。`vitest.config.ts` 固定
+  `name`/`maxWorkers`/`sequence.groupOrder` 消除该断言。
+- **守门补强**：`check-features.sh` 的"随仓库分发的资源文件"清单加入 rescue prompt（存在 + 未被 ignore）；
+  `test-supervisor.sh` 增加 rescue prompt 存在性与关键路径断言（23 → 29 项）。
+- **验证**：vitest **44 文件 512 用例**，连续 6/6 通过；`golden-tasks.sh` 连续 3/3 全绿；`tsc` 通过。
+- **文档**：`docs/development/MIGRATION-AUDIT.md` 的 G2（快照）/G4 标记为已修复，行动清单同步。
+
+## headless 定时任务入口 / G5 生命周期脚本补齐 / G6 通知裁定（第 55 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **先定位执行环境边界**：`custom/features/autopilot/run/runner.ts` 的 `buildRunArgs` 固定传 `--no-extensions`。
+  实测对比：`--mode json -p --no-session --no-extensions` 25s 干净退出（exit 0）；带 `--extension custom/bootstrap.ts`
+  同命令 60s 仍不退出（被 kill）。pi-tools 依赖 `agentDir/extensions` 自动发现，my-pi 没有该目录 →
+  **定时任务提示词里不能出现扩展工具/斜杠命令**（`memory_store`、`/memory`、`tmux_*`、`ctx_*` …），
+  否则任务静默失败或空转；这是迁移时未记录的隐性前提。
+- **headless 入口（新增脚本）**：
+  - `scripts/run-ts.sh`：以 vendor tsx 运行"需加载 my-pi TS 逻辑"的脚本。原因：`custom/` 用无扩展名导入，
+    Node 类型剥离不解析，`node scripts/memory-store.mjs` 裸跑报 `Cannot find module '.../custom/features/memory/env'`。
+  - `scripts/memory-store.mjs`：调 memory 纯逻辑 `storeEntry` 入库（零 LLM，内置标题去重；`--json`/`--file`/stdin/`--dry-run`）。
+  - `scripts/memory-lifecycle.mjs`：调 `analyzeLifecycle` 出只读生命周期报告（`--json`/`--limit`）。
+  - `scripts/reseed-seeds.mjs`：种子对账是"只补缺失、不覆盖"（`store/seeds.ts`），改提示词后需显式应用；
+    默认预演，`--apply` 先备份 `tasks.json` 并保留 id/enabled/lastRun/runCount/history。
+- **G5（语义 + 新发现的脚本缺口）**：
+  1. 审计新发现 `agent/extensions/pi-memory/scripts/memory-lifecycle.mjs`（237 行，零 LLM 只读报告）**完全未迁移**，
+     而 `DECISIONS [2026-09-21]` 声称 P3 记忆治理报告已落地——实际只有 `/memory lifecycle` 命令（headless 不可用），
+     且丢失「垃圾嫌疑」「聚合候选」两类信号（垃圾条目会混入升格候选，复发 pi-tools 2026-08-29 修过的缺陷）。
+     已在 `mine/lifecycle.ts` 补齐 `junkSuspects` / `aggregationCandidates`（solutions/procedure 标题 bigram-jaccard 并查集聚类，
+     组内 ≥3 条且 Σrecurrence ≥8）+ 垃圾不进升格候选 + `formatLifecycleReport` 增两段；命令与脚本共用同一纯逻辑。
+     不迁移「空壳心跳」（`MemoryEntry` 无 `tools`/`hit`）与「环境标签冲突」（环境用 `environments: string[]`）。
+  2. `daily-review` 提示词：步骤 5 改为调 `memory-lifecycle.mjs`（确定性，替代让 LLM 手搓统计）；
+     补回"其他设备长期未跑要明确指出"；明确淘汰/合并/聚合归纳为写操作需用户确认。
+  3. 明确**不迁移 Voyager 课程/workticket 提案步骤**：依赖 `SELF-OPTIMIZING-ROADMAP.md` 与运行时状态
+     `~/.pi/logs/lesson-course.json`（两仓库均无），且提示词写的落点 `docs/OPTIMIZATION-LOG.md` 在 pi-tools 里也是错的
+     （实际 `docs/maintenance/OPTIMIZATION-LOG.md`）；my-pi 用 `/memory mine` + `task-summarizer.mjs` + `packs/drafts/` 替代。
+- **守门接入**：新增 `scripts/check-seeds-headless.mjs`（扫描所有 `task.prompt`，命中扩展工具/斜杠命令即失败，
+  放行"不要用 X"类否定说明）→ golden 步骤 **11**；`--smoke` 的无头冒烟改为步骤 **12**，
+  判定改为"是否产出回复"（已知现象：带扩展的 `-p` 产出回复后不退出），并说明原因，避免把已知现象当失败。
+- **G6（通知/入站，裁定不迁移）**：出站 `notify.json`（Bark/ServerChan 的 curl 模板通道 + `rateLimitMinutes` 去重）
+  由 `autopilot/store/webhook.ts`（`PI_SCHEDULER_WEBHOOK` / `settings.webhookUrl`，POST JSON，10s 超时，失败静默）取代——
+  免去"任意 shell 模板"注入面；入站 `ntfy-relay.json`/`ntfy-relay.js`（手机 ntfy → 订阅轮询 → 注入，`injectMode: rpc` 兜底）
+  由 `link` 功能（SSH 传输 + `link_send` + `/link watch|attach`，含文件锁与防抖）取代——不依赖第三方中继，tmux 故障时仍可用。
+  记录见 `DECISIONS.md`。
+- **验证**：`bash scripts/golden-tasks.sh` 全绿（11 步；vitest **44 文件 514 用例**）；注入面基线按 AGENTS.md/STRUCTURE.md
+  的脚本计数同步刷新；`bash scripts/run-ts.sh scripts/memory-lifecycle.mjs [--json]` 在真实 `entries.json` 上正常输出。
+- **计数同步**：脚本 31→**32**（`STRUCTURE.md`/`AGENTS.md`/`scripts/README.md`/`check-features.sh` 清单）。
+- **文档**：`docs/development/MIGRATION-AUDIT.md` 的 G5/G6 标记完成、新增缺陷 #9 与第二轮修复明细；
+  行动清单仅剩 G3（压缩暖前缀）。

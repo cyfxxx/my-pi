@@ -89,9 +89,9 @@ bash portable/agent/skills/pi-full-audit/review.sh
 - **目录树全览**：含隐藏目录，标注每块职责：
   - `vendor/pi/` 上游只读源码（独立 git clone，主仓库已忽略）
   - `custom/` 唯一维护的代码层（adapters/core/features/bootstrap.ts）
-  - `portable/` 运行时数据收敛区（config/sessions/extensions/memory/skills）
+  - `portable/` 运行时数据收敛区（agent/{config,skills,agents,modes} + memory/）
   - `packs/` 外部技能包（按需加载，不注入系统提示词）
-  - `scripts/` 仅 4 个脚本（build/dev/check/sync）
+  - `scripts/` 21 个运维脚本（含共享库 lib-vendor.sh，扁平不建子目录）
   - `patches/` 上游改动补丁
   - `docs/` 项目文档
 - **git 状态**：`git status` + `.gitignore` 核对

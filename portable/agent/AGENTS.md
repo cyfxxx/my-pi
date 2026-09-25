@@ -15,7 +15,7 @@ custom/                    # 自定义层（adapters/core/features/bootstrap.ts�
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
 deploy/                    # 可选系统级部署产物（systemd 等）
-scripts/                   # 18 个运维脚本
+scripts/                   # 32 个运维脚本
 patches/                   # 上游补丁
 ```
 
@@ -75,6 +75,8 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-st
 ```bash
 npm run check                      # 隔离边界验证（scripts/check-isolation.sh）
 npx tsc --noEmit -p custom/        # 自定义层类型检查
+bash scripts/golden-tasks.sh       # 行为防退化基准（--fast 仅结构守门，跳过 tsc/vitest）
+bash scripts/install-hooks.sh      # 启用 git 钩子（pre-commit 快检 / pre-push 全量；本地无 CI）
 bash scripts/dev.sh                # 开发模式（tsx 直接运行 TS）
 bash scripts/build.sh              # 构建 vendor/pi(coding-agent)；vendor 缺失时自动引导（custom/ 不编译）
 ./my-pi.sh                         # 便携启动
@@ -82,6 +84,7 @@ bash scripts/sync-upstream.sh      # 上游同步（vendor/pi 为独立 git clon
 ```
 
 修订代码后运行 `npm run check`；类型检查用 `npx tsc --noEmit -p custom/`。
+新增/删除工具或命令后运行 `node scripts/gen-registrations.mjs --update` 刷新注册面基线（否则守门会失败）。
 
 ## 开发规范
 

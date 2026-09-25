@@ -121,7 +121,7 @@ bash scripts/dev.sh
 | intervention | 干预捕获 | 钩子型 |
 | link | 多设备互联（SSH 通道 + 远程 RPC） | 工具型 |
 | memory | 跨会话持久记忆 | 工具型 |
-| mode | 模式切换（full/light/quick） | 钩子型 |
+| mode | 模式切换（full/minimal/roleplay） | 钩子型 |
 | plan-mode | 计划模式（TUI 计划/任务管理） | 钩子型 |
 | subagent | 子代理（delegate 给专门 agent） | 工具型 |
 | tmux | tmux 会话管理（后台任务/长任务） | 工具型 |

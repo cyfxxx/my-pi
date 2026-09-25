@@ -43,7 +43,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..");
 
 // 仅供兼容：<root>/portable/agent（旧 ~/.pi/ 语义）。新代码应使用 resolvePiPath() 的结果。
-const PI_DIR = join(REPO_ROOT, "portable", "config");
+const PI_DIR = join(REPO_ROOT, "portable", "agent");
 const PINPM_DIR = join(PI_DIR, "npm/node_modules"); // my-pi 中不存在该目录，相关区段安全跳过
 
 // Dry-run 模式：只检测原文匹配情况，不改写任何文件。

@@ -172,7 +172,7 @@
 1. 三类内容一律原样复制
 2. packs 原样迁移；skills 与 docs 逐篇检查、按 my-pi 结构改写后迁移（丢弃 pi-tools 专有内容）
 **决策**：选项 2
-**理由**：packs 与仓库结构耦合弱且内含本地经验沉淀（`EXPERIENCE.md`），原样保留并用 `diff -r` 校验；skills/docs 与项目结构强耦合，原样迁移会产生误导性文档。docs 精选 8 篇保留可迁移价值（pi 扩展/SDK 开发、技能维护、多环境/Termux/终端运维），丢弃 10 篇 pi-tools 专有报告与路线图，清单记录在 `docs/README.md`。技能仅更新路径/命令/子系统引用，保留原有方法论与纪律，frontmatter `name` 不变。
+**理由**：packs 与仓库结构耦合弱且内含本地经验沉淀（`EXPERIENCE.md`），原样保留并用 `diff -r` 校验；skills/docs 与项目结构强耦合，原样迁移会产生误导性文档。docs 精选 9 篇保留可迁移价值（pi 扩展/SDK 开发、技能维护、多环境/Termux/终端运维，另有 `design/VISION.md`），丢弃 9 篇 pi-tools 专有报告与路线图，清单记录在 `docs/README.md`。技能仅更新路径/命令/子系统引用，保留原有方法论与纪律，frontmatter `name` 不变。
 
 ---
 
@@ -357,7 +357,7 @@
 1. `web-search` 拆分 `config/search/fetch/concurrency`、`link` 拆分 `types/config/net/card/guards/state/display` 并把 `link.ts` 更名 `protocol.ts`，两侧 `logic.ts` 改为 barrel（跨功能引用仍只走 `logic.ts`）。
 2. `context` 的 `before_agent_start` 补全压力分档（75%/90%）+ 委派/效率建议；重启提示改为**静态文本**（移除精确 token 数值，遵守"注入禁止精确数值"的缓存纪律）。
 3. `scripts/knowledge-ingest.mjs` 改为基于 `import.meta.url` 解析 ROOT 的可移植实现，条目 `environments:['all']` 跨设备可见；正式入库（脚本总数 18）。
-4. 新增 `deploy/systemd/pi-searxng.service`（原生 venv 托管）；`deploy/tmux`（终端配置）与 `pi-whisper.service` 按每环境独立/语音暂缓的既有口径不迁移。
+4. 新增 `deploy/systemd/pi-searxng.service`（原生 venv 托管）；`pi-whisper.service` 按语音暂缓的既有口径不迁移。`deploy/tmux`（终端配置）后于 2026-09-23（提交 `d39c8bc94`）迁移，见 `deploy/README.md`。
 5. Best-of-N 的 LLM 集成不迁移：原项目 `judgeCandidates` 为随机占位、`bestOfN` 依赖外部编排；纯评分逻辑（parseJudgeScores/selectBest/shouldVerify）已在 `autopilot/run/verifier` 迁移。
 6. `docs-check.mjs`/`docs-freshness.mjs` 不迁移：与本仓库 `check-doc-links.mjs` 重叠，且其"元信息表/目录导航"模板与本项目文档风格不符，会产生大量误报。
 **理由**：在不引入 vendor 核心补丁风险的前提下完成目录模块化与闭环；未能闭环或属环境专属的项以决策记录明确边界。
@@ -389,3 +389,126 @@
 4. **规避 Node IPv6 超时**：构建/生成默认注入 `--dns-result-order=ipv4first --no-network-family-autoselection`（本机 undici 对双栈域名超时，curl 正常）。
 5. **本地维护提交绕过上游钩子**：补丁 commit 加 `--no-verify`，并把 `LAST_SYNC_POINT` 加入 vendor `.git/info/exclude`。
 **理由**：上游更新必须可复现、可回滚、语义正确；确定性重建比隐式 merge 更安全，且与 fresh bootstrap 完全一致。
+
+### [2026-09-25] 成本审计：默认关闭压缩空闲门，并加运行时前缀指纹
+**背景**：用户反馈同一模型/同一思考档下，my-pi 的费用接近 deepseekharness 的 2 倍。实测对照（同一模型价目估算，harness 130 请求 vs my-pi 主会话 159 请求）：费用 $0.774 → $1.566（**2.02x**）；prompt 计费量 23.75M → 43.01M（1.81x），平均上下文 182,722 → 271,428（1.49x），起始上下文 8,250 → 179,746（21.8x），未命中 input 205,456 → 1,136,626（5.53x）。增量分解：**65% 来自平均上下文更大、33% 来自整段缓存失效**、2% 输出。
+根因有三：① 压缩空闲门（门3）在结构上恒不过——判定点只有 `turn_end`，而它总是紧跟一次用户输入，`now - lastUserActivityTs` 恒为本回合耗时（秒级）< 10 分钟，导致 10 小时 / 341K 上下文会话零压缩；② 每轮重建记忆注入消息（旧注入被 `filterInjectedMessages` 移除 + 新注入追加）使消息序列在注入点位移，配合 `_preparePromptAndLoadToolout` 的更新消息被 unshift 到最前，出现单次 170K–316K 全价重算；③ 长生命周期会话 + `--continue` 恢复把大上下文反复带回。
+**决策**：
+1. **门3 默认关闭**（`PI_CONTEXT_IDLE_MS` 默认 0）。打断风险由门1（进行中计划任务）与门2（本会话后台任务）承担。若仍要保守行为，设 `PI_CONTEXT_IDLE_MS>0`。
+   > **更正（同日，价目修正）**：当初据以论证的"压缩可省 61%、12 个请求回本"是按 `cacheRead = input/10` 估的。
+   > 核对 `models.json` 的 override 后真实比例为 **1/50**（input 0.15 / cacheRead 0.003 / output 0.60 per M），
+   > 于是压缩一次 256K 的自身开销约 $0.038，而省下的命中 token 仅值约 $0.0007/请求 → **回本需约 55 个后续请求**。
+   > 结论修正：**擦除（免费）才是主力，压缩只在高阈值/长会话下划算**；门3 默认关闭仍保留（可避免超窗与冷缓存后的大额重算），但不再是主要收益来源。
+   > 详见 [docs/development/CONTEXT-MANAGEMENT-COMPARISON.md](docs/development/CONTEXT-MANAGEMENT-COMPARISON.md) 第六节。
+2. **修正门3 语义**：新增 `passesIdleGateAtTurnEnd`，按「本回合开始**之前**的空闲」（`input` 钩子在覆盖前捕获 `preTurnIdleAnchor`）或「本回合已持续 ≥ IDLE_MS」放行，避免原判定恒假。
+3. **记忆注入去抖**：新增 `shouldInjectMemory`，注入块内容未变时不再重插（旧注入仍在历史中，模型照常可见）；`session_compact` 时重置以确保压缩后重新注入。
+4. **运行时前缀指纹**（`budget/prefix-fingerprint.ts` + `logs/prefix-fingerprints.jsonl` + `/context fingerprint`）：逐请求对 system/tools/消息头/总序列分段哈希并记录变化段，用于定位后续整段失效的确切来源（静态版 `check-injection-surface.sh` 只覆盖 system prompt）。
+**理由**：成本大头是"每请求都按 270K 上下文计费"，任何"为保缓存而不压缩"的取舍在该规模下都是净亏；同时需要一个运行时归因工具，避免再次靠推测定位缓存失效。
+
+### [2026-09-25] 上下文管理对比 DSH：让确定性擦除真正生效
+**背景**：对比 DeepSeek Harness（DSH，0.1.5-rc.2）的上下文管理后发现，my-pi 的多层擦除子系统**大半写了但没生效**。实测 10 小时 / 341K 上下文会话的构成：`assistant:thinking` **155,142（50.1%）**、`toolResult` **143,410（46.3%）**、assistant text 10,950、user 389。而 `pruneThinkingBudget` **无任何调用者**、`pruneToolResults` 因阈值 120K/80K 过高在该会话中**从未触发**（`[pruned:` 出现 0 次）；回收压力全落在有损的写入时截断上（308/562 条被截断，会话后期工具输出均值仅 155 token）。另发现 `read` 也受全会话 20K 输出预算约束 → 预算耗尽后 read 只剩 300 token，`output-archive` 承诺的"凭路径读回原文"失效。
+对照 DSH：其压缩阈值是 0.8×窗口（1e6 → 800K，实测不触发），工具输出走"read 上限 2000 行/50KB → spill >50KB 可恢复（排除 read）→ 压缩触发后才做 8,192 字符中段裁剪 → 摘要压缩"四级；DSH **没有** thinking 专用回收。my-pi 的擦除层（尤其 thinking）在机制上是 DSH 的超集，但实现未接线/阈值失准。
+**决策**：
+1. **接通 thinking 擦除**：`context` 钩子在工具擦除后调用 `pruneThinkingBudget`，默认保留最近 64K thinking（`PI_CONTEXT_KEEP_THINKING_TOKENS`）。
+2. **下调工具擦除阈值**：`PRUNE_PROTECT_TOKENS` 120K→**60K**、`PRUNE_MINIMUM_TOKENS` 80K→**30K**（env 可覆盖），使擦除在压缩之前真正回收。
+3. **`read` 豁免会话输出预算**：只受单次 5K 上限约束，恢复归档可读回（与 DSH spill 排除 `read` 一致）；另加 `PI_CONTEXT_OUTPUT_BUDGET_TOKENS` 供调参。
+4. **顺序固定为"先擦除、后压缩"**：擦除与压缩同样断裂一次前缀缓存，但擦除**无 LLM 调用**，压缩要发一次全价摘要请求。
+5. **压力分档改以压缩阈值为基准**：`setCompactThreshold` 此前从未被调用，分档一直按窗口算（1M 窗口下高档 850K），模型在 256K 压缩前收不到任何预警。现在 `before_agent_start` 写入阈值，`getBudgetReport` 用 `budgetBase`/`pressureRatio` 判定，`/context usage` 同时显示窗口占比与阈值占比。
+6. **易变运行时提示移出 system prompt**：压力档/休眠工具摘要/重启提示改为 `my-pi-context-advice` 消息，**仅在内容变化时追加**（append-only）；system prompt 只保留静态常量，避免前缀最前处变化导致整段缓存失效（对齐 DSH 的 change-only volatile context）。
+7. **归档目录加清理**：`tool-outputs` 此前无任何清理（实测 442 文件/2.8MB 无上限），新增 `sweepArchive`（14 天/200MB，递归两层），`session_start` 执行。
+8. **截断改头+尾保留**：命令/测试的错误在尾部，`truncateHeadTail`（头 40%/尾 60%）替代只留头部。
+**理由**：预计稳态上下文由 ~310K 降至 ~144K（**-53.6%**，用真实会话消息序列复刻两套擦除算法测得），且零额外 LLM 调用；不依赖上游补丁、不改动会话语义，是当前性价比最高的优化。
+**仍待办**（见 [docs/development/CONTEXT-MANAGEMENT-COMPARISON.md](docs/development/CONTEXT-MANAGEMENT-COMPARISON.md)）：压缩摘要的暖前缀重放仍是死代码（补丁点已定位在 `core/sdk.ts` 的 `buildRequestOptions`，但需改 vendor 关键路径，收益已因擦除生效而下降）；subagent 缺 fork（KV 复用）模式；压缩阈值是否降到 150K 待观察。
+
+### [2026-09-25] 长期维护基建：把"静默退化"变成"守门失败"
+**背景**：审计发现本项目的主要风险不是设计，而是**缺少发现问题的手段**：① 死导出扫描出 **28 个无任何引用的导出**（context 的压力/紧急提示 API、watchdog 的 `isTurnBusy`/`isBackgroundBusy`、plan-mode 的 `replaceState`/`getNextId` 等），其中 `pruneThinkingBudget`（占上下文 50%）与 `setCompactThreshold` 都曾长期"有测试无调用"；② `check-features.sh` 的工具/命令清单是**手写**的，漂移过 18 个工具；③ `.github/` 已删且 `.git/config` 的 `core.hooksPath` 悬空过，**提交时守门实际失效**（`tsc` 曾红数日无人察觉）；④ 补丁只验证"可应用"，**语义漂移不会失败**；⑤ `vendor/pi` 无离线兜底，上游改写历史即无法引导；⑥ `footer.ts` 被 3 个补丁叠加，是最高漂移面。
+**决策**：
+1. **`check-dead-exports.mjs`**：扫描 `custom/` 导出符号的跨文件引用，零引用即失败；`dead-exports-allowlist.txt` 作为**棘轮**（登记历史死导出并写明理由，禁止新增）。只剥注释、不剥字符串/模板，宁可漏报不可误报。
+2. **`gen-registrations.mjs` + `registration-baseline.json`**：注册面基线改由代码生成；`check-features.sh` 对照基线而非手写清单，变更需显式 `--update`（进 diff 可审）。
+3. **`.githooks/` + `install-hooks.sh`**：`pre-commit` 跑 `golden --fast`（秒级结构守门），`pre-push` 跑全量（tsc+vitest）。本地无 CI，钩子是唯一自动防线；`golden-tasks.sh` 新增 `--fast`。
+4. **`check-patches-behavior.mjs`**：断言补丁关键符号/自标记确实存在于 vendor 源码（004/005/006 用自带的 `Patch (…)` 标记，001/002/003 用显式符号表），补上"应用成功≠行为还在"的空缺。
+5. **`vendor-bundle.sh`**：`create/restore/status` 归档 PINNED_COMMIT；bundle 体积大（实测 66MB）**不入库**（`.gitignore` 忽略 `vendor/*.bundle`，遵守"大文件不入库"教训），`doctor.sh` 增加"离线归档缺失"告警。
+**理由**：这五项的收益都是"让问题在下一次显形"——把此前的静默退化（未接线、清单漂移、红状态入库、补丁漂移、上游不可达）转成守门失败或显式告警，且都不改变运行行为、风险低。
+
+### [2026-09-25] 平台范围：Linux/Termux 为主，Windows 原生便携部署不再支持
+**背景**：pi-tools 在 `portable/` 下提供 Windows 单目录便携部署：`start.ps1`/`start.bat`、`bin/*.ps1|.js`（setup/verify/diag/sync/update-*/check-*/repair-junctions/searxng-setup/whisper-setup）、`tools/tmux/tmux.cmd`、`ca-bundle.crt`。my-pi 把 `portable/` 改为运行时数据根目录（agentDir + memory），这些产物随之移除，但**此前没有任何决策记录**（只记了 Windows 原生 tmux 后端不迁移，见 `[2026-09-20]`）。
+**决策**：
+1. **支持范围**：Linux（含 Termux/Android，`scripts/patch-playwright-core.mjs` 做 playwright-core android 适配）与 macOS 为一等目标；Windows 仅经 **WSL2** 使用，不提供原生单目录便携启动。
+2. **不携带 Windows 启动器/管理器**：仓库根只保留 POSIX 启动器 `my-pi.sh`（经 `scripts/pi-supervisor.sh`）；不维护 `.ps1`/`.bat`/`.cmd`（已核实主仓库除 `packs/` 外无此类文件）。
+3. **保留的 Windows 感知**是有意的最小兼容：`features/link/net.ts` 的 WSL 检测（走 `ipconfig.exe` 取物理网卡 IP）、`features/voice` 的 Windows 录音分支判定（能力缺失时明确报错而非静默）。
+4. **Windows 原生能力不再补齐**：dshow 录音、PowerShell 引导、原生 tmux 后端、`ca-bundle.crt`（Windows GIT_SSL_CAINFO）均不迁移；Windows 下如需自签 CA，配置系统级 `GIT_SSL_CAINFO`。
+**理由**：单人维护 + 实测环境是 Linux/Termux，保留一条**未经测试**的 Windows 启动链路是负债（发布前无法验证、坏了无人知）。WSL2 覆盖 Windows 用户且只需维护一套启动器；把"不支持"写明，比留一堆半坏脚本更诚实。
+**代价**：Windows 用户首次使用需自行装 WSL2 + Node ≥22；`my-pi.sh` 是 bash 脚本，不适用于原生 Windows shell。
+
+### [2026-09-25] 语音服务脚本随仓库分发（修复迁移审计 G1）
+**背景**：迁移审计把"语音 STT 服务脚本缺失"列为 P0：`config.ts` 的 `whisperScript`/`sherpaScript` 指向
+`portable/memory/voice/pi-*.sh`，但该目录下**从来没有脚本**（pi-tools 把它们放在扩展目录、由 `rebuild.sh` 安装到 `~/.pi/scripts/`，
+my-pi 没有对应安装步骤）。后果是 `voice_transcribe` 必然失败（会话日志有实证：`No such file or directory`），
+而 `output-archive` 式的"能力缺失应显式报错"在这里退化成了路径错误。
+**决策**：
+1. 4 个脚本（`pi-whisper.sh` / `whisper-server.py` / `pi-sherpa.sh` / `pi-sherpa-server.py`）放在
+   `custom/features/voice/scripts/`——对应 pi-tools 的扩展内位置，**随仓库分发，fresh checkout 即可用**，
+   不再依赖安装步骤。
+2. 路径按脚本自身位置解析：`PI_HOME` 由 `SCRIPT_DIR` 上溯 4 层得到仓库根；配置读 `<agentDir>/pi-voice.json`；
+   日志/pid 落 `portable/memory/logs/voice/{whisper,sherpa}/`（`PI_VOICE_LOG_DIR` 只覆盖父目录，子目录固定，避免两个后端撞车）；
+   `SERVER` 指向同目录的 `.py`；venv 仍可 `PI_WHISPER_VENV`/`PI_SHERPA_VENV` 覆盖。
+3. `config.ts` 新增 `voiceScriptsDir()`，两个默认路径改指该目录；Python 服务端保持纯 env 驱动（无需改路径）。
+4. `custom/.gitignore` 的 `scripts/` 规则**放行** `features/voice/scripts/`，并在 `check-features.sh` 增加
+   "存在且未被 ignore" 的守门——这正是本次踩到的坑（文件放对了位置但被 ignore，fresh clone 仍会缺）。
+**理由**：脚本是"运行 voice 功能所必需、但内容不随环境的资产"，与 `packs/` 同类，应入库；
+把路径解析绑定到脚本自身位置，使目录重构不会再次悄悄失效。依赖（faster-whisper/sherpa-onnx 的 venv）仍属外部，由 `setup-external.sh whisper` 指引。
+**验证**：脚本 `bash -n` / Python `py_compile` 通过；`pi-whisper.sh start` 在真实 venv 上启动成功，
+`/health` 返回 `{"ok":true,"model":"base","device":"cpu"}`，随后 stop 恢复；新增回归测试断言默认路径存在且可执行。
+
+### [2026-09-25] 补 G2 快照缺口 + G4 救援 playbook + 修 vitest 门抖动
+**背景**：迁移审计剩余项里挑出三项确定性收益：① 手动 `/compact` 不产生快照（`snapshotBeforeCompact` 只挂在自动阈值路径，pi-tools 挂在 `session_before_compact` 覆盖所有压缩）；② rescue prompt 未迁移，`run_fix_pi` 只有 5 行内联指令；③ `golden-tasks.sh` 的 vitest 步骤**偶发假红**（`Projects "" and "" have different 'maxWorkers' but same 'sequence.groupOrder'` → `Test Files no tests / Errors 1`），而 pre-commit 依赖该门，假红会误拦提交。
+**决策**：
+1. **快照覆盖所有压缩**：`context` 注册 `session_before_compact` 钩子，手动 `/compact` 与 pi 内置溢出压缩都会落快照；用 `snapshotDoneForCompact` 标记避免与自动路径重复；`snapshotBeforeCompact` 的 `reason` 增加 `'manual'`。
+2. **救援 playbook 入库并接线**：新增 `portable/agent/recovery/rescue-prompt.md`，按 my-pi 事实重写（`vendor/pi` 只读/改动走 `patches/`、好 pi 在 `recovery/cache/dist/cli.js`、`scripts/build.sh` 回退、`doctor.sh`+`golden --fast` 验证、`portable/memory/` 不可删、不提交）；`run_fix_pi` 存在该文件时以 `--append-system-prompt` 追加，`-p` 只留最短任务陈述。`.gitignore` 放行该文件（`recovery/` 下其余运行数据仍忽略）。未迁移 `rescue-config.json`——my-pi 直接引用固定路径，无需该配置。
+3. **门抖动显式消除**：`vitest.config.ts` 固定 `name`/`maxWorkers`/`sequence.groupOrder`，使该内部断言不再触发；`check-features.sh` 把"随仓库分发的资源文件（4 个语音脚本 + rescue prompt）存在且未被 ignore"纳入守门。
+**理由**：前两项补齐能力缺口（快照覆盖手动压缩、修复者拿到可操作 playbook）；第三项保证"守门可信"——一个会假红的 pre-commit 比没有守门更糟（会被习惯性 `--no-verify` 绕过）。
+**验证**：vitest 连续 6/6 通过；`golden-tasks.sh` 连续 3/3 全绿（十项）；supervisor 测试 29 项（新增 rescue prompt 存在性与关键路径断言）；`tsc` 通过。
+
+### [2026-09-25] headless 定时任务的能力边界：种子提示词只走脚本，不走扩展工具
+**背景**：迁移审计 G5 追查 `daily-review` 提示词丢步骤时发现更深的问题：**定时任务的执行环境与交互会话不同**。
+`custom/features/autopilot/run/runner.ts` 的 `buildRunArgs` 固定传 `--no-extensions`——因为带扩展的 `-p` 一次性运行
+在本环境**不退出**（实测：`--no-extensions` 25s 干净退出 exit 0；带 `--extension` 60s 超时被 kill）。
+pi-tools 依赖 `agentDir/extensions` 自动发现，my-pi 没有该目录，于是"提示词里可用扩展工具"这一前提**在 my-pi 不成立**：
+`memory_store`、`/memory`、`tmux_*`、`ctx_*` 等在那次运行中根本不存在，任务只会静默失败或空转。
+同时发现 pi-tools `pi-memory/scripts/memory-lifecycle.mjs`（237 行只读治理报告）**完全未迁移**，而 `daily-review`
+的第 5 步正是靠它；my-pi 只有 `/memory lifecycle` 命令，在 headless 里同样不可用。
+**决策**：
+1. **headless 入口统一为脚本**：新增 `scripts/run-ts.sh`（以 vendor tsx 运行需加载 my-pi TS 逻辑的脚本——
+   `custom/` 用无扩展名导入，`node scripts/*.mjs` 裸跑会报 `Cannot find module`）、`scripts/memory-store.mjs`（`storeEntry` 零 LLM 入库）、
+   `scripts/memory-lifecycle.mjs`（`analyzeLifecycle` 只读报告，`--json`/`--limit`）。提示词只引用仓库内脚本。
+2. **补齐生命周期治理信号**：`mine/lifecycle.ts` 增 `junkSuspects`（无实义内容/噪声标题）与 `aggregationCandidates`
+   （同主题 solutions/procedure 聚类，组内 ≥3 且 Σrecurrence ≥8），并让垃圾嫌疑**不进升格候选**——
+   这正是 pi-tools 2026-08-29 修过的缺陷，未迁移该脚本会让它复发。不迁移「空壳心跳」（无 `tools`/`hit` 字段）
+   与「环境标签冲突」（`environments` 非标签集）。
+3. **明确不迁移 Voyager 课程/workticket 提案步骤**：它依赖 pi-tools `SELF-OPTIMIZING-ROADMAP.md` 与运行时状态
+   `~/.pi/logs/lesson-course.json`（两仓库均无此文件），提示词里写的落点 `docs/OPTIMIZATION-LOG.md` 在 pi-tools 里也是错的
+   （实际为 `docs/maintenance/OPTIMIZATION-LOG.md`）。my-pi 用 `/memory mine` + `task-summarizer.mjs` + `packs/drafts/` 预留位替代。
+4. **种子改版需显式应用**：autopilot 的种子对账是"只补缺失、不覆盖"（`store/seeds.ts`），改提示词不会传播到已注册任务；
+   新增 `scripts/reseed-seeds.mjs`（默认预演，`--apply` 备份后写入，保留 id/enabled/lastRun/runCount/history）。
+5. **守门**：新增 `scripts/check-seeds-headless.mjs` 扫描所有 `task.prompt`，命中扩展工具/斜杠命令即失败
+   （放行"不要用 X"这类否定说明），接入 `golden-tasks.sh` 步骤 11——把这条隐性约束变成显式失败。
+**理由**：任务失败的最坏形态是"看起来跑了"。把可用面收敛到"随仓库分发、可离线测试的脚本"，既让 headless 可靠，
+也让提示词里的能力在 `--fast` 守门里可验证；顺带消除 LLM 手搓统计导致的结果不可复现。
+**代价**：脚本是受限入口（没有记忆检索/思考能力），提示词只能表达确定性流程；需要判断的环节仍由任务内的 LLM 完成。
+
+### [2026-09-25] 通知与入站通道：出站用 webhook、入站用 link（不迁移 notify.json / ntfy-relay）
+**背景**：迁移审计 G6 指出 pi-tools 的两类配置在 my-pi 无对应物：① `agent/notify.example.json`——模板命令通道
+（Bark/ServerChan 各一条 `curl` 模板 + `rateLimitMinutes` 去重 + 静默失败），由 `pi-autopilot/scripts/pi-notify.sh` 驱动；
+② `agent/ntfy-relay.json`（`{"injectMode":"rpc"}`）+ `ntfy-relay.js/.sh`——手机 ntfy app → 订阅轮询 → 注入本机
+（`rpc` 模式是 tmux 故障时的兜底远控）。
+**决策**：两者均**不迁移**，由既有能力取代：
+1. **出站**：`autopilot/store/webhook.ts`（`PI_SCHEDULER_WEBHOOK` 优先，其次 `settings.json` 的 `webhookUrl`）在任务完成时
+   POST JSON（`task/type/schedule/result/time/output`，output 截断 1000 字符，10s 超时，失败静默）。
+   Bark/ServerChan/ntfy 都提供 HTTP 端点，直接填 webhook URL 即可；不再支持"任意 shell 模板"这一**注入面**，
+   也不需要 my-pi 侧实现去重（去重属推送服务的职责）。
+2. **入站**：`link` 功能（`link_send` 工具 + `/link send|status|watch|inbox|attach`，SSH 传输层 + 跨进程文件锁 + 并发/去重防抖）
+   覆盖"手机/另一台设备远程给 pi 下指令"的场景，且**不依赖第三方中继**；`/link attach` 可在 tmux 之外接入会话，
+   正是 `injectMode: rpc` 想解决的 tmux 故障场景。
+**理由**：两项取代都减少了面（少一个 shell 模板通道、少一个常驻轮询守护进程与第三方主题密钥），能力不减；
+`notify.json`/`ntfy-relay.json` 含 token/topic（等同密钥），不进仓库反而是好事。
+**代价**：需要"同一通知发多个渠道"时要靠服务端转发或自建 webhook 汇聚；link 需先配置设备清单与 SSH 凭据。

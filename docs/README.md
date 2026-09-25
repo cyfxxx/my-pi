@@ -53,6 +53,9 @@
 | [../portable/agent/AGENTS.md](../portable/agent/AGENTS.md) | 开发规范与环境描述（唯一注入的 AGENTS.md） |
 | [PROGRESS.md](../PROGRESS.md) | 迁移与架构修复进度 |
 | [DECISIONS.md](../DECISIONS.md) | 架构决策记录 |
+| [development/MIGRATION-AUDIT.md](development/MIGRATION-AUDIT.md) | pi-tools → my-pi 迁移完整性审计（缺口与优先级） |
+| [development/CONTEXT-MANAGEMENT-COMPARISON.md](development/CONTEXT-MANAGEMENT-COMPARISON.md) | 上下文管理系统对比（my-pi vs DeepSeek Harness）与优化项 |
+| [development/DSH-CONTEXT-AUDIT.md](development/DSH-CONTEXT-AUDIT.md) | DeepSeek Harness 上下文管理逐条证据（外部参照） |
 
 ---
 

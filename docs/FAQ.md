@@ -104,8 +104,8 @@ pi-backup restore --backup <路径>   # 从本地归档恢复到仓库根
 
 ### Q: 如何切换运行模式？
 
-模式由环境变量 `PI_AGENT_MODE` 控制，取值为 `full`（默认，全部功能）、`light`
-（仅 web-search 与 plan-mode）、`quick`（仅内置工具）；模式配置定义在
+模式由环境变量 `PI_AGENT_MODE` 控制，取值为 `full`（默认，全部功能）、`minimal`
+（仅内置工具，无自定义功能；测试/修复用）或 `roleplay`（web-search + 隔离记忆）；模式配置定义在
 `custom/features/mode/logic.ts`。
 
 ### Q: 如何压缩上下文？
