@@ -29,7 +29,8 @@ export function extractUserRequest(messages: readonly unknown[], maxLen = 200): 
 
 /**
  * 压缩空闲门（门3）：距用户上次输入或任务完成不足 IDLE_MS 时不允许自动压缩。
- * 原实现见 pi-tools `pi-context/auto-compact-controller.ts`（IDLE_MS 默认 10 分钟）。
+ * 原实现见 pi-tools `pi-context/auto-compact-controller.ts`（其 IDLE_MS 默认 10 分钟；
+ * my-pi 因实测净亏已默认关闭，见 budget/task-gate.ts）。
  * `idleMs <= 0` 关闭该门；两个活动时刻均无记录（0）时视为通过，不阻塞。
  */
 export function passesIdleGate(params: {
@@ -42,6 +43,32 @@ export function passesIdleGate(params: {
   const lastActivity = Math.max(params.lastUserActivityTs, params.taskDoneAt);
   if (lastActivity <= 0) return true;
   return params.now - lastActivity >= params.idleMs;
+}
+
+/**
+ * 压缩空闲门（门3）在 `turn_end` 处的判定。
+ *
+ * 修复：判定点只有 `turn_end`，而它**总是紧跟在一次用户输入之后**（`input` 钩子先把
+ * `lastUserActivityTs` 置为当前时刻）。因此 `passesIdleGate` 里的差值恒等于本回合耗时
+ * （秒级）< IDLE_MS，门在结构上不可能通过——实测 10 小时 / 341K 上下文的长会话零压缩。
+ *
+ * 语义修正为「用户此刻或本回合开始前处于非活跃」：满足其一即放行
+ *   A. 本回合开始**之前**用户已离开 ≥ idleMs（`preTurnIdleAnchor` 在 input 钩子中
+ *      于覆盖 `lastUserActivityTs` 前捕获）；
+ *   B. 本回合自身已持续 ≥ idleMs 且期间无用户输入（长工具循环，用户确实不在交互）。
+ * `PI_CONTEXT_IDLE_MS=0` 仍可整体关闭该门。
+ */
+export function passesIdleGateAtTurnEnd(params: {
+  idleMs: number;
+  preTurnIdleAnchor: number;
+  lastUserActivityTs: number;
+  now: number;
+}): boolean {
+  const { idleMs, now } = params;
+  if (idleMs <= 0) return true;
+  if (params.preTurnIdleAnchor > 0 && now - params.preTurnIdleAnchor >= idleMs) return true;
+  if (params.lastUserActivityTs > 0 && now - params.lastUserActivityTs >= idleMs) return true;
+  return false;
 }
 
 export function hasInProgressTask(tasks: readonly { status: string }[]): boolean {

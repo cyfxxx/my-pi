@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   estimateTokens,
   truncateByTokens,
+  truncateHeadTail,
+  tailByTokens,
+  HEAD_TAIL_MARK,
   setContextWindow,
   setCompactThreshold,
   setUsedTokens,
@@ -108,19 +111,22 @@ describe('context-budget: truncateByTokens 边界感知与标记预算', () => {
   });
 });
 
-describe('context-budget: 压力分母为真实窗口', () => {
+describe('context-budget: 压力基准 = 压缩阈值（回退窗口）', () => {
   beforeEach(() => resetAllBudgets());
 
-  it('ratio 以真实 contextWindow 为分母', () => {
+  it('ratio 以真实 contextWindow 为分母；压力以压缩阈值为基准', () => {
     setContextWindow(1_000_000);
     setCompactThreshold(200_000);
     setUsedTokens(180_000);
     const report = getBudgetReport();
-    expect(report.ratio).toBeCloseTo(0.18);
-    expect(report.pressure).toBe('low');
+    expect(report.ratio).toBeCloseTo(0.18); // 窗口分母
+    expect(report.budgetBase).toBe(200_000);
+    expect(report.pressureRatio).toBeCloseTo(0.9); // 阈值分母
+    // 窗口占比仅 18%，但已达压缩阈值 90% → 必须预警（旧实现此处为 low，模型收不到预警）
+    expect(report.pressure).toBe('high');
   });
 
-  it('高占用按窗口比例升档', () => {
+  it('未设压缩阈值时回退窗口比例', () => {
     setContextWindow(1_000_000);
     setUsedTokens(950_000);
     expect(getBudgetReport().pressure).toBe('critical');
@@ -160,5 +166,33 @@ describe('context-budget: 真实校准与输出累计', () => {
     const report = getOutputReport();
     expect(report).toContain('bash');
     expect(report).toMatch(/工具输出预算: \d+/);
+  });
+});
+
+describe('context-budget: 头+尾截断（保留尾部错误）', () => {
+  it('预算内原样返回', () => {
+    expect(truncateHeadTail('short text', 100)).toBe('short text');
+  });
+
+  it('超预算时保留头部与尾部，中间省略', () => {
+    const head = 'HEAD-MARKER-' + 'a'.repeat(4000);
+    const tail = 'b'.repeat(4000) + '-TAIL-ERROR';
+    const out = truncateHeadTail(`${head}${tail}`, 500);
+    expect(out).toContain('HEAD-MARKER-');
+    expect(out).toContain('-TAIL-ERROR');
+    expect(out).toContain(HEAD_TAIL_MARK);
+    expect(estimateTokens(out)).toBeLessThanOrEqual(500);
+  });
+
+  it('tailByTokens 只取末尾且不超预算', () => {
+    const text = 'x'.repeat(4000) + 'END';
+    const tail = tailByTokens(text, 100);
+    expect(tail.endsWith('END')).toBe(true);
+    expect(estimateTokens(tail)).toBeLessThanOrEqual(100);
+  });
+
+  it('空文本不抛错', () => {
+    expect(truncateHeadTail('', 100)).toBe('');
+    expect(tailByTokens('', 100)).toBe('');
   });
 });

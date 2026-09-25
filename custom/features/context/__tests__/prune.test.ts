@@ -59,15 +59,16 @@ describe('pruneToolResults: 工具输出分层擦除', () => {
     expect(messageText(r.messages[14])).toContain('y');
   });
 
-  it('新默认（120K/80K）：5 轮×5万 token 不触发（append-only 优先）', () => {
+  it('新默认（60K/30K）：5 轮×5万 token 即擦除最旧输出（原 120K/80K 从不触发）', () => {
     const r = pruneToolResults(session(5, 200_000));
-    expect(r.modified).toBe(false);
-    expect(r.prunedCount).toBe(0);
+    expect(r.modified).toBe(true);
+    // 保护带 60K 先吸收 1 条 50K，其后（最旧）1 条被擦除
+    expect(r.prunedCount).toBe(1);
   });
 
-  it('更大会话量（8 轮×5万 token）才跨过保护带触发擦除', () => {
+  it('显式保护带 120K：8 轮×5万 token 时仅擦除 3 条更早输出', () => {
     const msgs = session(8, 200_000);
-    const r = pruneToolResults(msgs);
+    const r = pruneToolResults(msgs, { protectTokens: 120_000 });
     expect(r.modified).toBe(true);
     expect(r.prunedCount).toBe(3);
     for (const i of [2, 5, 8]) expect(messageText(r.messages[i])).toMatch(/^\[pruned: \d+ chars\]$/);
@@ -84,7 +85,7 @@ describe('pruneToolResults: 工具输出分层擦除', () => {
   it('已擦除判定：正文含 "[pruned:" 字面量（非开头）不误判', () => {
     const msgs = session(8, 200_000);
     msgs[2] = toolResult(`文件内容如下：\n[pruned: 12345 chars]\n${'y'.repeat(200_000)}`);
-    const r = pruneToolResults(msgs);
+    const r = pruneToolResults(msgs, { protectTokens: 120_000 });
     expect(r.prunedCount).toBe(3);
     expect(isPrunedMessage(msgs[2])).toBe(false);
     expect(messageText(r.messages[2])).toMatch(/^\[pruned: \d+ chars\]$/);
@@ -141,9 +142,9 @@ describe('pruneToolResults: 工具输出分层擦除', () => {
     expect(blockTypes(r.messages[8])).toContain('image');
   });
 
-  it('常数：缓存友好调优（120K/80K/2）', () => {
-    expect(PRUNE_PROTECT_TOKENS).toBe(120_000);
-    expect(PRUNE_MINIMUM_TOKENS).toBe(80_000);
+  it('常数：擦除调优（60K/30K/2）——原 120K/80K 在长会话中从未触发', () => {
+    expect(PRUNE_PROTECT_TOKENS).toBe(60_000);
+    expect(PRUNE_MINIMUM_TOKENS).toBe(30_000);
     expect(KEEP_RECENT_TURNS).toBe(2);
   });
 });

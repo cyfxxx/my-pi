@@ -21,6 +21,10 @@ export interface BudgetReport {
   total: number;
   remaining: number;
   ratio: number;
+  /** 压力分档的真实基准：已设压缩阈值时用它，否则用窗口总量 */
+  budgetBase: number;
+  /** used / budgetBase */
+  pressureRatio: number;
   pressure: 'low' | 'medium' | 'high' | 'critical';
   topConsumers: { tool: string; tokens: number }[];
 }
@@ -129,10 +133,15 @@ export function getBudgetReport(): BudgetReport {
   const base = s.totalBudget;
   const ratio = base > 0 ? Math.min(1, used / base) : 0;
 
+  // 压力分档以**压缩阈值**为基准：窗口远大于阈值时（实测 1M 窗口 / 256K 阈值），
+  // 按窗口比例分档会让模型在压缩前收不到任何预警（阈值仅占窗口 25.6%，而高档是 85%）。
+  const pressureBase = s.compactThreshold && s.compactThreshold > 0 ? s.compactThreshold : base;
+  const pressureRatio = pressureBase > 0 ? Math.min(1, used / pressureBase) : 0;
+
   let pressure: BudgetReport['pressure'] = 'low';
-  if (ratio >= CRITICAL_THRESHOLD) pressure = 'critical';
-  else if (ratio >= HIGH_THRESHOLD) pressure = 'high';
-  else if (ratio >= MEDIUM_THRESHOLD) pressure = 'medium';
+  if (pressureRatio >= CRITICAL_THRESHOLD) pressure = 'critical';
+  else if (pressureRatio >= HIGH_THRESHOLD) pressure = 'high';
+  else if (pressureRatio >= MEDIUM_THRESHOLD) pressure = 'medium';
 
   const consumerMap = new Map<string, number>();
   for (const e of s.tokenUsageLog) {
@@ -148,6 +157,8 @@ export function getBudgetReport(): BudgetReport {
     total: s.totalBudget,
     remaining: Math.max(0, s.totalBudget - used),
     ratio,
+    budgetBase: pressureBase,
+    pressureRatio,
     pressure,
     topConsumers,
   };
@@ -169,10 +180,10 @@ export function resetBudget(): void {
 export function getUrgencyHint(): string | null {
   const r = getBudgetReport();
   if (r.pressure === 'critical') {
-    return '🔴 上下文即将达到窗口上限；压缩会自动触发并生成摘要（关键决策与待办保留在摘要中），需精确保真的细节可先存 ctx_note。';
+    return '🔴 上下文即将达到压缩阈值；压缩会自动触发并生成摘要（关键决策与待办保留在摘要中），需精确保真的细节可先存 ctx_note。';
   }
   if (r.pressure === 'high') {
-    return '🟠 上下文已占窗口 85%。';
+    return '🟠 上下文已接近压缩阈值（85%）。';
   }
   return null;
 }
@@ -190,6 +201,38 @@ export function estimateTokens(text: string): number {
 
 const TRUNC_BREAKS = '。；;！!？?…\n，,、 ()：“”';
 const TRUNC_MARK_TOKEN_BUDGET = 6;
+/** 头尾截断的中间省略标记 */
+export const HEAD_TAIL_MARK = '\n\n[... 中间已省略 ...]\n\n';
+
+/** 从尾部按 token 预算取一段（命令报错通常在末尾，故保留尾部） */
+export function tailByTokens(text: string, maxTokens: number): string {
+  if (!text) return '';
+  if (estimateTokens(text) <= maxTokens) return text;
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (estimateTokens(text.slice(text.length - mid)) <= maxTokens) low = mid;
+    else high = mid - 1;
+  }
+  return text.slice(text.length - low);
+}
+
+/**
+ * 头+尾保留式截断：中间省略。
+ * 只保留头部会丢掉命令输出的错误/结论（多在末尾），故头尾各留一段
+ * （默认头 40% / 尾 60%，偏向尾部）；与 DSH spill 的 head/tail 预览同思路。
+ */
+export function truncateHeadTail(text: string, maxTokens: number, headRatio = 0.4): string {
+  if (!text) return '';
+  if (estimateTokens(text) <= maxTokens) return text;
+  const body = Math.max(2, maxTokens - estimateTokens(HEAD_TAIL_MARK));
+  const headBudget = Math.max(1, Math.floor(body * headRatio));
+  const tailBudget = Math.max(1, body - headBudget);
+  const head = truncateByTokens(text, headBudget).replace(/\n\n\[截断\]$/, '');
+  const tail = tailByTokens(text, tailBudget);
+  return `${head}${HEAD_TAIL_MARK}${tail}`;
+}
 
 export function truncateByTokens(text: string, maxTokens: number): string {
   if (estimateTokens(text) <= maxTokens) return text;
@@ -215,8 +258,20 @@ export function truncateByTokens(text: string, maxTokens: number): string {
 
 // ── 输出预算（按 token） ──
 
-const OUTPUT_BUDGET_TOKENS = 20_000;
+/** 会话累计输出预算（env `PI_CONTEXT_OUTPUT_BUDGET_TOKENS` 可覆盖） */
+function outputBudgetTokens(): number {
+  const n = Number(process.env.PI_CONTEXT_OUTPUT_BUDGET_TOKENS);
+  return Number.isFinite(n) && n > 0 ? n : 20_000;
+}
 const PER_TOOL_TOKENS = 5_000;
+/**
+ * 会话预算豁免工具：`read` 是"凭占位符路径取回归档原文"的唯一手段
+ * （见 output-archive.ts 的设计承诺）。若它也受会话累计预算约束，长会话后期
+ * 所有 read 会被压到 300 token，归档的"可读回"即失效（实测 562 条工具输出中
+ * 308 条被截断、会话后期 read 输出均值仅 155 token）。
+ * 对豁免工具只施加单次上限，不受也不消耗会话累计预算。
+ */
+const SESSION_BUDGET_EXEMPT_TOOLS = new Set(['read']);
 
 export function recordOutput(tool: string, outputLength: number): void {
   const tokens = Math.ceil(outputLength / 3.5);
@@ -228,19 +283,22 @@ export function recordOutput(tool: string, outputLength: number): void {
 /**
  * 按会话累计输出预算裁剪工具输出，并把实际放行的输出计入预算。
  * 此前只裁剪不累计，导致 20K 上限形同虚设（跨调用裁剪永不生效）。
+ * 豁免工具（read）只受单次上限约束，保证归档原文可被读回。
  */
 export function pruneToolOutput(text: string, toolName: string): string {
   const s = getState();
   const textTokens = estimateTokens(text);
-  const remaining = OUTPUT_BUDGET_TOKENS - s.outputTotalTokens;
+  const exempt = SESSION_BUDGET_EXEMPT_TOOLS.has(toolName);
+  const budget = outputBudgetTokens();
+  const remaining = exempt ? PER_TOOL_TOKENS : budget - s.outputTotalTokens;
   const allowed = Math.min(PER_TOOL_TOKENS, Math.max(300, remaining));
 
   let result: string;
-  if (textTokens <= allowed && s.outputTotalTokens + textTokens <= OUTPUT_BUDGET_TOKENS) {
+  if (textTokens <= allowed && (exempt || s.outputTotalTokens + textTokens <= budget)) {
     result = text;
   } else {
-    const truncated = truncateByTokens(text, allowed);
-    const truncatedText = truncated.replace(/\n\n\[截断\]$/, '');
+    // 头+尾保留：命令/测试输出的错误与结论通常在末尾，只留头部会丢关键信息
+    const truncatedText = truncateHeadTail(text, allowed);
     const ratio = textTokens > 0 ? Math.round((allowed / textTokens) * 100) : 100;
     result = archivedStub(
       text,
@@ -248,9 +306,11 @@ export function pruneToolOutput(text: string, toolName: string): string {
     );
   }
 
-  // 记入实际放行内容（裁剪后），使累计预算随会话推进收敛。
-  s.outputEntries.push({ tool: toolName, tokens: estimateTokens(result), ts: Date.now() });
-  s.outputTotalTokens += estimateTokens(result);
+  // 记入实际放行内容（裁剪后），使累计预算随会话推进收敛；豁免工具不占用预算。
+  if (!exempt) {
+    s.outputEntries.push({ tool: toolName, tokens: estimateTokens(result), ts: Date.now() });
+    s.outputTotalTokens += estimateTokens(result);
+  }
   return result;
 }
 
@@ -261,13 +321,14 @@ export function getOutputReport(): string {
   for (const e of s.outputEntries) {
     byTool.set(e.tool, (byTool.get(e.tool) || 0) + e.tokens);
   }
+  const budget = outputBudgetTokens();
   const lines = [
-    `工具输出预算: ${s.outputTotalTokens.toLocaleString()}/${OUTPUT_BUDGET_TOKENS.toLocaleString()} token`,
+    `工具输出预算: ${s.outputTotalTokens.toLocaleString()}/${budget.toLocaleString()} token（read 豁免）`,
   ];
   for (const [tool, tokens] of byTool) {
     lines.push(`  ${tool}: ${tokens.toLocaleString()} token`);
   }
-  lines.push(`  剩余: ${Math.max(0, OUTPUT_BUDGET_TOKENS - s.outputTotalTokens).toLocaleString()} token`);
+  lines.push(`  剩余: ${Math.max(0, budget - s.outputTotalTokens).toLocaleString()} token`);
   return lines.join('\n');
 }
 
@@ -316,4 +377,5 @@ export function resetAllBudgets(): void {
   resetOutputBudget();
   resetCacheStats();
   getState().totalBudget = DEFAULT_TOTAL;
+  getState().compactThreshold = null;
 }

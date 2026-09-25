@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readEnvRatio, resolveContext, hasBackgroundTask } from '../budget/task-gate';
-import { passesIdleGate } from '../logic';
+import { passesIdleGate, passesIdleGateAtTurnEnd } from '../logic';
 
 let dir: string;
 
@@ -94,5 +94,62 @@ describe('passesIdleGate（压缩门3：空闲判定）', () => {
     expect(
       passesIdleGate({ idleMs: 600_000, lastUserActivityTs: now - 600_000, taskDoneAt: now - 900_000, now }),
     ).toBe(true);
+  });
+});
+
+describe('passesIdleGateAtTurnEnd（门3 在 turn_end 的正确判定）', () => {
+  const now = 1_000_000_000;
+  const IDLE = 600_000;
+
+  it('idleMs<=0 时关闭该门', () => {
+    expect(
+      passesIdleGateAtTurnEnd({ idleMs: 0, preTurnIdleAnchor: now - 1, lastUserActivityTs: now, now }),
+    ).toBe(true);
+  });
+
+  it('回归：用户本回合刚输入（锚点为 0，回合耗时很短）→ 不压缩', () => {
+    // 修复前该场景恒为 false；修复后仍应 false（本回合用户活跃，且回合前无记录）
+    expect(
+      passesIdleGateAtTurnEnd({ idleMs: IDLE, preTurnIdleAnchor: 0, lastUserActivityTs: now - 5_000, now }),
+    ).toBe(false);
+  });
+
+  it('核心修复：用户空闲 7.8 小时后回来发消息 → turn_end 放行（此前恒 false）', () => {
+    expect(
+      passesIdleGateAtTurnEnd({
+        idleMs: IDLE,
+        preTurnIdleAnchor: now - 28_000_000,
+        lastUserActivityTs: now - 3_000,
+        now,
+      }),
+    ).toBe(true);
+  });
+
+  it('连续对话（回合前仅隔 30s）→ 不压缩', () => {
+    expect(
+      passesIdleGateAtTurnEnd({
+        idleMs: IDLE,
+        preTurnIdleAnchor: now - 30_000,
+        lastUserActivityTs: now - 3_000,
+        now,
+      }),
+    ).toBe(false);
+  });
+
+  it('长工具循环：本回合已持续 ≥ IDLE_MS 且无用户输入 → 放行', () => {
+    expect(
+      passesIdleGateAtTurnEnd({
+        idleMs: IDLE,
+        preTurnIdleAnchor: now - 1_000,
+        lastUserActivityTs: now - IDLE,
+        now,
+      }),
+    ).toBe(true);
+  });
+
+  it('首次回合（两者均无记录）→ 不因空闲放行', () => {
+    expect(
+      passesIdleGateAtTurnEnd({ idleMs: IDLE, preTurnIdleAnchor: 0, lastUserActivityTs: now - 1_000, now }),
+    ).toBe(false);
   });
 });

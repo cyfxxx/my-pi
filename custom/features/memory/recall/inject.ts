@@ -132,3 +132,14 @@ export function filterInjectedMessages<T extends object>(messages: T[]): T[] {
   }
   return filtered;
 }
+
+/**
+ * 注入去抖：注入块内容与上次相同则不再注入。
+ *
+ * 每轮重插（旧注入被 `filterInjectedMessages` 移除 + 新注入追加）会使消息序列在注入点
+ * 发生位移，位移点**之后**的前缀缓存全部失效；实测 my-pi 出现单次 170K–316K 全价重算，
+ * 且这些事件都紧跟一次注入。内容不变时历史中的旧注入已足够，跳过即可保持前缀稳定。
+ */
+export function shouldInjectMemory(block: string, lastInjectedBlock: string | null): boolean {
+  return block.length > 0 && block !== lastInjectedBlock;
+}

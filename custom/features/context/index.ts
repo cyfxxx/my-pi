@@ -8,11 +8,15 @@
  * 迁移自 pi-tools pi-context：使用真实 contextWindow/用量校准上下文预算。
  */
 
+import { join, dirname } from 'node:path';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerCommand, sendMessage, getAllToolNames, getThinkingLevel, setThinkingLevel } from '../../adapters/ui-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
+import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
+import { getMemoryDir } from '../../core/config';
+import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
 import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
 import {
@@ -21,7 +25,7 @@ import {
   LOW_PRESSURE_DELEGATION,
   FULL_DELEGATION_ADVICE,
   hasInProgressTask,
-  passesIdleGate,
+  passesIdleGateAtTurnEnd,
   extractUserRequest,
 } from './logic';
 import { recordTaskRecord } from './budget/task-record';
@@ -45,15 +49,17 @@ import {
   resetAllBudgets,
   setContextWindow,
   setUsedTokens,
+  setCompactThreshold,
   recordToolUsage,
   estimateTokens,
   getBudgetReport,
   pruneToolOutput,
   getCacheStats,
 } from './budget/budget';
-import { pruneToolResults, sweepPruneRefs } from './budget/prune';
+import { pruneToolResults, pruneThinkingBudget, sweepPruneRefs } from './budget/prune';
+import { sweepArchive } from './budget/output-archive';
 import type { PruneMessage } from './budget/prune';
-import { makeCompactDecider, makeAutoContinueGate } from './budget/auto-compact';
+import { makeCompactDecider, makeAutoContinueGate, computeCompactThreshold } from './budget/auto-compact';
 import { createSpeedTracker, formatSpeedCompact } from './budget/token-speed';
 import { recordUsage, loadDiagLines, formatUsageSummary } from './usage-diag/diag';
 import {
@@ -62,6 +68,9 @@ import {
   COMPACT_COOLDOWN_MS,
   IDLE_MS,
   TASK_GATE,
+  PRUNE_PROTECT,
+  PRUNE_MINIMUM,
+  KEEP_THINKING_TOKENS,
   readEnvRatio,
   resolveContext,
   hasBackgroundTask,
@@ -76,6 +85,9 @@ import {
 import { appendUsage } from './usage-stats';
 
 
+
+/** 易变运行时提示（压力档/休眠工具摘要/重启提示）的消息类型；仅内容变化时追加 */
+const VOLATILE_ADVICE_TAG = 'my-pi-context-advice';
 
 export function register(pi: ExtensionAPI): void {
   const toolState = createToolLifecycleState();
@@ -92,6 +104,26 @@ export function register(pi: ExtensionAPI): void {
   // 未命中（$0.15/M），重放后大部分转为 cacheRead（$0.003/M）。
   const warmState = createWarmPrefixState();
   warmState.compactWarmAllowed = true;
+  // 运行时前缀指纹（逐请求）：定位"整段缓存失效"发生在 system / tools / 消息序列哪一段。  // 纯诊断，PI_PREFIX_FINGERPRINT=off 可关；只写本地 JSONL，不进 LLM 上下文。
+  const fingerprintEnabled = process.env.PI_PREFIX_FINGERPRINT !== 'off';
+  const fingerprintFile =
+    process.env.PI_PREFIX_FINGERPRINT_FILE || join(getMemoryDir(), 'logs', 'prefix-fingerprints.jsonl');
+  let lastFingerprint: PrefixFingerprint | null = null;
+  // 上一次追加的易变运行时提示内容（仅变化时追加，避免每轮重插导致的消息序列位移）
+  let lastVolatileContext: string | null = null;
+  const recordFingerprint = (payload: { messages?: unknown[]; tools?: unknown }): void => {
+    try {
+      const fp = fingerprintRequest(payload, lastFingerprint);
+      lastFingerprint = fp;
+      ensureDir(dirname(fingerprintFile));
+      appendJSONLRotating(fingerprintFile, fp, 1_000_000);
+    } catch {
+      /* 诊断失败不影响请求 */
+    }
+  };
+  /** 最近一次请求的前缀指纹（供 /context fingerprint 查看） */
+  const lastFingerprintLine = (): string =>
+    lastFingerprint ? formatFingerprint(lastFingerprint) : '(尚未记录到请求)';
   const fallbackContextWindow = (() => {
     const n = Number(process.env.PI_CONTEXT_WINDOW_FALLBACK);
     return Number.isFinite(n) && n > 0 ? n : 1_000_000;
@@ -100,12 +132,18 @@ export function register(pi: ExtensionAPI): void {
   let layeringApplied = false;
   let lastContextMessages: unknown[] | null = null;
   let compactedThisSettlement = false;
+  // 自动阈值路径已写快照的标记：session_before_compact 据此避免重复快照，
+  // 而手动 /compact（不经过本路径）仍会走 session_before_compact 落快照。
+  let snapshotDoneForCompact = false;
   let thinkState: ThinkLevelState | null = null;
   const thinkingAutoEnabled = process.env.PI_CONTEXT_THINKING_AUTO !== 'off';
   const speedTracker = createSpeedTracker();
   let lastSpeedUiAt = 0;
   // 门3（空闲判定）状态：用户上次输入时刻、任务忙→闲的转折时刻、上轮任务是否忙
   let lastUserActivityTs = 0;
+  // 本回合开始前的活动锚点（input 钩子在覆盖 lastUserActivityTs 之前捕获），
+  // 用于 turn_end 判定“用户在本回合开始前是否已离开足够久”（见 passesIdleGateAtTurnEnd）
+  let preTurnIdleAnchor = 0;
   let taskDoneAt = 0;
   let taskBusyPrev: boolean | null = null;
 
@@ -126,6 +164,7 @@ export function register(pi: ExtensionAPI): void {
       const subcommands = [
         { value: 'usage', label: 'usage', description: '显示 token 使用诊断' },
         { value: 'report', label: 'report', description: '显示预算报告' },
+        { value: 'fingerprint', label: 'fingerprint', description: '显示最近一次请求的前缀指纹' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
       const filtered = filterCompletions(subcommands, prefix);
@@ -133,17 +172,26 @@ export function register(pi: ExtensionAPI): void {
     },
     handler: async (args, ctx) => {
       const subcommand = args.trim() || 'usage';
-      const helpText = '/context <子命令>\n  usage   显示 token 使用诊断\n  report  显示预算报告';
+      const helpText =
+        '/context <子命令>\n  usage        显示 token 使用诊断\n  report       显示预算报告\n  fingerprint  显示最近一次请求的前缀指纹';
       if (subcommand === 'help') {
         ctx.ui.notify(helpText, 'info');
+        return;
+      }
+      if (subcommand === 'fingerprint') {
+        ctx.ui.notify(
+          `最近一次请求前缀指纹:\n  ${lastFingerprintLine()}\n逐请求日志: ${fingerprintFile}` +
+            (fingerprintEnabled ? '' : '\n（PI_PREFIX_FINGERPRINT=off，本次未记录）'),
+          'info',
+        );
         return;
       }
       if (subcommand === 'usage' || subcommand === 'report') {
         const r = getBudgetReport();
         ctx.ui.notify(
           `Token 使用报告:
-已使用: ${r.used.toLocaleString()} / ${r.total.toLocaleString()} (${(r.ratio * 100).toFixed(1)}%)
-剩余: ${r.remaining.toLocaleString()} token
+已使用: ${r.used.toLocaleString()} / ${r.total.toLocaleString()} 窗口 (${(r.ratio * 100).toFixed(1)}%)
+压缩阈值: ${r.budgetBase.toLocaleString()} token（压力 ${(r.pressureRatio * 100).toFixed(1)}%）
 压力级别: ${r.pressure}
 主要消耗: ${r.topConsumers.map((c) => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}`,
           'info',
@@ -246,6 +294,9 @@ export function register(pi: ExtensionAPI): void {
     handler: async () => {
       resetAllBudgets();
       void sweepPruneRefs(pruneRefsDir(), { retentionDays: PRUNE_REFS_RETENTION_DAYS }).catch(() => {});
+      // 工具输出归档目录此前无任何清理（实测 442 文件已无上限增长）；按 14 天/200MB 回收，
+      // 保留窗口比 prune-refs 宽，因为归档是"凭路径读回原文"的凭据。
+      void sweepArchive().catch(() => {});
     },
   });
 
@@ -261,20 +312,30 @@ export function register(pi: ExtensionAPI): void {
         applyToolLayering(pi);
       }
       const usage = ctx.getContextUsage?.();
+      let compactThreshold: number | null = null;
       if (usage) {
         setContextWindow(usage.contextWindow);
         if (usage.tokens != null) setUsedTokens(usage.tokens);
+        // 压缩阈值同时作为"压力分档基准"：窗口 1M 而阈值 256K 时，按窗口比例分档
+        // 永远到不了高档，模型会在压缩前收不到任何预警。
+        compactThreshold = computeCompactThreshold(usage.contextWindow, {
+          absoluteTokens: ABSOLUTE_TOKENS,
+          largeRatio: readEnvRatio('PI_CONTEXT_COMPACT_LARGE_RATIO'),
+          smallRatio: readEnvRatio('PI_CONTEXT_COMPACT_SMALL_RATIO'),
+        });
+        if (compactThreshold) setCompactThreshold(compactThreshold);
       }
       const e = event as { systemPrompt?: string };
       if (typeof e.systemPrompt !== 'string') return;
-      // 压力提示：按窗口比例分档（静态文本，仅跨档时变化，缓存友好；禁止注入精确数值）
-      const ratio = usage && usage.contextWindow > 0 ? (usage.tokens ?? 0) / usage.contextWindow : 0;
+      // 压力提示：按"距压缩阈值"的比例分档（静态文本，仅跨档时变化，缓存友好；禁止注入精确数值）
+      const ratio =
+        compactThreshold && compactThreshold > 0 ? (usage?.tokens ?? 0) / compactThreshold : 0;
       let pressureLine = '';
       if (ratio >= 0.9) {
         pressureLine =
-          '[上下文已占窗口 90%；达到压缩条件将自动压缩并生成摘要，关键决策与待办会保留在摘要中；需精确保真的细节可先存 memory_store。]';
+          '[上下文已接近压缩阈值；达到后会压缩并生成摘要，关键决策与待办会保留在摘要中；需精确保真的细节可先存 memory_store。]';
       } else if (ratio >= 0.75) {
-        pressureLine = '[上下文已占窗口 75%。]';
+        pressureLine = '[上下文已接近压缩阈值。]';
       }
       const advice = pressureLine
         ? `${FULL_DELEGATION_ADVICE}\n${pressureLine}`
@@ -282,10 +343,24 @@ export function register(pi: ExtensionAPI): void {
       // 重启提示：超过绝对阈值时给静态指引（先 /compact 再重启，避免首轮全量重发）
       const restartHint =
         usage?.tokens != null && usage.tokens > RESTART_TOKENS
-          ? '\n\n[上下文已超过重启提示阈值：如需重启，建议先 /compact，可避免重启后首轮全量重发。]'
+          ? '[上下文已超过重启提示阈值：如需重启，建议先 /compact，可避免重启后首轮全量重发。]'
           : '';
+      // 易变运行时提示（压力档/休眠工具摘要/重启提示）**不再写入 system prompt**：
+      // 它们位于前缀最前处，一旦变化就是整段缓存失效（实测单次 170K–316K 全价重算）。
+      // 改为"内容变化时才追加一条消息"（append-only，不删除旧的）：变化点落在尾部，
+      // 只影响其后的少量 token。对齐 DSH 的 change-only volatile context 做法。
+      const volatileText = [advice, buildSleepingSummary(new Set(getAllToolNames(pi))), restartHint]
+        .filter(Boolean)
+        .join('\n\n');
+      let message: { customType: string; content: string; display: boolean } | undefined;
+      if (volatileText && volatileText !== lastVolatileContext) {
+        lastVolatileContext = volatileText;
+        message = { customType: VOLATILE_ADVICE_TAG, content: volatileText, display: false };
+      }
+      // system prompt 只追加静态常量，保持逐字节稳定（工具集变化本身无法避免）
       return {
-        systemPrompt: `${e.systemPrompt}\n\n${advice}\n\n${EFFICIENCY_ADVICE}\n\n${buildSleepingSummary(new Set(getAllToolNames(pi)))}${restartHint}`,
+        systemPrompt: `${e.systemPrompt}\n\n${EFFICIENCY_ADVICE}`,
+        ...(message ? { message } : {}),
       };
     },
   });
@@ -331,9 +406,21 @@ export function register(pi: ExtensionAPI): void {
       }
 
       const dumpRef = buildPruneDumpRef(ctx as { sessionManager?: { getSessionId?: () => string | null } });
-      const pruned = pruneToolResults(working as PruneMessage[], { dumpRef });
+      const pruned = pruneToolResults(working as PruneMessage[], {
+        protectTokens: PRUNE_PROTECT,
+        minimumTokens: PRUNE_MINIMUM,
+        dumpRef,
+      });
       if (pruned.modified) {
         working = pruned.messages as unknown[];
+        modified = true;
+      }
+
+      // 历史 thinking 块按 token 预算擦除。实测长会话中 thinking 可占上下文 ~50%
+      // （10 小时会话：155K/310K），且无 LLM 成本即可回收，必须在压缩之前做。
+      const thinkTrimmed = pruneThinkingBudget(working as PruneMessage[], KEEP_THINKING_TOKENS);
+      if (thinkTrimmed.modified) {
+        working = thinkTrimmed.messages as unknown[];
         modified = true;
       }
 
@@ -423,13 +510,14 @@ export function register(pi: ExtensionAPI): void {
       if (hasBackgroundTask()) return;
       const decision = compactDecider.decide(resolved.tokens, resolved.window);
       if (!decision.shouldCompact) return;
-      // 门3：距用户上次输入或任务完成不足 IDLE_MS 不压缩（活跃工作时压缩会打断思路，
-      // 且压缩使前缀缓存整体失效、下一轮全量未命中）。PI_CONTEXT_IDLE_MS=0 可关。
+      // 门3：本回合开始前用户已离开 ≥ IDLE_MS，或本回合自身已持续 ≥ IDLE_MS（长工具循环）
+      // 才允许压缩。修复前这里比较的是“距本回合用户输入”，差值恒为本回合耗时（秒级），
+      // 门永远不过 → 交互式长会话从不压缩（实测 341K 上下文零压缩）。
       if (
-        !passesIdleGate({
+        !passesIdleGateAtTurnEnd({
           idleMs: IDLE_MS,
+          preTurnIdleAnchor,
           lastUserActivityTs,
-          taskDoneAt,
           now: Date.now(),
         })
       ) {
@@ -437,10 +525,29 @@ export function register(pi: ExtensionAPI): void {
       }
       // 压缩前快照（保留最近 8 份/7 天，失败不阻塞压缩）
       snapshotBeforeCompact(lastContextMessages, resolved.tokens, decision.threshold, 'threshold');
+      snapshotDoneForCompact = true;
       compactedThisSettlement = true;
       autoContinueGate.arm();
       compactDecider.markCompact();
       ctx.compact?.();
+    },
+  });
+
+  // 任意压缩（含手动 /compact、pi 内置溢出压缩）前落快照。
+  // 修复：此前只在自动阈值路径调用 snapshotBeforeCompact，手动 /compact 不产生快照
+  // （pi-tools 的 pi-memory 在 session_before_compact 里快照，覆盖所有压缩）。
+  registerHook(pi, {
+    event: 'session_before_compact',
+    handler: () => {
+      if (snapshotDoneForCompact) {
+        // 本轮自动压缩已快照过，避免重复
+        snapshotDoneForCompact = false;
+        return;
+      }
+      if (!lastContextMessages || lastContextMessages.length === 0) return;
+      const used = getBudgetReport().used;
+      const threshold = getBudgetReport().budgetBase;
+      snapshotBeforeCompact(lastContextMessages, used, threshold, 'manual');
     },
   });
 
@@ -449,6 +556,9 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'input',
     handler: () => {
+      // 先记录本回合开始“之前”的活动锚点，再更新当前输入时刻：
+      // turn_end 的压缩判定依赖它区分“用户刚从长时间空闲回来”与“用户正在连续对话”。
+      preTurnIdleAnchor = Math.max(lastUserActivityTs, taskDoneAt);
       lastUserActivityTs = Date.now();
     },
   });
@@ -463,9 +573,11 @@ export function register(pi: ExtensionAPI): void {
       const last = payload.messages[payload.messages.length - 1] as { role?: string; content?: unknown };
       if (isSummarizationMessage(last)) {
         const replayed = buildReplayedPayload(warmState, payload.messages, payload);
+        if (fingerprintEnabled) recordFingerprint(replayed ?? payload);
         return replayed ?? undefined;
       }
       saveMainRequestPayload(warmState, modelKey, payload.messages, payload.tools);
+      if (fingerprintEnabled) recordFingerprint(payload);
       return undefined;
     },
   });

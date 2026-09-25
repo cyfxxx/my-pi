@@ -6,17 +6,20 @@
  * 输出是上下文主要消耗。本模块在 `context` 事件阶段做确定性"事后擦除"：
  * 保留最近 N 轮 + 保护带 token，更早的已完成 toolResult 输出替换为占位。
  *
- * 缓存纪律：判定只依赖消息内容本身；擦除改变消息序列会断裂前缀缓存，故
- * 保护带/最低回收阈值调高（120K/80K），普通会话不触发，清理职责优先交给
- * auto-compact（一次性断裂 + 摘要）。
+ * 缓存纪律：判定只依赖消息内容本身；擦除改变消息序列会断裂前缀缓存，但**不产生 LLM 调用**，
+ * 比 auto-compact（一次全价摘要请求 + 同样断裂缓存）便宜得多，因此应在压缩前尽可能由本模块回收。
+ *
+ * 阈值校准（2026-09-25 成本审计）：原 120K/80K 在 10 小时 / 341K 上下文的真实会话中**从未触发**
+ * （该会话擦除占位符出现 0 次），因为写入时截断已把单条输出压到约 300 token，旧输出总量
+ * 难以越过保护带。下调为 60K/30K，使擦除能在压缩前真正回收（env 可覆盖）。
  */
 
 import { readdir, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { estimateTokens } from './budget';
 
-export const PRUNE_PROTECT_TOKENS = 120_000;
-export const PRUNE_MINIMUM_TOKENS = 80_000;
+export const PRUNE_PROTECT_TOKENS = 60_000;
+export const PRUNE_MINIMUM_TOKENS = 30_000;
 export const KEEP_RECENT_TURNS = 2;
 export const PRUNE_SENTINEL = '[pruned:';
 export const NON_TEXT_BLOCK_TOKENS = 1000;

@@ -97,12 +97,12 @@ export function pruneSnapshots(dir = snapshotDir()): number {
   }
 }
 
-/** 压缩前保存快照（失败不阻塞压缩） */
+/** 压缩前保存快照（失败不阻塞压缩）。reason 区分触发来源：自动阈值 / 溢出 / 手动 /compact。 */
 export function snapshotBeforeCompact(
   lastContextMessages: unknown[] | null,
   contextTokens: number,
   threshold: number,
-  reason: 'overflow' | 'threshold' = 'threshold',
+  reason: 'overflow' | 'threshold' | 'manual' = 'threshold',
 ): string | null {
   try {
     if (!lastContextMessages || lastContextMessages.length === 0) return null;

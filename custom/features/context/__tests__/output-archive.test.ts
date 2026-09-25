@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, rmSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { archiveOutput, archivedStub } from '../budget/output-archive';
-import { pruneToolOutput } from '../budget/budget';
+import { archiveOutput, archivedStub, archiveDir, sweepArchive } from '../budget/output-archive';
+import { pruneToolOutput, resetOutputBudget, estimateTokens } from '../budget/budget';
 
 const tmp = mkdtempSync(join(tmpdir(), 'my-pi-archive-'));
 process.env.PI_OUTPUT_ARCHIVE_DIR = tmp;
@@ -64,5 +64,50 @@ describe('output-archive 工具输出归档', () => {
     expect(out).toMatch(/原文 \d+ 字符已存档: (.+\.txt)$/);
     const m = out.match(/已存档: (.+\.txt)$/)!;
     expect(readFileSync(m[1], 'utf-8')).toBe(big);
+  });
+
+  it('read 豁免会话输出预算：预算耗尽后仍能读回归档（可恢复性保证）', () => {
+    resetOutputBudget();
+    // 耗尽 20K 会话输出预算
+    for (let i = 0; i < 6; i++) pruneToolOutput('b'.repeat(20_000), 'bash');
+    const bashOut = pruneToolOutput('c'.repeat(20_000), 'bash');
+    expect(bashOut).toContain('输出已截断');
+    expect(estimateTokens(bashOut)).toBeLessThan(600); // 被压到 300 token 档
+
+    // read 仍按单次上限放行（不受会话累计预算约束）
+    const readText = 'x'.repeat(12_000); // ≈3000 token
+    expect(pruneToolOutput(readText, 'read')).toBe(readText);
+  });
+
+  it('sweepArchive 按保留期清理过期归档（含子目录）', async () => {
+    const dir = join(archiveDir(), 'zz');
+    mkdirSync(dir, { recursive: true });
+    const oldFile = join(dir, 'old.txt');
+    const newFile = join(dir, 'new.txt');
+    writeFileSync(oldFile, 'x'.repeat(200));
+    writeFileSync(newFile, 'y'.repeat(200));
+    const past = (Date.now() - 30 * 86_400_000) / 1000;
+    utimesSync(oldFile, past, past);
+
+    const stats = await sweepArchive({ retentionDays: 1 });
+    expect(stats.scanned).toBeGreaterThanOrEqual(2);
+    expect(stats.deletedByAge).toBeGreaterThanOrEqual(1);
+    expect(existsSync(oldFile)).toBe(false);
+    expect(existsSync(newFile)).toBe(true);
+  });
+
+  it('sweepArchive 总量超限时从最旧删起（retentionDays<0 只做容量回收）', async () => {
+    const dir = join(archiveDir(), 'yy');
+    mkdirSync(dir, { recursive: true });
+    const a = join(dir, 'a.txt');
+    const b = join(dir, 'b.txt');
+    writeFileSync(a, 'a'.repeat(2000));
+    writeFileSync(b, 'b'.repeat(2000));
+    const past = (Date.now() - 10 * 86_400_000) / 1000;
+    utimesSync(a, past, past);
+
+    const stats = await sweepArchive({ retentionDays: -1, maxTotalBytes: 3000 });
+    expect(stats.deletedBySize).toBeGreaterThanOrEqual(1);
+    expect(existsSync(a)).toBe(false); // 最旧的先删
   });
 });

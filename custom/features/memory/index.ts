@@ -38,6 +38,7 @@ import {
   buildInjectionBlock,
   INJECT_TAG,
   filterInjectedMessages,
+  shouldInjectMemory,
   detectEnvironment,
   formatEnvironments,
   CATEGORIES,
@@ -54,6 +55,10 @@ import {
 import type { MemoryCategory, MemoryEntry, RuntimeEnv } from './logic';
 
 export function register(pi: ExtensionAPI): void {
+  // 上一次注入块内容。用于"内容未变则不重插"：注入消息由 before_agent_start 追加、
+  // 旧注入由 context 钩子移除，每轮重插会使消息序列在注入点发生位移，位移点之后的前缀
+  // 缓存全部失效（实测单次 170K–316K 全价重算）。内容不变时保留历史中的旧注入即可。
+  let lastInjectedBlock: string | null = null;
   // ── ctx_note / ctx_list（便笺，跨压缩存活）──
   registerNotesTools(pi);
   // ── ctx_snap（便笺检查点）──
@@ -388,6 +393,8 @@ export function register(pi: ExtensionAPI): void {
   });
 
   // ── 每轮注入（消息注入，缓存友好）──
+  // 仅当注入块内容**发生变化**时才追加新注入：内容未变时旧注入仍在历史中，模型照常可见，
+  // 而避免"移除旧注入 + 追加新注入"造成的序列位移（位移点之后前缀缓存失效）。
   registerHook(pi, {
     event: 'before_agent_start',
     handler: async () => {
@@ -396,6 +403,8 @@ export function register(pi: ExtensionAPI): void {
       if (kept) entries = kept;
       const { block, entries: n, summaries: m } = buildInjectionBlock(entries, loadSummaries());
       if (n === 0 && m === 0) return undefined;
+      if (!shouldInjectMemory(block, lastInjectedBlock)) return undefined;
+      lastInjectedBlock = block;
       return { message: { customType: INJECT_TAG, content: block, display: false } };
     },
   });
@@ -414,6 +423,8 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'session_compact',
     handler: async (event, ctx) => {
+      // 压缩可能把历史中的注入消息摘要掉 → 重置，确保下一轮重新注入
+      lastInjectedBlock = null;
       updateNotes((n) => {
         n['_ctx.compacted_at'] = new Date().toISOString();
       });

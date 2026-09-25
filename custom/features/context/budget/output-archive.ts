@@ -16,10 +16,15 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { readdir, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
 import { writeTextSync } from '../../../core/atomic-write';
 import { scrubSecrets } from '../../../core/secrets';
+
+/** 归档保留期与总量上限（归档是"读回原文"的凭据，保留窗口比 prune-refs 宽） */
+export const ARCHIVE_RETENTION_DAYS = 14;
+export const ARCHIVE_MAX_TOTAL_BYTES = 200 * 1024 * 1024;
 
 /** 归档根目录（每次调用时读 env，便于测试注入） */
 export function archiveDir(): string {
@@ -48,4 +53,83 @@ export function archiveOutput(text: string): string | null {
 export function archivedStub(text: string, base: string): string {
   const path = archiveOutput(text);
   return path ? `${base} 原文 ${text.length} 字符已存档: ${path}` : base;
+}
+
+export interface SweepArchiveOptions {
+  retentionDays?: number;
+  maxTotalBytes?: number;
+}
+
+export interface SweepArchiveStats {
+  scanned: number;
+  deletedByAge: number;
+  deletedBySize: number;
+  freedBytes: number;
+}
+
+/**
+ * 清理归档目录：先按保留期删除过期文件，再在总量超限时从最旧删起。
+ * 归档按内容哈希分两层子目录（`<hh>/<hash>-<len>.txt`），故需递归一层。
+ * 任何单文件失败都忽略（fail-open），不影响会话启动。
+ */
+export async function sweepArchive(opts: SweepArchiveOptions = {}): Promise<SweepArchiveStats> {
+  const retentionDays = opts.retentionDays ?? ARCHIVE_RETENTION_DAYS;
+  const maxTotalBytes = opts.maxTotalBytes ?? ARCHIVE_MAX_TOTAL_BYTES;
+  const stats: SweepArchiveStats = { scanned: 0, deletedByAge: 0, deletedBySize: 0, freedBytes: 0 };
+  const root = archiveDir();
+  const files: { path: string; mtime: number; size: number }[] = [];
+
+  const collect = async (dir: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) {
+        await collect(p);
+        continue;
+      }
+      if (!e.isFile()) continue;
+      const st = await stat(p).catch(() => null);
+      if (!st) continue;
+      files.push({ path: p, mtime: st.mtimeMs, size: st.size });
+    }
+  };
+  await collect(root);
+
+  stats.scanned = files.length;
+  if (retentionDays >= 0) {
+    const cutoff = Date.now() - retentionDays * 86_400_000;
+    for (const f of files) {
+      if (f.mtime >= cutoff) continue;
+      try {
+        await unlink(f.path);
+        stats.deletedByAge++;
+        stats.freedBytes += f.size;
+        f.size = 0;
+      } catch {
+        /* 单文件失败忽略 */
+      }
+    }
+  }
+  let remaining = files.reduce((s, f) => s + f.size, 0);
+  if (remaining > maxTotalBytes) {
+    for (const f of [...files].sort((a, b) => a.mtime - b.mtime)) {
+      if (remaining <= maxTotalBytes) break;
+      if (f.size === 0) continue;
+      try {
+        await unlink(f.path);
+        stats.deletedBySize++;
+        stats.freedBytes += f.size;
+        remaining -= f.size;
+        f.size = 0;
+      } catch {
+        /* 单文件失败忽略 */
+      }
+    }
+  }
+  return stats;
 }
