@@ -4,10 +4,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { cleanForSpeech, isSpeechWorthy, createTtsDispatcher, extractAssistantText, selectTtsEngine } from '../tts/tts';
-import { loadConfig } from '../config';
+import { loadConfig, DEFAULTS, voiceScriptsDir } from '../config';
 import { ensureWhisperService } from '../stt/transcription';
 import { recorderSpec, convertToWav, deleteAudioPair, fileExists, waitForFileStable, cleanupStaleAudio } from '../audio/recording';
-import { mkdtempSync, rmSync, writeFileSync, utimesSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, utimesSync, existsSync, statSync, constants } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -231,5 +231,23 @@ describe('diagnostics / wake', () => {
     expect(spec.bin).toBe('ffmpeg');
     expect(spec.ext).toBe('wav');
     expect(spec.startArgs('x.wav').join(' ')).toContain('-f dshow');
+  });
+});
+
+describe('voice 服务脚本随仓库分发（回归：配置曾指向不存在的 portable/memory/voice/*）', () => {
+  it('默认 whisperScript / sherpaScript 指向仓库内脚本且存在可执行', () => {
+    expect(join(voiceScriptsDir(), 'pi-whisper.sh')).toBe(DEFAULTS.whisperScript);
+    expect(join(voiceScriptsDir(), 'pi-sherpa.sh')).toBe(DEFAULTS.sherpaScript);
+    for (const p of [DEFAULTS.whisperScript, DEFAULTS.sherpaScript]) {
+      expect(existsSync(p), `${p} 应存在`).toBe(true);
+      expect(constants.X_OK & statSync(p).mode, `${p} 应可执行`).toBeTruthy();
+    }
+  });
+
+  it('服务端 python 与启动脚本同目录且存在', () => {
+    const dir = voiceScriptsDir();
+    for (const f of ['whisper-server.py', 'pi-sherpa-server.py']) {
+      expect(existsSync(join(dir, f)), `${f} 应存在`).toBe(true);
+    }
   });
 });

@@ -41,3 +41,4 @@
 
 - 检索/注入：[recall/README.md](recall/README.md)
 - 治理/挖掘：[mine/README.md](mine/README.md)
+- headless 入口（定时任务无扩展工具/命令）：`scripts/memory-store.mjs`（入库）、`scripts/memory-lifecycle.mjs`（生命周期报告），均须经 `bash scripts/run-ts.sh` 运行

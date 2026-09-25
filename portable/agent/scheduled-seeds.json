@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "跨设备每日任务种子（git 入库共享）：各设备 pi-autopilot 启动/运行中对账，本地缺失同名任务则自动注册；已存在则跳过不覆盖本地修改。修改种子文件后 push，其他设备 pull 后 60s 内自动生效。",
+  "note": "跨设备每日任务种子（git 入库共享）：各设备 pi-autopilot 启动/运行中对账，本地缺失同名任务则自动注册。**已存在的同名任务不会被覆盖**（保护本地修改）——修改本文件后，其他设备 pull 后只补缺失并提示 drift；要让已存在的任务应用新定义，运行 `node scripts/reseed-seeds.mjs --apply`（预演不加 --apply，先备份 tasks.json）。任务以 --no-extensions 运行：提示词只能用 bash/read/write 与 scripts/ 下的脚本，不要引用扩展工具或斜杠命令（守门：node scripts/check-seeds-headless.mjs）。",
   "tasks": [
     {
       "name": "tool-stats-daily",
@@ -21,7 +21,7 @@
       "name": "knowledge-subscribe",
       "type": "cron",
       "schedule": "20 8 * * *",
-      "prompt": "执行每日知识订阅（零 LLM 流程，渠道见 scripts/knowledge-fetch.py 与 packs/knowledge-fetch）：1) 运行 python3 scripts/knowledge-fetch.py 抓取各源最新内容；2) 若当日有新内容（portable/memory/knowledge/{{date}}.md），筛选 3-5 条真正有价值的条目（时效强/漏洞/重大新闻，排除过时教程与多源冗余），memory_search 查重后逐条 memory_store；3) 收尾写 portable/memory/knowledge/summary-{{date}}.md 概要（来源+一句话要点，无新内容则如实说明）；4) 将当日结果写入 portable/memory/daily-results/{{date}}-knowledge-<本机hostname>.md（3-5 行：新增条数与分区分布、入库条目标题、summary 路径；无新增也写一行'无新增'），git add 该文件 commit（message: 'knowledge: {{date}}'）后 push（推送冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。【提醒】需要修改订阅渠道/排查订阅不触发/调整过滤规则时，使用 packs/knowledge-fetch 技能。",
+      "prompt": "执行每日知识订阅（headless 运行：**不加载扩展**，只能用 bash/read/write 与 scripts/ 下的脚本，记忆类工具与斜杠命令均不可用）：1) 运行 python3 scripts/knowledge-fetch.py 抓取各源最新内容；2) 若当日有新内容（portable/memory/knowledge/{{date}}.md），筛选 3-5 条真正有价值的条目（时效强/漏洞/重大新闻，排除过时教程与多源冗余），把入选条目标题作为关键词执行 `bash scripts/run-ts.sh scripts/knowledge-ingest.mjs portable/memory/knowledge/{{date}}.md 5 --keywords <逗号分隔关键词>`（零 LLM 入库、内置去重；无合适关键词时省略 --keywords 取前 5 条）；3) 收尾写 portable/memory/knowledge/summary-{{date}}.md 概要（来源+一句话要点，无新内容则如实说明）；4) 写当日结果到 portable/memory/daily-results/{{date}}-knowledge-<本机hostname>.md（3-5 行：新增条数与分区分布、入库条目标题、summary 路径；无新增也写一行『无新增』），git add 该文件、commit（message: 'knowledge: {{date}}'）后 push（推送冲突先 git pull --rebase 重试一次，仍失败保留本地不阻塞）。【提醒】需要修改订阅渠道/排查订阅不触发/调整过滤规则时，使用 packs/knowledge-fetch 技能。",
       "useSubagent": true,
       "notifyMain": true,
       "waitForUserOnLocal": true,
@@ -36,7 +36,7 @@
       "name": "daily-review",
       "type": "cron",
       "schedule": "5 9 * * *",
-      "prompt": "执行每日回顾（确定性优先，勿跑无关命令）：1) 读取 portable/memory/daily-results/ 下全部设备的近期结果文件，对比各设备执行情况，识别遗漏与信息不对称；2) 回顾过去 24 小时会话摘要有价值的经验，提炼 1-3 条入库 memory_store（category=solutions，confidence=0.6）；3) 干预反思：按行解析 portable/memory/interventions.jsonl，筛出近 7 天且 correctivePrompt 非空的记录，若有则提炼 1-2 条教训 memory_store（category=solutions，title 前缀『干预教训:』，content 含纠正前后差异与今后做法及来源 ts）；4) 跨条目反思：统计 portable/memory/entries.json 中 createdAt 在近 24h 的非 deleted 条目，计算 Σ(confidence×recurrence)，>12 时归纳 1 条高层 insight 入库（solutions，content 以『归纳自：』开头并列出引用条目标题），≤12 跳过；5) 输出 200 字内回顾结论作为任务结果。",
+      "prompt": "执行每日回顾（headless 运行：**不加载扩展**，只能用 bash/read/write 与 scripts/ 下的脚本，记忆类工具与斜杠命令均不可用）。1) 读取 portable/memory/daily-results/ 下全部设备的近期结果文件，对比执行情况，指出遗漏与信息不对称，其他设备长期未跑要明确指出。2) 回顾近 24 小时会话摘要，提炼 1-3 条有价值经验，用 `bash scripts/run-ts.sh scripts/memory-store.mjs --json '<条目JSON数组>'` 入库（category=solutions，confidence=0.6；脚本内置标题去重，字段 title/content 必填）。3) 干预反思：按行解析 portable/memory/interventions.jsonl，取近 7 天且 correctivePrompt 非空的记录，提炼 1-2 条教训入库（title 前缀『干预教训:』，content 含纠正前后差异、今后正确做法与来源 ts），同样用 memory-store.mjs。4) 跨条目反思：用 node 一行统计 portable/memory/entries.json 中 createdAt 在近 24h 的非 deleted 条目，计算 Σ(confidence×recurrence)，>12 时归纳 1 条高层 insight 入库（solutions，content 以『归纳自：』开头并列出引用条目标题），≤12 跳过。5) 生命周期只读报告（确定性零 LLM，严禁修改任何条目）：运行 `bash scripts/run-ts.sh scripts/memory-lifecycle.mjs`（输出淘汰/升格/冲突/垃圾/聚合五类候选），把各类候选数量与有代表性的条目写进回顾结论；淘汰、合并、聚合归纳均为写操作，必须由用户确认，本任务不执行。6) 输出 200 字内回顾结论作为任务结果，首行固定为『知识订阅：<N 条新增或无新增>，详情 portable/memory/knowledge/summary-{{date}}.md』（读当日 daily-results 的 knowledge 结果，缺失则注明本机未跑）。",
       "useSubagent": true,
       "notifyMain": true,
       "waitForUserOnLocal": true,

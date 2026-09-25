@@ -11,12 +11,12 @@ import { transcribeByBackend } from './stt/transcription';
 export function platformInstallGuide(cfg: VoiceConfig): string {
   const kind = resolvePlatform(cfg);
   if (kind === 'termux') {
-    return '1) 录音：pkg install termux-api（需 Termux:API 应用 + 麦克风权限）\n2) 转码：pkg install ffmpeg\n3) 转写：pi-whisper.sh start';
+    return '1) 录音：pkg install termux-api（需 Termux:API 应用 + 麦克风权限）\n2) 转码：pkg install ffmpeg\n3) 转写：bash custom/features/voice/scripts/pi-whisper.sh start';
   }
   if (kind === 'windows') {
-    return '1) 录音：安装 ffmpeg（winget install ffmpeg）\n2) 麦克风：Windows 设置 → 隐私 → 麦克风\n3) 转写：pi-whisper.sh start';
+    return '1) 录音：安装 ffmpeg（winget install ffmpeg）\n2) 麦克风：Windows 设置 → 隐私 → 麦克风\n3) 转写：bash custom/features/voice/scripts/pi-whisper.sh start';
   }
-  return '1) 录音：apt-get install pulseaudio-utils（parec）或 alsa-utils（arecord）\n2) TTS：apt-get install espeak-ng（+ pulseaudio-utils）\n3) 转写：pi-whisper.sh start';
+  return '1) 录音：apt-get install pulseaudio-utils（parec）或 alsa-utils（arecord）\n2) TTS：apt-get install espeak-ng（+ pulseaudio-utils）\n3) 转写：bash custom/features/voice/scripts/pi-whisper.sh start';
 }
 
 export function voiceGuideError(cfg: VoiceConfig, detail: string): string {

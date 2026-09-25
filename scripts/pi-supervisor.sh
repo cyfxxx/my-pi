@@ -34,6 +34,22 @@ FIX_TIMEOUT="${PI_FIX_TIMEOUT:-240}"
 export PI_CODING_AGENT_DIR="$AGENT_DIR"
 export PI_MEMORY_DIR="$ROOT/portable/memory"
 
+# ── 包管理子命令直通（install/remove/uninstall/list/update）──
+# pi 的包管理分发要求 argv[0] 就是子命令本身（package-manager-cli.ts 的
+# parsePackageCommand 直接取 args[0]，main.ts 用原始 argv 调用）。若先注入
+# --extension，args[0] 会变成 --extension，子命令降级为位置参数（首条提示词），
+# 于是 `./my-pi.sh install …` 会误入交互会话而非安装。
+# 故这些子命令不注入扩展，原样交给 pi；包管理不需要扩展（扩展由 agentDir 自动发现）。
+case "${1:-}" in
+  install|remove|uninstall|list|update)
+    if [ ! -f "$CLI" ]; then
+      echo "❌ 未找到 $CLI，请先运行：bash scripts/build.sh" >&2
+      exit 1
+    fi
+    exec node "$CLI" "$@"
+    ;;
+esac
+
 # ── 模式（modes.json）→ 环境与启动参数 ──
 # 每轮启动前重解析：注入记忆命名空间、按模式附加人设（--append-system-prompt）。
 # 功能过滤由 bootstrap.ts 读取同一文件完成；此处不导出 PI_AGENT_MODE，
@@ -52,9 +68,11 @@ try{
   const cfg=(j.modes&&j.modes[mode])||null;
   if(cfg){ ns=cfg.memoryNamespace||""; ap=cfg.appendPrompt||""; }
 }catch(e){ if(!mode) mode="full"; }
-process.stdout.write(mode+"\t"+ns+"\t"+ap);
+  // 用 US(\x1f) 分隔：TAB 属空白字符，IFS=$'\t' 会把连续分隔符折叠，
+  // 导致中间字段为空时整体错位（set_model 缺 targetSession 时 PROV/MODEL 串位）。
+process.stdout.write([mode,ns,ap].join("\u001f"));
 ' "$AGENT_DIR/modes.json" 2>/dev/null)
-  IFS=$'\t' read -r mode ns ap <<<"$out"
+  IFS=$'\x1f' read -r mode ns ap <<<"$out"
   export PI_MEMORY_NAMESPACE="$ns"
   if [ -n "$ap" ] && [ -f "$AGENT_DIR/$ap" ]; then
     MODE_ARGS=(--append-system-prompt "$AGENT_DIR/$ap")
@@ -87,9 +105,9 @@ read_admin_action() {
   ACT=""; TARGET=""; PROV=""; MODEL=""
   [ -f "$ADMIN_STATE_FILE" ] || return 0
   local out
-  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);process.stdout.write(ok?[s.action,s.targetSession||"",s.targetProvider||"",s.targetModel||""].join("\t"):"")}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
+  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);process.stdout.write(ok?[s.action,s.targetSession||"",s.targetProvider||"",s.targetModel||""].join("\u001f"):"")}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
   [ -n "$out" ] || return 0
-  IFS=$'\t' read -r ACT TARGET PROV MODEL <<<"$out"
+  IFS=$'\x1f' read -r ACT TARGET PROV MODEL <<<"$out"
 }
 clear_admin_action() {
   node -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
@@ -138,8 +156,14 @@ run_fix_pi() {
 3. 用 edit/write/bash 修复（不要修改 vendor/pi 源码，除非确认是核心补丁问题；改动经 $ROOT/patches 管理）
 4. 验证：node --check 出错文件，或运行 bash $ROOT/scripts/golden-tasks.sh
 5. 最后输出一行：修复完成"
+  # 救援 playbook（my-pi 专属路径与流程）：存在则以 system prompt 追加，
+  # 让修复者拿到完整证据链/修复路径/纪律，而 -p 只留最短任务陈述（对齐 pi-tools 的 rescue-prompt.md）。
+  local rescue="$RECOVERY_DIR/rescue-prompt.md"
+  local append=()
+  [ -f "$rescue" ] && append=(--append-system-prompt "$rescue")
   local rc=0
-  timeout "$FIX_TIMEOUT" node "$bin" --no-extensions --no-skills --no-session -p "$instruction" >"$fix_log" 2>&1 || rc=$?
+  timeout "$FIX_TIMEOUT" node "$bin" --no-extensions --no-skills --no-session \
+    ${append[@]+"${append[@]}"} -p "$instruction" >"$fix_log" 2>&1 || rc=$?
   [ "$rc" -eq 124 ] && log "修复者超时（${FIX_TIMEOUT}s），已终止"
   [ -s "$fix_log" ] && log "修复输出: $(tail -3 "$fix_log" | tr '\n' ' ' | cut -c1-200)"
   return $rc
@@ -152,6 +176,13 @@ ensure_cache_build() {
   bash "$ROOT/scripts/pi-source-build.sh" >&2 || true
   [ -f "$CACHE_CLI" ]
 }
+
+# ── 库模式（测试）：定义完函数即返回，不进入主循环 ──
+# scripts/test-supervisor.sh 用 `MY_PI_SUPERVISOR_LIB=1 source 本文件` 直接测纯函数
+# （classify_crash / read_admin_action），无需网络、CLI 或 provider。
+if [ "${MY_PI_SUPERVISOR_LIB:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 # ── 主循环 ──
 ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" "$@")

@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getAgentDir, getMemoryDir } from '../../core/config';
+import { getAgentDir, getMemoryDir, getProjectRoot } from '../../core/config';
 
 export type PlatformKind = 'auto' | 'termux' | 'linux' | 'windows';
 export type TtsEngine = 'auto' | 'piper' | 'espeak';
@@ -60,6 +60,17 @@ export function configPath(): string {
   return process.env.PI_VOICE_CONFIG || join(getAgentDir(), 'pi-voice.json');
 }
 
+/**
+ * 语音服务脚本目录（随仓库分发）。
+ *
+ * 迁移 note：pi-tools 把脚本放在扩展目录、默认路径指向 `~/.pi/scripts/`（需 rebuild 安装）。
+ * my-pi 直接指向仓库内 `custom/features/voice/scripts/`，fresh checkout 即可用；
+ * 运行数据（日志/pid）仍收敛到 `portable/memory/logs/voice/`。
+ */
+export function voiceScriptsDir(): string {
+  return join(getProjectRoot(), 'custom', 'features', 'voice', 'scripts');
+}
+
 export const DEFAULTS: VoiceConfig = {
   whisperEndpoint: 'http://127.0.0.1:18766',
   whisperToken: '',
@@ -83,12 +94,12 @@ export const DEFAULTS: VoiceConfig = {
   language: '',
   whisperModel: 'base',
   whisperDevice: 'auto',
-  whisperScript: join(getMemoryDir(), 'voice', 'pi-whisper.sh'),
+  whisperScript: join(voiceScriptsDir(), 'pi-whisper.sh'),
   sttBackend: 'whisper',
   autoWake: false,
   sherpaEndpoint: 'http://127.0.0.1:18768',
   sherpaToken: '',
-  sherpaScript: join(getMemoryDir(), 'voice', 'pi-sherpa.sh'),
+  sherpaScript: join(voiceScriptsDir(), 'pi-sherpa.sh'),
 };
 
 function envBool(value: string | undefined, fallback: boolean): boolean {

@@ -19,7 +19,7 @@ import {
 import type { MemoryEntry } from '../store/types';
 import { searchEntriesWithScores, visibleAt, qualityScore } from '../recall/retrieval';
 import { detectContradiction, decideMerge } from '../store/merge';
-import { buildInjectionBlock, filterInjectedMessages, INJECT_TAG } from '../recall/inject';
+import { buildInjectionBlock, filterInjectedMessages, shouldInjectMemory, INJECT_TAG } from '../recall/inject';
 
 function entry(over: Partial<MemoryEntry> = {}): MemoryEntry {
   const now = new Date().toISOString();
@@ -180,18 +180,27 @@ describe('inject: 注入块', () => {
     expect(out).toHaveLength(2);
     expect((out[1] as { content: string }).content).toBe('new');
   });
+
+  it('shouldInjectMemory：内容变化才注入，未变则跳过（保持前缀缓存稳定）', () => {
+    expect(shouldInjectMemory('block-A', null)).toBe(true); // 首次
+    expect(shouldInjectMemory('block-A', 'block-A')).toBe(false); // 未变 → 跳过
+    expect(shouldInjectMemory('block-B', 'block-A')).toBe(true); // 变化 → 注入
+    expect(shouldInjectMemory('', null)).toBe(false); // 空块不注入
+  });
 });
 
 describe('lifecycle 生命周期报告', () => {
+  const LONG = '这是一条内容足够长的记忆条目，用于避开垃圾嫌疑判定（归一化后需不少于三十个字符）。';
+
   it('识别淘汰/升格/冲突候选', async () => {
     const { analyzeLifecycle } = await import('../mine/lifecycle');
     const now = Date.now();
     const old = new Date(now - 200 * 24 * 3600_000).toISOString();
     const entries: MemoryEntry[] = [
-      entry({ id: 'e1', title: '旧的低置信记忆', recurrence: 1, confidence: 0.3, accessedAt: old }),
-      entry({ id: 'e2', title: '常用解决方案', category: 'solutions', recurrence: 6, confidence: 0.9 }),
-      entry({ id: 'e3', title: '用户偏好深色主题', category: 'preference' }),
-      entry({ id: 'e4', title: '用户偏好浅色主题', category: 'preference' }),
+      entry({ id: 'e1', title: '旧的低置信记忆', content: LONG, recurrence: 1, confidence: 0.3, accessedAt: old }),
+      entry({ id: 'e2', title: '常用解决方案', content: LONG, category: 'solutions', recurrence: 6, confidence: 0.9 }),
+      entry({ id: 'e3', title: '用户偏好深色主题', content: LONG, category: 'preference' }),
+      entry({ id: 'e4', title: '用户偏好浅色主题', content: LONG, category: 'preference' }),
     ];
     const r = analyzeLifecycle(entries, { now });
     expect(r.evictionCandidates.map((x) => x.id)).toContain('e1');
@@ -201,12 +210,46 @@ describe('lifecycle 生命周期报告', () => {
     expect(r.active).toBe(4);
   });
 
-  it('formatLifecycleReport 含四段', async () => {
+  it('垃圾嫌疑：content 无实义与噪声标题，且不进升格候选', async () => {
+    const { analyzeLifecycle, junkReason } = await import('../mine/lifecycle');
+    expect(junkReason({ title: '正常标题', content: LONG })).toBeNull();
+    expect(junkReason({ title: '正常标题', content: '太短' })).toContain('无实义');
+    expect(junkReason({ title: 'test', content: LONG })).toContain('噪声');
+
+    const entries: MemoryEntry[] = [
+      entry({ id: 'j1', title: 'test', content: LONG, category: 'solutions', recurrence: 34 }),
+      entry({ id: 'j2', title: '空壳记录', content: '短', category: 'solutions', recurrence: 9 }),
+      entry({ id: 'ok', title: '真实高频方案', content: LONG, category: 'solutions', recurrence: 6 }),
+    ];
+    const r = analyzeLifecycle(entries);
+    expect(r.junkSuspects.map((x) => x.id).sort()).toEqual(['j1', 'j2']);
+    expect(r.promotionCandidates.map((x) => x.id)).toEqual(['ok']);
+  });
+
+  it('聚合候选：同主题 solutions 组内 ≥3 条且 Σrecurrence ≥8', async () => {
+    const { analyzeLifecycle } = await import('../mine/lifecycle');
+    const title = 'entries.json 合并冲突处理';
+    const entries: MemoryEntry[] = [
+      entry({ id: 'a1', title: `${title}：跨分支`, content: LONG, category: 'solutions', recurrence: 3 }),
+      entry({ id: 'a2', title: `${title}：三方比对`, content: LONG, category: 'solutions', recurrence: 3 }),
+      entry({ id: 'a3', title: `${title}：损坏恢复`, content: LONG, category: 'solutions', recurrence: 3 }),
+      entry({ id: 'b1', title: '完全无关的偏好设置记录', content: LONG, category: 'solutions', recurrence: 1 }),
+    ];
+    const r = analyzeLifecycle(entries);
+    expect(r.aggregationCandidates).toHaveLength(1);
+    expect(r.aggregationCandidates[0].size).toBe(3);
+    expect(r.aggregationCandidates[0].sumRecurrence).toBe(9);
+    expect(r.aggregationCandidates[0].members.map((m) => m.id).sort()).toEqual(['a1', 'a2', 'a3']);
+  });
+
+  it('formatLifecycleReport 含六段', async () => {
     const { analyzeLifecycle, formatLifecycleReport } = await import('../mine/lifecycle');
     const text = formatLifecycleReport(analyzeLifecycle([]));
     expect(text).toContain('淘汰候选');
     expect(text).toContain('升格候选');
     expect(text).toContain('冲突嫌疑');
+    expect(text).toContain('垃圾嫌疑');
+    expect(text).toContain('聚合候选');
     expect(text).toContain('规模');
   });
 });
