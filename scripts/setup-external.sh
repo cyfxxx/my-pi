@@ -66,10 +66,11 @@ setup_searxng() {
 }
 
 setup_whisper() {
-  warn "whisper 服务需手动部署（faster-whisper + 服务脚本）"
-  info "1) python3 -m venv /opt/pi-whisper/venv && /opt/pi-whisper/venv/bin/pip install faster-whisper"
-  info "2) 放置 whisper 服务脚本到 portable/agent/pi-voice.json 的 whisperScript 路径"
+  warn "whisper 服务需手动部署（faster-whisper 依赖较重，脚本本身已随仓库分发）"
+  info "1) python3 -m venv /opt/pi-whisper/venv && /opt/pi-whisper/venv/bin/pip install faster-whisper opencc-python-reimplemented"
+  info "2) 启动：bash custom/features/voice/scripts/pi-whisper.sh start（可用 PI_WHISPER_VENV 覆盖 venv 路径）"
   info "3) /voice doctor 验证；端点默认 http://127.0.0.1:18766"
+  info "备选（SenseVoice/onnx）：venv /opt/pi-sherpa/venv + pip install sherpa-onnx numpy，然后 bash custom/features/voice/scripts/pi-sherpa.sh start"
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }

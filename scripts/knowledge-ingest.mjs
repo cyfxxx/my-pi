@@ -9,8 +9,9 @@
  *     count      默认 5（1-10）
  *     --keywords 用标题关键词精选（逗号分隔）；缺省时取前 count 条
  *
- * 说明：需可加载 TypeScript（项目 Node 22 支持 `--experimental-strip-types`，
- * 或经 `scripts/dev.sh` / tsx 运行）。
+ * 说明：需经 tsx 运行（`custom/` 的 TS 用无扩展名导入，Node 类型剥离不解析）：
+ *   bash scripts/run-ts.sh scripts/knowledge-ingest.mjs <md-file> [count]
+ * 裸 `node scripts/knowledge-ingest.mjs` 会报 Cannot find module。
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -35,7 +36,7 @@ let logic;
 try {
   logic = await import(pathToFileURL(join(ROOT, 'custom/features/memory/logic.ts')).href);
 } catch (e) {
-  console.error(`无法加载 memory 逻辑（需 TS 支持，可用 scripts/dev.sh 或 --experimental-strip-types）：${e.message}`);
+  console.error(`无法加载 memory 逻辑（需 tsx 解析无扩展名导入；请用 bash scripts/run-ts.sh 运行）：${e.message}`);
   process.exit(3);
 }
 const { loadEntries, storeEntry, saveEntries } = logic;

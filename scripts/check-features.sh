@@ -9,17 +9,21 @@
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
+# 共享补丁判定（vendor_patch_applied：优先看 vendor 提交历史，避免顺序叠加补丁
+# 因后续补丁改写同文件上下文而被 --reverse --check 误判为"状态未知"）
+# shellcheck source=lib-vendor.sh
+source "$ROOT/scripts/lib-vendor.sh"
+
 MISSING=0
 WARN=0
 
 echo "=== my-pi 功能完整性检查 ==="
 echo ""
 
-# ---- 期望清单（与 pi-tools 注册面对齐）----
-# 格式：feature:name1,name2
-EXPECTED_TOOLS="web-search:web_search,fetch_url,web_fetch link:link_send,link_status browser:browser_navigate,browser_screenshot,browser_click,browser_type,browser_scroll,browser_extract,browser_evaluate,browser_find,browser_wait_for,browser_network,browser_select_option,browser_dialog,browser_download,browser_upload,browser_cookies,browser_pdf,browser_help,browser_close voice:voice_transcribe,voice_speak,voice_record tmux:tmux_run,tmux_status,tmux_read,tmux_send,tmux_stop,tmux_wait memory:memory_store,memory_search,memory_recall,memory_stats,memory_forget plan-mode:todo subagent:subagent autopilot:autopilot_status,autopilot_stats,autopilot_failover,admin_list_sessions,admin_switch_session,admin_restart context:enable_tool,thinking_level"
-EXPECTED_COMMANDS="autopilot:auto,schedule context:context,tools mode:mode plan-mode:plan voice:voice memory:memory link:link intervention:intervention"
-EXPECTED_SHORTCUTS="voice plan-mode"
+# ---- 注册面基线（生成式）----
+# 工具/命令/快捷键清单由 `scripts/gen-registrations.mjs` 从代码生成并落盘为
+# `scripts/registration-baseline.json`：代码与基线不一致即失败，需显式 `--update` 刷新
+# （刷新进 diff，便于人工确认注册面确实变了）。此前是手写清单，漂移过 18 个工具。
 HOOK_EVENTS="session_start before_agent_start context tool_call tool_result tool_execution_start"
 
 # ---- 1. 扩展目录完整性 ----
@@ -38,54 +42,18 @@ done
 [ "$FEATURE_COUNT" -eq 12 ] && echo "  ✅ feature 数量: 12" || { echo "  ❌ feature 数量: $FEATURE_COUNT（期望 12）"; MISSING=$((MISSING + 1)); }
 echo ""
 
-# ---- 2. 工具注册面 ----
-echo "2. 工具注册面"
-for entry in $EXPECTED_TOOLS; do
-  feature="${entry%%:*}"
-  names="${entry#*:}"
-  IFS=',' read -r -a arr <<< "$names"
-  for tool in "${arr[@]}"; do
-    if grep -q "name: '$tool'" "custom/features/$feature/index.ts" 2>/dev/null; then
-      echo "  ✅ $feature → $tool"
-    else
-      echo "  ❌ $feature → $tool 未注册"
-      MISSING=$((MISSING + 1))
-    fi
-  done
-done
+# ---- 2. 注册面（工具/命令/快捷键，对照生成式基线）----
+echo "2. 注册面（生成式基线）"
+if node scripts/gen-registrations.mjs >/tmp/check-features-registrations.log 2>&1; then
+  while IFS= read -r line; do echo "  ✅ $line"; done < /tmp/check-features-registrations.log
+else
+  while IFS= read -r line; do echo "  ❌ $line"; done < /tmp/check-features-registrations.log
+  MISSING=$((MISSING + 1))
+fi
 echo ""
 
-# ---- 3. 命令注册面 ----
-echo "3. 命令注册面"
-for entry in $EXPECTED_COMMANDS; do
-  feature="${entry%%:*}"
-  names="${entry#*:}"
-  IFS=',' read -r -a arr <<< "$names"
-  for cmd in "${arr[@]}"; do
-    if grep -q "registerCommand(pi, '$cmd'" "custom/features/$feature/index.ts" 2>/dev/null; then
-      echo "  ✅ $feature → /$cmd"
-    else
-      echo "  ❌ $feature → /$cmd 未注册"
-      MISSING=$((MISSING + 1))
-    fi
-  done
-done
-echo ""
-
-# ---- 4. 快捷键注册面 ----
-echo "4. 快捷键注册面"
-for feature in $EXPECTED_SHORTCUTS; do
-  if grep -q "registerShortcut(pi" "custom/features/$feature/index.ts" 2>/dev/null; then
-    echo "  ✅ $feature → registerShortcut"
-  else
-    echo "  ❌ $feature 未注册快捷键"
-    MISSING=$((MISSING + 1))
-  fi
-done
-echo ""
-
-# ---- 5. 适配器 API 覆盖面 ----
-echo "5. 适配器 API 覆盖面"
+# ---- 3. 适配器 API 覆盖面 ----
+echo "3. 适配器 API 覆盖面"
 for api in registerTool registerHook registerHooks registerCommand registerShortcut registerMessageRenderer getActiveTools setActiveTools appendEntry sendMessage Key; do
   if grep -rqw "$api" custom/adapters/ 2>/dev/null; then
     echo "  ✅ $api"
@@ -96,9 +64,9 @@ for api in registerTool registerHook registerHooks registerCommand registerShort
 done
 echo ""
 
-# ---- 6. 钩子事件覆盖 ----
+# ---- 4. 钩子事件覆盖 ----
 # 双重校验：事件名必须是 Pi 真实派发的（vendor/pi 类型中存在），且 feature 中确有注册。
-echo "6. 钩子事件覆盖"
+echo "4. 钩子事件覆盖"
 PI_TYPES="vendor/pi/packages/coding-agent/src/core/extensions/types.ts"
 for event in $HOOK_EVENTS; do
   used=0; valid=0
@@ -130,8 +98,8 @@ if [ -f "$PI_TYPES" ]; then
 fi
 echo ""
 
-# ---- 7. 关键配置文件 ----
-echo "7. 关键配置文件"
+# ---- 5. 关键配置文件 ----
+echo "5. 关键配置文件"
 for f in portable/agent/settings.json portable/agent/keybindings.json portable/agent/modes.json; do
   if [ -f "$f" ]; then
     echo "  ✅ $f"
@@ -149,11 +117,25 @@ for f in portable/agent/auth.json portable/agent/models.json; do
     WARN=$((WARN + 1))
   fi
 done
+# 随仓库分发的资源文件：既要存在，也不能被 ignore（否则 fresh clone 会缺文件）
+for f in custom/features/voice/scripts/pi-whisper.sh custom/features/voice/scripts/whisper-server.py \
+         custom/features/voice/scripts/pi-sherpa.sh custom/features/voice/scripts/pi-sherpa-server.py \
+         portable/agent/recovery/rescue-prompt.md; do
+  if [ ! -f "$f" ]; then
+    echo "  ❌ $f 缺失（随仓库分发的资源，功能会退化）"
+    MISSING=$((MISSING + 1))
+  elif git check-ignore -q "$f" 2>/dev/null; then
+    echo "  ❌ $f 被 .gitignore 忽略（fresh clone 会缺文件）"
+    MISSING=$((MISSING + 1))
+  else
+    echo "  ✅ $f"
+  fi
+done
 echo ""
 
-# ---- 8. 运维脚本 ----
-echo "8. 运维脚本"
-for script in build.sh dev.sh doctor.sh sync-upstream.sh check-isolation.sh check-features.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh check-doc-links.mjs pi-supervisor.sh pi-source-build.sh daily-health.mjs knowledge-fetch.py tool-stats-sync.mjs task-summarizer.mjs searxng-config.sh knowledge-ingest.mjs; do
+# ---- 6. 运维脚本 ----
+echo "6. 运维脚本"
+for script in build.sh dev.sh doctor.sh sync-upstream.sh check-isolation.sh check-features.sh check-dead-exports.mjs check-patches-behavior.mjs gen-registrations.mjs check-seeds-headless.mjs install-hooks.sh vendor-bundle.sh run-ts.sh memory-store.mjs memory-lifecycle.mjs reseed-seeds.mjs test-supervisor.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh check-doc-links.mjs pi-supervisor.sh pi-source-build.sh daily-health.mjs knowledge-fetch.py tool-stats-sync.mjs task-summarizer.mjs searxng-config.sh knowledge-ingest.mjs sync-memory.sh; do
   if [ -f "scripts/$script" ]; then
     echo "  ✅ scripts/$script"
   else
@@ -163,13 +145,14 @@ for script in build.sh dev.sh doctor.sh sync-upstream.sh check-isolation.sh chec
 done
 echo ""
 
-# ---- 9. 补丁完整性（对 vendor/pi 可应用或已应用）----
-echo "9. 补丁完整性"
+# ---- 7. 补丁完整性（对 vendor/pi 可应用或已应用）----
+echo "7. 补丁完整性"
 if [ -d "vendor/pi" ]; then
   for p in patches/*.patch; do
     [ -e "$p" ] || continue
     base=$(basename "$p")
-    if git -C vendor/pi apply --check "$ROOT/$p" >/dev/null 2>&1 \
+    if vendor_patch_applied vendor/pi "$p" \
+       || git -C vendor/pi apply --check "$ROOT/$p" >/dev/null 2>&1 \
        || git -C vendor/pi apply --check --reverse "$ROOT/$p" >/dev/null 2>&1; then
       echo "  ✅ $base（可应用或已应用）"
     else
@@ -183,8 +166,8 @@ else
 fi
 echo ""
 
-# ---- 10. 注册数量统计 ----
-echo "10. 注册数量统计"
+# ---- 8. 注册数量统计 ----
+echo "8. 注册数量统计"
 echo "  工具注册调用数: $(grep -rh "registerTool(pi" custom/features/*/index.ts 2>/dev/null | wc -l | tr -d ' ')"
 echo "  命令注册调用数: $(grep -rh "registerCommand(pi" custom/features/*/index.ts 2>/dev/null | wc -l | tr -d ' ')"
 echo "  快捷键注册调用数: $(grep -rh "registerShortcut(pi" custom/features/*/index.ts 2>/dev/null | wc -l | tr -d ' ')"

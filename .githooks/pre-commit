@@ -1,0 +1,21 @@
+#!/bin/bash
+# pre-commit — 提交前快检（秒级）
+#
+# 只跑确定性的结构与注册面守门（golden --fast：跳过 tsc/vitest，那两项在 pre-push 跑全量）。
+# 目的：拦住"红了几天没人知道"这类问题（本仓库历史上出现过 tsc 已红但无人察觉）。
+# 如需临时跳过：git commit --no-verify（不推荐）。
+set -u
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$ROOT" || exit 0
+
+if [ ! -f scripts/golden-tasks.sh ]; then
+  exit 0
+fi
+
+if ! bash scripts/golden-tasks.sh --fast; then
+  echo ""
+  echo "pre-commit：golden --fast 未通过，提交已阻止。"
+  echo "修复后重试；确实需要临时跳过用 git commit --no-verify（不推荐）。"
+  exit 1
+fi

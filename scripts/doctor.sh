@@ -70,6 +70,12 @@ if [ -d "$VENDOR_PI/.git" ]; then
   else
     bad "LAST_SYNC_POINT 缺失或格式无效"
   fi
+  # 离线兜底：上游改写历史/删库时，只有 bundle 能恢复 vendor（仓库本身不存 bundle）
+  if ls "$ROOT"/vendor/*.bundle >/dev/null 2>&1; then
+    ok "vendor 离线归档存在（$(ls -1 "$ROOT"/vendor/*.bundle | wc -l | tr -d ' ') 个）"
+  else
+    warn "无 vendor 离线归档（上游改写历史将无法引导；bash scripts/vendor-bundle.sh create 后另存仓库外）"
+  fi
   if [ "$FIX" = "1" ]; then
     NEED=0; for p in "$ROOT"/patches/*.patch; do
       [ -e "$p" ] || continue
@@ -184,6 +190,24 @@ if [ "$NET" = "1" ] && git rev-parse --git-dir >/dev/null 2>&1; then
   fi
 else
   echo "  • 已跳过（--no-net 或非 git 仓库）"
+fi
+
+# ── 11. 加密同步（记忆/会话资产）──
+# 私钥遗失=记忆不可解；密文过期=新设备拉不到最新记忆。两者都只告警，不阻断提交。
+echo "[11] 加密同步（记忆/会话）"
+if [ -f "$ROOT/sync/memory.tar.age" ]; then
+  ok "密文存在（$(stat -c%s "$ROOT/sync/memory.tar.age" 2>/dev/null || echo '?') 字节）"
+  if [ -f "$HOME/.config/my-pi/age.key" ] || [ -n "${MY_PI_AGE_KEY:-}" ]; then
+    if bash "$ROOT/scripts/sync-memory.sh" verify >/tmp/doctor-sync.log 2>&1; then
+      ok "verify 通过（可解密 / 公钥匹配 / 清单一致）"
+    else
+      warn "sync verify 未通过（备份过期或密钥不匹配）：$(tail -1 /tmp/doctor-sync.log)"
+    fi
+  else
+    warn "无私钥（无法 pull/verify；从备份恢复后重试）"
+  fi
+else
+  warn "无密文（bash scripts/sync-memory.sh push 后提交 sync/）"
 fi
 
 echo ""

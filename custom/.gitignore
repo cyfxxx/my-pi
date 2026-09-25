@@ -10,6 +10,9 @@
 
 # Scripts (runtime helpers, not source)
 scripts/
+# 例外：随仓库分发的语音服务脚本（faster-whisper / sherpa-onnx 后端；fresh checkout 需要）
+!features/voice/scripts/
+!features/voice/scripts/**
 
 # Test artifacts
 tests/__mocks__/

@@ -1,0 +1,125 @@
+{
+  "tools": {
+    "autopilot": [
+      "admin_get_config",
+      "admin_list_models",
+      "admin_list_sessions",
+      "admin_restart",
+      "admin_set_config",
+      "admin_set_model",
+      "admin_status",
+      "admin_switch_session",
+      "autopilot_failover",
+      "autopilot_policy",
+      "autopilot_stats",
+      "autopilot_status",
+      "schedule_task",
+      "verify_config",
+      "verify_report",
+      "verify_test"
+    ],
+    "browser": [
+      "browser_click",
+      "browser_close",
+      "browser_cookies",
+      "browser_dialog",
+      "browser_download",
+      "browser_evaluate",
+      "browser_extract",
+      "browser_find",
+      "browser_help",
+      "browser_navigate",
+      "browser_network",
+      "browser_pdf",
+      "browser_screenshot",
+      "browser_scroll",
+      "browser_select_option",
+      "browser_type",
+      "browser_upload",
+      "browser_wait_for"
+    ],
+    "context": [
+      "enable_tool",
+      "thinking_level"
+    ],
+    "link": [
+      "link_send",
+      "link_status"
+    ],
+    "memory": [
+      "ctx_exec",
+      "ctx_list",
+      "ctx_note",
+      "ctx_snap",
+      "memory_forget",
+      "memory_recall",
+      "memory_search",
+      "memory_stats",
+      "memory_store"
+    ],
+    "plan-mode": [
+      "ask_user",
+      "plan_enter",
+      "plan_exit",
+      "todo"
+    ],
+    "subagent": [
+      "subagent"
+    ],
+    "tmux": [
+      "tmux_read",
+      "tmux_run",
+      "tmux_send",
+      "tmux_status",
+      "tmux_stop",
+      "tmux_wait"
+    ],
+    "voice": [
+      "voice_record",
+      "voice_speak",
+      "voice_transcribe"
+    ],
+    "web-search": [
+      "fetch_url",
+      "web_fetch",
+      "web_search"
+    ]
+  },
+  "commands": {
+    "autopilot": [
+      "auto",
+      "schedule"
+    ],
+    "context": [
+      "context",
+      "tools",
+      "usage-diag"
+    ],
+    "intervention": [
+      "intervention"
+    ],
+    "link": [
+      "link"
+    ],
+    "memory": [
+      "memory"
+    ],
+    "mode": [
+      "mode"
+    ],
+    "plan-mode": [
+      "plan"
+    ],
+    "voice": [
+      "voice"
+    ]
+  },
+  "shortcuts": {
+    "plan-mode": [
+      "ctrlAlt('p')"
+    ],
+    "voice": [
+      "ctrlAlt('r')"
+    ]
+  }
+}

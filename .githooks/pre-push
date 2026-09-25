@@ -1,0 +1,20 @@
+#!/bin/bash
+# pre-push — 推送前全量守门（含 tsc 与 vitest）
+#
+# 本地无 CI（.github/ 已移除），推送前跑完整 golden 是最后一道自动防线。
+# 如需临时跳过：git push --no-verify（不推荐）。
+set -u
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$ROOT" || exit 0
+
+if [ ! -f scripts/golden-tasks.sh ]; then
+  exit 0
+fi
+
+if ! bash scripts/golden-tasks.sh; then
+  echo ""
+  echo "pre-push：golden 未通过，推送已阻止。"
+  echo "修复后重试；确实需要临时跳过用 git push --no-verify（不推荐）。"
+  exit 1
+fi

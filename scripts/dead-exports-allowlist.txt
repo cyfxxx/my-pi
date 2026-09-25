@@ -1,0 +1,37 @@
+# 死导出白名单（格式：`符号 理由`，逐行）
+#
+# check-dead-exports.mjs 只对**不在本清单**里的无引用导出报错：
+# 这是一个棘轮——不阻塞历史上已存在的死导出，但禁止新增"写了没接线"的代码。
+# 清理掉某个符号后，请同步删除本清单对应行，避免清单腐烂。
+#
+# ── A. 有意保留：公共 API 或待接线 ──
+registerHooks 适配器公共 API（与 registerHook 成对暴露，features 可按需用复数形式）
+DEFAULT_JUDGE_PROMPT Best-of-N LLM judge 未迁移（见 DECISIONS），常量与记录函数待接线
+recordVerification Best-of-N 验证记录未接线（同上）
+MIN_TAIL_LENGTH 暖前缀重放受上游事件限制暂为死代码（补丁点见 CONTEXT-MANAGEMENT-COMPARISON 第四节）
+getTokenPressureTag budget 公共查询 API（压力提示当前由 before_agent_start 自行组装）
+getUrgencyHint budget 公共查询 API（同上；若要启用"紧急提示"应接入 before_agent_start）
+setTotalBudget budget 公共配置 API（当前只用 setContextWindow）
+recordCacheUsage budget 公共记账 API（缓存用量由 footer/usage-diag 直接统计）
+#
+# ── B. 待清理：无调用者，建议删除或接线后再移出清单 ──
+taskTmpDir
+consumeRestartLog
+isTurnBusy
+isBackgroundBusy
+lastActivityTs
+listSchedulerFiles
+loadTaskRecords
+resetEnvironmentCache
+isInjectionBlock
+searchEntries
+resolveAndApply
+clearCompactionFlag
+resolveAppendPromptPath
+getNextId
+replaceState
+formatPlanMessageLine
+formatAgentList
+riskToolRestrictions
+voiceGuideError
+batchFetch

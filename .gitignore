@@ -53,11 +53,19 @@ portable/agent/*
 # 模式人设目录（--append-system-prompt 追加文件，随仓库分发）
 !portable/agent/modes/
 !portable/agent/modes/**
+# 救援 playbook（supervisor 启动修复者时以 --append-system-prompt 追加，随仓库分发）
+# recovery/ 下其余内容（cache/、审计、崩溃计数）仍是每环境运行数据，必须显式忽略。
+!portable/agent/recovery/
+portable/agent/recovery/*
+!portable/agent/recovery/rescue-prompt.md
 portable/memory/*
 !portable/memory/.gitkeep
 # 工具使用计数（跨设备共享的精简聚合，几 KB；原始 usage.jsonl 仍不入库）
+# 仅放行 tool-count-<device>.json；该目录下其它运行时文件（旧版 tool-use-*.jsonl、
+# tool-usage.json 等）不随之暴露。
 !portable/memory/stats/
-!portable/memory/stats/**
+portable/memory/stats/*
+!portable/memory/stats/tool-count-*.json
 
 # 运行时数据（data/ 目录）
 data/logs/
@@ -74,6 +82,8 @@ sync/.local-backup-*.tgz
 
 # vendor/pi 独立 git 仓库（上游 pi 源码，不纳入主仓库）
 vendor/pi/
+# vendor 离线归档 bundle（数十 MB 二进制，按"大文件不入库"纪律另存仓库外）
+vendor/*.bundle
 
 # packs 草稿（task-summarizer 自动生成，待人工确认；仅保留占位）
 packs/drafts/*

@@ -8,13 +8,13 @@ describe('buildWebhookPayload', () => {
   it('包含任务名/类型/计划/结果/时间，output 截断', () => {
     const long = 'x'.repeat(WEBHOOK_OUTPUT_MAX + 500);
     const p = buildWebhookPayload(
-      { name: 'nightly', type: 'prompt', schedule: '0 3 * * *' },
+      { name: 'nightly', type: 'cron', schedule: '0 3 * * *' },
       'success',
       long,
       new Date('2026-09-24T00:00:00Z'),
     );
     expect(p.task).toBe('nightly');
-    expect(p.type).toBe('prompt');
+    expect(p.type).toBe('cron');
     expect(p.schedule).toBe('0 3 * * *');
     expect(p.result).toBe('success');
     expect(p.time).toBe('2026-09-24T00:00:00.000Z');
@@ -22,7 +22,7 @@ describe('buildWebhookPayload', () => {
   });
 
   it('空 output 不报错', () => {
-    const p = buildWebhookPayload({ name: 't', type: 'prompt', schedule: '*' }, 'failed', '');
+    const p = buildWebhookPayload({ name: 't', type: 'cron', schedule: '*' }, 'failed', '');
     expect(p.output).toBe('');
   });
 });
@@ -57,13 +57,13 @@ describe('sendWebhook', () => {
 
   it('未配置 URL 时直接返回 false，不发请求', async () => {
     delete process.env.PI_SCHEDULER_WEBHOOK;
-    const ok = await sendWebhook({ name: 't', type: 'prompt', schedule: '*' }, 'success', 'out');
+    const ok = await sendWebhook({ name: 't', type: 'cron', schedule: '*' }, 'success', 'out');
     expect(ok).toBe(false);
   });
 
   it('URL 不可达时静默失败（返回 false 不抛）', async () => {
     process.env.PI_SCHEDULER_WEBHOOK = 'http://127.0.0.1:9/none';
-    const ok = await sendWebhook({ name: 't', type: 'prompt', schedule: '*' }, 'success', 'out');
+    const ok = await sendWebhook({ name: 't', type: 'cron', schedule: '*' }, 'success', 'out');
     expect(ok).toBe(false);
   });
 });

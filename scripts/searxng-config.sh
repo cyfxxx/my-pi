@@ -95,7 +95,7 @@ use_default_settings: true
 
 general:
   debug: false
-  instance_name: ".pi SearXNG"
+  instance_name: "my-pi SearXNG"
 
 search:
   safe_search: 0
