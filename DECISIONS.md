@@ -534,3 +534,19 @@ pi-tools 依赖 `agentDir/extensions` 自动发现，my-pi 没有该目录，于
 归档不清理则是慢性的资源泄漏。用一次 `stat` 换取确定性，代价可忽略（遍历规模都是几百个条目）。
 **验证**：`check-doc-links.mjs` 扫描数 79 → **88**（全绿，新文档链接有效）；`tsc` 通过；vitest **44 文件 514 用例**；
 `golden-tasks.sh` 全绿。
+
+### [2026-09-25] 移除 wechatide-skill 与 repo-size-audit 两个技能包
+**背景**：`packs/` 原本整目录迁移 pi-tools 的 16 个技能包（863 文件，逐字节一致）。复核后确认其中两个对本项目无实用价值：
+① `wechatide-skill`（微信开发者工具，27 文件）——通过官方 `wechatide` CLI 驱动 IDE，而该 CLI 只在 **Windows/macOS** 侧运行
+（WSL 需 interop），本项目一等目标是 Linux/Termux；且只服务微信小程序/小游戏场景；
+② `repo-size-audit`（1 文件）——「git 仓库体积审计」的能力已由 `scripts/doctor.sh`（vendor/dist/缓存/离线归档体检）
+与 `git count-objects -vH` 直接覆盖，且该技能收尾要求把结论 `memory_store` 入库，在 headless 与「执行-知识分离」约定下都不合适。
+**决策**：
+1. 删除两个包目录（共 28 个文件），`packs/` 收敛为 **13 个技能包 + `drafts/`**（837 个跟踪文件）。
+2. `packs/INDEX.md`、`packs/README.md` 同步移除条目；顺带修正 README 中被误置于末尾的两行表格
+   （`repo-size-audit`/`skill-integration`），并把 `skill-integration` 正式列入「当前包」。
+3. **删除不改变其余包**：`diff -rq` 反向验证除有意编辑文件外与 pi-tools 逐字节一致，保留"外部包可重新拉取比对"的能力。
+**理由**：packs 是**按需读取**的仓库（不注入提示词，只占磁盘与检索成本），但仍应只留真正会用到的能力——
+依赖不可用平台（微信 CLI）与已被自有脚本覆盖（体积审计）的包，只会稀释索引、误导后续选择。
+**替代**：仓库体积/卫生检查用 `bash scripts/doctor.sh`、`git count-objects -vH`、`.gitignore` 纪律；
+如需重新引入，从 pi-tools `packs/` 目录取回即可（git 历史亦保留本次删除）。

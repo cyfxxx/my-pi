@@ -6,7 +6,7 @@
 
 ## 一、结论摘要
 
-**总体迁移是成功的**：pi-tools 的核心能力（10 个扩展 → 12 个功能、863 个 packs 文件、packs/agent 配置、
+**总体迁移是成功的**：pi-tools 的核心能力（10 个扩展 → 12 个功能、packs 技能包（13 个，见 G9）、agent 配置、
 补丁体系、运维脚本、部署产物）均已迁移或按 my-pi 的新架构有意重构，且大部分偏离在
 [DECISIONS.md](../../DECISIONS.md)、[PROGRESS.md](../../PROGRESS.md)、[docs/README.md](../README.md) 中有明确记录。
 
@@ -48,7 +48,7 @@
 | 命令 | 10 个 | **11 个** | ✅ 无缺失；my-pi 新增 `/context` |
 | 快捷键 | 4 处（voice ×3、plan ×1） | 2 处（voice `Ctrl+Alt+R`、plan `Ctrl+Alt+P`） | ⚠ voice 的 `Enter`/`Shift+Enter` 条件拦截未迁移（依赖未迁移的上游补丁，见 G3） |
 | 钩子事件 | 含 `session_before_compact` | 已注册 `session_before_compact` | ✅ 已补齐（G2 快照部分）；LLM 会话提取有意不迁移 |
-| packs | 863 个文件 | 863/863 全在，另有 2 个新增 | ✅ 完全迁移 |
+| packs | 863 个文件 / 16 包 | 835 个文件逐字节一致 + 2 个 my-pi 新增；**有意移除 2 个技能包**（见 G9） | ✅ 迁移 + 有意裁剪 |
 | agentDir 配置 | `agent/*` | `portable/agent/*` | ✅ 语义等价，逐文件核对（见 4.2） |
 | skills | 23 个文件 | 23/23 全在 | ✅ 无缺失（22 篇适配、1 篇逐字节一致） |
 | docs | 18 篇 | 迁移 9 篇 + 2 篇新增 | ✅ 9 篇丢弃均有记录 |
@@ -60,8 +60,10 @@
 
 ### 4.1 完全迁移（逐字节或全量）
 
-- **`packs/`**：pi-tools 863 个文件全部存在，`diff -r` 无内容差异；my-pi 新增
-  `packs/drafts/.gitkeep`、`packs/knowledge-fetch/EXPERIENCE.md`，并在 `packs/INDEX.md` 补登记 `reverse-skill`。
+- **`packs/`**：pi-tools 863 个文件中，除**有意移除的 2 个技能包**（`wechatide-skill`、`repo-size-audit`，见 G9）
+  外的 835 个文件全部存在且 `diff -r` 无内容差异；my-pi 新增 `packs/drafts/.gitkeep`、
+  `packs/knowledge-fetch/EXPERIENCE.md`，并在 `packs/INDEX.md` 补登记 `reverse-skill`。
+  现为 **13 个技能包 + drafts**（`.gitkeep` 占位），`packs/` 合计 837 个跟踪文件。
 - **`APPEND_SYSTEM.md`、`agents/{reviewer,scout,worker}.md`、`keybindings.json`**：`cmp` 逐字节一致。
 - **注册面**：pi-tools 的 61 个工具与 10 个命令在 my-pi 中**无一缺失**。
 
@@ -195,6 +197,37 @@ pi-tools `scripts/rebuild.sh`（1497 行）拆分为 my-pi 的
 其后 **27 个提交**（含 17 个工具补齐、tmux 唤醒、plan 落盘、age 同步、模式改档位等）未记入；
 建议补一轮批次记录（本轮已追加一节，见文末）。
 
+### G9（P3，有意裁剪 + 路径引用）packs 技能包裁剪与迁移后路径引用 —— ✅ 已完成（2026-09-25）
+
+- **裁剪**：按用户决定移除 2 个技能包（共 28 个文件）——
+  - `wechatide-skill`（微信开发者工具，27 文件）：CLI 需在 Windows/macOS 侧运行（WSL 走 interop），
+    当前环境不可用，且只服务微信小程序/小游戏开发；
+  - `repo-size-audit`（1 文件）：与 `scripts/doctor.sh` + `git count-objects -vH` 的现有能力重叠，
+    且其收尾步骤依赖扩展工具 `memory_store`（headless 不可用）。
+  - 结果：`packs/` 由 16 包 863 文件 → **13 包 837 跟踪文件**（含 my-pi 新增的 `drafts/.gitkeep`、
+    `knowledge-fetch/EXPERIENCE.md`）；`packs/INDEX.md` 与 `packs/README.md` 同步（后者原先把
+    `repo-size-audit`/`skill-integration` 两行误置于章节末尾，一并归位）。
+- **路径引用更新**（packs 从 pi-tools 的 `~/.pi/packs` 变为仓库内 `packs/`）：
+  `packs/README.md`、`knowledge-fetch/{README,SKILL,daily-prompts}.md`、`pcb-design`、`embedded-dev`、
+  `gamedev`、`pdf-toolkit`、`skill-integration`、`cangjie-skill`、`dg-piagent` 的 `~/.pi/...`、`/root/.pi/...`
+  一律改为仓库内相对路径；`knowledge-fetch` 的每日任务说明改为指向 `portable/agent/scheduled-seeds.json`
+  与 headless 脚本入口（原文的 `memory_store`/`~/.pi/logs/` 已失效）。
+- **dg-piagent**：本机 pi 版本注记 `0.84.2` → **`0.87.0`**（`vendor/PINNED_COMMIT`），SDK 类型路径由
+  `node_modules/@earendil-works/...` 改为 `vendor/pi/packages/...`；新增「路径映射」说明
+  （pi 默认 `~/.pi/agent` ↔ my-pi `portable/agent`；`agentDir/extensions` 自动发现不适用于 my-pi 自有功能）。
+  另修其内部 5 处失效链接（`../../../docs/SKILLS-MAINTENANCE.md` → `../../docs/development/...`、
+  `references/→SKILL.md` 少一层、两个场景编号错位 `A04-system-prompt`/`A06-custom-tool`/`06-agent-session`）。
+- **gamedev**：`../../docs/VERSION-SUPPORT.md` → `../../references/VERSION-SUPPORT.md`；
+  `../disciplines/create-game-assets` → `../design/create-game-assets`；上游未随包分发的
+  `docs/SKILL-FORMAT.md` 由链接改为纯文本引用。
+- **反向验证**：`diff -rq /tmp/pi-tools/packs packs` 仅剩本清单所列的有意改动 + 2 处删除，
+  其余（含 `reverse-skill` 863 文件、`media-toolkit`、`novel-writing`、`cangjie-skill`、`colab-bridge`、
+  `comfyui-agent`）与 pi-tools **逐字节一致**。`reverse-skill` 内 4 处失效链接
+  （`skills/tool-index.md` 为运行时生成、`tools/反弹shell.md`、`phishing-case-study.md`）在 pi-tools 中同样失效，
+  属上游既有问题，为保持逐字节一致**不改**。
+- **验证**：`node scripts/check-features.sh`、`tsc`、vitest 514 用例、`golden-tasks.sh` 全绿
+  （`check-doc-links` 按设计排除 `packs/`，packs 内部链接用一次性脚本核对）。
+
 ## 六、本轮修复明细（含验证）
 
 | 文件 | 改动 |
@@ -226,6 +259,7 @@ pi-tools `scripts/rebuild.sh`（1497 行）拆分为 my-pi 的
 | [scripts/check-seeds-headless.mjs](../../scripts/check-seeds-headless.mjs) | 新增守门：定时任务提示词不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令（golden 步骤 11） |
 | [scripts/run-ts.sh](../../scripts/run-ts.sh)、`scripts/memory-store.mjs`、`scripts/reseed-seeds.mjs` | 新增：headless 写入记忆/知识入库入口；种子提示词改版后显式应用到已存在任务（种子对账只补缺失） |
 | [DECISIONS.md](../../DECISIONS.md) | 新增「headless 定时任务的能力边界」与「通知/inbound 通道由 webhook + link 取代」两条决策 |
+| `packs/`（G9） | 移除 `wechatide-skill`、`repo-size-audit`（28 文件）；`INDEX.md`/`README.md` 同步；10 处 pi-tools 路径引用改为仓库内路径 |
 
 验证（全部通过）：
 
@@ -250,4 +284,5 @@ bash scripts/golden-tasks.sh --smoke
 5. ~~**G5**：恢复种子提示词步骤；补齐未迁移的 `memory-lifecycle.mjs` 并给它 headless 入口~~ ✅ 已完成（2026-09-25）。
 6. ~~**G6**：裁定通知/入站通道~~ ✅ 已完成（2026-09-25，出站 webhook + 入站 `link`，见 DECISIONS）。
 7. ~~**G8**：补进度记录~~ ✅ 已完成（PROGRESS 追加批次 50）。
-8. **G3**（唯一遗留）：修压缩暖前缀（成本/延迟收益明确），或删死代码。
+8. ~~**G9**：packs 技能包裁剪（微信 / 仓库体积审计）与迁移后路径引用订正~~ ✅ 已完成（2026-09-25）。
+9. **G3**（唯一遗留）：修压缩暖前缀（成本/延迟收益明确），或删死代码。

@@ -974,3 +974,33 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
   见 DECISIONS 的「不信任 dirent 的 d_type」。扫描数 79 → **88**，链接全绿。
 - **验证**：`bash scripts/golden-tasks.sh` 全绿（含 `check-doc-links.mjs` 对新增/改动链接的校验）；
   `tsc` 通过；vitest **44 文件 514 用例**。
+
+## packs 技能包裁剪与迁移后路径引用订正（第 57 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **裁剪技能包（用户决定，移除 28 个文件）**：
+  - `wechatide-skill`（微信开发者工具，27 文件）：CLI 只在 Windows/macOS 侧运行，本项目一等目标是 Linux/Termux，
+    且仅服务微信小程序/小游戏场景；
+  - `repo-size-audit`（1 文件）：能力已由 `scripts/doctor.sh` + `git count-objects -vH` 覆盖，且其收尾依赖
+    `memory_store` 入库（headless 不可用）。
+  - 结果：`packs/` 16 包 863 文件 → **13 包 + `drafts/`，837 跟踪文件**；`INDEX.md`/`README.md` 同步
+    （README 中原先误置于末尾的 `repo-size-audit`/`skill-integration` 两行一并归位，后者正式列入「当前包」）。
+- **路径引用订正（packs 由 pi-tools 的 `~/.pi/packs` 变为仓库内 `packs/`）**：
+  - `packs/README.md`、`knowledge-fetch/{README,SKILL,daily-prompts}.md`、`pcb-design`、`embedded-dev`、
+    `gamedev`、`pdf-toolkit`、`skill-integration`、`cangjie-skill` 的 `~/.pi/packs`/`/root/.pi/...` 全部改为仓库内相对路径。
+  - `knowledge-fetch`：每日任务说明改写为「权威定义在 `portable/agent/scheduled-seeds.json` + headless 脚本入口」，
+    `daily-prompts.md` 标注 pi-tools v3 原文为历史归档（原文里 `memory_store`/`~/.pi/logs/` 已失效）；
+    SKILL.md 第 4 步由 `memory_search`+`memory_store` 改为 `run-ts.sh scripts/knowledge-ingest.mjs`（零 LLM、内置去重）。
+  - `dg-piagent`：本机 pi 版本 `0.84.2` → `0.87.0`，SDK 类型路径改指 `vendor/pi/packages/...`，新增「路径映射」说明
+    （`~/.pi/agent` ↔ `portable/agent`；`agentDir/extensions` 自动发现不适用于 my-pi 自有功能）；
+    修 5 处内部失效链接（`SKILLS-MAINTENANCE` 相对层级、`references→SKILL.md`、两个场景编号错位）。
+  - `gamedev`：`VERSION-SUPPORT.md` 指回 `references/`，`create-game-assets` 路径由 `disciplines/` 改 `design/`，
+    上游未随包分发的 `docs/SKILL-FORMAT.md` 由链接改为纯文本引用。
+- **反向验证**：`diff -rq /tmp/pi-tools/packs packs` 仅剩本次有意改动与 2 处删除；其余（含 `reverse-skill` 863 文件、
+  `media-toolkit`、`novel-writing`、`colab-bridge`、`comfyui-agent`）与 pi-tools **逐字节一致**。
+  `reverse-skill` 内 4 处失效链接（运行时生成的 `skills/tool-index.md`、`tools/反弹shell.md`、
+  `phishing-case-study.md`）在 pi-tools 中同样失效，属上游既有问题，为保持逐字节一致不改。
+- **文档**：`docs/development/MIGRATION-AUDIT.md` 新增 G9 并更新 packs 相关结论（863→837、16→13 包）；
+  `DECISIONS.md` 新增「移除 wechatide-skill 与 repo-size-audit」条目。
+- **验证**：`golden-tasks.sh` 全绿（隔离/注册面/死导出/tsc/vitest 514/补丁/补丁行为/注入面/文档链接/supervisor/种子提示词）；
+  packs 内相对链接用一次性脚本核对（`check-doc-links` 按设计排除 `packs/`）。
