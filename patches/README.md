@@ -10,8 +10,8 @@ patches/
 ├── 001-branding.patch         # 品牌化（name/piConfig）
 ├── 002-local-pi-mods.patch    # 本地 pi 源码改动
 ├── 003-tab-completion-fix.patch  # Tab 斜杠命令参数补全
-└── 004-footer-tweaks.patch    # footer 增强（实时上下文/双缓存率/人民币成本/重启提示）
-└── 005-footer-speed-and-scrollback.patch  # 速度并入 footer stats 行 + regular 模式保留 scrollback
+├── 004-footer-tweaks.patch    # footer 增强（实时上下文/双缓存率/人民币成本/重启提示）
+├── 005-footer-speed-and-scrollback.patch  # 速度并入 footer stats 行 + regular 模式保留 scrollback
 └── 006-footer-cost-and-cache-window.patch  # 汇率可配置 + CH 右值改最近 20 轮滑动窗口
 ```
 
@@ -37,10 +37,14 @@ patches/
 要求 `vendor/pi/` 处于对应基线（`vendor/PINNED_COMMIT`）：
 
 ```bash
-for p in patches/*.patch; do
-  git -C vendor/pi apply --check "$p"
-done
+bash scripts/check-features.sh          # 补丁可应用或已应用（含顺序叠加场景）
+bash scripts/golden-tasks.sh --fast     # 同上 + 补丁行为标记守门
 ```
+
+> 不要用 `git apply --check --reverse` 逐个判定：004/005/006 都改 `footer.ts`，顺序叠加后
+> 单个补丁的 reverse-check 会假失败。判定以**提交历史**为准（`scripts/lib-vendor.sh` 的
+> `vendor_patch_applied`，匹配 `local: NNN-*` 本地提交）；行为是否还在由
+> `scripts/check-patches-behavior.mjs` 断言关键符号/自标记。
 
 ## 使用方法
 

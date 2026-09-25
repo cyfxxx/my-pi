@@ -7,7 +7,7 @@
 | 属性 | 值 |
 |------|-----|
 | 版本 | v1.0 |
-| 更新日期 | 2026-09-20 |
+| 更新日期 | 2026-09-25 |
 | 适用范围 | my-pi 使用常见问题 |
 | 相关文档 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md), [README.md](../README.md) |
 
@@ -93,6 +93,15 @@ pi-backup sync
 
 详见 [pi-backup SKILL.md](../portable/agent/skills/pi-backup/SKILL.md)
 
+记忆与会话另可用 age 加密同步（跨设备，密文入库、私钥不入库）：
+
+```bash
+bash scripts/sync-memory.sh status   # 私钥/公钥指纹/密文状态
+bash scripts/sync-memory.sh push     # 重新加密并写入 sync/memory.tar.age
+bash scripts/sync-memory.sh pull     # 从密文恢复到 portable/
+bash scripts/sync-memory.sh verify   # 校验可解密性 + 公钥一致 + 清单一致 + JSON 有效
+```
+
 ### Q: 如何恢复？
 
 ```bash
@@ -169,8 +178,16 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 
 ### Q: 如何清理旧记忆？
 
-按需编辑 `portable/memory/notes.json`；memory 功能自带自动回收逻辑
-（`custom/features/memory/logic.ts` 的 `autoReclaim`）会清理过期条目。
+先看**只读**候选清单（不修改任何数据）：
+
+```bash
+/memory lifecycle                              # 会话内
+bash scripts/run-ts.sh scripts/memory-lifecycle.mjs --json   # headless / 脚本
+```
+
+报告给出淘汰候选（>180 天且低复现低置信）、升格候选、冲突嫌疑、垃圾嫌疑、聚合候选。
+删除/合并/归纳都是写操作，**必须用户确认后执行**（`/memory prune` 清理过期条目）。
+TTL 笔记另有自动回收（`notes.json`）。
 
 ### Q: 会话历史在哪里？
 
@@ -182,16 +199,23 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 
 ### Q: 如何提高响应速度？
 
-1. 使用 `pi /compact` 压缩上下文
-2. 检查上下文预算与工具输出占用：`custom/features/context/budget/budget.ts` 的预算报告
-3. 优化工具输出：调整 `custom/features/context/` 的归档与裁剪阈值
-   （归档落在 `portable/memory/tool-outputs/`）
+1. 上下文成本主要是「每请求都为全量上下文计费」，而不是压缩次数：确定性擦除
+   （旧 thinking / 旧工具输出）已默认开启且**零 LLM 调用**，无需手动干预；
+   用 `/context usage` 看预算与阈值占比。
+2. 长会话确需压缩时用 `/compact`；压缩会发一次全价摘要请求，是否划算取决于后续轮数
+   （见 [CONTEXT-MANAGEMENT-COMPARISON.md](development/CONTEXT-MANAGEMENT-COMPARISON.md)）。
+3. 工具输出归档/裁剪阈值可用 `PI_CONTEXT_*` 调整（见
+   [custom/features/context/README.md](../custom/features/context/README.md)），归档落在
+   `portable/memory/tool-outputs/`（14 天/200MB 自动清理）。
 
 ### Q: 缓存命中率低怎么办？
 
-检查 system prompt 注入面是否引入易变内容：按
-[portable/agent/AGENTS.md](../portable/agent/AGENTS.md) 的约定，注入禁止时间戳与
-精确数值（缓存友好）。
+1. 先归因：用 `/context fingerprint`（或 `portable/memory/logs/prefix-fingerprints.jsonl`）
+   看 `changed` 字段——`system`/`tools` 变化说明前缀最前处变了；仅 `messages` 变化说明是
+   压缩/擦除/注入位移；`sinceLastMs` 很大则属空闲后 provider 侧缓存失效。
+2. 再检查注入面是否引入易变内容：按
+   [portable/agent/AGENTS.md](../portable/agent/AGENTS.md) 的约定，注入禁止时间戳与
+   精确数值（缓存友好）；静态基线由 `bash scripts/check-injection-surface.sh` 守门。
 
 ### Q: 如何监控资源使用？
 
@@ -228,9 +252,11 @@ pi-backup create            # 归档默认包含 portable/memory/notes.json
 ### Q: 如何验证改动？
 
 ```bash
-npm run check               # 隔离边界验证
-npx tsc --noEmit -p custom/ # 类型检查
-npx vitest run              # 单元测试
+npm run check                 # 隔离边界验证
+npx tsc --noEmit -p custom/   # 类型检查
+npx vitest run                # 单元测试
+npm run golden                # 行为防退化基准（11 步；--fast 仅结构守门，--smoke 加无头冒烟）
+bash scripts/install-hooks.sh # 启用 git 钩子（提交前自动跑上述快检）
 ```
 
 ### Q: 文档在哪里？

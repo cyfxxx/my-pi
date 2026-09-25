@@ -4,7 +4,7 @@
 
 ## 注册面
 
-- 工具：`memory_store`、`memory_search`、`memory_recall`、`memory_stats`、`memory_forget`
+- 工具：`memory_store`、`memory_search`、`memory_recall`、`memory_stats`、`memory_forget`（记忆）；`ctx_note`、`ctx_list`、`ctx_snap`、`ctx_exec`（便笺/检查点/执行记录）
 - 命令：`/memory <search|stats|summary|lifecycle|mine [--ingest]|prune|cleanup|help>`
 - 钩子：`session_start`、`before_agent_start`、`context`、`session_compact`
 

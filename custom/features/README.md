@@ -19,7 +19,7 @@
 | [context](context/README.md) | 钩子型 | 命令 + 钩子 | Token 优化中枢（预算/剪枝/压缩/工具分层/thinking/任务记录） |
 | [link](link/README.md) | 工具型 | 工具 + 命令 | 多设备互联（SSH 通道 + 远程 RPC） |
 | [memory](memory/README.md) | 工具型 | 工具 + 命令 | 跨会话持久记忆（存储/检索/注入/治理/教训挖掘） |
-| [mode](mode/README.md) | 钩子型 | 命令 | 模式切换（full/light/quick） |
+| [mode](mode/README.md) | 钩子型 | 命令 | 模式切换（full/minimal/roleplay） |
 | [plan-mode](plan-mode/README.md) | 钩子型 | 工具 + 命令 + 快捷键 | 计划模式（只读探索 + 任务面板） |
 | [intervention](intervention/README.md) | 钩子型 | 命令 | 干预捕获（中断快照 + 纠正关联） |
 | [subagent](subagent/README.md) | 工具型 | 工具 | 子代理（delegate 给专门 agent） |
@@ -35,8 +35,11 @@
 
 ## 校验
 
-- `bash scripts/check-features.sh`：对照注册面检查工具/命令/快捷键/钩子/补丁完整性。
+- `bash scripts/check-features.sh`：对照生成的注册面基线（`scripts/registration-baseline.json`）检查
+  工具/命令/快捷键/钩子/补丁完整性；新增或删除工具后需 `node scripts/gen-registrations.mjs --update`。
 - `bash scripts/check-isolation.sh`：逻辑层不得有 Pi runtime 依赖。
+- `node scripts/check-dead-exports.mjs`：抓「写了没接线」的导出（白名单见 `scripts/dead-exports-allowlist.txt`）。
+- `bash scripts/golden-tasks.sh`：上述守门 + 类型/单测/补丁行为/注入面/文档/定时任务提示词的整体基准。
 
 ## 相关
 

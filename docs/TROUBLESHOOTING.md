@@ -7,7 +7,7 @@
 | 属性 | 值 |
 |------|-----|
 | 版本 | v1.1 |
-| 更新日期 | 2026-09-22 |
+| 更新日期 | 2026-09-25 |
 | 适用范围 | my-pi 运行时故障、重建/上游更新、扩展（custom/features）问题、配置问题 |
 | 相关文档 | [FAQ.md](./FAQ.md), [operations/ENVIRONMENTS.md](./operations/ENVIRONMENTS.md), [development/PI-EXT-DEV-NOTES.md](./development/PI-EXT-DEV-NOTES.md) |
 
@@ -46,7 +46,10 @@ npx tsc --noEmit -p custom/
 # 4. 运行单元测试
 npx vitest run
 
-# 5. 校验 portable/agent/ 下所有 JSON 合法性
+# 5. 行为防退化基准（11 步：含隔离/注册面/死导出/补丁行为/注入面/定时任务提示词等）
+npm run golden
+
+# 6. 校验 portable/agent/ 下所有 JSON 合法性
 for f in portable/agent/*.json; do
   node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" "$f" \
     && echo "$f OK" || echo "$f BROKEN"
@@ -61,6 +64,7 @@ done
 | `npm run check` 失败 | 隔离边界被破坏（features 直接 import vendor/pi） | §三 |
 | `tsc` 报错 | custom/ 类型或上游 API 变更 | §三 |
 | `vitest run` 失败 | 功能逻辑回归 | §六 |
+| `npm run golden` 失败 | 守门发现退化（死导出/注册面漂移/补丁行为/注入面/文档链接/定时任务提示词） | 见失败项输出 |
 | JSON BROKEN | 配置文件格式错误 | §四 |
 
 ### 2. 问题分类

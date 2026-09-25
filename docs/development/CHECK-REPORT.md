@@ -2,6 +2,7 @@
 
 > **历史报告**：记录 2026-09-21 的一次检查结论，其中的数量/命令面可能已随后续迁移变化；
 > 当前状态以 `PROGRESS.md`、`STRUCTURE.md` 与 `bash scripts/check-features.sh` 为准。
+> 迁移完整性的**权威结论**见 [MIGRATION-AUDIT.md](MIGRATION-AUDIT.md)（逐层对比 + 缺陷清单）。
 
 **检查时间**：2026-09-21（第二轮修正）
 **检查分支**：main（工作区）

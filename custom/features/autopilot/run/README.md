@@ -14,6 +14,9 @@
 ## 说明
 
 - 任务以**子进程**方式运行（`runner.ts`），不是主会话注入模型；因此 `Task` 没有 `pendingInject` 之类字段。
+- `buildRunArgs` 固定传 `--mode json -p --no-session --no-extensions`：任务运行**不加载扩展**，
+  提示词只能用 bash/read/write 与 `scripts/` 下的脚本（该约束由 `scripts/check-seeds-headless.mjs` 守门）。
+  原因：带 `--extension` 的 `-p` 一次性运行在本环境**产出回复后不退出**（实测 60s 超时被 kill，无扩展 25s 干净退出 exit 0）。
 - `verifier.bestOfN` 的 LLM 编排未迁移（原项目为随机占位）；纯评分/选择逻辑已迁移并被单测覆盖。
 - 看门狗通过写 admin state 请求重启，由 `scripts/pi-supervisor.sh` 消费。
 

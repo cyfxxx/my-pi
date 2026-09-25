@@ -20,7 +20,7 @@
 | `diagnostics.ts` | `doctor`、`benchmark`、平台安装指引 |
 | `audio/` | 录音/听写/唤醒，见 [audio/README.md](audio/README.md) |
 | `stt/` | 语音转写后端，见 [stt/README.md](stt/README.md) |
-| `tts/` | 语音合成（`tts.ts`） |
+| `tts/` | 语音合成（引擎选择/朗读/自动朗读），见 [tts/README.md](tts/README.md) |
 | `scripts/` | 随仓库分发的转写服务脚本与 Python 服务端（见下） |
 
 ## 转写服务脚本（`scripts/`）

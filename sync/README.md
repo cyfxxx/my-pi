@@ -22,15 +22,22 @@ bash scripts/sync-memory.sh init     # 首次：生成密钥 + 公钥 + 默认�
 bash scripts/sync-memory.sh push     # 加密写 sync/memory.tar.age
 git add sync/ && git commit -m 'chore(sync): 更新加密记忆/会话' && git push
 
+bash scripts/sync-memory.sh status   # 私钥/公钥指纹/密文状态（含 key fingerprint）
+bash scripts/sync-memory.sh verify   # 校验：可解密 + 公钥与私钥一致 + 清单一致 + JSON 有效
+bash scripts/sync-memory.sh verify --no-key   # 无私钥时只查密文完整性
+
 # 新设备：
 git pull
 # 放置私钥到 ~/.config/my-pi/age.key（或设 MY_PI_AGE_KEY）
 bash scripts/sync-memory.sh pull
 ```
 
+`verify` 会区分「本地不存在（push 会跳过）」与「本地存在但密文里缺失」——后者说明备份过期，需重新 `push`。
+
 ## 注意
 
 - 依赖 `age`（Debian/Ubuntu `apt install age`；Termux `pkg install age`）。
+- 环境变量：`MY_PI_AGE_KEY`（私钥路径）、`MY_PI_SYNC_DIR`（覆盖 `sync/` 目录，便于在别处演练）。
 - `pull` 会覆盖清单内文件，覆盖前自动备份到 `sync/.local-backup-*.tgz`。
 - 会话目录按 cwd 转义命名（`portable/agent/sessions/<转义 cwd>/`），跨设备路径不同会错位；
   建议保持相同项目路径或使用 `--session-dir`。

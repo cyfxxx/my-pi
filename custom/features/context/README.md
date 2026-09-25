@@ -7,7 +7,7 @@
 
 - 工具：`enable_tool`、`thinking_level`
 - 命令：`/context <usage|report|fingerprint|help>`、`/tools <list|enable <组>|help>`
-- 钩子：`session_start`、`before_agent_start`、`context`、`tool_call`、`tool_result`、`turn_end`、`session_compact`、`agent_settled`
+- 钩子：`session_start`、`before_agent_start`、`input`、`turn_start`、`context`、`tool_call`、`tool_result`、`message_update`、`turn_end`、`before_provider_request`（前缀指纹）、`session_compact`、`session_before_compact`（快照）、`agent_settled`
 
 ## 文件
 
@@ -40,9 +40,12 @@
 
 - 判定点只有 `turn_end`，而它总是紧跟一次用户输入，若比较「距最近一次输入」，差值恒为本回合耗时
   （秒级），门在连续工作中**永不可能通过** → 实测 10 小时 / 341K 上下文会话零压缩。
-- 零压缩下平均上下文 271K，即使 99% 命中，命中读取（cacheRead）本身就占成本大头。
-- 回放同一会话：开启压缩（阈值 256K）可让 prompt 费用降约 **61%**，远大于「不压缩保缓存」的收益
-  （一次压缩 ≈ 一个全价摘要请求，约 12 个请求即回本）。
+- **但压缩不是主要收益来源**（2026-09-25 价目修正）：缓存命中只要 $0.003/M（输入的 1/50），
+  一次 256K 压缩的自身开销约 `256K × $0.15/M = $0.038`，而它省下的命中 token 仅值约
+  `230K × $0.003/M = $0.0007/请求` → **回本约需 55 个后续请求**。此前"压缩可省 61%"的估算按 1/10 比例算，
+  **该结论已作废**（详见 [CONTEXT-MANAGEMENT-COMPARISON.md](../../../docs/development/CONTEXT-MANAGEMENT-COMPARISON.md) 第六节）。
+- 真正的杠杆是**免费擦除**（见下节）：稳态上下文 -53.6%、零 LLM 调用、不依赖回本计算。
+  压缩保留是为了避免超窗与冷缓存后的大额重算，不再是省钱主力。
 - 如需保守行为（只在长时间空闲后压缩），设 `PI_CONTEXT_IDLE_MS>0`（毫秒）；此时由
   `passesIdleGateAtTurnEnd` 按「回合开始前的空闲」正确判定。打断风险仍由门1/门2 承担。
 
@@ -81,6 +84,9 @@
 2. **工具输出擦除**（`budget.pruneToolResults`）：保留最近 2 轮 + 60K 保护带，更早的 toolResult
    替换为 `[pruned: N chars → ref]`（ref 落盘，14 天/50MB 清理）；可回收量 <30K 时不擦（避免小碎擦）。
 3. **历史 thinking 擦除**（`budget.pruneThinkingBudget`）：保留最近 64K thinking，更早的删除。
+
+落盘引用由 `session_start` 一并清理：`sweepPruneRefs`（擦除 ref，14 天/50MB）与
+`sweepArchive`（工具输出归档，14 天/200MB，此前无任何上限，实测 442 文件仍在增长）。
 
 校准依据（2026-09-25 成本审计，10 小时 / 341K 上下文会话）：thinking 占 **50%**、工具输出占 **46%**；
 而原阈值（120K/80K）与未接线的 thinking 擦除导致**两者全程未生效**，回收压力全落在有损的写入时截断上。

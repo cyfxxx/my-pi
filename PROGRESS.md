@@ -927,3 +927,50 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
 - **计数同步**：脚本 31→**32**（`STRUCTURE.md`/`AGENTS.md`/`scripts/README.md`/`check-features.sh` 清单）。
 - **文档**：`docs/development/MIGRATION-AUDIT.md` 的 G5/G6 标记完成、新增缺陷 #9 与第二轮修复明细；
   行动清单仅剩 G3（压缩暖前缀）。
+
+## 全量文档校订：按实现回填状态、修过期引用（第 56 批，2026-09-25）
+
+- 完成时间：2026-09-25
+- **范围**：60 篇项目自有文档（根文档 + `docs/` + `custom/**/README.md` + `scripts`/`patches`/`deploy`/`sync`/技能），
+  以「文档声明 vs 代码/脚本事实」为准逐项核对。方法：抽取各功能注册面（钩子/工具/命令）与
+  `scripts/registration-baseline.json` 比对；抽取文档中引用的文件与符号做存在性核对。
+- **状态回填（此前文档落后于实现）**：
+  - `docs/design/VISION.md`：§4 度量表「记忆治理」由**部分**改为**已有**（生命周期报告 + headless 入口）；
+    §5 标注为已落地并补「垃圾嫌疑/聚合候选」规则（垃圾不进升格候选）；§6 明确 P1–P3 达成、仅 P4 未完成；
+    §3.3 安全网由「27 用例 + check」改为 golden 11 步（514 用例）+ `.githooks/`；新增 v3 变更记录。
+  - `docs/README.md`：更新日期；新增「审计与对比」分组（迁移审计/上下文对比/DSH 证据/历史检查报告），
+    从「项目主文档」表移除重复条目。
+  - `README.md`：补 005/006 补丁；scripts 段改为列出守门脚本并指向 `scripts/README.md`（32 个）；
+    度量表补 headless 生命周期入口与 11 步 golden；验证段补 `--fast`/`--smoke` 与 `install-hooks.sh`。
+  - `docs/FAQ.md`：备份补 `sync-memory.sh`（含 `verify --no-key`）；清理旧记忆改走只读 `memory-lifecycle`；
+    性能/缓存命中率改为「先归因（`/context fingerprint`）再查注入面」；验证补 golden 与钩子。
+  - `docs/TROUBLESHOOTING.md`：快速清单补 `npm run golden` 与失败判读行。
+- **过期引用/缺口修复**：
+  - `custom/features/context/budget/README.md` **重写**：原文档只描述 warm-prefix 且教人新建不存在的
+    `adapters/warm-prefix-adapter.ts`（还用了 `any`）。现覆盖 14 个模块、关键常量与 `PI_CONTEXT_*` 环境变量、
+    缓存纪律，并显式标注 warm-prefix 为死代码（指向 G3）。
+  - `custom/features/context/README.md`：补 `session_before_compact` 等 4 个遗漏钩子；撤销已作废的
+    「压缩可省 61%」结论（改为「压缩回本约需 55 个请求，免费擦除才是主力」）；补归档 sweep。
+  - `custom/features/autopilot/README.md`：工具 6 → 16；新增 `tools/README.md`；补 headless 执行边界、
+    `run-ts.sh`/`memory-store.mjs` 入口与种子对账 add-only 语义。`run/README.md` 补 `--no-extensions` 实测原因；
+    `store/README.md` 补种子不覆盖语义。
+  - `custom/features/voice/tts/README.md` 新增（此前 audio/stt 有、tts 缺）；`custom/features/README.md`
+    模式取值 `full/light/quick` → `full/minimal/roleplay`，校验段补注册面基线/死导出/golden。
+  - `custom/features/memory/README.md` 补 4 个 `ctx_*` 工具；`link/README.md` 明确「入站远控通道」定位
+    （取代 pi-tools ntfy 中继）；`subagent/ui`、`voice` 的失效引用订正。
+  - `patches/README.md`：目录树修正；补丁验证改为「提交历史判定 `vendor_patch_applied` + 行为标记守门」，
+    并说明为何不能用 `git apply --check --reverse` 逐个判定（004/005/006 同改 `footer.ts`，顺序叠加会假失败）。
+  - `sync/README.md`：补 `status`/`verify`/`verify --no-key` 与 `MY_PI_AGE_KEY`/`MY_PI_SYNC_DIR`，
+    说明 verify 区分「本地不存在」与「备份缺失」。
+  - `STRUCTURE.md`：子包清单补 `autopilot/tools` 与 `context/usage-diag`，`docs/` 描述补 `design/` 与审计文档。
+  - `portable/agent/skills/pi-full-audit/MODULES.md`：脚本数 21 → 32。
+  - `docs/development/CHECK-REPORT.md`：加「权威结论见 MIGRATION-AUDIT」指引。
+- **守门缺陷（校订时发现并修复）**：`check-doc-links.mjs` 只扫到 79 篇 md，实际 88 篇 ——
+  `readdirSync(..., { withFileTypes: true })` 的 **d_type 在本环境不可靠**（新建普通文件被报成 `DT_LNK`，
+  `isFile()`/`isDirectory()` 均 false），导致 `rescue-prompt.md`、`alacritty-tmux-setup.md`、4 篇技能文档与
+  2 篇新增 README 被静默跳过。同类写法还存在于 `check-dead-exports.mjs`、`gen-registrations.mjs`、
+  `check-patches-behavior.mjs`（当前恰好无受影响文件，但命中即假绿）、`sweepArchive` 收集（归档永不清）、
+  `listPlans`、`loadAgentsFromDir`（静默丢计划/角色）。四个 walker 与三处运行时判定全部改为 **`stat` 为准**，
+  见 DECISIONS 的「不信任 dirent 的 d_type」。扫描数 79 → **88**，链接全绿。
+- **验证**：`bash scripts/golden-tasks.sh` 全绿（含 `check-doc-links.mjs` 对新增/改动链接的校验）；
+  `tsc` 通过；vitest **44 文件 514 用例**。

@@ -60,25 +60,31 @@ my-pi/
 ├── packs/                            # 外部技能包仓库（按需读取，不注入系统提示词）
 ├── docs/                             # 项目文档（使用/开发/运维）
 │
-├── scripts/
+├── scripts/                          # 运维脚本（32 个，见 scripts/README.md）
 │   ├── build.sh                      # 一键重建/引导（新设备可复现）
 │   ├── doctor.sh                     # 本地环境 vs 仓库体检（--fix 自动修复）
 │   ├── sync-upstream.sh              # 上游同步 + 自动修复（重建/刷缓存/类型检查）
 │   ├── lib-vendor.sh                 # build/sync/doctor 共享逻辑（补丁幂等）
 │   ├── dev.sh                        # 开发模式脚本
-│   ├── check-isolation.sh            # 隔离边界验证
-│   ├── check-features.sh             # 功能完整性检查
+│   ├── golden-tasks.sh               # 行为防退化基准（--fast 结构守门 / --smoke 无头冒烟）
+│   ├── check-isolation.sh            # 隔离边界验证（9 项）
+│   ├── check-features.sh             # 功能完整性 + 注册面基线
+│   ├── check-dead-exports.mjs        # 死导出守门（写了没接线）
+│   ├── check-patches-behavior.mjs    # 补丁行为存在性守门
+│   ├── check-injection-surface.sh    # system prompt 注入面指纹基线
+│   ├── check-seeds-headless.mjs      # 定时任务提示词 headless 可用性
+│   ├── check-doc-links.mjs           # 文档链接一致性
+│   ├── install-hooks.sh              # 启用 .githooks（pre-commit/pre-push）
 │   ├── setup-external.sh             # 外部服务/依赖安装（可选）
-│   ├── patch-playwright-core.mjs     # Termux playwright-core 补丁
-│   ├── golden-tasks.sh               # 行为防退化基准
-│   ├── check-injection-surface.sh    # 注入面基线守门
-│   └── check-doc-links.mjs           # 文档链接一致性
+│   └── run-ts.sh · memory-*.mjs …    # headless 入口等（完整清单见 scripts/README.md）
 │
-├── patches/                          # 上游补丁
+├── patches/                          # 上游补丁（6 个）
 │   ├── 001-branding.patch            # 品牌化补丁
 │   ├── 002-local-pi-mods.patch       # 本地 pi 源码改动
 │   ├── 003-tab-completion-fix.patch  # Tab 命令参数补全
-│   └── 004-footer-tweaks.patch       # TUI footer 调整
+│   ├── 004-footer-tweaks.patch       # TUI footer 调整
+│   ├── 005-footer-speed-and-scrollback.patch
+│   └── 006-footer-cost-and-cache-window.patch
 │
 ├── my-pi.sh                          # 便携启动脚本
 ├── PROGRESS.md                       # 进度追踪
@@ -147,9 +153,9 @@ Layer 0 ─ 基础层 ───────────── vendor/pi/ (上游
 | 干预率 | `/intervention stats` | abort 快照 + corrective 关联，落 `portable/memory/interventions.jsonl` |
 | token/缓存 | `/context usage`、`/auto stats` | `usage-stats` 持久化工具 token 与缓存命中率 |
 | 任务成功率 | `/auto stats`、`/auto metrics` | autopilot telemetry（按模型/任务） |
-| 记忆治理 | `/memory lifecycle` | 只读报告：淘汰/升格/冲突/规模 |
+| 记忆治理 | `/memory lifecycle`、`scripts/memory-lifecycle.mjs --json` | 只读报告：淘汰/升格/冲突/垃圾/聚合候选（后者供 headless 定时任务消费） |
 | 教训闭环 | `/memory mine [--ingest]` | 从纠正意图挖掘教训并入库（自动去重） |
-| 防退化 | `npm run golden` | 隔离/注册面/类型/单测/补丁/注入面基线 |
+| 防退化 | `npm run golden`（`--fast` / `--smoke`） | 11 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词（`--smoke` 追加无头冒烟） |
 
 ## 上游同步
 
@@ -219,11 +225,15 @@ bash scripts/check-isolation.sh
 # 功能完整性检查
 bash scripts/check-features.sh
 
-# 行为防退化基准（聚合上述检查）
+# 行为防退化基准（11 步；--fast 仅结构守门，--smoke 追加无头冒烟）
 npm run golden
+npm run golden -- --fast
 
 # TypeScript 类型检查
 npx tsc --noEmit -p custom/
+
+# 启用 git 钩子（pre-commit 快检 / pre-push 全量；本地无 CI）
+bash scripts/install-hooks.sh
 ```
 
 ## 外部服务安装

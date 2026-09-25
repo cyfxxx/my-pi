@@ -52,7 +52,7 @@ my-pi 的自定义代码。三层结构：
 - `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`（原子写）、`net-guard.ts`（SSRF 防护）
 - `features/`：每个功能必须包含 `logic.ts`（纯逻辑出口/barrel，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）；`__tests__/` 为 vitest 单测
   - 小功能直接把模块铺在功能根目录（如 `tmux/logic.ts`、`browser/impl.ts`）
-  - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`
+  - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run,tools}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/{budget,usage-diag}`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`
   - 子包内互引用用相对路径；跨功能引用只走对方 `logic.ts`
 - `bootstrap.ts`：入口，组装所有功能
 - 另有 `package.json`、`tsconfig.json`（工作区与编译配置），`dist/`（构建产物，gitignored）
@@ -79,7 +79,7 @@ my-pi 的自定义代码。三层结构：
 **不注入系统提示词**：packs 不放入 `portable/agent/skills/`，需要时按需读取 `packs/<name>/SKILL.md`（防提示词膨胀）。索引见 `packs/INDEX.md`，约定与整合纪律见 `packs/README.md`。
 
 ### `docs/`
-项目文档，按读者任务分类：`FAQ.md`/`TROUBLESHOOTING.md`（使用与排障）、`development/`（扩展与 SDK 开发、技能维护）、`operations/`（多环境、Termux、终端/tmux）。索引与来源说明见 `docs/README.md`。
+项目文档，按读者任务分类：`FAQ.md`/`TROUBLESHOOTING.md`（使用与排障）、`design/`（愿景与落地路线）、`development/`（扩展与 SDK 开发、技能维护、迁移审计与上下文对比）、`operations/`（多环境、Termux、终端/tmux）。索引与来源说明见 `docs/README.md`。
 
 ### `patches/`
 对 `vendor/pi/` 的补丁。每个补丁记录一个明确的修改：
@@ -149,7 +149,8 @@ custom/features/*/logic.ts
 
 - `custom/core/README.md`、`custom/adapters/README.md`、`custom/features/README.md`：三层底座与规范
 - `custom/features/<功能>/README.md`：全部 12 个功能的注册面、文件、数据与配置
-- 大功能的子包：`context/budget/`、`autopilot/{store,run}/`、`memory/{store,recall,mine}/`、`plan-mode/{core,ui}/`、`subagent/{core,ui}/`、`voice/{audio,stt}/` 各自有 `README.md`
+- 大功能的子包：`context/{budget,usage-diag}/`、`autopilot/{store,run,tools}/`、`memory/{store,recall,mine}/`、`plan-mode/{core,ui}/`、`subagent/{core,ui}/`、`voice/{audio,stt,tts}/` 各自有 `README.md`
+- 语音服务脚本（whisper/sherpa）随仓库分发在 `custom/features/voice/scripts/`，见 `custom/features/voice/README.md`
 - `scripts/README.md`：运维脚本分类索引
 
 ## 已知偏离

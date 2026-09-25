@@ -6,7 +6,7 @@
 
 | 属性 | 值 |
 |------|-----|
-| 更新日期 | 2026-09-21 |
+| 更新日期 | 2026-09-25 |
 | 适用范围 | my-pi 项目文档索引 |
 | 相关文档 | [README.md](../README.md)、[STRUCTURE.md](../STRUCTURE.md)、[DECISIONS.md](../DECISIONS.md) |
 
@@ -28,6 +28,14 @@
 | [development/PI-EXT-DEV-NOTES.md](development/PI-EXT-DEV-NOTES.md) | pi 扩展开发实测经验：保留键、参数补全语义、UI API、缓存友好约定、黑盒开发流程 |
 | [development/PI-SDK-EXTENSION.md](development/PI-SDK-EXTENSION.md) | pi SDK 深度定制方案：纯函数增强、工具工厂、类型突破、命令上下文、自定义 Provider |
 | [development/SKILLS-MAINTENANCE.md](development/SKILLS-MAINTENANCE.md) | 技能使用后改进机制：偏差记录、合并节奏、packs 外部包处理 |
+
+### 审计与对比
+
+| 文档 | 内容 |
+|------|------|
+| [development/MIGRATION-AUDIT.md](development/MIGRATION-AUDIT.md) | pi-tools → my-pi 迁移完整性审计：逐层对比、9 个确证缺陷（已关闭）、遗留 G3 与证据 |
+| [development/CONTEXT-MANAGEMENT-COMPARISON.md](development/CONTEXT-MANAGEMENT-COMPARISON.md) | 上下文管理系统对比（my-pi vs DeepSeek Harness）：机制差异、实测构成、优化项与成本模型 |
+| [development/DSH-CONTEXT-AUDIT.md](development/DSH-CONTEXT-AUDIT.md) | DeepSeek Harness 上下文管理逐条证据（外部参照，含 `file:line`） |
 | [development/CHECK-REPORT.md](development/CHECK-REPORT.md) | 历史功能/脚本检查报告（迁移波次补漏记录，供追溯） |
 
 ### 运维
@@ -53,9 +61,6 @@
 | [../portable/agent/AGENTS.md](../portable/agent/AGENTS.md) | 开发规范与环境描述（唯一注入的 AGENTS.md） |
 | [PROGRESS.md](../PROGRESS.md) | 迁移与架构修复进度 |
 | [DECISIONS.md](../DECISIONS.md) | 架构决策记录 |
-| [development/MIGRATION-AUDIT.md](development/MIGRATION-AUDIT.md) | pi-tools → my-pi 迁移完整性审计（缺口与优先级） |
-| [development/CONTEXT-MANAGEMENT-COMPARISON.md](development/CONTEXT-MANAGEMENT-COMPARISON.md) | 上下文管理系统对比（my-pi vs DeepSeek Harness）与优化项 |
-| [development/DSH-CONTEXT-AUDIT.md](development/DSH-CONTEXT-AUDIT.md) | DeepSeek Harness 上下文管理逐条证据（外部参照） |
 
 ---
 
@@ -81,5 +86,8 @@
 - `design/SELF-OPTIMIZING-BASELINE.md`、`design/SELF-OPTIMIZING-ROADMAP.md` — pi-tools 的自我优化基线与执行路线图（my-pi 的落地路线已并入 [design/VISION.md](design/VISION.md) §6）
 - `development/AGENTS-DETAILS.md` — pi-tools `agent/` 目录（extensions/services/lib）的细节索引，对应子系统在 my-pi 已重组
 - `maintenance/GIT-HISTORY-REWRITE.md`、`maintenance/MODULARIZATION-PLAN.md`、`maintenance/OPTIMIZATION-LOG.md` — pi-tools 的历史重写、模块化方案与优化日志
+  （优化日志由 `memory-lifecycle.mjs` 的只读报告驱动；该脚本已按 my-pi 布局迁移为
+  `scripts/memory-lifecycle.mjs`，但其"报告写入 OPTIMIZATION-LOG → 用户确认 → 升格"的自我优化回路
+  **有意未迁移**，见 `DECISIONS.md` 的 headless 条目与 `docs/design/VISION.md` §6 P4）
 
 my-pi 的架构决策与迁移进度分别记录在 [DECISIONS.md](../DECISIONS.md) 与 [PROGRESS.md](../PROGRESS.md)。

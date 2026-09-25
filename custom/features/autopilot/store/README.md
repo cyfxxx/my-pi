@@ -11,11 +11,13 @@
 | `metrics.ts` | 度量仪表盘聚合 | `collectMetrics`、`formatMetrics` |
 | `sessions.ts` | 会话列表格式化 | `sortByModified`、`formatSessionList` |
 | `notifications.ts` | 离线任务执行报告（results JSONL + seen 标记） | `collectUnread`、`parseResults`、`formatSummary`、`readSeenTs`/`writeSeenTs` |
-| `seeds.ts` | 种子任务同步（`scheduled-seeds.json`） | `loadSeeds`、`diffSeedTask`、`syncSeedTasks` |
+| `seeds.ts` | 种子任务同步（`scheduled-seeds.json`，**只补缺失、不覆盖**已存在任务） | `loadSeeds`、`diffSeedTask`、`syncSeedTasks` |
 
 ## 关键约定
 
 - `withStoreLock` 是**进程内** Promise 队列（不跨进程）；跨进程会话锁用 `acquireSessionLock`（pid + TTL）。
+- 种子对账是 add-only：修改 `scheduled-seeds.json` 的提示词**不会**传播到已注册任务（启动时只提示 drift），
+  需 `node scripts/reseed-seeds.mjs --apply` 显式应用（默认预演；写入前备份 `tasks.json`，保留 id/enabled/lastRun/runCount/history）。
 - 配置字段做类型校验（数值仅接受有限正数），防手改配置使策略静默失效。
 - 轮转/追加日志走 `core/fs-json`，阈值各自保留（results 2MB、telemetry 等）。
 

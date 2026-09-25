@@ -14,7 +14,7 @@
 | 旧工具输出回收 | 8,192 字符中段裁剪，**仅在压缩触发后才跑** | `pruneToolResults` 阈值 120K/80K，实测**从未触发** | ✅ 阈值降至 60K/30K，**每次请求都跑** |
 | 写入时截断+归档 | spill >50KB 落盘 + 路径，**可读回**，`read` 豁免 | 单次 5K + **全会话 20K**，用完后一律 300 token，`read` 也被压 → 归档形同虚设 | ✅ `read` 豁免会话预算，归档可读回 |
 | 压缩摘要的缓存复用 | 摘要调用**重放前缀**，命中 KV 缓存 | `warm-prefix` 已有实现但因上游事件不覆盖压缩路径而**是死代码** | ⚠ 仍未修（需上游补丁） |
-| system prompt 变动 | `in-history` 路由**追加到缓存历史之后** | 每轮重写 system prompt（含 sleeping summary/压力档） | ⚠ 待用新指纹确认后处理 |
+| system prompt 变动 | `in-history` 路由**追加到缓存历史之后** | 每轮重写 system prompt（含 sleeping summary/压力档） | ✅ 易变段移出 system prompt（转为 append-only 消息），并加运行时前缀指纹做归因 |
 | 逐请求用量记账 | `inputTokens`（未命中）/`cacheReadTokens`/`cacheWriteTokens`/`reasoningTokens`，**无货币成本** | 同维度 + **¥ 成本** + 命中率 + `/usage-diag` | ✅ 领先 |
 | 子代理上下文 | fork（继承历史、复用 KV）与 spawn（空）两种 | 仅 spawn（`--no-session --no-extensions`） | ⚠ 缺 fork 模式 |
 
@@ -99,7 +99,7 @@
 即约 **-54% 的稳态上下文**，且**零额外 LLM 调用**；折算到成本模型相当于每请求省掉一半的 prompt 计费。
 O7 另把"整段缓存失效"的风险面从 system prompt 收窄到消息尾部（上一轮测得的整段失效占额外费用 33%）。
 
-验证：`tsc` 通过；vitest **44 文件 510 用例**；`golden-tasks.sh` 七项全绿；
+验证：`tsc` 通过；vitest **44 文件 514 用例**；`golden-tasks.sh` 十一项全绿（`--smoke` 时十二项）；
 新增用例覆盖 `truncateHeadTail`/`tailByTokens`、`sweepArchive`（按龄/按量）、`read` 预算豁免、
 压力基准（阈值分母 + 未设阈值回退窗口）、指纹 `sinceLastMs`、以及新擦除阈值下的默认行为。
 

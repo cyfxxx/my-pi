@@ -10,7 +10,7 @@
 | 属性 | 值 |
 |------|-----|
 | 版本 | v2.0 |
-| 更新日期 | 2026-09-20 |
+| 更新日期 | 2026-09-25 |
 | 适用范围 | 项目愿景、方法论、治理规则、落地路线 |
 | 相关文档 | [DECISIONS.md](../../DECISIONS.md)、[PROGRESS.md](../../PROGRESS.md)、[../development/SKILLS-MAINTENANCE.md](../development/SKILLS-MAINTENANCE.md) |
 
@@ -75,7 +75,7 @@ my-pi 现有硬约束：`custom/features/context/budget/budget.ts` 的预算与�
 ### 3.3 防退化第一
 进化的最大风险不是慢，是退化：一条错误教训入库后会自我强化污染后续行为。
 一切结构性改动以回归测试为安全网；记忆写操作走"报告→确认→快照→执行→验证"。
-my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行为级 golden tasks 待建（§6 P2）。
+my-pi 当前安全网 = `npm run golden`（11 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词，共 514 用例）+ `.githooks/`（pre-commit 快检、pre-push 全量；本地无 CI）。
 
 ### 3.4 执行-知识分离（2026-08-31 加入，源自 WikiSkill 论文消融实证）
 生产执行路径不直接消费记忆库/教训/干预记录等 wiki 式知识解题：知识只经"沉淀→升格通道"间接影响行为。回顾与训练回路中允许访问知识库，但生产任务会话若直接从知识库取答案，会令执行轨迹失去信息量，长期看降低技能质量（论文实测：训练期开放 wiki 访问使最终技能降质 63.7%→60.9%）。
@@ -88,21 +88,23 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 | 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有**：`custom/features/context/usage-stats.ts` 持久化工具 token/缓存读写（`usage.jsonl`），`/context usage` 产出命中率；`scripts/check-injection-surface.sh` 注入面前缀指纹守门 |
 | 干预 | abort 快照留存率 / corrective 关联率 | pi-intervention → `memory/interventions.jsonl` | **已有**：`custom/features/intervention/` 落盘 `portable/memory/interventions.jsonl`，`/intervention stats` 产出关联率/近 7 天 |
 | 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **已有**：autopilot telemetry（按模型/任务成功率 + 预算）`/auto stats` |
-| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`npm run golden`）+ 199 单测用例 |
-| 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 | memory-lifecycle.mjs（只读报告） | **部分**：`memory/store/storage.ts` 已有治理字段（recurrence/confidence/accessedAt/source/links/supersededBy），只读生命周期报告待建（P3） |
+| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh` 11 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词）+ 死导出与补丁行为守门 + `.githooks/`；514 单测用例 |
+| 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 / 垃圾与聚合 | memory-lifecycle.mjs（只读报告） | **已有**：`memory/store/storage.ts` 治理字段就绪；`memory/mine/lifecycle.ts` + `/memory lifecycle` 出六类候选，`scripts/memory-lifecycle.mjs --json` 供 headless 定时任务消费 |
 
-结论：度量层已基本建成（P1/P2 达成）；P3 记忆生命周期报告与 P4 升格通道待推进。落地顺序见 §6。
+结论：度量层已基本建成（P1/P2/P3 达成）；仅 P4 升格通道待推进。落地顺序见 §6。
 
 ## 五、记忆生命周期治理规则 v1
 
-> 本节是**目标设计**；当前 `custom/core/note-store.ts` 是 `键 → 字符串` 的简单持久化，尚未实现下列字段与流程。
+> 本节规则已落地（2026-09-21 实现，2026-09-25 补齐垃圾嫌疑/聚合候选）：字段在 `custom/features/memory/store/types.ts`，报告在 `custom/features/memory/mine/lifecycle.ts`，命令 `/memory lifecycle`、headless 入口 `scripts/memory-lifecycle.mjs`。
 
 数据源字段（目标）：`recurrence`（复现次数）、`accessedAt`、`confidence`、`source`。
 
 - **内容域边界（2026-08-29 用户指令）**：长期记忆只存 pi 项目/用户相关内容；项目域经验（如游戏开发、外部技能包的实操经验）存对应技能包（`packs/<name>/EXPERIENCE.md` 或 `SKILL.md`），不进记忆库。
 - **淘汰候选**：未删除 且 recurrence≤1 且 accessedAt 距今 >180 天 且 confidence<0.7 → 报告列出；批量删除必须用户确认。
 - **升格候选**：solutions/fact 类 recurrence≥5 → 进入 §3.1 升格通道评估。
-- **冲突嫌疑**：标题近似或同主题反向结论 → 报告列出，由会话裁决合并。
+- **冲突嫌疑**：同类别且标题近似（bigram-jaccard ≥0.5）→ 报告列出，由会话裁决合并。
+- **垃圾嫌疑**：content 归一化后 <30 字符或标题为测试噪声词 → 报告列出；**不进升格候选**（防噪声条目硬化为规则）。
+- **聚合候选**：solutions/procedure 同主题（bigram-jaccard ≥0.34）组内 ≥3 条且 Σrecurrence ≥8 → 建议归纳为单条规则，走「报告→确认」流程。
 - 生命周期报告只读幂等；任何写操作先快照记忆数据。
 
 ## 六、落地路线
@@ -112,7 +114,7 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 - **P0 已完成（2026-09-20）**：项目骨架与三隔离一收敛；12 个功能注册；纯逻辑迁移（token 预算、工具输出归档、脱敏、原子写入、笔记持久化、子代理内置角色）；`packs/`、技能、文档迁移；三层验证（check/tsc/vitest）全绿。
 - **P1 度量基建（已完成，2026-09-21）**：干预捕获落盘（`interventions.jsonl` + `/intervention stats`）→ 任务遥测（autopilot telemetry + `/auto stats`）→ 缓存/用量统计（`usage-stats.ts` + `/context usage`）。判据达成：可产出干预率、token 成本、缓存命中率三项数字。
 - **P2 防退化（已完成，2026-09-21）**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`--smoke` 无头冒烟）+ `scripts/check-injection-surface.sh`（system prompt 前缀指纹基线）。判据达成：结构性改动可被 `npm run golden` 拦截。
-- **P3 记忆生命周期（已完成，2026-09-21）**：治理字段在 `memory/store/storage.ts` 就绪（recurrence/confidence/accessedAt/source/links/supersededBy）；只读生命周期报告 `memory/mine/lifecycle.ts` + `/memory lifecycle`（§5 淘汰/升格/冲突/规模四类）；教训闭环 `memory/mine/lesson-miner.ts` + `/memory mine [--ingest]`（从干预纠正意图挖掘并入记忆库，自动去重）。
+- **P3 记忆生命周期（已完成，2026-09-21；2026-09-25 补齐）**：治理字段在 `memory/store/types.ts` 就绪（recurrence/confidence/accessedAt/source/links/supersededBy）；只读生命周期报告 `memory/mine/lifecycle.ts` + `/memory lifecycle`（§5 淘汰/升格/冲突/垃圾/聚合五类候选 + 规模陈旧度）；headless 入口 `scripts/memory-lifecycle.mjs`（定时任务无扩展命令可用）；教训闭环 `memory/mine/lesson-miner.ts` + `/memory mine [--ingest]`（从干预纠正意图挖掘并入记忆库，自动去重）。
 - **P4 升格通道执行**：按 §3.1 把反复有效的软引导硬化，并同步降权原软引导。判据：软层条目不无限增长（注入预算受控）。
 
 ## 七、未来展望（受限于算力与技术，暂缓）
@@ -133,3 +135,4 @@ my-pi 当前安全网 = `npx vitest run`（27 用例）+ `npm run check`；行�
 
 - 2026-08-26 v1：初稿。用户口述愿景整理 + 四大基建计划（P1 干预捕获 / P2 任务遥测 / P3 golden tasks / P4 记忆生命周期）。
 - 2026-09-20 v2：自 pi-tools 迁移并按 my-pi 现状重写。保留 §1–§3、§5 的愿景与方法论（仅把落点映射到 my-pi 的目录与硬约束）；§4 度量表由"pi-tools 全绿"改写为 my-pi 真实差距（度量层整体缺失）；§5 明确标注为目标设计；新增 §6 落地路线（P0 已完成 → P4），替代原 pi-tools `SELF-OPTIMIZING-ROADMAP.md`。
+- 2026-09-25 v3：按实现现状回填 §4/§5/§6：度量层 P1–P3 全部达成（golden 11 步 + 死导出/补丁行为守门 + `.githooks/`，514 用例）；§5 增补垃圾嫌疑/聚合候选规则并标注已落地（含 headless 入口 `scripts/memory-lifecycle.mjs`）；P4 升格通道为唯一未完成阶段。

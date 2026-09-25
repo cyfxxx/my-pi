@@ -31,6 +31,13 @@
 | `pi-link-state.json` / `pi-link-active.json` / `pi-link-outbox.json` | 运行时状态 | `PI_LINK_STATE_DIR` |
 | `PI_UNATTENDED` | 无人值守标记（影响主动发送） | — |
 
+## 定位：入站远控通道
+
+本功能是 my-pi 的**入站远控**通路：手机/另一台设备经 SSH 给本机 pi 下指令、读回结果，
+不依赖第三方中继，也**不依赖 tmux**（`/link attach` 可直接接入会话）——
+pi-tools 用 ntfy 中继 + `injectMode: rpc` 解决的"tmux 故障时远程控制"场景由此取代，
+该配置**有意未迁移**（见 `DECISIONS.md` 的通知/入站通道条目）。
+
 ## 相关
 
 - 跨设备互联的终端/SSH 运维经验：`docs/operations/`
