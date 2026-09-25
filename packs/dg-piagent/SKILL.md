@@ -15,9 +15,16 @@ description: |
 
 > ⚠️ **版本基线**: 本 skill 的 API 描述已对齐到 **pi-coding-agent v0.83.0**。
 >
-> 🖥 **本机注记（pi packs 导入）**: 当前环境 pi 版本为 **0.84.2**，高于本 skill 基线。涉及本机实际 SDK 使用时，若与 skill 描述相抵触，以本机 `node_modules/@earendil-works/pi-coding-agent/dist/**/*.d.ts` + CHANGELOG 为准。
+> 🖥 **本机注记（my-pi 仓库）**: 本仓库 vendored 的 pi 为 **v0.87.0**（`vendor/PINNED_COMMIT` = `d201760ff`），高于
+> 本 skill 基线。涉及本机实际 SDK 使用时，若与 skill 描述相抵触，以
+> `vendor/pi/packages/coding-agent/dist/**/*.d.ts` + `vendor/pi/packages/coding-agent/CHANGELOG.md` 为准。
 >
-> **遇 pi-ai import 失败时**，先查 `node_modules/@earendil-works/pi-ai/dist/compat.d.ts` 的 `export *` 列表，确认符号归属哪个入口。
+> **遇 pi-ai import 失败时**，先查 `vendor/pi/packages/pi-ai/dist/compat.d.ts` 的 `export *` 列表，确认符号归属哪个入口。
+>
+> 📁 **路径映射（本文档其余部分沿用 pi 默认路径）**: pi 的默认 agentDir 是 `~/.pi/agent`，本仓库通过
+> `PI_CODING_AGENT_DIR` 指向 **`portable/agent`**（技能 `portable/agent/skills/`、会话 `portable/agent/sessions/`）。
+> `agentDir/extensions` 自动发现只对第三方扩展有效——my-pi 自有功能不走该目录，而是 `custom/features/` +
+> `custom/bootstrap.ts`，由启动器以 `--extension custom/bootstrap.ts` 加载（逻辑层零 Pi 依赖，见 `custom/README.md`）。
 
 ## 版本协议 ⭐
 
@@ -27,7 +34,7 @@ description: |
 
 2. **升级前评估**：当任务涉及安装/升级（或用户问版本）时，先跑 `npm view @earendil-works/pi-coding-agent version` 拿 latest 与基线对比。若不同，联网查该版本 CHANGELOG/release notes，从 SDK 二次开发角度评估（新功能 / 破坏性变更），给用户简短建议，由用户决定是否升级。日常开发（项目已装好）不触发。
 
-3. **升级即更新 skill**：若用户同意升到 X.Y.Z，安装后按 [技能维护机制](../../../docs/SKILLS-MAINTENANCE.md) 流程，对照新版 `dist/**/*.d.ts` + CHANGELOG 审查 skill 差异，产出更新清单，报用户确认后再改，并同步更新顶部基线版本号。
+3. **升级即更新 skill**：若用户同意升到 X.Y.Z，安装后按 [技能维护机制](../../docs/development/SKILLS-MAINTENANCE.md) 流程，对照新版 `dist/**/*.d.ts` + CHANGELOG 审查 skill 差异，产出更新清单，报用户确认后再改，并同步更新顶部基线版本号。
 
 **变更查阅渠道**（第 2/3 步执行依据）：
 
@@ -268,7 +275,7 @@ try {
 
 > 完整路径导航表(三个包自带内容不对称)、检索配方、降级策略、回流提示 → [source-fallback.md](references/source-fallback.md)
 
-**兜底解决后**:若该问题任何用 pi-agent 的项目都可能遇到,主动建议用户「值得补进 skill 吗」,由用户决定(遵循 [技能维护机制](../../../docs/SKILLS-MAINTENANCE.md) 沉淀)。
+**兜底解决后**:若该问题任何用 pi-agent 的项目都可能遇到,主动建议用户「值得补进 skill 吗」,由用户决定(遵循 [技能维护机制](../../docs/development/SKILLS-MAINTENANCE.md) 沉淀)。
 
 ---
 
@@ -276,7 +283,7 @@ try {
 
 **官方源码参考**: `packages/coding-agent/src/`(SDK)、`packages/agent/src/`(Agent 核心)、`packages/ai/src/`(AI 抽象)
 
-**Skill 维护**: 发现信息缺失/错误导致走弯路时,按 [技能维护机制](../../../docs/SKILLS-MAINTENANCE.md) 6 条原则完善本 skill,并同步更新 [CHANGELOG.md](CHANGELOG.md)（历史沿革，永久保留）。
+**Skill 维护**: 发现信息缺失/错误导致走弯路时,按 [技能维护机制](../../docs/development/SKILLS-MAINTENANCE.md) 6 条原则完善本 skill,并同步更新 [CHANGELOG.md](CHANGELOG.md)（历史沿革，永久保留）。
 
 ## 使用后经验沉淀（必做）
 

@@ -4,6 +4,6 @@ Six Agent Skills for browser games: Phaser 4.2 core and Arcade Physics, PixiJS
 8.19 rendering, and three.js r184 scene, glTF, material, and lighting workflows.
 
 Each subdirectory is one skill. Existing projects keep their locked dependency
-versions; see [`VERSION-SUPPORT.md`](../../docs/VERSION-SUPPORT.md).
+versions; see [`VERSION-SUPPORT.md`](../../references/VERSION-SUPPORT.md).
 
-See [`docs/SKILL-FORMAT.md`](../../docs/SKILL-FORMAT.md) for the authoring standard.
+See `docs/SKILL-FORMAT.md` in the upstream gamedev repo for the authoring standard.

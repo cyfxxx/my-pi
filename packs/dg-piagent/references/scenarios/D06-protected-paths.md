@@ -386,7 +386,7 @@ pi.on("tool_call", (event, ctx) => {
 - [E01 拦截与修改工具调用](E01-tool-intercept.md) — 修改而非阻断工具参数
 - [E06 流式处理工具输出](E06-streaming-transform.md) — 记录执行日志
 - [A04 工具白名单](A04-tool-whitelist.md) — `tools` / `excludeTools` 配置项
-- [A06 自定义工具](A06-custom-tool.md) — 默认启用规则
+- [D01 自定义工具](D01-custom-tool.md) — 默认启用规则
 - [sdk_doc/04-events.md](../sdk_doc/04-events.md) — `tool_call` 扩展独有事件详解
 - [sdk_doc/07-extensions-api.md](../sdk_doc/07-extensions-api.md) — 扩展 API 完整参考
-- [sdk_doc/06-agent-session.md](../sdk_doc/06-agent-session.md) — `createAgentSession` 配置项
+- [sdk_doc/01-create-agent-session.md](../sdk_doc/01-create-agent-session.md) — `createAgentSession` 配置项

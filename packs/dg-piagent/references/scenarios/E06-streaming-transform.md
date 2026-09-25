@@ -43,7 +43,7 @@
 
 ## 默认行为
 
-**工具启用规则**（与 [A04](A04-tool-whitelist.md) / [A06](A06-xxx.md) / [D01](D01-custom-tool.md) / [D04](D04-confirm-destructive.md) / [D05](D05-tool-result-render.md) / [E01](E01-tool-intercept.md) 一致）：
+**工具启用规则**（与 [A04](A04-tool-whitelist.md) / [D01](D01-custom-tool.md) / [D04](D04-confirm-destructive.md) / [D05](D05-tool-result-render.md) / [E01](E01-tool-intercept.md) 一致）：
 
 | `createAgentSession` 配置 | 内置工具 | 扩展工具 | customTools |
 |--------------------------|---------|---------|-------------|

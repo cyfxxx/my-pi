@@ -98,4 +98,4 @@ grep -rln "<主题>" node_modules/@earendil-works/pi-coding-agent/docs/
 
 > 「这条信息来自 node_modules 源码，看起来任何用 pi-agent 的项目都可能遇到——值得补进 skill 吗？」
 
-由用户决定。若确认补，遵循 [skill-maintenance.md](skill-maintenance.md) 的 6 条原则就近沉淀。
+由用户决定。若确认补，遵循 [技能维护机制](../../../docs/development/SKILLS-MAINTENANCE.md) 的 6 条原则就近沉淀。

@@ -1,6 +1,6 @@
 ---
 name: skill-integration
-description: 外部技能包（GitHub zip 等）引入与整合进 ~/.pi/packs 的统一流程：选包下载、安全审查、验收冒烟、通用/专用三层归置、整合纪律。用户说"去 GitHub 找 xxx 整合进 packs""引入技能包""外部技能整合"时触发。
+description: 外部技能包（GitHub zip 等）引入与整合进仓库内 packs/ 的统一流程：选包下载、安全审查、验收冒烟、通用/专用三层归置、整合纪律。用户说"去 GitHub 找 xxx 整合进 packs""引入技能包""外部技能整合"时触发。
 ---
 
 # 外部技能包引入与整合

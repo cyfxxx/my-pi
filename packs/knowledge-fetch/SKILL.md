@@ -5,7 +5,7 @@ description: 搭建零 LLM 官方源直连的知识订阅（渠道调研、抓�
 
 # 零 LLM 知识订阅搭建
 
-以官方 API + RSS 直连替代搜索引擎，为定时任务提供稳定、真实、有用的信息抓取。已验证实例：`/root/.pi/scripts/knowledge-fetch.py` v2（5 大 section，接入 daily-health-check 任务）。
+以官方 API + RSS 直连替代搜索引擎，为定时任务提供稳定、真实、有用的信息抓取。已验证实例：`scripts/knowledge-fetch.py` v2（5 大 section）+ `scripts/knowledge-ingest.mjs`（零 LLM 入库），接入 my-pi 定时任务 `knowledge-subscribe` / `daily-review`。
 
 ## 适用与不适用
 
@@ -16,7 +16,7 @@ description: 搭建零 LLM 官方源直连的知识订阅（渠道调研、抓�
 
 ### 1. 诊断现状（若为排查"功能未触发"）
 
-1. 找到既有抓取任务/脚本，看调度配置（scheduled-tasks.json）是否启用、lastRun 是否成功
+1. 找到既有抓取任务/脚本，看调度配置（my-pi：`portable/memory/scheduler/tasks.json`，种子定义在 `portable/agent/scheduled-seeds.json`）是否启用、lastRun 是否成功
 2. 看去重文件（如 .seen.txt）是否全部命中、当日输出 md 是否为空
 3. 单源失败常被吞异常（fetch 返回 ''），用 curl 手动验证源可达性，别只看脚本日志
 
@@ -35,8 +35,11 @@ description: 搭建零 LLM 官方源直连的知识订阅（渠道调研、抓�
 
 ### 4. 接入调度
 
-1. 接入现有定时任务（如 daily-health-check 的第 4 步）：`python3 scripts/knowledge-fetch.py` 先跑一次验证
-2. 若当日有新增：LLM 环节读 md、挑 3-5 条真正有价值的（时效强/漏洞/病毒/重大新闻，排除过时教程与多源冗余），memory_search 查重后逐条 memory_store
+1. 接入现有定时任务（my-pi 为 `knowledge-subscribe` 的抓取步骤）：`python3 scripts/knowledge-fetch.py` 先跑一次验证
+2. 若当日有新增：挑 3-5 条真正有价值的（时效强/漏洞/重大新闻，排除过时教程与多源冗余），作为关键词交给
+   `bash scripts/run-ts.sh scripts/knowledge-ingest.mjs portable/memory/knowledge/<date>.md 5 --keywords <关键词>` 入库——
+   **不要**在提示词里用 `memory_search`/`memory_store`：定时任务以 `--no-extensions` 运行，扩展工具不存在；
+   入库动作本身已含去重（标题/contentHash/jaccard），无需额外查重（见 `EXPERIENCE.md` 第 2 条）
 3. 抓取失败不影响健康判定（知识部分与健康判定解耦）
 
 ### 5. 迭代
@@ -48,8 +51,10 @@ description: 搭建零 LLM 官方源直连的知识订阅（渠道调研、抓�
 
 ## 本机环境备注（环境：termux-ubuntu —— proot-Distro aarch64，Android 宿主 proot 容器，uname 含 PRoot；其他设备以自身环境为准）
 
-- 已验证实例：`/root/.pi/scripts/knowledge-fetch.py` v2（5 大 section，接入 daily-health-check 任务），本机可直接复用
-- 定时接入走 pi-autopilot 的 scheduled-tasks.json；渠道集中在脚本内 SOURCES 列表管理
+- 已验证实例：`scripts/knowledge-fetch.py` v2（抓取）+ `scripts/knowledge-ingest.mjs`（入库），随仓库分发可直接复用
+- 定时接入改 `portable/agent/scheduled-seeds.json`（`knowledge-subscribe`）；已注册任务因种子对账只补缺失，
+  需 `node scripts/reseed-seeds.mjs --apply` 显式应用。渠道集中在脚本内 SOURCES 列表管理
+- headless 提示词只能调 `scripts/` 下的脚本（`--no-extensions`），不得引用扩展工具/斜杠命令
 
 ## 使用后经验沉淀（必做）
 

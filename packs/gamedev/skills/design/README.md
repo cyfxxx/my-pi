@@ -12,4 +12,4 @@ Start with [`create-game-assets`](create-game-assets/SKILL.md) when the task nee
 a cohesive sprite, tileset, texture, UI-art, or 3D-asset family rather than a
 single disposable image.
 
-See [`docs/SKILL-FORMAT.md`](../../docs/SKILL-FORMAT.md) for the authoring standard.
+See `docs/SKILL-FORMAT.md` in the upstream gamedev repo for the authoring standard.

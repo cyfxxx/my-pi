@@ -12,7 +12,7 @@
 **不适合**：
 - 任何能 `bash` 一次搞定的操作 → 自定义工具的固定 token 开销远高于让模型写 bash
 - 需要交互式 UI（选择项、确认）→ 工具是模型主动调用的，不能用来跟用户对话；考虑 [E02-extension-basics](E02-extension-basics.md)
-- 需要在会话启动时改变 Agent 行为 → 用 [A04-system-prompt](A04-system-prompt.md) 或 [C03-context-files](C03-context-files.md)
+- 需要在会话启动时改变 Agent 行为 → 用 [A03-system-prompt](A03-system-prompt.md) 或 [C03-context-files](C03-context-files.md)
 
 **不用会怎样**：模型可能用 bash 反复试错、参数错位、输出格式不稳定；某些操作可能因没有合适工具被模型直接拒绝执行。
 

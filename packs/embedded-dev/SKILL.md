@@ -75,10 +75,10 @@ Linux 串口权限：`sudo usermod -aG dialout $USER` 后重新插拔。
 
 ```bash
 # MIT 许可，可直接克隆使用（12 个子命令式 skill，config.json 配置体系）
-git clone https://github.com/zhinkgit/embeddedskills.git ~/.pi/packs/upstream/embeddedskills
+git clone https://github.com/zhinkgit/embeddedskills.git packs/upstream/embeddedskills   # 相对 my-pi 仓库根
 
 # 无 LICENSE，默认版权保留：仅个人学习使用，勿复制分发；克隆前确认用途合规
-git clone https://github.com/LeoKemp223/embed-ai-tool.git ~/.pi/packs/upstream/embed-ai-tool
+git clone https://github.com/LeoKemp223/embed-ai-tool.git packs/upstream/embed-ai-tool
 ```
 
 详细对照（36 个上游 skill 的功能清单与本包映射）：`references/upstream-catalog.md`

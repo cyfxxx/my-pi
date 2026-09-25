@@ -84,7 +84,7 @@ kicad-cli sch export bom project.kicad_sch -o bom.csv --fields "Reference,Value,
 
 ```bash
 # kicad-happy：11 个 skill（MIT），含全套分析脚本与 review 流水线
-git clone https://github.com/aklofas/kicad-happy.git ~/.pi/packs/upstream/kicad-happy
+git clone https://github.com/aklofas/kicad-happy.git packs/upstream/kicad-happy   # 仓库根为 my-pi 根
 ```
 
 详细目录：`references/upstream-catalog.md`

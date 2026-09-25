@@ -21,7 +21,7 @@ description: >
 cd /tmp && rm -rf awesome-gds gds.tgz
 curl -sL -m 60 "https://codeload.github.com/gamedev-skills/awesome-gamedev-agent-skills/tar.gz/refs/heads/main" -o gds.tgz
 tar xzf gds.tgz -C /tmp --strip-components=1 --one-top-level=awesome-gds
-# 对照下方"收编清单"复制：cp -r awesome-gds/skills/<目录>/* /root/.pi/packs/gamedev/skills/<分组>/
+# 对照下方"收编清单"复制（路径相对 my-pi 仓库根）：cp -r awesome-gds/skills/<目录>/* packs/gamedev/skills/<分组>/
 ```
 
 ## 收编清单（39 个技能）

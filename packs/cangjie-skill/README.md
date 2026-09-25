@@ -9,7 +9,7 @@
 ## 在 pi 中使用
 
 - **触发**: 用户要求"拆书 / 蒸馏一本书 / 把 XX 书(视频/播客)做成 skill"时，读本 SKILL.md 按 RIA-TV++ 管线执行
-- **产物落点**: 上游默认装到 `~/.claude/skills/`；pi 下建议蒸馏产物先落 `packs/drafts/` 走确认流程，确认后按 packs 防膨胀守则决定是否入 `agent/skills/`（同时激活的外部技能 ≤3）
+- **产物落点**: 上游默认装到 `~/.claude/skills/`；pi 下建议蒸馏产物先落 `packs/drafts/` 走确认流程，确认后按 packs 防膨胀守则决定是否入 `portable/agent/skills/`（同时激活的外部技能 ≤3）
 - **原文不动**: methodology/extractors/templates 未做修改；安装路径等宿主差异以上一条为准
 
 ## 与 pi 升格通道的关系

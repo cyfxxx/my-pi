@@ -52,7 +52,7 @@ pdf-toolkit/
 
 ## 验证记录
 
-在 /root/.pi/packs/pdf-toolkit/examples/ 下用生成样本实测：生成→提取→表格→合并→拆分→旋转→加密→解密→水印→报告→表单填写→验证。
+在 packs/pdf-toolkit/examples/（相对 my-pi 仓库根）下用生成样本实测：生成→提取→表格→合并→拆分→旋转→加密→解密→水印→报告→表单填写→验证。
 
 ## 环境备注
 

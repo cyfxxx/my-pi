@@ -2,7 +2,7 @@
 
 > ## 如何使用
 >
-> 1. 若用户需求不被内置 6 个技能覆盖，先查本索引找到匹配技能。
+> 1. 若用户需求不被内置 4 个技能（`pi-backup`/`pi-bug-diagnosis`/`pi-full-audit`/`pi-translate-zh`）覆盖，先查本索引找到匹配技能。
 > 2. 命中后对应读取 `packs/<name>/SKILL.md` 了解完整步骤。
 >
 > ## 包索引
@@ -21,9 +21,7 @@
 > | `pcb-design` | PCB、原理图、硬件、电路板审查、KiCad | PCB/硬件设计辅助 |
 > | `pdf-toolkit` | PDF、pdf、文档提取、合并、加密 | PDF 全场景处理 |
 > | `reverse-skill` | 逆向、渗透、安全研究、CTF、漏洞利用 | 逆向/授权渗透/安全研究技能路由（入口 `skills/SKILL.md`） |
-> | `repo-size-audit` | 仓库体积、git 体积、git gc、git 仓库审计 | git 仓库体积审计 |
 > | `skill-integration` | 技能包、整合、外部技能、GitHub 技能包 | 外部技能包整合流程 |
-> | `wechatide-skill` | 微信、IDE、微信开发、小程序 | 微信相关开发辅助 |
 >
 > ## 二级功能索引
 >
