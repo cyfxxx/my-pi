@@ -11,7 +11,7 @@
  * （原实现写 `~/.pi/plans`；my-pi 的运行时数据统一收敛到 portable/）。
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
 import type { Task, TaskState } from './state';
@@ -109,7 +109,15 @@ export function listPlans(): Array<{ name: string; ts: number; path: string }> {
   if (!existsSync(dir)) return [];
   try {
     return readdirSync(dir, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && e.name.startsWith('plan-'))
+      .filter((e) => e.name.startsWith('plan-'))
+      // 以 statSync 为准：dirent 的 d_type 在 overlayfs/沙箱下不可靠（实测把普通文件报成 DT_LNK）
+      .filter((e) => {
+        try {
+          return statSync(join(dir, e.name)).isDirectory();
+        } catch {
+          return false;
+        }
+      })
       .map((e) => ({ name: e.name, ts: Number(e.name.replace('plan-', '')), path: join(dir, e.name) }))
       .filter((e) => Number.isFinite(e.ts))
       .sort((a, b) => b.ts - a.ts);

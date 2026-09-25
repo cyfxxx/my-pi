@@ -20,12 +20,29 @@ const FEATURES = join(ROOT, 'custom', 'features');
 const BASELINE = join(ROOT, 'scripts', 'registration-baseline.json');
 const UPDATE = process.argv.includes('--update');
 
+/**
+ * 目录项类型判定（**不信任 dirent 类型标志**）。
+ *
+ * d_type 在 overlayfs / 沙箱文件系统上不可靠（实测把新建普通文件报成 `DT_LNK`，
+ * `isFile()`/`isDirectory()` 均为 false）。注册面基线若漏扫文件会**静默漏登记工具**
+ * （守门假绿），故以 `statSync` 为准。
+ */
+function entryKind(full) {
+  try {
+    const st = statSync(full);
+    return st.isDirectory() ? 'dir' : st.isFile() ? 'file' : 'other';
+  } catch {
+    return 'other';
+  }
+}
+
 function walk(dir, out = []) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (e.name === '__tests__' || e.name === 'node_modules' || e.name === 'dist') continue;
     const full = join(dir, e.name);
-    if (e.isDirectory()) walk(full, out);
-    else if (e.isFile() && e.name.endsWith('.ts')) out.push(full);
+    const kind = entryKind(full);
+    if (kind === 'dir') walk(full, out);
+    else if (kind === 'file' && e.name.endsWith('.ts')) out.push(full);
   }
   return out;
 }

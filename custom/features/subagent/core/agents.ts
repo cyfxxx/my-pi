@@ -62,8 +62,14 @@ function loadAgentsFromDir(dir: string, source: 'user' | 'project'): AgentConfig
   }
   for (const entry of entries) {
     if (!entry.name.endsWith('.md')) continue;
-    if (!entry.isFile() && !entry.isSymbolicLink()) continue;
     const filePath = path.join(dir, entry.name);
+    // 以 statSync 为准：dirent 的 d_type 在 overlayfs/沙箱下不可靠（实测把普通文件报成 DT_LNK），
+    // 误判会静默丢失角色定义。
+    try {
+      if (!fs.statSync(filePath).isFile()) continue;
+    } catch {
+      continue;
+    }
     let content: string;
     try {
       content = fs.readFileSync(filePath, 'utf-8');

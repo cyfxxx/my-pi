@@ -88,13 +88,15 @@ export async function sweepArchive(opts: SweepArchiveOptions = {}): Promise<Swee
     }
     for (const e of entries) {
       const p = join(dir, e.name);
-      if (e.isDirectory()) {
+      // 以 stat 为权威：dirent 的 d_type 在 overlayfs/沙箱下不可靠（实测把普通文件报成 DT_LNK），
+      // 依赖 e.isFile() 会让这些归档文件永远不被清理。
+      const st = await stat(p).catch(() => null);
+      if (!st) continue;
+      if (st.isDirectory()) {
         await collect(p);
         continue;
       }
-      if (!e.isFile()) continue;
-      const st = await stat(p).catch(() => null);
-      if (!st) continue;
+      if (!st.isFile()) continue;
       files.push({ path: p, mtime: st.mtimeMs, size: st.size });
     }
   };

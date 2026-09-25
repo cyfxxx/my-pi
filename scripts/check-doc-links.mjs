@@ -14,6 +14,24 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCAN_DIRS = ['.', 'docs', 'portable/agent'];
 const SKIP = new Set(['node_modules', 'vendor', 'packs', '.git']);
 
+/**
+ * 目录项类型判定（**不信任 dirent 类型标志**）。
+ *
+ * `readdirSync(..., { withFileTypes: true })` 的 d_type 在 overlayfs / 沙箱文件系统上不可靠：
+ * 2026-09-25 实测发现新建文件被报成 `DT_LNK`（`isFile()` 与 `isDirectory()` 均 false，
+ * `isSymbolicLink()` 为 true），而 `lstat` 显示是普通文件。直接依赖这些标志会让这些 md
+ * **静默逃过守门**（当时漏扫 10 个 md，含 rescue-prompt 与两个新增 README）。
+ * 故一律以 `statSync`（跟随符号链接）为准。
+ */
+function entryKind(full) {
+  try {
+    const st = statSync(full);
+    return st.isDirectory() ? 'dir' : st.isFile() ? 'file' : 'other';
+  } catch {
+    return 'other';
+  }
+}
+
 function walk(dir, out = []) {
   let entries;
   try {
@@ -24,8 +42,9 @@ function walk(dir, out = []) {
   for (const e of entries) {
     if (SKIP.has(e.name)) continue;
     const full = join(dir, e.name);
-    if (e.isDirectory()) walk(full, out);
-    else if (e.isFile() && e.name.endsWith('.md')) out.push(full);
+    const kind = entryKind(full);
+    if (kind === 'dir') walk(full, out);
+    else if (kind === 'file' && e.name.endsWith('.md')) out.push(full);
   }
   return out;
 }

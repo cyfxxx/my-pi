@@ -512,3 +512,25 @@ pi-tools 依赖 `agentDir/extensions` 自动发现，my-pi 没有该目录，于
 **理由**：两项取代都减少了面（少一个 shell 模板通道、少一个常驻轮询守护进程与第三方主题密钥），能力不减；
 `notify.json`/`ntfy-relay.json` 含 token/topic（等同密钥），不进仓库反而是好事。
 **代价**：需要"同一通知发多个渠道"时要靠服务端转发或自建 webhook 汇聚；link 需先配置设备清单与 SSH 凭据。
+
+### [2026-09-25] 不信任 dirent 的 d_type：守门与目录遍历一律以 stat 为准
+**背景**：文档校订时发现 `check-doc-links.mjs` 只扫到 **79 篇** md，而树内实际有 **88 篇**。
+根因是 `readdirSync(dir, { withFileTypes: true })` 返回的 `Dirent` 在本环境的文件系统（overlayfs/沙箱）上
+**d_type 不可靠**：新建的普通文件被报成 `DT_LNK`——`isFile()` 与 `isDirectory()` 都为 `false`，
+`isSymbolicLink()` 为 `true`，而 `lstat` 明确显示是普通文件。依赖这些标志的遍历会**静默跳过**这些文件：
+当时被漏掉的有 `portable/agent/recovery/rescue-prompt.md`、`docs/operations/alacritty-tmux-setup.md`、
+4 篇技能文档与 2 篇新增 README（`autopilot/tools/`、`voice/tts/`）。
+**影响面**（审查后确认）：
+- `check-doc-links.mjs`：**已在漏扫**（链接失效不会被发现）。
+- `check-dead-exports.mjs` / `gen-registrations.mjs` / `check-patches-behavior.mjs`：同类写法，当前恰好没有
+  受影响文件，但一旦命中即**守门假绿**（死导出漏报、注册面漏登记、补丁行为标记漏检）。
+- `context/budget/output-archive.ts` 的 `sweepArchive`：被误报的归档文件**永远不会被清理**（磁盘只增不减）。
+- `plan-mode/core/plans.ts` 的 `listPlans`、`subagent/core/agents.ts` 的角色发现：会静默丢失计划/角色。
+**决策**：凡需要判断"是文件还是目录"，**以 `statSync`/`stat` 为权威**（跟随符号链接），
+不依赖 `Dirent.isFile()/isDirectory()/isSymbolicLink()`；`Dirent` 只用于取名字。
+- 守门脚本：新增本地 `entryKind(full)` 辅助（`statSync` → `'dir' | 'file' | 'other'`），四个 walker 全部改用它。
+- 运行时：`sweepArchive` 的收集、`listPlans`、`loadAgentsFromDir` 同样改为 `stat` 判定。
+**理由**：这些都是"看起来在工作"的静默失效——守门漏扫比守门不存在更危险（会给出虚假安全感），
+归档不清理则是慢性的资源泄漏。用一次 `stat` 换取确定性，代价可忽略（遍历规模都是几百个条目）。
+**验证**：`check-doc-links.mjs` 扫描数 79 → **88**（全绿，新文档链接有效）；`tsc` 通过；vitest **44 文件 514 用例**；
+`golden-tasks.sh` 全绿。

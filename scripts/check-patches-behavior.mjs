@@ -13,7 +13,7 @@
  * 用法：node scripts/check-patches-behavior.mjs
  * vendor/pi 不存在（fresh checkout）时跳过（exit 0）。
  */
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,6 +50,16 @@ function findSelfMarker(marker) {
   const base = join(VENDOR, 'packages');
   if (!existsSync(base)) return [];
   const hits = [];
+  // 目录项类型以 statSync 为准：d_type 在 overlayfs/沙箱下不可靠（实测把普通文件报成 DT_LNK），
+  // 漏扫会让"补丁行为标记"假绿。
+  const kindOf = (full) => {
+    try {
+      const st = statSync(full);
+      return st.isDirectory() ? 'dir' : st.isFile() ? 'file' : 'other';
+    } catch {
+      return 'other';
+    }
+  };
   const walk = (dir) => {
     let entries;
     try {
@@ -60,8 +70,9 @@ function findSelfMarker(marker) {
     for (const e of entries) {
       if (e.name === 'node_modules' || e.name === 'dist') continue;
       const full = join(dir, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (e.isFile() && /\.(ts|tsx)$/.test(e.name)) {
+      const kind = kindOf(full);
+      if (kind === 'dir') walk(full);
+      else if (kind === 'file' && /\.(ts|tsx)$/.test(e.name)) {
         try {
           if (readFileSync(full, 'utf-8').includes(marker)) hits.push(full.slice(VENDOR.length + 1));
         } catch {
