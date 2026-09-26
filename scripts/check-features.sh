@@ -118,9 +118,13 @@ for f in portable/agent/auth.json portable/agent/models.json; do
   fi
 done
 # 随仓库分发的资源文件：既要存在，也不能被 ignore（否则 fresh clone 会缺文件）
+# 清单对照 .gitignore 白名单维护：agents/**、modes/**、scheduled-seeds.json、injection-baseline.json
+# 均为显式放行项，缺失即分发不完整（check-seeds-headless/check-injection-surface 会因此静默跳过）。
 for f in custom/features/voice/scripts/pi-whisper.sh custom/features/voice/scripts/whisper-server.py \
          custom/features/voice/scripts/pi-sherpa.sh custom/features/voice/scripts/pi-sherpa-server.py \
-         portable/agent/recovery/rescue-prompt.md; do
+         portable/agent/recovery/rescue-prompt.md \
+         portable/agent/scheduled-seeds.json portable/agent/injection-baseline.json \
+         portable/agent/modes/roleplay.md portable/agent/agents/*.md; do
   if [ ! -f "$f" ]; then
     echo "  ❌ $f 缺失（随仓库分发的资源，功能会退化）"
     MISSING=$((MISSING + 1))

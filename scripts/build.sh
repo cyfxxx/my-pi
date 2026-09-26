@@ -60,8 +60,19 @@ fi
 
 # ── 3. vendor/pi 引导（独立 git clone，不纳入主仓库）──
 if [ ! -d "$VENDOR_PI/.git" ]; then
-  echo "📥 vendor/pi 不存在，从上游引导..."
-  rm -rf "$VENDOR_PI"
+  # 目录存在但缺少 .git = 未完成引导/损坏。不得无条件 rm -rf（可能误删手工放置的
+  # 源码或未推送改动）：非空时先备份为 .bak.<时间戳>（匹配 .gitignore 的 *.bak.*），
+  # 再保持原 clone 流程不变。
+  if [ -d "$VENDOR_PI" ]; then
+    if [ -n "$(ls -A "$VENDOR_PI" 2>/dev/null || echo READ_FAIL)" ]; then
+      BACKUP="$VENDOR_PI.bak.$(date +%Y%m%d-%H%M%S).$$"
+      echo "⚠ vendor/pi 存在但缺少 .git（引导未完成或已损坏），先备份到 $BACKUP" >&2
+      mv "$VENDOR_PI" "$BACKUP"
+    else
+      rmdir "$VENDOR_PI" 2>/dev/null || true
+    fi
+  fi
+  echo "📥 vendor/pi 缺失或未完成引导，从上游引导..."
   if ! timeout "${PI_CLONE_TIMEOUT:-600}" git clone "$UPSTREAM_URL" "$VENDOR_PI"; then
     echo "✗ clone 上游失败/超时（网络受限？）。可设 PI_UPSTREAM_URL 指向镜像。" >&2
     exit 1
@@ -149,9 +160,19 @@ else
   # doctor.sh 用它替代源码 mtime 比对（patch 应用/checkout 会 touch 源文件导致误报）。
   # dist/ 已被 vendor/pi/.gitignore 忽略，戳文件不会污染 git 状态。
   STAMP="$VENDOR_PI/packages/coding-agent/dist/.build-stamp"
+  # 先捕获 git 输出再哈希：若直接写管道，git 失败会被 sha256sum 的 exit 0 掩盖，
+  # stamp 会记录“空输入哈希”（与干净工作树同形，doctor 误判）。失败显式写 unknown。
+  if ! STAMP_HEAD="$(git -C "$VENDOR_PI" rev-parse HEAD 2>/dev/null)"; then
+    STAMP_HEAD="unknown"
+  fi
+  if ! STAMP_DIRTY="$(git -C "$VENDOR_PI" status --porcelain 2>/dev/null)"; then
+    STAMP_DIRTY_HASH="unknown"
+  else
+    STAMP_DIRTY_HASH="$(printf '%s' "$STAMP_DIRTY" | sha256sum | cut -c1-16)"
+  fi
   {
-    git -C "$VENDOR_PI" rev-parse HEAD 2>/dev/null || echo unknown
-    git -C "$VENDOR_PI" status --porcelain 2>/dev/null | sha256sum | cut -c1-16
+    printf '%s\n' "$STAMP_HEAD"
+    printf '%s\n' "$STAMP_DIRTY_HASH"
   } > "$STAMP"
   echo "✓ 构建戳：$STAMP"
 fi

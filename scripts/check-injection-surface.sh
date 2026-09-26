@@ -17,7 +17,12 @@ FILES=(
 
 hash_file() {
   local f="$ROOT/$1"
-  if [ -f "$f" ]; then sha256sum "$f" | awk '{print $1}'; else echo "missing"; fi
+  if [ -f "$f" ]; then
+    sha256sum "$f" | awk '{print $1}'
+  else
+    echo "⚠ 注入面源文件缺失: $f（该文件未纳入本次校验，门禁覆盖不完整）" >&2
+    echo "missing"
+  fi
 }
 
 combined=""
@@ -46,7 +51,7 @@ if [ "${1:-}" = "--update" ]; then
 fi
 
 if [ ! -f "$BASELINE" ]; then
-  echo "⚠ 注入面基线不存在（首次）：运行 bash scripts/check-injection-surface.sh --update 建立"
+  echo "⚠ 跳过注入面校验：基线文件缺失 $BASELINE（门禁未运行；建立: bash scripts/check-injection-surface.sh --update）" >&2
   exit 0
 fi
 

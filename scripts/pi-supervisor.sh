@@ -130,7 +130,9 @@ health_check() {
 classify_crash() {
   local crash_log="$1"
   [ -f "$crash_log" ] || { echo "external"; return; }
-  if grep -qE "50[0-9]|429|ECONNREFUSED|ETIMEDOUT|ECONNRESET|ENOTFOUND|socket hang up|rate.limit|stream interrupted|timeout.*exceeded|Upstream request failed" "$crash_log" 2>/dev/null; then
+  # 5xx/429 必须带数字边界，且后一个字符不能是字母/数字：
+  # 避免命中时长/端口/行号里的数字串（1502ms 的 502、:4290 的 429、500ms 的 500）。
+  if grep -qE "(^|[^0-9])(50[0-9]|429)([^0-9A-Za-z]|$)|ECONNREFUSED|ETIMEDOUT|ECONNRESET|ENOTFOUND|socket hang up|rate.limit|stream interrupted|timeout.*exceeded|Upstream request failed" "$crash_log" 2>/dev/null; then
     echo "transient"; return
   fi
   if grep -qE "SyntaxError|ParseError|Unexpected (reserved )?token|Cannot find module|ERR_MODULE_NOT_FOUND|does not provide an export named" "$crash_log" 2>/dev/null; then

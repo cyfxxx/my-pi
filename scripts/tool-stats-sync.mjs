@@ -32,7 +32,14 @@ const ONLY_PRUNE = args.includes('--prune');
 const ONLY_REPORT = args.includes('--report');
 const DAILY = args.includes('--daily');
 const DAYS_ARG = args.find((a) => a.startsWith('--days='));
-const RETENTION_DAYS = DAYS_ARG ? parseInt(DAYS_ARG.split('=')[1], 10) : 30;
+const RETENTION_DAYS_DEFAULT = 30;
+const DAYS_RAW = DAYS_ARG ? DAYS_ARG.slice('--days='.length) : '';
+const DAYS_PARSED = DAYS_ARG ? parseInt(DAYS_RAW, 10) : RETENTION_DAYS_DEFAULT;
+// 非法值（NaN/<=0）不能流入 cutoff 计算（NaN 会让剪枝失效并把本机计数覆写为 0）
+const RETENTION_DAYS = Number.isFinite(DAYS_PARSED) && DAYS_PARSED > 0 ? DAYS_PARSED : RETENTION_DAYS_DEFAULT;
+if (DAYS_ARG && RETENTION_DAYS !== DAYS_PARSED) {
+  console.warn(`⚠ --days=${DAYS_RAW} 无效（需为 > 0 的整数），回退默认 ${RETENTION_DAYS_DEFAULT} 天`);
+}
 
 const DEVICE = process.env.PI_DEVICE_ID || hostname() || 'host';
 const DEVICE_TAG = DEVICE.replace(/[^A-Za-z0-9._-]/g, '_');

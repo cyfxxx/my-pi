@@ -19,7 +19,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SEEDS = join(ROOT, 'portable', 'agent', 'scheduled-seeds.json');
 
 if (!existsSync(SEEDS)) {
-  console.log('⚠ 未找到 scheduled-seeds.json，跳过');
+  console.error(`⚠ 跳过 check-seeds-headless：前置文件缺失 ${SEEDS}（门禁未运行，未校验任何定时任务提示词）`);
   process.exit(0);
 }
 

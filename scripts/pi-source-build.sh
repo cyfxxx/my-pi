@@ -5,8 +5,12 @@
 # L4「源码缓存」：构建 coding-agent 后把 dist 复制到
 # portable/agent/recovery/cache/dist，作为修复损坏 dist 的“好 pi”。
 #
-# 用法：bash scripts/pi-source-build.sh [--force] [--no-build]
+# 用法：bash scripts/pi-source-build.sh [--no-build]
 #   --no-build  跳过 scripts/build.sh（仅把现有 dist 缓存为“好 pi”，供 build.sh --cache 复用）
+#
+# 注：旧版 usage 曾声明 [--force]，但默认路径即执行完整重建（DO_BUILD=1），脚本中
+# 不存在“命中缓存就跳过”的分支，--force 无独立语义；为避免“传了没效果”的误导，
+# 已从 usage 移除。若未来引入构建产物复用，可在此实现 --force 强制重建。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,7 +19,10 @@ DIST="$VENDOR/packages/coding-agent/dist"
 CACHE="$ROOT/portable/agent/recovery/cache"
 DO_BUILD=1
 for arg in "$@"; do
-  [ "$arg" = "--no-build" ] && DO_BUILD=0
+  case "$arg" in
+    --no-build) DO_BUILD=0 ;;
+    *) echo "⚠ 未知参数: $arg（已忽略；可用参数: --no-build）" >&2 ;;
+  esac
 done
 
 ok() { echo "  ✓ $1"; }
