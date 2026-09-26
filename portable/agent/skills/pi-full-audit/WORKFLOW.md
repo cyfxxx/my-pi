@@ -55,7 +55,8 @@ bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
 **委派 prompt 要点**：
 - 明确角色与只读："以 scout 角色只读审查，不修改任何文件"
 - 明确维度：正确性/安全/资源/并发与状态/回归影响/可维护性/架构边界
-- **输出精简约束**："只列问题，每条 文件:行号 + 一句话描述 + 级别（HIGH/MEDIUM/LOW），LOW 最多 5 条；总输出控制在 2500 字内"
+- **输出精简约束**：“只列问题，每条 文件:行号 + 一句话描述 + 级别（HIGH/MEDIUM/LOW），LOW 最多 5 条；总输出控制在 2500 字内”
+- **scout 实际无 bash（实测）**：scout 角色不能执行命令（定义含 bash 但被 readonly 屏蔽），委派 scout 只做读码级核实；需 git log/实测的验证直接交主会话或 reviewer 角色
 
 ## 第 4 步：复核子代理逐条核实（防过度自信，必做）
 

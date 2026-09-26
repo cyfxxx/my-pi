@@ -193,7 +193,7 @@ bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
 | 阶段 | 内容 | 失败定性 |
 |------|------|----------|
 | A | git 卫生：空白错误、vendor/pi 只读、portable 运行时数据误入库、大文件/二进制 | 误入库=HIGH；vendor/pi 改动=HIGH |
-| A2 | 密钥/凭据模式（脱敏，仅报位置） | 被跟踪才算 HIGH；gitignore 的本地配置属正常 |
+| A2 | 密钥/凭据模式（脱敏，仅报位置） | 被跟踪才算 HIGH；gitignore 的本地配置属正常；`portable/agent/auth.json`、`recovery/cache/` 构建产物等运行时数据命中一律按噪音跳过（单次可达 22 项，信噪比极低） |
 | B | JSON 合法性 + Shell 语法 | 语法错误=HIGH |
 | C | 隔离边界 `npm run check` | 违规=HIGH |
 | D | 类型检查 `npx tsc --noEmit -p custom/` | 类型错误=HIGH |
