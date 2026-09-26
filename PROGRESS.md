@@ -1038,3 +1038,20 @@ DSH 相比明显异常（本机 ¥8.04 / 544 请求 / 42.3M tokens vs DSH ¥18.0
   "上一条注入"（注入追加在轮末，故通常即上一次请求尾部 → 便宜），**并非每次都在头部**；
   只有会话首次刷新因上一条注入落在第 3 条消息（头部）而整段失效一次（实测 $0.029/会话）。
   故不修改，仅订正注释与文档（`recall/inject.ts`、`context/README.md`）。
+
+## 关闭工具按需加载，全部工具常驻（第 59 批，2026-09-26）
+
+承接第 58 批的成本归因：工具 schema 在请求最前处，`enable_tool` 一改工具列表就整段断缓存
+（实测 3 次：11:50 启用组 $0.0107、12:41 启用组 $0.0361、12:52 重启后重新启用 $0.0752），
+且启用状态是进程内存态、重启复位 → 每次重启都要再付一次。
+
+- **开关**：`custom/features/context/budget/task-gate.ts` 新增 `TOOL_LAYERING`（`PI_CONTEXT_TOOL_LAYERING=on`
+  才启用），默认 **off = 全部工具常驻**；`tool-groups.ts` 新增纯函数 `effectiveActiveTools(names, enabled, layered)`。
+- **接线**：`applyToolLayering` 按开关下发；`dormantToolsActive` 关闭时恒 false（不再回调）；`enableGroup`
+  关闭时直接说明"无需启用"；`buildToolsReport`/`/tools` 汇报"全部常驻"；`enable_tool` 描述与 `/tools`
+  补全项按开关生成；休眠组摘要不再注入易变提示（避免误导模型去 enable）。
+- **盈亏平衡（保守上限）**：休眠 schema 按 20K token、上下文 250K 估，常驻 100 请求 ≈ 20K×0.003/M×100
+  = **$0.006**；一次中途 enable = 250K×0.15/M = **$0.0375** → 一次 enable 即抵消整场会话的常驻成本。
+- **验证**：tsc 通过；vitest 全绿（新增 `effectiveActiveTools` 4 例 + `TOOL_LAYERING` 3 例）；
+  注入面基线已 `--update` 刷新（`portable/agent/AGENTS.md` 的 `web_fetch` 不再要求 `enable_tool`）；
+  `golden-tasks.sh` 全量通过。

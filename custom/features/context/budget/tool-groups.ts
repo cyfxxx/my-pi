@@ -6,7 +6,13 @@
  * 方案：核心工具 schema 常驻；休眠工具组不注入 schema，仅在 system prompt
  * 保留一行简介，需要时由模型调用 `enable_tool("<组名>")` 启用（本会话内保持）。
  *
- * 关键约束：
+ * 现状（2026-09-26 成本审计后）：**按需加载默认关闭**（`TOOL_LAYERING`，见 task-gate.ts），
+ * **全部工具常驻**。工具 schema 在请求最前处，会话中途 `enable_tool` 会让整段前缀缓存失效
+ * （实测单次 $0.01–0.04，且重启后分层复位需再次 enable）；而休眠组 schema 常驻只按命中价
+ * （1/50）计费，一次中途 enable 的成本就超过一整场会话的常驻成本。分组定义保留，
+ * `PI_CONTEXT_TOOL_LAYERING=on` 可恢复旧行为。
+ *
+ * 关键约束（仅在按需加载开启时适用）：
  * 1. 工具 schema 是 API 请求级状态，enable_tool 是唯一入口（改 setActiveTools）。
  * 2. 工具列表变化 = 前缀缓存断裂；enable 是低频显式操作，禁止每轮动态启停。
  * 3. 启用状态是进程内存态，重启恢复默认分层。
@@ -177,4 +183,18 @@ export function computeActiveTools(
   const excluded = SLEEPING_GROUPS.filter((g) => !enabledGroups.has(g.name)).flatMap((g) => g.tools);
   const excludedSet = new Set(excluded);
   return allToolNames.filter((n) => !excludedSet.has(n));
+}
+
+/**
+ * 按开关取实际活动工具集（纯函数，供测试与 tool-layering 共用）。
+ * `layered=false`（默认）→ 全部工具常驻：不做休眠裁剪，`enable_tool` 成为无操作。
+ * 理由见 `task-gate.ts` 的 `TOOL_LAYERING`：休眠组 schema 常驻只花命中价，
+ * 而中途 enable 会让整段前缀缓存失效，一次就比一整场会话的常驻成本贵。
+ */
+export function effectiveActiveTools(
+  allToolNames: string[],
+  enabledGroups: ReadonlySet<string>,
+  layered: boolean,
+): string[] {
+  return layered ? computeActiveTools(allToolNames, enabledGroups) : [...allToolNames];
 }

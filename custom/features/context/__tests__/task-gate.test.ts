@@ -183,3 +183,33 @@ describe('PER_TURN_ERASE（每轮历史擦除开关）', () => {
     }
   });
 });
+
+describe('TOOL_LAYERING（工具按需加载开关）', () => {
+  afterEach(() => {
+    delete process.env.PI_CONTEXT_TOOL_LAYERING;
+    vi.resetModules();
+  });
+
+  it('默认关闭：全部工具常驻（中途 enable 会整段断缓存，得不偿失）', async () => {
+    delete process.env.PI_CONTEXT_TOOL_LAYERING;
+    vi.resetModules();
+    const mod = await import('../budget/task-gate');
+    expect(mod.TOOL_LAYERING).toBe(false);
+  });
+
+  it('PI_CONTEXT_TOOL_LAYERING=on 才恢复休眠分层', async () => {
+    process.env.PI_CONTEXT_TOOL_LAYERING = 'on';
+    vi.resetModules();
+    const mod = await import('../budget/task-gate');
+    expect(mod.TOOL_LAYERING).toBe(true);
+  });
+
+  it('其它取值不启用，避免误开', async () => {
+    for (const v of ['1', 'true', 'yes']) {
+      process.env.PI_CONTEXT_TOOL_LAYERING = v;
+      vi.resetModules();
+      const mod = await import('../budget/task-gate');
+      expect(mod.TOOL_LAYERING, `PI_CONTEXT_TOOL_LAYERING=${v} 不应启用`).toBe(false);
+    }
+  });
+});

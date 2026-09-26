@@ -57,7 +57,7 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存�
 ## 网络搜索（三级通路）
 
 - `web_search`：走可配置的 SearXNG 端点（`SEARXNG_URL`/`PI_WEB_TOOLKIT_SEARXNG_URL` > `settings.json` 的 `pi-web-search.searxng_url` > 本地 `http://127.0.0.1:8889`）；不可达/无结果时自动降级 `searchDirect`（Bing）。
-- `web_fetch`：免 SearXNG 的 Bing 直搜（休眠组 `web-fallback`，需 `enable_tool("web-fallback")`）。
+- `web_fetch`：免 SearXNG 的 Bing 直搜（属休眠组 `web-fallback`；工具已默认全部常驻，直接调用即可）。
 - `fetch_url`：轻量 HTTP GET（仅公网 http/https，拒绝内网/回环）。
 - **SearXNG 引擎配置是常见坑**：默认启用 google/duckduckgo/brave/wikipedia 等被封锁引擎会全部 timeout 并拖垮整次搜索。用 `bash scripts/searxng-config.sh --force` 生成只启可达引擎（baidu/bing/sogou/360search/bilibili/yandex/stackoverflow/github）且 bing 指向 `cn.bing.com` 的配置。
 - 超时默认 30s（`pi-web-search.search_timeout`），因本地多引擎聚合常需 10s+。

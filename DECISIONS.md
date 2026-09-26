@@ -592,3 +592,23 @@ pi 永远以空参启动（新建会话）。原项目 `pi-wrapper.sh` 是在启
 确实丢失 `--session`，已验证测试会失败）。
 **验证**：`bash scripts/test-supervisor.sh` 44 项通过（原 29 项）；`tsc` 通过；vitest 全绿
 （新增 `restart-log.test.ts` 4 例，覆盖 supervisor 清 action 后 restartLog 仍可消费的跨语言契约）。
+
+### [2026-09-26] 关闭工具按需加载，全部工具常驻
+**背景**：承接同日"每轮历史擦除默认关闭"。工具 schema 位于请求**最前处**，`enable_tool` 一改
+工具列表就让整段前缀缓存失效。实测 `2026-09-26T11-31-12` 会话：3 次工具集变化（11:50 启用组、
+12:41 启用组、12:52 重启后重新启用）分别造成 $0.0107、$0.0361、$0.0382+$0.0370 的冷缓存请求；
+且启用状态是**进程内存态**，重启即复位，等于每次重启都要再付一次。
+**选项**：
+1. 保持休眠分层（省 schema token，但每会话付 1–3 次整段重算）
+2. 关闭按需加载，全部工具常驻
+3. 常驻但保留 enable_tool 供极端场景
+**决策**：选项 2+3：`applyToolLayering` 默认下发全部工具（`TOOL_LAYERING=off`），
+`enable_tool` 保留注册但为无操作、`/tools` 汇报"全部常驻"，`PI_CONTEXT_TOOL_LAYERING=on`
+可恢复旧行为。休眠组摘要不再注入易变提示（否则会误导模型去 enable）。
+**理由**：这是一次**成本口径反转**——分层优化的是"token 数量"，而按 1/50 的命中价计费，
+常驻 schema 的开销几乎为零：保守上限（休眠 schema 20K token、上下文 250K、100 请求）
+常驻成本 ≈ 20K×0.003/M×100 = **$0.006**，而一次中途 enable 就是 250K×0.15/M = **$0.0375**，
+即一次 enable 就抵消整场会话的常驻成本（约 6 倍）。此外还消除了"忘了启用导致功能不可用"的失败模式。
+**验证**：tsc 通过；vitest 全绿（新增 `effectiveActiveTools` 4 例、`TOOL_LAYERING` 3 例）；
+`check-injection-surface.sh --update` 刷新（AGENTS.md 的 `web_fetch` 说明不再要求 enable）；
+`golden-tasks.sh` 全量通过。

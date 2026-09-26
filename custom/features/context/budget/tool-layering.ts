@@ -10,22 +10,24 @@ import { getAllToolNames, getActiveTools, setActiveTools } from '../../../adapte
 import {
   CORE_TOOLS,
   SLEEPING_GROUPS,
-  computeActiveTools,
+  effectiveActiveTools,
   buildSleepingSummary,
   groupsWithTools,
 } from './tool-groups';
+import { TOOL_LAYERING } from './task-gate';
 
-/** 已启用工具组（进程内存态，重启恢复默认分层） */
+/** 已启用工具组（进程内存态；仅在 TOOL_LAYERING=on 时参与裁剪） */
 export const enabledGroups = new Set<string>();
 
-/** 应用工具分层：全部注册工具减去未启用休眠组的工具 */
+/** 应用工具集：按需加载开启时裁掉未启用休眠组，默认（关闭）全部工具常驻 */
 export function applyToolLayering(pi: PiApi): void {
   const all = getAllToolNames(pi);
-  setActiveTools(pi, computeActiveTools(all, enabledGroups));
+  setActiveTools(pi, effectiveActiveTools(all, enabledGroups, TOOL_LAYERING));
 }
 
 /** 是否存在"已启用但处于休眠名单"的工具（用于计划模式退出等场景自愈） */
 export function dormantToolsActive(pi: PiApi): boolean {
+  if (!TOOL_LAYERING) return false; // 全部常驻时不存在"休眠工具"，也无需自愈回调
   const current = new Set(getActiveTools(pi));
   return SLEEPING_GROUPS.some((g) => !enabledGroups.has(g.name) && g.tools.some((t) => current.has(t)));
 }
@@ -37,6 +39,14 @@ function presentToolSet(pi: PiApi): Set<string> {
 
 /** 启用某个休眠组，返回结果说明（只允许启用"当前有已注册工具"的组） */
 export function enableGroup(pi: PiApi, name: string): { ok: boolean; message: string } {
+  if (!TOOL_LAYERING) {
+    return {
+      ok: false,
+      message:
+        '工具按需加载已关闭（默认）：全部工具 schema 常驻，无需启用任何组。' +
+        '如需恢复休眠分层，设 PI_CONTEXT_TOOL_LAYERING=on 后重启。',
+    };
+  }
   const group = SLEEPING_GROUPS.find((g) => g.name === name);
   if (!group) {
     const available = groupsWithTools(presentToolSet(pi)).map((g) => g.name);
@@ -62,6 +72,14 @@ export function enableGroup(pi: PiApi, name: string): { ok: boolean; message: st
 export function buildToolsReport(pi: PiApi): string {
   const present = presentToolSet(pi);
   const active = new Set(getActiveTools(pi));
+  if (!TOOL_LAYERING) {
+    return [
+      '## 工具状态：全部常驻（按需加载已关闭）',
+      `已注册工具全部活动: ${active.size} 个`,
+      `分组定义仍保留 ${groupsWithTools(present).length} 个（休眠名单不生效）；`,
+      '恢复休眠分层：设 PI_CONTEXT_TOOL_LAYERING=on 后重启。',
+    ].join('\n');
+  }
   const core = CORE_TOOLS.filter((t) => present.has(t));
   const groups = groupsWithTools(present);
   const lines = ['## 工具分层状态'];

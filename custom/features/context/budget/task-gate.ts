@@ -56,6 +56,21 @@ export const PRUNE_MINIMUM = envNum('PI_CONTEXT_PRUNE_MINIMUM_TOKENS', DEFAULT_P
 export const KEEP_THINKING_TOKENS = envNum('PI_CONTEXT_KEEP_THINKING_TOKENS', DEFAULT_KEEP_THINKING_TOKENS);
 
 /**
+ * 工具按需加载（休眠分层）开关：`PI_CONTEXT_TOOL_LAYERING=on` 启用；**默认 off = 全部工具常驻**。
+ *
+ * 权衡（2026-09-26 成本审计）：工具 schema 位于请求最前处，会话中途 `enable_tool` 改变工具列表
+ * 会让**整段**前缀缓存失效（实测单次 $0.01–0.04；重启后分层复位，需再次 enable 再付一次）。
+ * 反过来，让休眠组 schema 常驻的代价是固定的 token：命中时只按 1/50 价计费。
+ *
+ * 盈亏平衡（保守上限）：设休眠组 schema 共 N token，每次 enable 的代价是上下文的 S×$0.15/M。
+ *   N=20K、S=250K 时：常驻 100 个请求共 20K×0.003/M×100 = $0.006；
+ *   一次中途 enable 就要 250K×0.15/M = $0.0375。
+ * 即**一次**中途 enable 就足以抵消整场会话的常驻成本（约 6 倍），且省掉"忘了启用"的失败模式。
+ * 只有"从不使用休眠组、且会话极长"的场景才需要重新打开。
+ */
+export const TOOL_LAYERING = process.env.PI_CONTEXT_TOOL_LAYERING === 'on';
+
+/**
  * 每轮历史擦除开关（PI_CONTEXT_ERASE=on 启用；默认 off）。
  *
  * 成本审计（2026-09-26，真实会话：105 请求 / 约 250K 上下文 / 自动压缩 1 次）：

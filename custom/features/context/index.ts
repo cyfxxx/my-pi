@@ -72,6 +72,7 @@ import {
   PRUNE_MINIMUM,
   KEEP_THINKING_TOKENS,
   PER_TURN_ERASE,
+  TOOL_LAYERING,
   readEnvRatio,
   resolveContext,
   hasBackgroundTask,
@@ -203,15 +204,17 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // 注册工具：enable_tool —— 启用休眠工具组（本会话内保持）
+  // 注册工具：enable_tool —— 仅在按需加载开启时有意义（默认全部常驻，见 TOOL_LAYERING）
   registerTool(pi, {
     name: 'enable_tool',
-    description: `启用休眠工具组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）。启用后工具列表更新一次（前缀缓存重算），本会话内保持，重启恢复默认；已启用组再次启用无副作用。`,
+    description: TOOL_LAYERING
+      ? `启用休眠工具组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）。启用后工具列表更新一次（前缀缓存重算），本会话内保持，重启恢复默认；已启用组再次启用无副作用。`
+      : '工具按需加载已关闭（默认）：全部工具 schema 已常驻，无需调用本工具。',
     parameters: {
       group: {
         type: 'string',
         enum: SLEEPING_GROUPS.map((g) => g.name),
-        description: '要启用的休眠工具组名',
+        description: '要启用的休眠工具组名（按需加载关闭时无操作）',
       },
     },
     execute: async (args) => {
@@ -245,19 +248,19 @@ export function register(pi: ExtensionAPI): void {
 
   // 注册命令：/tools - 工具分层管理（list / enable <组> / help）
   registerCommand(pi, 'tools', {
-    description: '工具分层：list 查看分组/状态，enable <组> 启用休眠组',
+    description: '工具状态：list 查看分组/状态；按需加载开启时 enable <组> 可启用休眠组',
     getArgumentCompletions: (prefix) => {
       const trimmed = prefix.trim();
       const first = trimmed.split(/\s+/)[0] ?? '';
       if (!trimmed.includes(' ')) {
         const items = [
           { value: 'list', label: 'list - 查看分组/状态' },
-          { value: 'enable ', label: 'enable - 启用休眠组' },
+          ...(TOOL_LAYERING ? [{ value: 'enable ', label: 'enable - 启用休眠组' }] : []),
           { value: 'help', label: 'help - 显示用法' },
         ];
         return filterCompletions(items, first) || null;
       }
-      if (first === 'enable') {
+      if (first === 'enable' && TOOL_LAYERING) {
         const arg = trimmed.split(/\s+/)[1] ?? '';
         return groupsWithTools(new Set(getAllToolNames(pi)))
           .filter((g) => g.name.startsWith(arg))
@@ -277,14 +280,20 @@ export function register(pi: ExtensionAPI): void {
         return;
       }
       if (cmd === 'help') {
+        const enableLine = TOOL_LAYERING
+          ? `  enable <组>   启用休眠组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）\n`
+          : '  （按需加载已关闭：全部工具常驻，enable 无操作）\n';
         ctx.ui.notify(
-          `工具分层命令:\n\n用法: /tools <子命令>\n\n子命令:\n  list          查看分组/状态\n  enable <组>   启用休眠组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）\n  help          显示此帮助`,
+          `工具命令:\n\n用法: /tools <子命令>\n\n子命令:\n  list          查看分组/状态\n${enableLine}  help          显示此帮助`,
           'info',
         );
         return;
       }
       const report = buildToolsReport(pi);
-      ctx.ui.notify(`tools: ${SLEEPING_GROUPS.length} 个休眠组`, 'info');
+      ctx.ui.notify(
+        TOOL_LAYERING ? `tools: ${SLEEPING_GROUPS.length} 个休眠组` : 'tools: 全部工具常驻',
+        'info',
+      );
       sendMessage(pi, { customType: 'tools-report', content: report, display: true }, { triggerTurn: false });
     },
   });
@@ -350,7 +359,12 @@ export function register(pi: ExtensionAPI): void {
       // 它们位于前缀最前处，一旦变化就是整段缓存失效（实测单次 170K–316K 全价重算）。
       // 改为"内容变化时才追加一条消息"（append-only，不删除旧的）：变化点落在尾部，
       // 只影响其后的少量 token。对齐 DSH 的 change-only volatile context 做法。
-      const volatileText = [advice, buildSleepingSummary(new Set(getAllToolNames(pi))), restartHint]
+      // 休眠组摘要只在按需加载开启时出现：默认全部工具常驻，列休眠组只会误导模型。
+      const volatileText = [
+        advice,
+        TOOL_LAYERING ? buildSleepingSummary(new Set(getAllToolNames(pi))) : '',
+        restartHint,
+      ]
         .filter(Boolean)
         .join('\n\n');
       let message: { customType: string; content: string; display: boolean } | undefined;

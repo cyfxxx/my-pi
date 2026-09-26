@@ -5,9 +5,17 @@
 
 ## 注册面
 
-- 工具：`enable_tool`、`thinking_level`
+- 工具：`enable_tool`（按需加载默认关闭，此时恒为无操作）、`thinking_level`
 - 命令：`/context <usage|report|fingerprint|help>`、`/tools <list|enable <组>|help>`
 - 钩子：`session_start`、`before_agent_start`、`input`、`turn_start`、`context`、`tool_call`、`tool_result`、`message_update`、`turn_end`、`before_provider_request`（前缀指纹）、`session_compact`、`session_before_compact`（快照）、`agent_settled`
+
+## 工具常驻策略（2026-09-26 起默认常驻）
+
+全部工具 schema 常驻，不做休眠裁剪：工具 schema 位于请求最前处，会话中途 `enable_tool`
+改一次工具列表就让**整段**前缀缓存失效（实测单次 $0.01–0.04，重启后分层复位还需再 enable 一次）；
+而让休眠组 schema 常驻只按命中价（1/50）计费——按保守上限（休眠 schema 20K token、上下文 250K）
+算，常驻 100 个请求共约 $0.006，一次中途 enable 就是 $0.0375。分组定义与 `/tools`、`enable_tool`
+仍保留以便回溯，`PI_CONTEXT_TOOL_LAYERING=on` 可恢复休眠分层。
 
 ## 文件
 
@@ -62,7 +70,8 @@
 - **system prompt 只追加静态常量** `EFFICIENCY_ADVICE`。易变运行时提示（压力档文案、休眠工具摘要、
   重启提示）**不再写入 system prompt**，而是在 `before_agent_start` 以 `my-pi-context-advice` 消息
   **仅在内容变化时追加**（append-only，不删除旧的）：变化点落在尾部，只影响其后的少量 token，
-  避免"前缀最前处变化 → 整段缓存失效"（实测单次 170K–316K 全价重算）。
+  避免"前缀最前处变化 → 整段缓存失效"（实测单次 170K–316K 全价重算）。其中**休眠组摘要只在
+  `PI_CONTEXT_TOOL_LAYERING=on` 时出现**——默认全部工具常驻，再列"休眠组"只会误导模型去 enable。
 - 记忆注入同理（`shouldInjectMemory`：内容未变不重插；**原项目 `pi-tools` 每轮都重插，无去抖**，
   my-pi 是更省的那一侧）。移除旧注入的位移点是**上一条注入的位置**（注入总追加在轮末，故通常就是
   上一次请求的尾部 → 只影响尾部少量 token）；唯一例外是会话中的**首次**刷新：上一条注入还是第 1 轮
@@ -80,7 +89,7 @@
 
 ## 关键环境变量
 
-`PI_CONTEXT_THINKING_AUTO=off`（关自动切档）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_ERASE=on`（开每轮擦除，默认关）、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
+`PI_CONTEXT_THINKING_AUTO=off`（关自动切档）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_ERASE=on`（开每轮擦除，默认关）、`PI_CONTEXT_TOOL_LAYERING=on`（开休眠分层，默认关=全部工具常驻）、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
 
 ## 确定性擦除（零 LLM 成本，默认关闭）
 

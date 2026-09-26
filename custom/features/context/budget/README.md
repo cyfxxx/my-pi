@@ -34,6 +34,7 @@
 | 空闲判定 | 关闭（0） | `PI_CONTEXT_IDLE_MS` |
 | 任务门总开关 | 开 | `PI_CONTEXT_TASK_GATE=off` |
 | 每轮擦除总开关 | **关** | `PI_CONTEXT_ERASE=on` |
+| 工具按需加载 | **关**（全部常驻） | `PI_CONTEXT_TOOL_LAYERING=on` |
 | 工具擦除保护带 | 60K | `PI_CONTEXT_PRUNE_PROTECT_TOKENS` |
 | 工具擦除最小回收 | 30K | `PI_CONTEXT_PRUNE_MINIMUM_TOKENS` |
 | thinking 保留量 | 64K | `PI_CONTEXT_KEEP_THINKING_TOKENS` |
@@ -55,7 +56,10 @@
   消息 append-only 追加（仅在内容变化时），避免前缀最前处变动导致整段缓存失效。
 - 禁止时间戳/精确数值进入注入面；token 估算统一走 `estimateTokens`。
 - 缓存断裂归因用 `prefix-fingerprint.ts`（记录到 `portable/memory/logs/prefix-fingerprints.jsonl`，`/context fingerprint` 查看）。
-  已知断裂源按代价排序：每轮擦除（已关闭）> 会话中途 `enable_tool` 改工具集 > system prompt 变化 > 记忆注入刷新。
+  已知断裂源按代价排序：每轮擦除（已关闭）> 会话中途 `enable_tool` 改工具集（已关闭：全部常驻）> system prompt 变化 > 记忆注入首次刷新。
+- **工具 schema 常驻 vs 休眠分层**：schema 在请求最前处，会话中途 enable 一次 = 整段重算（实测 $0.01–0.04，
+  重启后还要再 enable）；休眠组常驻只按命中价计费，一次 enable 的成本就超过整场会话的常驻成本。
+  故默认全部常驻（`TOOL_LAYERING=off`），分组定义保留但 `enable_tool` 无操作。
 
 ## 已知限制：warm-prefix 是死代码
 
