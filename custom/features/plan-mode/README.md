@@ -20,7 +20,7 @@
 
 ## 状态与数据
 
-- 任务状态在**进程内**（`core/store.ts` 的模块级 state，`getState`/`commitState`）；不落盘。
+- 任务状态以**进程内**为准（`core/store.ts` 的模块级 state，`getState`/`commitState`）；任务变化时经 `index.ts` 的 `syncPlanToFile` 落盘到 `<memoryDir>/plans/plan-<ts>/plan.md`（写盘由 `core/plans.ts` 承担），启动时由 `restoreStateFromPlans` 恢复最近的未完成计划（`cleanupOldPlans` 只留最近 20 份）。
 - `ui/view.ts` 提供 `renderPlanFile`/`parsePlanFile` 序列化工具（供往返/持久化复用）。
 - subagent 运行时若发现 `portable/memory/plans/<plan>/plan.md` 会作为「活跃计划」并入子代理提示词。
 

@@ -27,7 +27,7 @@
 
 | 路径 | 内容 | 覆盖变量 |
 |------|------|----------|
-| `pi-link-config.json` | 设备清单（名称/地址/密钥） | `PI_LINK_CONFIG` |
+| `pi-link.json` | 设备清单（名称/地址/密钥） | `PI_LINK_CONFIG` |
 | `pi-link-state.json` / `pi-link-active.json` / `pi-link-outbox.json` | 运行时状态 | `PI_LINK_STATE_DIR` |
 | `PI_UNATTENDED` | 无人值守标记（影响主动发送） | — |
 

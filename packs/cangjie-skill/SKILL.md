@@ -17,7 +17,7 @@ description: Distill a book, long-video transcript, podcast, course, or intervie
 
 ## 核心方法论: RIA-TV++
 
-一个五阶段 + 并行提取 + 三重验证 + darwin 兼容测试的流水线。详见 `methodology/00-overview.md`。
+一个七阶段节点（0/1/1.5/2/3/4/5）+ 并行提取 + 三重验证 + darwin 兼容测试的流水线。详见 `methodology/00-overview.md`。
 
 ```
 阶段 0: Adler 整书理解     → BOOK_OVERVIEW.md

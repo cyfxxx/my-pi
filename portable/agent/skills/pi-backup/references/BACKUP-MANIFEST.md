@@ -17,7 +17,7 @@
 | 跟踪配置 | `portable/agent/APPEND_SYSTEM.md` | 追加系统提示词 |
 | 跟踪配置 | `portable/agent/keybindings.json` | pi 用户级键位配置 |
 | 技能 | `portable/agent/skills/*/` | 所有已安装技能（SKILL.md 及附属文件，如 `references/`） |
-| 记忆笔记 | `portable/memory/notes.json` | note-store 持久记忆数据（gitignore，**必须靠归档带走**） |
+| 记忆笔记 | `portable/memory/notes.json` | 持久记忆数据（gitignore，**必须靠归档带走**） |
 | 仓库入口 | `my-pi.sh` | 便携启动脚本（解析仓库根 + 加载 `custom/bootstrap.ts`） |
 | 仓库配置 | `package.json`、`package-lock.json`、`vitest.config.ts`、`.npmrc`、`.gitattributes` | 依赖声明 / 测试配置 / 仓库级属性 |
 | 仓库配置 | `.gitignore` | git 忽略规则（含 `portable/agent/*`、`vendor/pi/` 排除规则） |

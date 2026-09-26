@@ -30,7 +30,7 @@
 
 ## 数据落点
 
-功能自身只写 `portable/memory/`（经 `core/config.getMemoryDir`）；Pi 的配置/会话/技能在 `portable/agent/`。
+功能数据多数写 `portable/memory/`（经 `core/config.getMemoryDir`）；`autopilot`/`link`/`voice` 等的配置与状态写 `portable/agent/`（经 `getAgentDir`）。Pi 的配置/会话/技能也在 `portable/agent/`。
 运行时数据不入库（见根 `.gitignore`）。
 
 ## 校验

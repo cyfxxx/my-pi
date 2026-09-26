@@ -4,7 +4,8 @@
  * pi 的扩展约定：模块必须**默认导出**一个工厂函数 `(pi) => void | Promise<void>`，
  * pi 加载扩展时调用它（见 vendor/pi loader.ts 的 `jiti.import(path, { default: true })`）。
  *
- * 职责：只做组装——把 FEATURES 交给 registry 注册到 pi。
+ * 职责：只做组装——解析启动模式（写 `PI_AGENT_MODE`/`PI_MEMORY_NAMESPACE` 环境变量、按模式过滤功能），
+ * 并把 FEATURES 交给 registry 注册到 pi。
  * 约束：
  *   - 会话、配置目录、模型等由 pi 自身管理，扩展不创建 session
  *   - 每个功能的注册都通过 registry；此处不直接调用 feature 内部实现

@@ -40,7 +40,7 @@
 │   ├── RULES-kali.md
 │   └── README-kali.md
 ├── RULES.md                   # Windows 版规则
-└── Readme.md                  # Windows 版说明
+└── README.md                  # Windows 版说明
 ```
 
 

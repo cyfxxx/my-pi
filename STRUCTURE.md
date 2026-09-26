@@ -69,7 +69,7 @@ my-pi 的自定义代码。三层结构：
   - `extensions/`：第三方扩展目录（`agentDir/extensions` 自动发现，放 `<name>/index.ts` 即生效）
   - `npm/`、`git/`：`./my-pi.sh install` 安装的 npm / git 扩展包（来源记入 `settings.json` 的 `packages`）
   - `auth.json`、`models.json`、`models-store.json`、`trust.json`、`pi-link-*.json`：每环境独立、不入库（`modes.json`、`scheduled-seeds.json` 已白名单入库）
-- `memory/`：my-pi 自定义功能的数据（note-store 的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
+- `memory/`：my-pi 自定义功能的数据（memory 功能的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
 
 `my-pi.sh` / `scripts/dev.sh` 只导出 `PI_CODING_AGENT_DIR`（pi 识别）与 `PI_MEMORY_DIR`（`custom/` 识别）；项目根不再有 `.pi/` 目录。
 
@@ -132,7 +132,7 @@ my-pi 的自定义代码。三层结构：
 my-pi.sh
   ↓ 设置环境变量
 PI_CODING_AGENT_DIR=portable/agent   # pi 识别（agentDir：技能/会话/扩展都在其下）
-PI_MEMORY_DIR=portable/memory         # custom/ 的 note-store 识别
+PI_MEMORY_DIR=portable/memory         # custom/ 识别（core/config.ts 的 getMemoryDir）
   ↓ 启动
 vendor/pi/packages/coding-agent/dist/cli.js
   ↓ 加载

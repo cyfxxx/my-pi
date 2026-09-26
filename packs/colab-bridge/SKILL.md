@@ -17,8 +17,7 @@ description: 把 Google Colab（免费 GPU）作为 pi 的远程 Python/GPU 执�
 colab-bridge/
 ├── colab/colab-bridge.ipynb   # Colab 专用 notebook：内嵌桥接服务 + 隧道 + 自检，上传即用
 ├── colab/colab_bridge.py      # 桥接服务源码（notebook 内嵌同一份；可单独部署）
-├── bin/colab_exec             # pi 侧 CLI（python3，stdlib only）
-└── README.md
+└── bin/colab_exec             # pi 侧 CLI（python3，stdlib only）
 ```
 
 ## 使用流程（一次配置）

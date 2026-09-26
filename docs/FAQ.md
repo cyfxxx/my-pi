@@ -167,7 +167,7 @@ subagent、tmux、voice、web-search。
 
 ### Q: 记忆数据在哪里？
 
-`portable/memory/notes.json`（note-store 持久记忆，gitignore，必须靠归档带走）。
+`portable/memory/notes.json`（memory 功能的持久笔记，gitignore，必须靠归档带走）。
 笔记由 memory 功能在会话中自动维护，并在会话启动时报告统计。
 
 ### Q: 如何导出记忆？

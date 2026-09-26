@@ -185,11 +185,12 @@ pi-tools `scripts/rebuild.sh`（1497 行）拆分为 my-pi 的
   未移植；my-pi 自家 provider 返回 `{value:string}`，风险低。
 - 上游 `pi-whisper.service`、SearXNG `stop` 能力、Termux 前置脚本、tmux.conf 自动同步、
   pi-link `authorized_keys` 安装、工具统计 post-merge 钩子、CI（`.github/workflows/ci.yml` 已删）
-  与 `pi-bench`/`test-recovery` 等度量脚本缺失——多数被 my-pi 的本地守门/新架构取代，
-  但 **`pi-supervisor.sh` 目前零测试**，且冒烟由 9 域缩为 1 条（`golden-tasks.sh --smoke`）。
+  与 `pi-bench`/`test-recovery` 等度量脚本缺失——多数被 my-pi 的本地守门/新架构取代。
+  ✅ 已解决（2026-09-25）：补了 `scripts/test-supervisor.sh`（29 项）并接入 golden 第 10 步；
+  冒烟仍为 1 条（`golden-tasks.sh --smoke`），属有意裁剪（完整覆盖由 golden 全量承担）。
 - **Windows 单目录便携部署**（`portable/start.ps1|.bat`、`portable/bin/*.ps1|.js`、`tools/tmux/tmux.cmd`、
-  `ca-bundle.crt`）随 `portable/` 改作运行时数据而被移除，但**在任何决策文档中都未记录**，
-  属未记录的偏离；建议补一条 DECISIONS 说明。
+  `ca-bundle.crt`）随 `portable/` 改作运行时数据而被移除。
+  ✅ 已解决（2026-09-25）：平台范围已记入 DECISIONS「平台范围：Linux/Termux 为主，Windows 原生便携部署不再支持」。
 
 ### G8（P3，文档陈旧）
 
@@ -266,7 +267,7 @@ pi-tools `scripts/rebuild.sh`（1497 行）拆分为 my-pi 的
 ```
 bash scripts/golden-tasks.sh
   ✓ 1 隔离边界   ✓ 2 功能注册面   ✓ 3 死导出   ✓ 4 类型检查   ✓ 5 单元测试（44 文件/514 用例）
-  ✓ 6 补丁状态（6 个）   ✓ 7 补丁行为标记   ✓ 8 注入面基线   ✓ 9 文档链接（79 篇）
+  ✓ 6 补丁状态（6 个）   ✓ 7 补丁行为标记   ✓ 8 注入面基线   ✓ 9 文档链接（79→92 篇，2026-09-26 复核）
   ✓ 10 supervisor 测试（29 项）   ✓ 11 定时任务提示词（headless 可用）
   🎉 golden tasks 全部通过
 bash scripts/golden-tasks.sh --smoke

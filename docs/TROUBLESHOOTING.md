@@ -106,7 +106,7 @@ bash scripts/build.sh
 **验证：**
 ```bash
 # 确认上游锁定点存在
-ls vendor/pi/PINNED_COMMIT vendor/pi/LAST_SYNC_POINT
+ls vendor/PINNED_COMMIT vendor/pi/LAST_SYNC_POINT
 
 # 确认构建产物存在
 ls vendor/pi/packages/coding-agent/dist/cli.js
@@ -187,7 +187,9 @@ git checkout HEAD -- portable/agent/settings.json
 git checkout HEAD -- portable/agent/keybindings.json
 ```
 
-**注意：** `auth.json`、`models.json`、`models-store.json`、`modes.json`、`trust.json` 为每环境独立且被 gitignore，无法从 git 恢复，只能由备份还原（见 §七，`pi-backup` 技能）。
+**注意：** `auth.json`、`models.json`、`models-store.json`、`trust.json`、`pi-link-*.json` 为每环境独立且被 gitignore，无法从 git 恢复，只能由备份还原（见 §七，`pi-backup` 技能）。
+
+另：`modes.json`、`scheduled-seeds.json`、`injection-baseline.json` 已白名单入库（跨环境共享），不在每环境清单内。
 
 ---
 
@@ -236,7 +238,7 @@ grep -rn "vendor/pi" custom/adapters/ custom/core/
 ```
 
 **解决：**
-- 把 Pi API 调用从 `custom/features/*/` 移到 `custom/adapters/tool-adapter.ts`、`hook-adapter.ts`，features 只保留纯逻辑。
+- 把 Pi API 调用从 `custom/features/*/` 移到 `custom/adapters/tool-adapter.ts`、`hook-adapter.ts`、`ui-adapter.ts`、`session-adapter.ts`，features 只保留纯逻辑。
 - 重新构建并重试：`bash scripts/build.sh`。
 - 扩展开发细节见 [development/PI-EXT-DEV-NOTES.md](./development/PI-EXT-DEV-NOTES.md)。
 
@@ -283,7 +285,7 @@ done
 ./my-pi.sh
 ```
 
-**关键事实：** pi 只识别 `PI_CODING_AGENT_DIR`（agentDir）与 `PI_PACKAGE_DIR`；技能、会话、扩展都挂在 agentDir 下，启动器**不再导出** `PI_SESSION_DIR`/`PI_SKILLS_DIR`/`PI_EXTENSION_DIR` 这类无效变量。`PI_MEMORY_DIR` 不由 pi 读取，而是 `custom/core/note-store.ts` 读取。会话目录若需覆盖，用 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir`。
+**关键事实：** pi 只识别 `PI_CODING_AGENT_DIR`（agentDir）与 `PI_PACKAGE_DIR`；技能、会话、扩展都挂在 agentDir 下，启动器**不再导出** `PI_SESSION_DIR`/`PI_SKILLS_DIR`/`PI_EXTENSION_DIR` 这类无效变量。`PI_MEMORY_DIR` 不由 pi 读取，而是 `custom/core/config.ts` 的 `getMemoryDir` 读取。会话目录若需覆盖，用 `PI_CODING_AGENT_SESSION_DIR` 或 `--session-dir`。
 
 ### 4.2 技能（skills）未发现
 
@@ -310,18 +312,17 @@ node -e "console.log(JSON.parse(require('fs').readFileSync('portable/agent/setti
 
 **解决：**
 ```bash
-# 跟踪的文件：settings.json / keybindings.json / AGENTS.md / APPEND_SYSTEM.md
+# 跟踪的文件：settings.json / keybindings.json / AGENTS.md / APPEND_SYSTEM.md / modes.json / scheduled-seeds.json / injection-baseline.json
 git status portable/agent/
 
 # 每环境独立的文件（gitignore，不入库、不随 git 同步）
 ls -la portable/agent/auth.json \
        portable/agent/models.json \
        portable/agent/models-store.json \
-       portable/agent/modes.json \
        portable/agent/trust.json
 
 # 同步跟踪的配置
-git pull --rebase origin master
+git pull --rebase origin main
 ```
 
 跨环境约定与凭据分发详见 [operations/ENVIRONMENTS.md](./operations/ENVIRONMENTS.md)。
@@ -356,7 +357,7 @@ node -e "JSON.parse(require('fs').readFileSync('portable/agent/models.json','utf
 **解决：**
 ```bash
 # 拉取最新（有本地提交时用 rebase）
-git pull --rebase origin master
+git pull --rebase origin main
 
 # 检查远程配置
 git remote -v
@@ -431,7 +432,7 @@ du -sh portable/agent/sessions/ portable/memory/
 
 ## 七、数据问题
 
-运行时数据全部收敛在 `portable/`：`portable/agent/`（agentDir：Pi 配置、`skills/` 技能、`sessions/` 会话、`extensions/` 第三方扩展）、`portable/memory/`（自定义功能数据：note-store 笔记 + `tool-outputs/` 归档）。
+运行时数据全部收敛在 `portable/`：`portable/agent/`（agentDir：Pi 配置、`skills/` 技能、`sessions/` 会话、`extensions/` 第三方扩展）、`portable/memory/`（自定义功能数据：memory 笔记 + `tool-outputs/` 归档）。
 
 ### 7.1 记忆数据异常
 
@@ -449,8 +450,8 @@ find portable/memory -maxdepth 1 -name '*.json' -print0 2>/dev/null | \
       && echo "$f OK" || echo "$f BROKEN"
   done
 
-# 记忆读写逻辑位于 note-store 与 memory 功能模块
-ls custom/core/note-store.ts custom/features/memory/
+# 记忆读写逻辑位于 custom/features/memory/
+ls custom/features/memory/ custom/features/memory/store/
 ```
 
 **恢复：** 使用 `pi-backup` 技能从备份还原对应数据。`portable/memory/` 被 gitignore，git 不能作为恢复来源。

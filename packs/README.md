@@ -38,7 +38,7 @@ packs/
 4. **跨包复用**：有跨包通用价值的工具坑（网络通道、依赖安装、API 变化）同时 `memory_store`（带环境标签）
 5. **技能缺陷**：流程本身暴露的问题（命令失效/字段过时/章节不合理）直接改 SKILL.md 对应章节，不只写经验文件
 
-各包 SKILL.md 末尾应有"使用后经验沉淀"引导段（pdf-toolkit/gamedev 已落地为范本）；存量包下次使用时先补段再执行。
+各包 SKILL.md 末尾应有"使用后经验沉淀"引导段（当前仅 gamedev 已落地为范本）；存量包下次使用时先补段再执行。
 
 ## 更新与整合原则（整合优先，禁止直接覆盖）
 
@@ -87,7 +87,7 @@ packs/
 | `gamedev/` | 游戏开发技能组（skills/{design,godot,web,workflow}） |
 | `reverse-skill/` | 逆向/CTF 技能包（含 burp-mcp 等） |
 | `dg-piagent/` | pi-agent SDK 开发助手（教程同步维护，API 基线 v0.83.0，含 sdk_doc/场景 references） |
-| `novel-writing/` | 长篇网文工程化写作系统：六大协议（大纲/规划目录/草案/正文/体检/存档）+ 一致性/叙事/输出条例 + 文风溯源/去AI指纹 + 50章分批/事实锁/状态回证/伏笔追踪/双重审查。整合 tianming-skill 等 3 个开源仓库并优化（CC BY-NC-SA 4.0，来源见包内 README） |
+| `novel-writing/` | 长篇网文工程化写作系统：六大协议（大纲/规划目录/草案/正文/体检/存档）+ 一致性/叙事/输出条例 + 文风溯源/去AI指纹 + 50章分批/事实锁/状态回证/伏笔追踪/双重审查。整合 tianming-skill 等 3 个开源仓库并优化（CC BY-NC-SA 4.0，来源见 SKILL.md「来源与许可」） |
 | `embedded-dev/` | 嵌入式/MCU 开发 AI 技能入口：构建/烧录/调试/串口/协议领域路由 + 开源工具链命令速查 + 执行闭环（证据驱动）。整合 embeddedskills(MIT) 与 embed-ai-tool(无LICENSE仅引用) 的通用能力；专用工具（llm-pid-tuner/garycli/on-MCU agent 等）记录在 references/specialized-tools.md |
 | `pcb-design/` | PCB/硬件设计 AI 技能入口：KiCad 工具链路由 + 设计审查契约（最小清单/证据分级）+ ERC/DRC/Gerber/SPICE/EMC 命令速查。提炼 kicad-happy(MIT)/skidl-skills(MIT)/hardware-agency-agents(MIT)；MCP server 与 ML 布局记录在 references/specialized-tools.md |
 | `cangjie-skill/` | 长内容蒸馏元技能（外部收纳 kangarooking/cangjie-skill @5f03a4c，MIT）：RIA-TV++ 七阶段管线把书/长视频转写/播客蒸馏成原子化可执行 skills——Adler 整书分析→5 提取器并行→三重验证（通过率 25-50%）→RIA++ 六维构造→Zettelkasten 关联→压力测试（诱饵题+混淆题）→交付；原文不动，pi 适配与验收规范见包内 README |

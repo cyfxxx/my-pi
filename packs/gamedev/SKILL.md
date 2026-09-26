@@ -52,11 +52,11 @@ tar xzf gds.tgz -C /tmp --strip-components=1 --one-top-level=awesome-gds
 
 | 阶段 | 技能 |
 |---|---|
-| 立项/玩法 | workflows/prototype-fast、game-jam |
+| 立项/玩法 | skills/workflow/prototype-fast、game-jam |
 | 核心实现 | web/*、godot/*、design/game-feel、design/physics-tuning、design/game-ai、design/input-systems、design/camera-systems |
 | 内容/界面 | design/game-ui-ux、design/dialogue-systems、design/level-design、design/save-systems、design/procedural-gen、design/create-game-assets |
 | 打磨/性能 | design/performance-optimization、design/audio-design、design/shader-programming |
-| 发布 | workflows/itch-publish、steam-publish；Godot 项目另见 godot-export |
+| 发布 | skills/workflow/itch-publish、steam-publish；Godot 项目另见 godot-export |
 
 ## 本机开发闭环约定
 

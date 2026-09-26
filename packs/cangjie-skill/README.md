@@ -4,7 +4,7 @@
 
 - **来源**: [kangarooking/cangjie-skill](https://github.com/kangarooking/cangjie-skill) @ 5f03a4c（v2.0.0）
 - **许可**: MIT（见 LICENSE，原文收纳）
-- **收纳范围**: SKILL.md + methodology/（8 阶段）+ extractors/（5 提取器）+ templates/（5 模板）。排除上游 assets/、.github/、star-history 脚本（与技能功能无关）
+- **收纳范围**: SKILL.md + methodology/（7 阶段节点 + 00-overview 总览）+ extractors/（5 提取器）+ templates/（5 模板）。排除上游 assets/、.github/、star-history 脚本（与技能功能无关）
 
 ## 在 pi 中使用
 
@@ -14,4 +14,4 @@
 
 ## 与 pi 升格通道的关系
 
-本包的三重验证门槛（≥2 独立出处 / 能答新问题 / 非常识独特性）与压力测试（诱饵题+跨技能混淆题）已提炼进 `drafts/external-skill-pack-integration.SKILL.md` 的验收规范，作为会话产出→SKILL 草稿→packs 单向升格通道的准入标准。
+本包的三重验证门槛（≥2 独立出处 / 能答新问题 / 非常识独特性）与压力测试（诱饵题+跨技能混淆题）作为会话产出→SKILL 草稿→packs 单向升格通道的准入标准。

@@ -18,6 +18,7 @@
 | `store/` | 记忆存储子包，见 [store/README.md](store/README.md) |
 | `recall/` | 检索与注入子包，见 [recall/README.md](recall/README.md) |
 | `mine/` | 治理与教训挖掘子包，见 [mine/README.md](mine/README.md) |
+| `tools/` | ctx_* 工具注册实现（`notes-tools.ts`：ctx_note/ctx_list；`checkpoint-tools.ts`：ctx_snap；`exec-tool.ts`：ctx_exec） |
 
 ## 数据落点（`portable/memory/`）
 

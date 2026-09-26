@@ -9,7 +9,7 @@ my-pi 是基于 pi 框架的私人 AI 助手（硬分叉）。本目录 `portabl
 ```
 portable/agent/           # pi 的运行时根目录（agentDir）：配置 + 技能 + 会话 + 扩展
 portable/agent/skills/    # 技能目录（pi 从 agentDir/skills 发现，随仓库分发）
-portable/memory/           # 自定义功能数据（note-store 笔记、工具输出归档）
+portable/memory/           # 自定义功能数据（记忆笔记、工具输出归档）
 vendor/pi/                 # 上游 Pi 代码（独立 clone，只读）
 custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
@@ -32,7 +32,7 @@ Layer 0 ─ 基础层 ───────────── vendor/pi/（上�
 ```
 
 **依赖规则**：`features/` 的逻辑层（`index.ts` 与 `__tests__/` 除外）零 Pi 依赖；仅 `adapters/` 可 runtime import `vendor/pi`（`import type` 除外）。
-大功能的实现按职责分组（`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`），`logic.ts` 仅作 barrel。
+大功能的实现按职责分组（`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/budget`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`）；`logic.ts` 是对外出口（多数为 barrel，`context/logic.ts` 另含少量共享逻辑）。
 
 ## 关键配置
 
@@ -42,10 +42,10 @@ pi 通过此环境变量定位运行时根目录（agentDir），默认 `~/.pi/a
 
 ```bash
 export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/agent"   # pi 识别（agentDir）
-export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-store 识别
+export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存储识别
 ```
 
-**运行时数据布局**：pi 只识别 `PI_CODING_AGENT_DIR`（另有 `PI_PACKAGE_DIR`），技能/会话/扩展都挂在 agentDir 下，因此：
+**运行时数据布局**：pi 以 `PI_CODING_AGENT_DIR` 为运行时根目录（另有 `PI_PACKAGE_DIR`；`PI_CODING_AGENT_SESSION_DIR` 可单独重定向会话目录，本项目未使用），技能/会话/扩展都挂在 agentDir 下，因此：
 
 - 技能：`portable/agent/skills/`（= `agentDir/skills`，随仓库分发）；`settings.json` 的 `"skills"` 数组是相对 `agentDir` 的覆盖模式（如 `+skills/pi-backup/SKILL.md`）
 - 会话：`portable/agent/sessions/<转义 cwd>/*.jsonl`
@@ -56,7 +56,7 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 的 note-st
 
 ## 网络搜索（三级通路）
 
-- `web_search`：走可配置的 SearXNG 端点（`settings.json` 的 `pi-web-search.searxng_url` > `SEARXNG_URL`/`PI_WEB_TOOLKIT_SEARXNG_URL` > 本地 `http://127.0.0.1:8889`）；不可达/无结果时自动降级 `searchDirect`（Bing）。
+- `web_search`：走可配置的 SearXNG 端点（`SEARXNG_URL`/`PI_WEB_TOOLKIT_SEARXNG_URL` > `settings.json` 的 `pi-web-search.searxng_url` > 本地 `http://127.0.0.1:8889`）；不可达/无结果时自动降级 `searchDirect`（Bing）。
 - `web_fetch`：免 SearXNG 的 Bing 直搜（休眠组 `web-fallback`，需 `enable_tool("web-fallback")`）。
 - `fetch_url`：轻量 HTTP GET（仅公网 http/https，拒绝内网/回环）。
 - **SearXNG 引擎配置是常见坑**：默认启用 google/duckduckgo/brave/wikipedia 等被封锁引擎会全部 timeout 并拖垮整次搜索。用 `bash scripts/searxng-config.sh --force` 生成只启可达引擎（baidu/bing/sogou/360search/bilibili/yandex/stackoverflow/github）且 bing 指向 `cn.bing.com` 的配置。

@@ -336,7 +336,7 @@ ctx.waitForIdle()           // 等待 agent 空闲
 ctx.reload()                // 重新加载扩展/技能/配置
 ```
 
-命令注册同样要走适配层：当前 `custom/adapters/` 只提供 tool-adapter / hook-adapter，要注册命令需先新增命令适配器，不要把 `pi.registerCommand` 直接写进功能模块。
+命令注册同样要走适配层：`custom/adapters/ui-adapter.ts` 提供 `registerCommand`（另有 tool-adapter / hook-adapter / session-adapter），不要把 `pi.registerCommand` 直接写进功能模块。
 
 **`sendUserMessage` 的 `deliverAs` 参数：**
 
@@ -469,7 +469,7 @@ pi.registerProvider("my-provider", {
 ### 注意事项
 
 - **SDK 版本锁定：** SDK 行为随 `vendor/PINNED_COMMIT` 锁定的上游版本变化。`bash scripts/sync-upstream.sh` 之后如果导入的函数签名变了，适配器会在编译期或运行时 break，需要同步回归。
-- **隔离纪律：** 任何 SDK import（含 `import type`）只允许出现在 `custom/adapters/`，`logic.ts` 保持零 Pi 依赖；改动后跑 `npm run check`。
+- **隔离纪律：** 任何 SDK **runtime** import 只允许出现在 `custom/adapters/`；feature 的 `index.ts` 可用 `import type`（编译后擦除），`logic.ts` 保持零 Pi 依赖；改动后跑 `npm run check`。
 - **类型安全优先：** 能用 `import type` 就别 cast `as any`。方案 C 的 cast 应该集中在一个适配器文件里，方便排查。
 - **测试：** 类型检查 `npx tsc --noEmit -p custom/`，单测 `npx vitest run`（`npm test`），隔离边界 `npm run check`；用到 SDK 导入的功能要在上游同步后做回归测试。
 - **热重载行为：** 功能通过 `ctx.reload()` 重载时，`globalThis` 上残留的状态不会自动清理。

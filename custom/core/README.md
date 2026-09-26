@@ -1,6 +1,6 @@
 # custom/core — 核心服务层
 
-纯逻辑底座，**零 Pi 依赖**：任何 feature 都可以 import，但本层不得 import `@earendil-works/*`、不得 import feature。
+纯逻辑底座，**零 Pi 依赖**：任何 feature 都可以 import，但本层不得 runtime import `@earendil-works/*`（`import type` 编译后擦除，例外）、不得 import feature。
 所有路径都动态解析，支持从任意位置调用。
 
 ## 文件

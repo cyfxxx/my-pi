@@ -2,11 +2,11 @@
  * Memory Feature — 入口（只通过 adapters 与 Pi 交互）
  *
  * 迁移自 pi-tools `agent/extensions/pi-memory/{index,tools,commands}.ts`。
- * 提供 5 个工具（store/search/recall/stats/forget）、`/memory` 命令、
+ * 提供 5 个记忆工具（store/search/recall/stats/forget）+ 4 个 ctx_* 工具
+ * （ctx_note/ctx_list、ctx_snap、ctx_exec）、`/memory` 命令、
  * 每轮注入块（消息注入，缓存友好）、以及 compaction 标记。
  *
- * 未迁移：LLM 提取（extract.ts）与 ctx_* 工具（exec-sandbox/checkpoint/notes），
- * 留待后续批次。
+ * 未迁移：LLM 提取（extract.ts）。
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';

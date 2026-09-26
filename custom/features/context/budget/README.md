@@ -31,7 +31,7 @@
 | 绝对压缩阈值 | 256K | `PI_CONTEXT_ABSOLUTE_TOKENS` |
 | 重启提示阈值 | 100K | `PI_CONTEXT_RESTART_TOKENS` |
 | 压缩冷却 | 10 分钟 | `PI_CONTEXT_COMPACT_COOLDOWN_MS` |
-| 空闲判定 | 3 分钟 | `PI_CONTEXT_IDLE_MS` |
+| 空闲判定 | 关闭（0） | `PI_CONTEXT_IDLE_MS` |
 | 任务门总开关 | 开 | `PI_CONTEXT_TASK_GATE=off` |
 | 工具擦除保护带 | 60K | `PI_CONTEXT_PRUNE_PROTECT_TOKENS` |
 | 工具擦除最小回收 | 30K | `PI_CONTEXT_PRUNE_MINIMUM_TOKENS` |
