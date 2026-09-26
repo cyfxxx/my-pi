@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadConfig } from '../config';
-import { BrowserManager, shotDir, pdfDir, downloadsDirDefault, isSensitiveUploadPath } from '../impl';
+import { BrowserManager, shotDir, pdfDir, downloadsDirDefault, isSensitiveUploadPath, shouldBlockRequest } from '../impl';
 
 describe('config', () => {
   const saved: Record<string, string | undefined> = {};
@@ -58,6 +58,28 @@ describe('navigate 协议守卫（无需启动浏览器）', () => {
   it('无效 URL 拒绝', async () => {
     const b = new BrowserManager({ headless: true, viewport_width: 800, viewport_height: 600 });
     await expect(b.navigate('not a url')).rejects.toThrow('无效 URL');
+  });
+});
+
+describe('shouldBlockRequest（子资源 SSRF 拦截判定，无需启动浏览器）', () => {
+  it('拦截字面内网/回环 http(s)，放行公网与非 http 协议', () => {
+    for (const u of [
+      'http://192.168.1.1/x',
+      'http://[::ffff:127.0.0.1]/',
+      'http://localhost./x',
+      'http://169.254.169.254/latest/meta-data',
+    ]) {
+      expect(shouldBlockRequest(u), u).toBe(true);
+    }
+    for (const u of [
+      'https://example.com/a',
+      'http://8.8.8.8/',
+      'data:image/png;base64,xx',
+      'blob:https://example.com/x',
+      'about:blank',
+    ]) {
+      expect(shouldBlockRequest(u), u).toBe(false);
+    }
   });
 });
 

@@ -19,6 +19,7 @@ import {
   appendRecord,
   linkCorrective,
   summarize,
+  MAX_RECORDS,
 } from '../logic';
 
 describe('intervention 纯逻辑', () => {
@@ -76,6 +77,18 @@ describe('intervention 纯逻辑', () => {
 
     // 已关联的记录不重复回填
     expect(linkCorrective(file, rec.id, 'late', new Date())).toBe(false);
+  });
+
+  it('appendRecord 高频追加：超过上限+余量自动压缩且保留最新记录（M13-b）', () => {
+    const target = MAX_RECORDS + 250;
+    for (let i = 0; i < target; i++) {
+      appendRecord(file, buildRecord({ prompt: `p${i}`, tools: [], tail: '', steering: [] }));
+    }
+    const lines = readFileSync(file, 'utf-8').split('\n').filter(Boolean);
+    // 压缩阈值 = MAX_RECORDS + 200 余量，未触发压缩时文件行数可略高于 MAX_RECORDS
+    expect(lines.length).toBeLessThanOrEqual(MAX_RECORDS + 300);
+    expect(lines.length).toBeGreaterThan(MAX_RECORDS - 300);
+    expect(JSON.parse(lines[lines.length - 1]).prompt).toBe(`p${target - 1}`);
   });
 
   it('summarize 产出总数/关联/steering/近7天', () => {

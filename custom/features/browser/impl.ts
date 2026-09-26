@@ -54,6 +54,12 @@ const SENSITIVE_ETC = ['/etc/shadow', '/etc/gshadow', '/etc/sudoers'];
  * 上传敏感路径判定（prompt 注入防护）：拒绝系统凭据/私钥目录、密钥文件，
  * 以及 my-pi 运行时数据目录（含 auth.json / models 等）。
  */
+/** 子资源/页面内导航请求的 SSRF 判定：仅拦截字面指向内网/回环的 http(s)（data:/blob:/about: 放行） */
+export function shouldBlockRequest(url: string): boolean {
+  if (!/^https?:/i.test(url)) return false;
+  return !isUrlAllowed(url);
+}
+
 export function isSensitiveUploadPath(realPath: string): boolean {
   const p = realPath.replace(/\\/g, '/');
   const lowered = p.toLowerCase();
@@ -187,6 +193,16 @@ export class BrowserManager {
     this.page = await this.browser!.newPage();
     await this.page.setViewportSize({ width: this.config.viewport_width, height: this.config.viewport_height });
     const pg = this.page as Page;
+    // 子资源与页面内导航同样做 SSRF 防护：公网页面不得拉取字面内网/回环地址的资源
+    await pg.route('**', (route) => {
+      const reqUrl = route.request().url();
+      if (shouldBlockRequest(reqUrl)) {
+        console.warn(`[browser] 已拦截内网请求: ${reqUrl.slice(0, 120)}`);
+        void route.abort('blockedbyclient').catch(() => {});
+        return;
+      }
+      void route.continue().catch(() => {});
+    });
     pg.on('request', (req) => {
       if (this.networkLog.length >= this.MAX_NETWORK) this.networkLog.shift();
       this.networkLog.push({ url: req.url(), method: req.method(), type: req.resourceType(), timestamp: Date.now() });

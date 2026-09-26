@@ -8,6 +8,7 @@
  * 缓存纪律：本模块不注入 system prompt、不写入时间戳到提示词。
  */
 
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getMemoryDir } from '../../core/config';
@@ -128,10 +129,37 @@ export function writeLines(file: string, records: InterventionRecord[]): void {
   writeTextSync(file, records.map((r) => JSON.stringify(r)).join('\n') + '\n');
 }
 
+/** 列表超过 MAX_RECORDS + 余量时做一次全量压缩（append 均摊 O(1)） */
+const COMPACT_SLACK = 200;
+
+/** 进程内单文件追加计数（压缩后重置；跨进程偏低仅推迟压缩，不丢数据） */
+const appendCounters = new Map<string, number>();
+
 export function appendRecord(file: string, record: InterventionRecord): void {
-  const records = readLines(file);
-  records.push(record);
-  writeLines(file, records.slice(-MAX_RECORDS));
+  // append-only：高频 abort 不再每次全量读改写（O(n) → 摊还 O(1)）；
+  // appendFileSync 的 O_APPEND 单行写入是原子的，并发追加不互覆。
+  mkdirSync(path.dirname(file), { recursive: true });
+  appendFileSync(file, JSON.stringify(record) + '\n');
+  let count = appendCounters.get(file);
+  if (count === undefined) {
+    try {
+      count = readFileSync(file, 'utf-8').split('\n').filter(Boolean).length;
+    } catch {
+      count = 1;
+    }
+  } else {
+    count += 1;
+  }
+  if (count > MAX_RECORDS + COMPACT_SLACK) {
+    try {
+      const lines = readFileSync(file, 'utf-8').split('\n').filter(Boolean);
+      writeTextSync(file, lines.slice(-MAX_RECORDS).join('\n') + '\n');
+      count = Math.min(lines.length, MAX_RECORDS);
+    } catch {
+      /* 压缩失败不影响已追加记录 */
+    }
+  }
+  appendCounters.set(file, count);
 }
 
 /** 把 corrective prompt 回填到指定 abort 记录（调用方负责关联窗判定） */
