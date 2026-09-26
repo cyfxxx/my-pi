@@ -10,7 +10,7 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { runAskUser } from './core/ask-user';
-import { renderPlanFile, writePlanFile, cleanupOldPlans, restoreStateFromPlans, listPlans } from './core/plans';
+import { syncPlanFile, restoreStateFromPlans, listPlans } from './core/plans';
 import type { AskUserParams } from './core/ask-user';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
@@ -83,14 +83,12 @@ export function register(pi: ExtensionAPI): void {
   // 以免抹掉进入前用户/其他 feature 已禁用的工具。
   let savedActiveTools: string[] | null = null;
   const overlay = new TodoOverlay();
-  // 计划落盘：任务状态变化时同步 plan-<ts>/plan.md（供重启后磁盘恢复）
+  // 计划落盘：任务状态变化时同步 plan-<ts>/plan.md（供重启后磁盘恢复）；
+  // 空状态（clear）时删除当前计划文件，避免重启后已清空的计划被 restoreStateFromPlans 复活。
   let planStamp = Date.now();
   const syncPlanToFile = (): void => {
     try {
-      const st = getState();
-      if (st.tasks.length === 0) return;
-      writePlanFile(planStamp, renderPlanFile(st.tasks, st.nextId));
-      cleanupOldPlans();
+      syncPlanFile(planStamp, getState());
     } catch {
       /* 落盘失败不影响任务操作 */
     }
@@ -273,6 +271,7 @@ export function register(pi: ExtensionAPI): void {
       if (sub === 'clear') {
         const count = getState().tasks.filter((t) => t.status !== 'deleted').length;
         resetState();
+        syncPlanToFile();
         overlay.update();
         ctx.ui.notify(`已清空 ${count} 个计划任务。`, 'info');
         return;

@@ -2,7 +2,10 @@
  * subagent 纯逻辑回归测试
  * 迁移自 pi-tools subagent/tests 的核心语义（frontmatter/agents/helpers/concurrency）。
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseFrontmatter, discoverAgents } from '../core/agents';
 import {
   classifyTaskRisk,
@@ -19,7 +22,7 @@ import {
   getMaxParallelTasks,
 } from '../core/helpers';
 import type { SingleResult } from '../core/types';
-import { resolveModelId } from '../core/runner';
+import { resolveModelId, getActivePlanSnippet } from '../core/runner';
 
 describe('parseFrontmatter', () => {
   it('解析 name/description/tools/readonly', () => {
@@ -171,5 +174,69 @@ describe('resolveModelId 模型优先级', () => {
   it('无会话模型时返回 undefined（交给 settings 默认）', () => {
     expect(resolveModelId(undefined, undefined, undefined)).toBeUndefined();
     expect(resolveModelId(undefined, undefined, { id: 'x' })).toBeUndefined();
+  });
+});
+
+describe('getActivePlanSnippet（复用 plan-mode 活跃计划语义）', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'my-pi-subagent-plans-'));
+    process.env.PI_PLANS_DIR = join(dir, 'plans');
+  });
+
+  afterEach(() => {
+    delete process.env.PI_PLANS_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function writePlan(ts: number, content: string): void {
+    const planDir = join(dir, 'plans', `plan-${ts}`);
+    mkdirSync(planDir, { recursive: true });
+    writeFileSync(join(planDir, 'plan.md'), content);
+  }
+
+  it('从 PI_PLANS_DIR 读取，而非硬编码 memoryDir/plans', () => {
+    const now = Date.now();
+    // 干扰项：仅存在于 memoryDir/plans
+    const memPlan = join(dir, 'memory', 'plans', `plan-${now - 1000}`);
+    mkdirSync(memPlan, { recursive: true });
+    writeFileSync(join(memPlan, 'plan.md'), '- [ ] 1. 仅内存目录中的干扰计划\n<!-- nextId: 2 -->');
+    expect(getActivePlanSnippet()).toBeNull();
+
+    writePlan(now - 2000, '- [ ] 1. PI_PLANS_DIR 内的计划\n<!-- nextId: 2 -->');
+    expect(getActivePlanSnippet()).toContain('PI_PLANS_DIR 内的计划');
+  });
+
+  it('按时间倒序取 ≤7 天且含未完成任务的计划', () => {
+    const now = Date.now();
+    writePlan(now - 8 * 24 * 3600 * 1000, '- [ ] 1. 过期计划\n<!-- nextId: 2 -->');
+    writePlan(now - 1000, '- [x] 1. 已完成计划\n<!-- nextId: 2 -->');
+    expect(getActivePlanSnippet()).toBeNull();
+    writePlan(now - 2000, '- [ ] 1. 待办计划\n<!-- nextId: 2 -->');
+    expect(getActivePlanSnippet()).toContain('待办计划');
+  });
+
+  it('忽略同名普通文件与损坏 plan.md（statSync 判目录）', () => {
+    const now = Date.now();
+    mkdirSync(join(dir, 'plans'), { recursive: true });
+    writeFileSync(join(dir, 'plans', `plan-${now - 500}`), 'not a directory');
+    writePlan(now - 1000, '不是计划文件');
+    expect(getActivePlanSnippet()).toBeNull();
+    writePlan(now - 1500, '- [ ] 1. 有效计划\n<!-- nextId: 2 -->');
+    expect(getActivePlanSnippet()).toContain('有效计划');
+  });
+
+  it('超过 2048 字符截断并标记', () => {
+    const content = `- [ ] 1. ${'x'.repeat(3000)}\n<!-- nextId: 2 -->`;
+    writePlan(Date.now() - 1000, content);
+    const snippet = getActivePlanSnippet();
+    expect(snippet).not.toBeNull();
+    expect(snippet!.endsWith('...（已截断）')).toBe(true);
+    expect(snippet!.length).toBe(2048 + '\n...（已截断）'.length);
+  });
+
+  it('无计划时返回 null', () => {
+    expect(getActivePlanSnippet()).toBeNull();
   });
 });

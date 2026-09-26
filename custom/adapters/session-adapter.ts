@@ -78,15 +78,26 @@ export async function listSessions(cwd?: string): Promise<ListSessionsResult> {
   }
 }
 
-/** 按 sessionId 前缀 / 文件路径 / 文件名解析目标会话 */
+/** 按 sessionId 前缀 / 文件路径 / 文件名解析目标会话；前缀歧义或多命中时返回 null 并告警 */
 export async function resolveSession(target: string): Promise<SessionRow | null> {
   const t = target.trim();
   if (!t) return null;
   const result = await listSessions();
-  if (!result.success || !result.data) return null;
+  if (!result.success || !result.data) {
+    if (!result.success) console.warn('resolveSession 列出会话失败:', result.error);
+    return null;
+  }
   const all = result.data;
-  const byId = all.find((s) => s.id && s.id.startsWith(t));
-  if (byId) return byId;
-  const byPath = all.find((s) => s.path === t || s.path.endsWith('/' + t));
-  return byPath ?? null;
+  const byId = all.filter((s) => s.id && s.id.startsWith(t));
+  if (byId.length > 1) {
+    console.warn(`resolveSession: "${t}" 匹配 ${byId.length} 个会话（前缀歧义），请使用更长的前缀或完整 ID`);
+    return null;
+  }
+  if (byId.length === 1) return byId[0];
+  const byPath = all.filter((s) => s.path === t || s.path.endsWith('/' + t));
+  if (byPath.length > 1) {
+    console.warn(`resolveSession: "${t}" 匹配 ${byPath.length} 个会话路径，请指定唯一路径`);
+    return null;
+  }
+  return byPath[0] ?? null;
 }

@@ -3,13 +3,13 @@
  * 数据目录通过 PI_MEMORY_DIR 隔离（dataDir() 每次读 env，无模块级缓存）。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyNoteOp, formatNoteList, parseNoteKey, getNotesSize } from '../tools/notes-tools';
 import { applySnapOp, sanitizeSnapName, listCheckpoints } from '../tools/checkpoint-tools';
 import { detectLanguage, truncateOutput, execLanguageAsync, DEFAULT_MAX_OUTPUT } from '../tools/exec-tool';
-import { loadNotes } from '../store/notes';
+import { loadNotes, updateNotes } from '../store/notes';
 import { checkpointsDir } from '../store/storage';
 
 let dir: string;
@@ -65,6 +65,61 @@ describe('ctx_note / ctx_list（便笺）', () => {
 
   it('getNotesSize 排除内部键', () => {
     expect(getNotesSize({ a: '1234', __ttl_a: 'x', '_ctx.x': 'yy' })).toBe(4);
+  });
+});
+
+describe('updateNotes 跨进程合并（M3 防丢更新）', () => {
+  it('两次 updateNotes 交错：回调期间盘上写入（其他会话）的键不丢', () => {
+    writeFileSync(join(dir, 'notes.json'), JSON.stringify({ existing: 'v0' }));
+    updateNotes((notes) => {
+      notes.alpha = 'A';
+      // 模拟另一实例/会话在本次保存前完成一次 updateNotes 写入（同步嵌套即交错点）
+      updateNotes((inner) => {
+        inner.beta = 'B';
+      });
+    });
+    const notes = loadNotes();
+    expect(notes.existing).toBe('v0');
+    expect(notes.alpha).toBe('A');
+    expect(notes.beta).toBe('B');
+  });
+
+  it('删除的键不被盘上旧值复活，且并发新增键保留', () => {
+    writeFileSync(
+      join(dir, 'notes.json'),
+      JSON.stringify({ doomed: 'stale', __ttl_doomed: '2099-01-01T00:00:00Z', keep: 'k' }),
+    );
+    updateNotes((notes) => {
+      delete notes.doomed;
+      delete notes.__ttl_doomed;
+      // 模拟并发写者：盘上仍留有旧键，同时新增了一个键
+      const onDisk = JSON.parse(readFileSync(join(dir, 'notes.json'), 'utf-8')) as Record<string, string>;
+      onDisk.other = 'new';
+      writeFileSync(join(dir, 'notes.json'), JSON.stringify(onDisk));
+    });
+    const notes = loadNotes();
+    expect(notes.doomed).toBeUndefined();
+    expect(notes.__ttl_doomed).toBeUndefined();
+    expect(notes.keep).toBe('k');
+    expect(notes.other).toBe('new');
+  });
+
+  it('__ttl_* 元数据键按普通键参与差分（重设 TTL / 删除带 TTL 的键）', () => {
+    writeFileSync(
+      join(dir, 'notes.json'),
+      JSON.stringify({ k: 'v', __ttl_k: '2099-01-01T00:00:00Z', goner: 'x', __ttl_goner: '2099-01-01T00:00:00Z' }),
+    );
+    updateNotes((notes) => {
+      notes.k = 'v2';
+      notes.__ttl_k = '2030-01-01T00:00:00Z';
+      delete notes.goner;
+      delete notes.__ttl_goner;
+    });
+    const saved = JSON.parse(readFileSync(join(dir, 'notes.json'), 'utf-8')) as Record<string, string>;
+    expect(saved.k).toBe('v2');
+    expect(saved.__ttl_k).toBe('2030-01-01T00:00:00Z');
+    expect('goner' in saved).toBe(false);
+    expect('__ttl_goner' in saved).toBe(false);
   });
 });
 

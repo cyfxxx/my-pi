@@ -2,7 +2,7 @@
  * 计划落盘（plans）测试：渲染/解析往返、格式校验、清理、磁盘恢复
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -12,6 +12,9 @@ import {
   listPlans,
   cleanupOldPlans,
   restoreStateFromPlans,
+  findActivePlan,
+  removePlan,
+  syncPlanFile,
   plansDir,
   planDirPath,
   MAX_PLANS,
@@ -152,6 +155,91 @@ describe('restoreStateFromPlans（磁盘恢复兜底）', () => {
     writePlanFile(now - 2000, renderPlanFile(tasks, 6));
     const restored = restoreStateFromPlans(now);
     expect(restored?.ts).toBe(now - 2000);
+  });
+});
+
+describe('syncPlanFile / removePlan（M4：清空计划不复活）', () => {
+  it('空状态删除当前计划目录，重启不再恢复', () => {
+    const now = Date.now();
+    writePlanFile(now - 1000, renderPlanFile(tasks, 6));
+    expect(restoreStateFromPlans(now)?.ts).toBe(now - 1000);
+    expect(syncPlanFile(now - 1000, { tasks: [], nextId: 1 })).toBe('removed');
+    expect(existsSync(planDirPath(now - 1000))).toBe(false);
+    expect(restoreStateFromPlans(now)).toBeNull();
+  });
+
+  it('仅删除当前计划，不误删其它计划目录', () => {
+    const now = Date.now();
+    writePlanFile(now - 5000, renderPlanFile([{ id: 1, subject: '旧计划', status: 'pending' }], 2));
+    writePlanFile(now - 1000, renderPlanFile(tasks, 6));
+    expect(syncPlanFile(now - 1000, { tasks: [], nextId: 1 })).toBe('removed');
+    expect(listPlans().map((p) => p.ts)).toEqual([now - 5000]);
+    expect(restoreStateFromPlans(now)?.ts).toBe(now - 5000);
+  });
+
+  it('有任务时写入；removePlan 对不存在路径幂等返回 false', () => {
+    const now = Date.now();
+    expect(syncPlanFile(now - 1000, { tasks: [{ id: 1, subject: 'x', status: 'pending' }], nextId: 2 })).toBe('written');
+    expect(readFileSync(join(planDirPath(now - 1000), 'plan.md'), 'utf-8')).toContain('- [ ] 1. x');
+    expect(removePlan(now - 999999)).toBe(false);
+    expect(syncPlanFile(now - 999998, { tasks: [], nextId: 1 })).toBe('removed');
+  });
+});
+
+describe('findActivePlan（活跃计划查找语义，subagent 复用）', () => {
+  it('取最新 ≤7 天且含未完成任务的计划，返回原始内容', () => {
+    const now = Date.now();
+    writePlanFile(now - 5000, renderPlanFile([{ id: 1, subject: '旧计划', status: 'pending' }], 2));
+    const content = renderPlanFile(tasks, 6);
+    writePlanFile(now - 1000, content);
+    const active = findActivePlan(now);
+    expect(active?.ts).toBe(now - 1000);
+    expect(active?.content).toBe(content);
+    expect(active?.state.tasks.some((t) => t.status === 'pending')).toBe(true);
+  });
+
+  it('跳过过期计划与全完成/已删除计划', () => {
+    const now = Date.now();
+    writePlanFile(now - MAX_RESTORE_AGE_MS - 1000, renderPlanFile(tasks, 6));
+    writePlanFile(
+      now - 2000,
+      renderPlanFile(
+        [
+          { id: 1, subject: 'done', status: 'completed' },
+          { id: 2, subject: 'del', status: 'deleted' },
+        ],
+        3,
+      ),
+    );
+    expect(findActivePlan(now)).toBeNull();
+    writePlanFile(now - 3000, renderPlanFile([{ id: 1, subject: '阻塞中', status: 'blocked' }], 2));
+    expect(findActivePlan(now)?.ts).toBe(now - 3000);
+  });
+
+  it('plan.md 损坏时跳到下一份', () => {
+    const now = Date.now();
+    mkdirSync(planDirPath(now - 500), { recursive: true });
+    writeFileSync(join(planDirPath(now - 500), 'plan.md'), '不是计划文件');
+    writePlanFile(now - 1000, renderPlanFile([{ id: 1, subject: '有效', status: 'pending' }], 2));
+    expect(findActivePlan(now)?.ts).toBe(now - 1000);
+  });
+
+  it('statSync 判目录：符号链接指向的计划目录同样命中（dirent.isDirectory 会漏）', () => {
+    const now = Date.now();
+    mkdirSync(plansDir(), { recursive: true });
+    const realDir = join(dir, 'real-plan-dir');
+    mkdirSync(realDir, { recursive: true });
+    writeFileSync(join(realDir, 'plan.md'), renderPlanFile([{ id: 1, subject: '链接计划', status: 'pending' }], 2));
+    symlinkSync(realDir, planDirPath(now - 42));
+    expect(listPlans().some((p) => p.ts === now - 42)).toBe(true);
+    expect(findActivePlan(now)?.ts).toBe(now - 42);
+  });
+
+  it('与 restoreStateFromPlans 选择同一份计划', () => {
+    const now = Date.now();
+    writePlanFile(now - 5000, renderPlanFile([{ id: 1, subject: 'a', status: 'pending' }], 2));
+    writePlanFile(now - 1000, renderPlanFile(tasks, 6));
+    expect(findActivePlan(now)?.ts).toBe(restoreStateFromPlans(now)?.ts);
   });
 });
 

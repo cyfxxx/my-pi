@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import type { AgentConfig } from './agents';
 import type { SingleResult, SubagentDetails, OnUpdateCallback } from './types';
 import { getFinalOutput, resolveAgentTools, buildAgentPrompt, scheduleKillChain, calculateContextTokens } from './helpers';
-import { getMemoryDir } from '../../../core/config';
+import { findActivePlan } from '../../plan-mode/logic';
 
 /**
  * 子代理模型优先级（高 → 低）：
@@ -31,24 +31,14 @@ export function resolveModelId(
   return undefined;
 }
 
-function findActivePlan(): string | null {
-  try {
-    const plansDir = path.join(getMemoryDir(), 'plans');
-    if (!fs.existsSync(plansDir)) return null;
-    const entries = fs.readdirSync(plansDir, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name.startsWith('plan-'));
-    if (entries.length === 0) return null;
-    entries.sort((a, b) => b.name.localeCompare(a.name));
-    for (const entry of entries) {
-      const planPath = path.join(plansDir, entry.name, 'plan.md');
-      if (fs.existsSync(planPath)) {
-        const content = fs.readFileSync(planPath, 'utf-8');
-        return content.length > 2048 ? content.slice(0, 2048) + '\n...（已截断）' : content;
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
+/**
+ * 读取当前活跃计划内容（复用 plan-mode 的恢复语义：PI_PLANS_DIR 优先、7 天窗口、
+ * statSync 判目录、含未完成任务），供子代理系统提示注入；超过 2048 字符截断。
+ */
+export function getActivePlanSnippet(): string | null {
+  const plan = findActivePlan();
+  if (!plan) return null;
+  return plan.content.length > 2048 ? plan.content.slice(0, 2048) + '\n...（已截断）' : plan.content;
 }
 
 function writePromptToTempFile(agentName: string, prompt: string): { dir: string; filePath: string } {
@@ -116,7 +106,7 @@ export async function runSubprocessAgent(
   try {
     if (agent.systemPrompt.trim()) {
       let fullPrompt = buildAgentPrompt(agent);
-      const activePlan = findActivePlan();
+      const activePlan = getActivePlanSnippet();
       if (activePlan) {
         fullPrompt += `\n\n---\n## 当前活跃计划（plan.md）\n以下是最新的执行计划，请确保你的工作对齐此计划：\n\n${activePlan}`;
       }
@@ -131,7 +121,10 @@ export async function runSubprocessAgent(
 
     const exitCode = await new Promise<number>((resolve) => {
       const invocation = getPiInvocation(args);
-      const SENSITIVE_ENV = /^(ANTHROPIC_API_KEY|OPENAI_API_KEY|GOOGLE_API_KEY|AWS_SECRET|PI_SESSION_ID|PI_AUTH|PI_API_KEY)/i;
+      // 剥离敏感凭据：通用 *_API_KEY/*_API_TOKEN/*_AUTH_TOKEN/*_OAUTH_TOKEN 结尾
+      // + AWS 凭据 + PI 自身凭据（供任何 provider、不限于原 5 个固定名）
+      const SENSITIVE_ENV =
+        /(_API_KEY|_API_TOKEN|_AUTH_TOKEN|_OAUTH_TOKEN)$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)|^PI_(SESSION_ID|AUTH|API_KEY)/i;
       const filteredEnv: Record<string, string> = {};
       for (const [k, v] of Object.entries(process.env)) {
         if (v !== undefined && !SENSITIVE_ENV.test(k)) filteredEnv[k] = v;

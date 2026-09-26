@@ -65,7 +65,10 @@ export function extractRunOutput(lines: string[]): string {
 export function runTaskOnce(task: Task, cwd: string, timeoutMs = task.maxRunTime * 1000): Promise<TaskRunResult> {
   const started = Date.now();
   const invocation = getPiInvocation(buildRunArgs(task));
-  const SENSITIVE_ENV = /^(ANTHROPIC_API_KEY|OPENAI_API_KEY|GOOGLE_API_KEY|AWS_SECRET|PI_SESSION_ID|PI_AUTH|PI_API_KEY)/i;
+  // 剥离敏感凭据：通用 *_API_KEY/*_API_TOKEN/*_AUTH_TOKEN/*_OAUTH_TOKEN 结尾
+  // + AWS 凭据 + PI 自身凭据（供任何 provider、不限于原 5 个固定名）
+  const SENSITIVE_ENV =
+    /(_API_KEY|_API_TOKEN|_AUTH_TOKEN|_OAUTH_TOKEN)$|^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)|^PI_(SESSION_ID|AUTH|API_KEY)/i;
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (v !== undefined && !SENSITIVE_ENV.test(k)) env[k] = v;

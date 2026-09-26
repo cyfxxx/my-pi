@@ -103,6 +103,41 @@ export function writePlanFile(ts: number, content: string): string {
   return file;
 }
 
+/**
+ * 删除当前会话的计划目录（仅 `plan-<ts>`，不触碰其它计划目录）。
+ * 仅当目标是目录时删除；不存在/非目录/删除失败返回 false。
+ */
+export function removePlan(ts: number): boolean {
+  const dir = planDirPath(ts);
+  try {
+    if (!statSync(dir).isDirectory()) return false;
+  } catch {
+    return false;
+  }
+  try {
+    rmSync(dir, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 同步当前会话任务状态到计划文件：
+ * - 有任务：写入 `plan-<ts>/plan.md` 并清理超出上限的旧计划
+ * - 空状态（`/plan clear`、`todo clear`）：删除当前计划目录，
+ *   防止重启时 `restoreStateFromPlans` 把已清空的计划复活
+ */
+export function syncPlanFile(ts: number, state: TaskState): 'written' | 'removed' {
+  if (state.tasks.length === 0) {
+    removePlan(ts);
+    return 'removed';
+  }
+  writePlanFile(ts, renderPlanFile(state.tasks, state.nextId));
+  cleanupOldPlans();
+  return 'written';
+}
+
 /** 按时间倒序列出计划目录（仅含 plan-* 目录） */
 export function listPlans(): Array<{ name: string; ts: number; path: string }> {
   const dir = plansDir();
@@ -142,24 +177,41 @@ export function cleanupOldPlans(maxPlans = MAX_PLANS): number {
   return removed;
 }
 
+/** 当前活跃计划：解析状态 + 原始文件内容 + 计划目录时间戳 */
+export interface ActivePlan {
+  state: TaskState;
+  content: string;
+  ts: number;
+}
+
 /**
- * 从磁盘恢复任务状态：取最新一份「未过期且仍有未完成任务」的 plan.md。
- * 返回 `{ state, ts }`（ts 为计划目录时间戳，调用方续写同一份计划）；无可用计划返回 null。
+ * 查找当前活跃计划：按时间倒序取第一份「未过期（≤ MAX_RESTORE_AGE_MS）且含未完成任务」的 plan.md。
+ * 目录规则统一走 `listPlans`（`PI_PLANS_DIR` 优先、statSync 判目录、时间倒序）。
+ * `restoreStateFromPlans` 与 subagent 的活跃计划注入复用本函数，保证恢复语义一致。
  */
-export function restoreStateFromPlans(now = Date.now()): { state: TaskState; ts: number } | null {
+export function findActivePlan(now = Date.now()): ActivePlan | null {
   for (const d of listPlans()) {
     if (now - d.ts > MAX_RESTORE_AGE_MS) continue;
-    let content: string | null = null;
+    let content: string;
     try {
       content = readFileSync(join(d.path, 'plan.md'), 'utf-8');
     } catch {
       continue;
     }
-    const restored = parsePlanFile(content);
-    if (!restored || restored.tasks.length === 0) continue;
-    const hasRemaining = restored.tasks.some((t) => t.status !== 'completed' && t.status !== 'deleted');
+    const state = parsePlanFile(content);
+    if (!state || state.tasks.length === 0) continue;
+    const hasRemaining = state.tasks.some((t) => t.status !== 'completed' && t.status !== 'deleted');
     if (!hasRemaining) continue;
-    return { state: restored, ts: d.ts };
+    return { state, content, ts: d.ts };
   }
   return null;
+}
+
+/**
+ * 从磁盘恢复任务状态：取最新一份「未过期且仍有未完成任务」的 plan.md。
+ * 返回 `{ state, ts }`（ts 为计划目录时间戳，调用方续写同一份计划）；无可用计划返回 null。
+ */
+export function restoreStateFromPlans(now = Date.now()): { state: TaskState; ts: number } | null {
+  const active = findActivePlan(now);
+  return active ? { state: active.state, ts: active.ts } : null;
 }
