@@ -6,6 +6,7 @@
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdirSync, readdirSync, rmSync, statSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { getAgentDir } from '../../../core/config';
 import type { VoiceConfig } from '../config';
 import { runCommand, nowStamp, type CommandResult } from '../types';
 
@@ -86,7 +87,7 @@ let activeRecorder: { child: ChildProcess; file: string } | null = null;
 let termuxSessionActive = false;
 
 function sessionStateFile(): string {
-  return join(process.env.HOME ?? '/tmp', '.pi', 'agent', '.my-pi-voice-session.json');
+  return join(getAgentDir(), '.my-pi-voice-session.json');
 }
 function writeSessionOwner(): void {
   try {

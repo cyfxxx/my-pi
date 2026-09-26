@@ -59,6 +59,7 @@ import {
 import type { TaskType, FallbackModel, Task } from './logic';
 import { runTaskOnce } from './run/runner';
 import { sendWebhook } from './store/webhook';
+import { acquireSessionLock, releaseSessionLock } from './store/storage';
 import { registerAdminTools } from './tools/admin-tools';
 import { registerScheduleTool } from './tools/schedule-tool';
 import { registerVerifyTools } from './tools/verify-tools';
@@ -407,6 +408,8 @@ export function register(pi: ExtensionAPI): void {
     if (!c.enabled) return;
     const due = listTasks().filter((t) => t.enabled && isDue(t));
     if (due.length === 0) return;
+    // 跨进程互斥：另一实例（多开会话 / supervisor 重拉窗口）正在执行时让出本轮
+    if (!acquireSessionLock()) return;
     running = true;
     setBackgroundBusy(true);
     const notify = (t: string, l: 'info' | 'warning' | 'error'): void => {
@@ -444,7 +447,9 @@ export function register(pi: ExtensionAPI): void {
         }
         if (r.result === 'failed') {
           const errClass = classifyError(r.stderr || r.output, r.exitCode);
-          const decision = decide(task, errClass, c.policy, c.fallbackModels, {
+          // updateTaskAfterRun 已把 failCount 落盘：用最新任务状态决策，避免读到自增前的计数（off-by-one）
+          const fresh = listTasks().find((t) => t.id === task.id) ?? task;
+          const decision = decide(fresh, errClass, c.policy, c.fallbackModels, {
             stderr: r.stderr || r.output,
             exitCode: r.exitCode,
             promptLen: task.prompt.length,
@@ -452,12 +457,28 @@ export function register(pi: ExtensionAPI): void {
             durationMs: r.durationMs,
           });
           notify(`autopilot 任务 ${task.name} 失败：${decision.note}`, 'warning');
+          // 执行决策（此前只通知不执行，暂停/熔断/切换全部失效）
+          if (decision.type === 'suspend_task') {
+            await updateTask(task.id, { enabled: false });
+            notify(`autopilot: 任务 ${task.name} 已自动暂停（${decision.note}）`, 'warning');
+          } else if (decision.type === 'failover') {
+            let sessionFile: string | undefined;
+            try {
+              sessionFile = ctx.sessionManager.getSessionFile();
+            } catch {
+              /* stale ctx */
+            }
+            const text = executeFailover(decision.target, decision.note, false, sessionFile);
+            await updateTask(task.id, { failoverCount: (fresh.failoverCount ?? 0) + 1 });
+            notify(`autopilot: ${text}`, 'warning');
+          }
         } else {
           notify(`autopilot 任务 ${task.name} 完成`, 'info');
         }
       }
     } finally {
       running = false;
+      releaseSessionLock();
       setBackgroundBusy(false);
     }
   };
