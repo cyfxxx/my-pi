@@ -40,7 +40,12 @@
   `node scripts/reseed-seeds.mjs --apply` 显式应用（保留 id/enabled/lastRun/runCount/history）。
 - 策略：`decide`/`checkBudget`/`planFailover`/`executeFailover`（模型 failover、预算上限、错误分类）。
 - 自愈：看门狗 `watchdog.ts`（空闲/挂起判定 → 请求重启），supervisor 消费 `state.json`。
-- admin 工具写 `state.json`，由 `scripts/pi-supervisor.sh` 在退出时执行重启/切会话。
+- admin 工具写 `state.json`，由 `scripts/pi-supervisor.sh` 在退出时执行重启/切会话；
+  重启参数经 `PENDING_ARGS` 跨轮传递（每轮开头的 `EXTRA_ARGS` 重置会吞掉直接写入的值），
+  映射逻辑是纯函数 `build_admin_args`（`scripts/test-supervisor.sh` 有单测 + stub CLI 端到端回归）。
+- 重启通知：`session_start` 消费 `consumeRestartLog()` 并以 `ctx.ui.notify` + `sendUserMessage`
+  注入"系统已重启。操作/原因"，仅交互会话消费（headless `-p` 子进程会先吃掉 restartLog）。
+  写入端保留在 `restartLog` 字段，supervisor 只清 `action`——两边都不可省。
 
 ## 相关
 

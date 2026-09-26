@@ -15,11 +15,13 @@
 #
 # 用法：bash scripts/pi-supervisor.sh [pi 参数...]
 #   MY_PI_NO_SUPERVISOR=1  跳过 supervisor，直接启动（调试用）
+#   MY_PI_CLI / MY_PI_AGENT_DIR  覆盖 CLI 与 agent 目录（scripts/test-supervisor.sh
+#                       用 stub CLI 跑真实主循环，验证重启续接参数不丢失）
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLI="$ROOT/vendor/pi/packages/coding-agent/dist/cli.js"
-AGENT_DIR="$ROOT/portable/agent"
+CLI="${MY_PI_CLI:-$ROOT/vendor/pi/packages/coding-agent/dist/cli.js}"
+AGENT_DIR="${MY_PI_AGENT_DIR:-$ROOT/portable/agent}"
 RECOVERY_DIR="$AGENT_DIR/recovery"
 CACHE_CLI="$RECOVERY_DIR/cache/dist/cli.js"
 AUDIT="$RECOVERY_DIR/recovery-audit.jsonl"
@@ -111,6 +113,32 @@ read_admin_action() {
 }
 clear_admin_action() {
   node -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
+}
+
+# ── admin 请求 → 续接参数（纯函数，test-supervisor.sh 直接测）──
+# 结果写入全局数组 ADMIN_ARGS。语义与原项目 pi-wrapper.sh 一致：
+#   restart/restart_hang → 优先 --session 精确恢复，缺失回退 --continue
+#   switch_session       → --session（缺失回退 --continue）
+#   set_model            → --provider/--model，再续接会话
+# 绝不能返回空参数启动：空参会让 pi 新建会话（"每次都要手动恢复"的根因）。
+ADMIN_ARGS=()
+build_admin_args() {
+  local act="$1" target="$2" prov="$3" model="$4"
+  ADMIN_ARGS=()
+  case "$act" in
+    restart|restart_hang)
+      if [ -n "$target" ]; then ADMIN_ARGS=(--session "$target"); else ADMIN_ARGS=(--continue); fi
+      ;;
+    switch_session)
+      if [ -n "$target" ]; then ADMIN_ARGS=(--session "$target"); else ADMIN_ARGS=(--continue); fi
+      ;;
+    set_model)
+      if [ -n "$prov" ] && [ -n "$model" ]; then
+        ADMIN_ARGS=(--provider "$prov" --model "$model")
+        if [ -n "$target" ]; then ADMIN_ARGS+=(--session "$target"); else ADMIN_ARGS+=(--continue); fi
+      fi
+      ;;
+  esac
 }
 
 # ── 健康检查：核心模块可完整加载（无扩展）──
@@ -208,6 +236,10 @@ RECOVERY_ROUNDS=0
 CONSECUTIVE_FAIL=0
 LAST_CLASS=""
 EXTRA_ARGS=()
+# admin 请求的续接参数：case 分支写入，下一轮开头消费。
+# 必须跨 `continue` 存活——否则会被下一轮的 EXTRA_ARGS 重置吞掉（历史 bug：
+# 重启请求写了 --session 却仍以空参启动，pi 新建会话，用户永远回不到原会话）。
+PENDING_ARGS=()
 
 while true; do
   # supervisor 脚本自身变更检测：改脚本后无需手工重跑 my-pi.sh，
@@ -223,8 +255,11 @@ while true; do
   fi
 
   # 每轮重置：防上一轮的 --provider/--model/--session 残留累积（对应原 wrapper 的
-  # 「Reset extra args each iteration to avoid accumulation」）
-  EXTRA_ARGS=()
+  # 「Reset extra args each iteration to avoid accumulation」）。
+  # 顺序关键：先把上一轮 admin 分支存入 PENDING_ARGS 的参数取出，再清空 PENDING_ARGS；
+  # 重置只针对"未被消费的残留"，不会吃掉本轮要用的续接参数。
+  EXTRA_ARGS=("${PENDING_ARGS[@]}")
+  PENDING_ARGS=()
   apply_mode
   log "启动 Pi..."
   CRASH_LOG="/tmp/my-pi-crash-$$.log"
@@ -240,40 +275,28 @@ while true; do
         log "admin 请求重启（$ACT），重新启动..."
         clear_admin_action
         # 优先 --session 精确恢复当前会话；缺失时回退 --continue 恢复最近会话。
-        # 绝不能空参启动：空参会让 pi 新建会话（每次都要手动恢复的根因；
-        # 原项目 pi-wrapper.sh 的重启分支同样以 --continue 兜底）。
-        if [ -n "$TARGET" ]; then
-          log "恢复会话: $TARGET"
-          EXTRA_ARGS=(--session "$TARGET")
-        else
-          log "未指定会话，回退 --continue 恢复最近会话"
-          EXTRA_ARGS=(--continue)
-        fi
+        # 写入 PENDING_ARGS（而非 EXTRA_ARGS）：EXTRA_ARGS 在下一轮开头会被重置。
+        build_admin_args "$ACT" "$TARGET" "$PROV" "$MODEL"
+        PENDING_ARGS=("${ADMIN_ARGS[@]}")
+        log "续接参数: ${PENDING_ARGS[*]}"
         continue
         ;;
       set_model)
         if [ -n "$PROV" ] && [ -n "$MODEL" ]; then
           log "admin 请求切换模型: $PROV/$MODEL"
           clear_admin_action
-          EXTRA_ARGS=(--provider "$PROV" --model "$MODEL")
-          if [ -n "$TARGET" ]; then
-            EXTRA_ARGS+=(--session "$TARGET")
-          else
-            EXTRA_ARGS+=(--continue)
-          fi
+          build_admin_args "$ACT" "$TARGET" "$PROV" "$MODEL"
+          PENDING_ARGS=("${ADMIN_ARGS[@]}")
+          log "续接参数: ${PENDING_ARGS[*]}"
           continue
         fi
         ;;
       switch_session)
-        if [ -n "$TARGET" ]; then
-          log "admin 请求切换会话: $TARGET"
-          clear_admin_action
-          EXTRA_ARGS=(--session "$TARGET")
-        else
-          log "切换会话缺少目标，回退 --continue"
-          clear_admin_action
-          EXTRA_ARGS=(--continue)
-        fi
+        log "admin 请求切换会话: ${TARGET:-（缺目标，回退 --continue）}"
+        clear_admin_action
+        build_admin_args "$ACT" "$TARGET" "$PROV" "$MODEL"
+        PENDING_ARGS=("${ADMIN_ARGS[@]}")
+        log "续接参数: ${PENDING_ARGS[*]}"
         continue
         ;;
     esac

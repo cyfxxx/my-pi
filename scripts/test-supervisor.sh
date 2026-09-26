@@ -99,6 +99,25 @@ check "clear_admin_action → 动作清空" "" "$ACT"
 check "clear 保留其它字段" "keep" "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).reason))' "$PI_ADMIN_STATE_FILE")"
 
 echo ""
+echo "=== build_admin_args（重启续接参数，绝不能为空）==="
+# 回归：曾因主循环每轮开头 EXTRA_ARGS=() 覆盖了 case 分支写入的 --session，
+# 重启后 pi 以空参启动并新建会话（用户回不到原会话）。续接参数必须经过
+# PENDING_ARGS 跨 continue 传递，且任何分支都不允许产出空数组。
+args_of() { build_admin_args "$1" "$2" "$3" "$4"; printf '%s' "${ADMIN_ARGS[*]}"; }
+
+check "restart + 有会话 → --session" "--session /s/cur.jsonl" "$(args_of restart /s/cur.jsonl '' '')"
+check "restart 无会话 → --continue 兜底" "--continue" "$(args_of restart '' '' '')"
+check "restart_hang 同 restart" "--session /s/cur.jsonl" "$(args_of restart_hang /s/cur.jsonl '' '')"
+check "switch_session 有目标" "--session /s/other.jsonl" "$(args_of switch_session /s/other.jsonl '' '')"
+check "switch_session 缺目标 → --continue" "--continue" "$(args_of switch_session '' '' '')"
+check "set_model 带会话" "--provider deepseek --model deepseek-flash --session /s/cur.jsonl" \
+  "$(args_of set_model /s/cur.jsonl deepseek deepseek-flash)"
+check "set_model 无会话 → --continue" "--provider deepseek --model deepseek-flash --continue" \
+  "$(args_of set_model '' deepseek deepseek-flash)"
+check "set_model 缺模型 → 保持空（不空参启动）" "" "$(args_of set_model /s/cur.jsonl deepseek '')"
+check "未知动作 → 空" "" "$(args_of none /s/cur.jsonl '' '')"
+
+echo ""
 echo "=== 救援 playbook（run_fix_pi 以 --append-system-prompt 追加）==="
 RESCUE="$RECOVERY_DIR/rescue-prompt.md"
 check "rescue-prompt.md 存在" "yes" "$([ -f "$RESCUE" ] && echo yes || echo no)"
@@ -114,6 +133,53 @@ if [ -f "$RESCUE" ]; then
     fi
   done
 fi
+
+echo ""
+echo "=== 主循环重启续接（端到端，stub CLI）==="
+# 回归（2026-09-26 实测 bug）：主循环每轮开头 `EXTRA_ARGS=()` 会把上一轮 case 分支
+# 写入的续接参数清掉，于是 `admin_restart` 后 pi 以空参启动 → 新建会话，用户回不到
+# 原会话。这里用 stub CLI 跑**真实主循环**，断言第二轮启动真的收到 --session。
+LOOP="$TMP/loop"
+mkdir -p "$LOOP/agent"
+cat > "$LOOP/cli.js" <<'STUB'
+const fs = require('node:fs');
+const dir = process.env.LOOP_DIR;
+const counter = `${dir}/runs`;
+const n = fs.existsSync(counter) ? Number(fs.readFileSync(counter, 'utf8')) : 0;
+fs.writeFileSync(counter, String(n + 1));
+fs.writeFileSync(`${dir}/argv-${n}.txt`, process.argv.slice(2).join(' '));
+if (n === 0) {
+  // 首次启动：模拟模型调用 admin_restart（写重启请求后退出）
+  fs.writeFileSync(process.env.PI_ADMIN_STATE_FILE, JSON.stringify({
+    action: 'restart',
+    targetSession: '/tmp/session-cur.jsonl',
+    reason: '端到端测试',
+    timestamp: Date.now(),
+    restartLog: { action: 'restart', reason: '端到端测试', timestamp: Date.now() },
+  }));
+}
+process.exit(0);
+STUB
+
+run_loop() {
+  rm -f "$LOOP/runs" "$LOOP"/argv-*.txt
+  LOOP_DIR="$LOOP" MY_PI_CLI="$LOOP/cli.js" MY_PI_AGENT_DIR="$LOOP/agent" \
+    PI_ADMIN_STATE_FILE="$LOOP/state.json" \
+    bash "$ROOT/scripts/pi-supervisor.sh" >"$LOOP/out.log" 2>&1
+}
+
+run_loop
+check "主循环跑满两轮" "2" "$(cat "$LOOP/runs")"
+check "第二轮收到 --session（续接原会话）" "yes" \
+  "$(grep -q -- '--session /tmp/session-cur.jsonl' "$LOOP/argv-1.txt" && echo yes || echo no)"
+check "第二轮仍注入 bootstrap 扩展" "yes" \
+  "$(grep -q -- '--extension .*custom/bootstrap.ts' "$LOOP/argv-1.txt" && echo yes || echo no)"
+check "第一轮不带 --session（基线）" "no" \
+  "$(grep -q -- '--session' "$LOOP/argv-0.txt" && echo yes || echo no)"
+check "重启动作已被消费（不留 action）" "none" \
+  "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).action))' "$LOOP/state.json" 2>/dev/null || echo missing)"
+check "restartLog 保留（供新进程注入重启通知）" "端到端测试" \
+  "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).restartLog?.reason))' "$LOOP/state.json" 2>/dev/null || echo missing)"
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then

@@ -11,6 +11,7 @@ import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-a
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
+import { sendUserMessage } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { listSessions, resolveSession } from '../../adapters/session-adapter';
 import { formatSessionList } from './store/sessions';
@@ -31,6 +32,7 @@ import {
   isLocalModel,
   readState,
   writeRestartRequest,
+  consumeRestartLog,
   listTasks,
   addTask,
   deleteTask,
@@ -401,6 +403,9 @@ export function register(pi: ExtensionAPI): void {
   // ── 执行循环：每分钟检查到期任务并运行（子进程隔离）──
   let running = false;
   let tickTimer: ReturnType<typeof setInterval> | null = null;
+  // 重启通知在同一进程内只消费一次（restartLog 已被 consumeRestartLog 清空，
+  // 此标志防多个 session_start 钩子/重入重复注入）
+  let restartNoticeShown = false;
 
   const runDueTasks = async (ctx: ExtensionContext): Promise<void> => {
     if (running) return;
@@ -564,6 +569,27 @@ export function register(pi: ExtensionAPI): void {
       if (unread.length) {
         if (ctx.hasUI) ctx.ui.notify(formatSummary(unread), unread.some((e) => e.result !== 'success') ? 'warning' : 'info');
         writeSeenTs(Date.now());
+      }
+      // ── 重启恢复通知（对齐 pi-tools pi-autopilot 的 consumeRestartLog）──
+      // supervisor 以 --session 续接会话后**只恢复历史**，模型无从得知"进程刚重启、
+      // 为什么重启、该继续做什么"。原项目在 session_start 消费 restartLog 并注入一条
+      // 用户消息；迁移时漏了消费端（restartLog 写入但无人读），表现为"重启后没有任何提示"。
+      // 网关：仅交互会话消费，否则 headless/-p 子进程会先把它吃掉。
+      if (ctx.hasUI && !restartNoticeShown) {
+        const log = consumeRestartLog();
+        if (log && log.action && log.action !== 'none') {
+          restartNoticeShown = true;
+          const reason = typeof log.reason === 'string' && log.reason ? log.reason : '(未指定原因)';
+          let line = `系统已重启。操作: ${log.action} | 原因: ${reason}`;
+          if (log.targetProvider || log.targetModel) {
+            line += ` | 目标模型: ${String(log.targetProvider ?? '-')}/${String(log.targetModel ?? '-')}`;
+          }
+          if (typeof log.targetSession === 'string' && log.targetSession) {
+            line += ` | 会话: ${log.targetSession}`;
+          }
+          ctx.ui.notify(line, 'info');
+          sendUserMessage(pi, `[系统] ${line}。历史上下文已恢复，请从中断处继续当前任务。`);
+        }
       }
     },
   });
