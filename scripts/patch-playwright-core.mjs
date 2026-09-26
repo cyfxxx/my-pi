@@ -44,8 +44,9 @@ export function patchSource(src) {
     out = out.replace(reProc, '(process.platform === "linux" || process.platform === "android")');
     changed = true;
   }
-  // 裸 platform === "linux"（hostPlatform 等），排除 process.platform
-  const reBare = /(?<!process\.)(?<!\w)platform === "linux"/g;
+  // 裸 platform === "linux"（hostPlatform 等），排除 process.platform 与属性访问（`X.platform`）；
+  // 注：若不禁 `.`，会把打包产物的 `X.default.platform === "linux"` 改写成非法语法 `X.default.(…)`。
+  const reBare = /(?<![\w.])platform === "linux"/g;
   if (reBare.test(out)) {
     out = out.replace(reBare, '(platform === "linux" || platform === "android")');
     changed = true;

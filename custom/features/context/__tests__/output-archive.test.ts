@@ -79,6 +79,15 @@ describe('output-archive 工具输出归档', () => {
     expect(pruneToolOutput(readText, 'read')).toBe(readText);
   });
 
+  it('预算耗尽但单条输出未超限 → 提示“已归档”而非“已截断”（文案回归）', () => {
+    resetOutputBudget();
+    for (let i = 0; i < 6; i++) pruneToolOutput('b'.repeat(20_000), 'bash');
+    const out = pruneToolOutput('tiny note', 'todo');
+    expect(out).toContain('输出已归档');
+    expect(out).not.toContain('输出已截断');
+    expect(out).toContain('tiny note');
+  });
+
   it('sweepArchive 按保留期清理过期归档（含子目录）', async () => {
     const dir = join(archiveDir(), 'zz');
     mkdirSync(dir, { recursive: true });

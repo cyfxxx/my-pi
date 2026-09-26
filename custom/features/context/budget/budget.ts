@@ -300,10 +300,12 @@ export function pruneToolOutput(text: string, toolName: string): string {
     // 头+尾保留：命令/测试输出的错误与结论通常在末尾，只留头部会丢关键信息
     const truncatedText = truncateHeadTail(text, allowed);
     const ratio = textTokens > 0 ? Math.round((allowed / textTokens) * 100) : 100;
-    result = archivedStub(
-      text,
-      `${truncatedText}\n\n[${toolName} 输出已截断：约 ${textTokens} token → ${allowed} token (${ratio}%)]`,
-    );
+    // 预算耗尽但单条输出未超限（全文保留）时不应显示“已截断 300%+”的错误文案
+    const note =
+      textTokens <= allowed
+        ? `${toolName} 输出已归档（会话输出预算已满，原文可读回）`
+        : `${toolName} 输出已截断：约 ${textTokens} token → ${allowed} token (${ratio}%)`;
+    result = archivedStub(text, `${truncatedText}\n\n[${note}]`);
   }
 
   // 记入实际放行内容（裁剪后），使累计预算随会话推进收敛；豁免工具不占用预算。
