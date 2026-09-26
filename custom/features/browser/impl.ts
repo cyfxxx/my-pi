@@ -118,7 +118,9 @@ export function ensureLocalBinaryEnv(): void {
 function isProtocolSecurityError(e: unknown): boolean {
   return (
     e instanceof Error &&
-    (e.message.startsWith('重定向到不允许的协议') || e.message.startsWith('协议不支持'))
+    (e.message.startsWith('重定向到不允许的协议') ||
+      e.message.startsWith('重定向到内网') ||
+      e.message.startsWith('协议不支持'))
   );
 }
 
@@ -244,6 +246,10 @@ export class BrowserManager {
           }
           if (fp !== 'http:' && fp !== 'https:') {
             throw new Error(`重定向到不允许的协议: ${fp}//（浏览器已拦截 ${finalUrl.slice(0, 60)}）`);
+          }
+          // 重定向可能把公网 URL 跳到内网（初始 URL 已验，finalUrl 必须复检）
+          if (!isUrlAllowed(finalUrl)) {
+            throw new Error(`重定向到内网/回环地址: ${new URL(finalUrl).hostname}（仅允许公网 http/https）`);
           }
         }
         return this.getPageInfo();

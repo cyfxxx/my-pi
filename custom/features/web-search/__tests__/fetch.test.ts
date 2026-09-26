@@ -138,6 +138,29 @@ describe('fetchUrl: SSRF 防护', () => {
       expect(await fetchUrl(u), u).toContain('拒绝访问内网');
     }
   });
+
+  it('重定向到内网 → 拒绝且不再请求目标（回归：审计发现跟进 302 绕过）', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/secret' } });
+    }));
+    const out = await fetchUrl('https://example.com/start');
+    expect(out).toContain('拒绝重定向到内网');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('重定向到公网 → 跟随并返回最终内容', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return calls.length === 1
+        ? new Response(null, { status: 302, headers: { location: 'https://example.com/final' } })
+        : new Response('ok-final', { status: 200 });
+    }));
+    expect(await fetchUrl('https://example.com/start')).toBe('ok-final');
+    expect(calls).toEqual(['https://example.com/start', 'https://example.com/final']);
+  });
 });
 
 describe('sanitizeMaxResults', () => {

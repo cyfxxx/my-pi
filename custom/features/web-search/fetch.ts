@@ -163,6 +163,9 @@ export async function readBodyLimited(
 
 export const FETCH_BODY_CAP = 512 * 1024;
 
+/** 手动重定向上限（每跳复检 isUrlAllowed） */
+const MAX_REDIRECTS = 5;
+
 /** 轻量 HTTP GET（协议白名单 + 超时 + 响应体上限），返回格式化文本 */
 export async function fetchUrl(
   url: string,
@@ -190,10 +193,36 @@ export async function fetchUrl(
   signal?.addEventListener?.('abort', onUserAbort);
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PiBot/1.0)' },
-    });
+    // 手动跟随重定向：每跳复检 isUrlAllowed，防止公网 URL 302 跳到内网（SSRF）
+    let currentUrl = url;
+    let res: Response | null = null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      res = await fetch(currentUrl, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PiBot/1.0)' },
+        redirect: 'manual',
+      });
+      if (res.status < 300 || res.status >= 400) break;
+      const loc = res.headers.get('location');
+      try {
+        await res.body?.cancel();
+      } catch {
+        /* 已释放 */
+      }
+      if (!loc) break;
+      if (hop === MAX_REDIRECTS) return `重定向次数过多（上限 ${MAX_REDIRECTS}）：${currentUrl}`;
+      let next: string;
+      try {
+        next = new URL(loc, currentUrl).toString();
+      } catch {
+        return `重定向目标无效：${loc.slice(0, 120)}`;
+      }
+      if (!isUrlAllowed(next)) {
+        return `拒绝重定向到内网/回环地址：${new URL(next).hostname}（fetch_url 仅允许公网 http/https）`;
+      }
+      currentUrl = next;
+    }
+    if (!res) return '请求失败: 未获得响应';
     if (!res.ok) {
       try {
         await res.body?.cancel();
