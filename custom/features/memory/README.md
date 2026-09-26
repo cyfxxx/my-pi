@@ -27,6 +27,7 @@
 | `entries.json` | 记忆条目 | `PI_MEMORY_DIR` |
 | `summaries.json` | 会话摘要 | — |
 | `notes.json` | TTL 笔记 | — |
+| `checkpoints/` | ctx_snap 用户检查点（压缩快照在 `checkpoints/compact/`，不混入列表） | — |
 | `memory-search.jsonl` | 检索台账（轮转 4MB） | `PI_MEMORY_TRACE_FILE` |
 | `interventions.jsonl` | 只读，教训挖掘来源 | `PI_INTERVENTIONS_FILE` |
 

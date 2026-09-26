@@ -3,7 +3,7 @@
  * 数据目录通过 PI_MEMORY_DIR 隔离（dataDir() 每次读 env，无模块级缓存）。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyNoteOp, formatNoteList, parseNoteKey, getNotesSize } from '../tools/notes-tools';
@@ -159,6 +159,45 @@ describe('ctx_snap（检查点）', () => {
     const cpDir = checkpointsDir();
     const files = existsSync(cpDir) ? readdirSync(cpDir) : [];
     expect(files).toHaveLength(0);
+  });
+
+  it('压缩快照隔离：compact-* 不列出、禁保存、禁恢复，便笺不被清空', () => {
+    applyNoteOp('keep', 'v');
+    applySnapOp('real1');
+    mkdirSync(checkpointsDir(), { recursive: true });
+    // 旧版散落在根目录的压缩快照
+    writeFileSync(
+      join(checkpointsDir(), 'compact-123.json'),
+      JSON.stringify({ ts: 123, contextTokens: 1, messages: [] }),
+    );
+    // 新版独立子目录的压缩快照
+    mkdirSync(join(checkpointsDir(), 'compact'), { recursive: true });
+    writeFileSync(
+      join(checkpointsDir(), 'compact', 'compact-456.json'),
+      JSON.stringify({ ts: 456, contextTokens: 1, messages: [] }),
+    );
+
+    const listed = listCheckpoints();
+    expect(listed).toContain('real1');
+    expect(listed).not.toContain('compact-123');
+    expect(listed).not.toContain('compact-456');
+
+    expect(applySnapOp('compact-789').isError).toBe(true); // 保留前缀禁止保存
+    expect(applySnapOp('restore:compact-123').isError).toBe(true); // 旧快照禁恢复
+    expect(loadNotes().keep).toBe('v'); // 恢复被拒后便笺完好
+
+    expect(sanitizeSnapName('compact-1')).toBeNull();
+    expect(sanitizeSnapName('Compact-1')).toBeNull();
+    expect(sanitizeSnapName('compactish')).toBe('compactish');
+  });
+
+  it('缺 notes 的检查点文件恢复被拒绝且不动便笺', () => {
+    mkdirSync(checkpointsDir(), { recursive: true });
+    writeFileSync(join(checkpointsDir(), 'broken.json'), JSON.stringify({ timestamp: Date.now() }));
+    applyNoteOp('safe', 'v');
+    const res = applySnapOp('restore:broken');
+    expect(res.isError).toBe(true);
+    expect(loadNotes().safe).toBe('v');
   });
 });
 

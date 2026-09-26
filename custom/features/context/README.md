@@ -26,7 +26,7 @@
 | `task-records.jsonl` | 每轮任务结构记录（供 task-summarizer） | `PI_TASK_RECORD_FILE` |
 | `logs/level-changes.jsonl` | thinking 档位变更审计 | `PI_LEVEL_CHANGE_FILE` |
 | `logs/prune-refs/` | 工具输出擦除溯源 ref | `PI_PRUNE_REFS_DIR` |
-| `checkpoints/` | 压缩前快照 | `PI_COMPACT_SNAPSHOT_DIR` |
+| `checkpoints/compact/` | 压缩前快照（保留 8 份/7 天；旧版 `checkpoints/compact-*.json` 兼容清理） | `PI_COMPACT_SNAPSHOT_DIR` |
 | `tool-outputs/` | 工具输出归档 | `PI_OUTPUT_ARCHIVE_DIR` |
 | `logs/prefix-fingerprints.jsonl` | 逐请求前缀指纹（定位整段缓存失效，轮转 1MB） | `PI_PREFIX_FINGERPRINT_FILE` |
 | `tmux-registry.json` | 只读，用于背景任务判定 | `PI_TMUX_REGISTRY` |

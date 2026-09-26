@@ -14,7 +14,7 @@
 | `prune.ts` | 消息级擦除（工具输出 + thinking） | `PRUNE_PROTECT_TOKENS`(60K)/`PRUNE_MINIMUM_TOKENS`(30K)/`DEFAULT_KEEP_THINKING_TOKENS`(64K)、`pruneToolResults`、`pruneThinkingBudget`、`sweepPruneRefs` |
 | `prune-dump.ts` | 擦除转储引用目录（14 天清理） | `pruneRefsDir`、`PRUNE_REFS_RETENTION_DAYS`、`buildPruneDumpRef` |
 | `output-archive.ts` | 大工具输出落盘 + 占位符 + 清理 | `ARCHIVE_RETENTION_DAYS`(14)/`ARCHIVE_MAX_TOTAL_BYTES`(200MB)、`archiveOutput`、`archivedStub`、`sweepArchive` |
-| `compression.ts` | 压缩前快照与 JSON 缩减 | `snapshotBeforeCompact`、`pruneSnapshots`、`shrinkHalf`、`compactJson`、`snapshotDir` |
+| `compression.ts` | 压缩前快照（`checkpoints/compact/`，旧版根目录兼容清理）与 JSON 缩减 | `snapshotBeforeCompact`、`pruneSnapshots`、`shrinkHalf`、`compactJson`、`snapshotDir`、`legacySnapshotDir` |
 | `task-gate.ts` | 阈值/门限解析（含 env 覆盖）与后台任务判定 | `ABSOLUTE_TOKENS`/`RESTART_TOKENS`/`COMPACT_COOLDOWN_MS`/`IDLE_MS`/`TASK_GATE`、`resolveContext`、`hasBackgroundTask` |
 | `auto-compact.ts` | 压缩判定与阈值计算 | `computeCompactThreshold`、`makeCompactDecider`、`makeAutoContinueGate` |
 | `prefix-fingerprint.ts` | 逐请求前缀指纹（system/tools/消息头/总量分段哈希） | `fingerprintRequest`、`formatFingerprint`、`systemTextOf`、`FINGERPRINT_HEAD_MESSAGES` |
@@ -38,6 +38,7 @@
 | thinking 保留量 | 64K | `PI_CONTEXT_KEEP_THINKING_TOKENS` |
 | 会话输出预算 | 20K | `PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（`read` 豁免） |
 | 归档目录 | `<PI_MEMORY_DIR>/tool-outputs` | `PI_OUTPUT_ARCHIVE_DIR` |
+| 压缩快照目录 | `<PI_MEMORY_DIR>/checkpoints/compact` | `PI_COMPACT_SNAPSHOT_DIR` |
 
 比例类阈值另可经 `PI_CONTEXT_*_RATIO` 覆盖（`readEnvRatio`）。
 

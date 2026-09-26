@@ -15,7 +15,7 @@
 | `logic.ts` | 纯逻辑 barrel |
 | `config.ts` | 配置/会话名/日志路径（`loadTmuxConfig`、`normalizeSessionName`） |
 | `session.ts` | tmux CLI 封装：探测/启动/读取/发送/等待 |
-| `registry.ts` | 会话注册表与 shutdown 清理 |
+| `registry.ts` | 会话注册表与 shutdown 清理（跨进程文件锁串行化 RMW） |
 
 ## 数据与配置（`portable/memory/`）
 
@@ -23,8 +23,10 @@
 |------|------|----------|
 | `tmux/` | 会话日志目录（轮转 10MB） | `PI_TMUX_LOG_DIR` |
 | `tmux-registry.json` | 本扩展管理的会话注册表 | `PI_TMUX_REGISTRY` |
+| `tmux-registry.json.lock` | 注册表写锁（`open('wx')`+陈旧判定，写入口持锁 RMW） | 随 `PI_TMUX_REGISTRY` |
 
-环境变量：`PI_TMUX_BIN`、`PI_TMUX_PREFIX`、`PI_TMUX_LINES`、`PI_TMUX_TIMEOUT_SEC`、`PI_SESSION_ID`。
+环境变量：`PI_TMUX_BIN`、`PI_TMUX_PREFIX`、`PI_TMUX_LINES`、`PI_TMUX_TIMEOUT_SEC`、`PI_SESSION_ID`、
+`PI_TMUX_LOCK_TIMEOUT_MS`（默认 2000）、`PI_TMUX_LOCK_STALE_MS`（默认 15000）。
 
 ## 完成自动唤醒
 
@@ -39,6 +41,8 @@
 
 - 只管理带 `SESSION_PREFIX` 前缀、且被登记为本 pi 会话（`isPiSession`）的 tmux 会话，不干扰用户手动会话。
 - 日志超限时 `rotateLogIfLarge` 轮转，避免无限增长。
+- 注册表写入口在同一把文件锁内完成「读-改-写」并原子落盘；锁获取超时（默认 2s）会告警并降级为无锁写，
+  绝不死等；持有者崩溃残留的锁按 pid/时间戳判定为陈旧后抢占（避免永久死锁）。
 
 ## 相关
 

@@ -38,6 +38,7 @@ export type { TmuxRunResult, SessionProbe, SessionInfo, ReadOutput, SendOpts, Wa
 export {
   loadRegistry,
   saveRegistry,
+  registryLockPath,
   registerSession,
   unregisterSession,
   pruneRegistry,

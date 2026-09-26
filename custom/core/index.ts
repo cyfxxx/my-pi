@@ -22,6 +22,14 @@ export {
 
 export { scrubSecrets, SECRET_PATTERNS } from './secrets'
 export { writeJSONSync, writeTextSync, writeJSONAtomic } from './atomic-write'
+export {
+  withFileLock,
+  tryAcquireFileLock,
+  isFileLockStale,
+  FILE_LOCK_DEFAULT_TIMEOUT_MS,
+  FILE_LOCK_DEFAULT_STALE_MS,
+} from './file-lock'
+export type { FileLockOptions } from './file-lock'
 export { isBlockedHost, isUrlAllowed } from './net-guard'
 export { ensureDir, readJSONSync, readJSONOr, readJSONL, appendJSONL, appendJSONLRotating } from './fs-json'
 export { localDay, truncateChars, oneLine, formatTokens } from './text'
