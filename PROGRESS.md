@@ -1004,3 +1004,37 @@ intervention、context、web-search、tmux、mode、memory、link、plan-mode、
   `DECISIONS.md` 新增「移除 wechatide-skill 与 repo-size-audit」条目。
 - **验证**：`golden-tasks.sh` 全绿（隔离/注册面/死导出/tsc/vitest 514/补丁/补丁行为/注入面/文档链接/supervisor/种子提示词）；
   packs 内相对链接用一次性脚本核对（`check-doc-links` 按设计排除 `packs/`）。
+
+## 重启续接修复 / 擦除成本反转 / 重启通知注入（第 58 批，2026-09-26）
+
+用户报告两个问题：① 模型调用重启工具后回不到原会话，且重启后无任何自动注入；② API 消耗与
+DSH 相比明显异常（本机 ¥8.04 / 544 请求 / 42.3M tokens vs DSH ¥18.01 / 1765 请求 / 472.9M tokens）。
+
+- **重启续接断裂（supervisor 主循环）**：`EXTRA_ARGS=()` 在**每轮开头**重置，而重启/切换分支在**轮末**
+  写入 `--session`/`--continue` 后 `continue` → 参数被下一轮开头清空，pi 永远空参启动（新建会话）。
+  改为 `EXTRA_ARGS=("${PENDING_ARGS[@]}")` + 立即清空 `PENDING_ARGS`；参数映射抽成纯函数
+  `build_admin_args`（原项目 `pi-wrapper.sh` 在同一处重置+赋值，故无此问题）。
+- **重启通知从未注入**：`consumeRestartLog()` 只有定义没有调用（pi-tools 在 `session_start` 消费并注入
+  "系统已重启。操作: … | 原因: …"）。已在 `custom/features/autopilot/index.ts` 的 `session_start` 接线
+  （`ctx.ui.notify` + `sendUserMessage`），仅交互会话消费以免 headless `-p` 子进程抢先吃掉。
+- **成本归因（用本机会话记录复原真实调用序列）**：`2026-09-26T11-31-12` 会话 105 请求 / 约 250K 上下文
+  / 自动压缩 1 次 = $0.645，其中 16 个请求缓存命中率 < 50%，占 **$0.481（75%）**；若按正常命中率只需 $0.048。
+  离线重放（把真实会话喂给 `pruneToolResults`/`pruneThinkingBudget`，逐条比对相邻请求变换后的消息序列）
+  证明根因是 **`context` 钩子每轮从未改写的历史重算擦除计划**，擦除边界随会话增长前移 →
+  **每轮**都在更靠后的位置与上一轮分叉 → 其后 190K–250K token 全价重发（单次 $0.03）。
+- **决策：每轮擦除默认关闭**（`PI_CONTEXT_ERASE=on` 保留旧行为）。缓存命中价是未命中价的 1/50，
+  擦除 F token 每请求只省 `F×0.003/M`，断裂一次却付 `S×0.15/M` → 回本需 `49×S/F` 次后续请求
+  （S=200K、F=10K → 约 1000 次），不可达。**"减少 token 数量"与"降低费用"是两个目标**，
+  TUI 的 `Σ` 变小不代表花得少。回收上下文交给压缩。见 `DECISIONS.md` 同日条目。
+- **验证**：`bash scripts/test-supervisor.sh` **44 项**通过（新增 `build_admin_args` 9 例 +
+  用 stub CLI 跑真实主循环的端到端 6 例；把修复回退后"第二轮收到 --session"确实失败，回归有效）；
+  vitest **48 文件 565 用例**全绿（新增 `restart-log.test.ts` 4 例、`PER_TURN_ERASE` 3 例）；
+  `tsc` 通过；`bash scripts/golden-tasks.sh --fast` 全绿（隔离/注册面/死导出/补丁/补丁行为/注入面 92 文档/supervisor/种子）。
+- **保持原设计（不改）**：
+  ① 会话中途 `enable_tool` 改工具集——每次全量重算（实测 3 次约 $0.08），但休眠分层本就是显式低频操作，
+  按用户决定保持现状；
+  ② 记忆注入的 `filterInjectedMessages` 去重——与原项目 `pi-memory` **逐字一致**（my-pi 另加
+  `shouldInjectMemory` 去抖，刷新次数比原项目更少）。复核后订正了本批次早先的判断：移除点始终是
+  "上一条注入"（注入追加在轮末，故通常即上一次请求尾部 → 便宜），**并非每次都在头部**；
+  只有会话首次刷新因上一条注入落在第 3 条消息（头部）而整段失效一次（实测 $0.029/会话）。
+  故不修改，仅订正注释与文档（`recall/inject.ts`、`context/README.md`）。

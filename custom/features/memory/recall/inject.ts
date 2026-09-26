@@ -136,9 +136,14 @@ export function filterInjectedMessages<T extends object>(messages: T[]): T[] {
 /**
  * 注入去抖：注入块内容与上次相同则不再注入。
  *
- * 每轮重插（旧注入被 `filterInjectedMessages` 移除 + 新注入追加）会使消息序列在注入点
- * 发生位移，位移点**之后**的前缀缓存全部失效；实测 my-pi 出现单次 170K–316K 全价重算，
- * 且这些事件都紧跟一次注入。内容不变时历史中的旧注入已足够，跳过即可保持前缀稳定。
+ * 重插（旧注入被 `filterInjectedMessages` 移除 + 新注入追加）会使消息序列在**上一条注入
+ * 所处位置**发生位移，位移点之后的前缀缓存失效。多数情况下该位置就是上一次请求的尾部
+ * （注入总是追加在轮末），只影响尾部少量 token；但会话中的**首次**刷新例外——那时上一条
+ * 注入还是第 1 轮的注入（消息序列第 3 条，属头部），会整段失效一次。
+ * 实测（2026-09-26 会话，105 请求）：首次刷新 cacheRead 10.6K/199.5K（$0.029）；
+ * 之后的刷新位移点在 198.5K 处，cacheRead 198.5K/244K（仅尾部失效）。
+ * 故去抖的价值在于**减少刷新次数**（原项目每轮重插，my-pi 仅在内容变化时重插），
+ * 而不是消除位移本身。
  */
 export function shouldInjectMemory(block: string, lastInjectedBlock: string | null): boolean {
   return block.length > 0 && block !== lastInjectedBlock;

@@ -33,6 +33,7 @@
 | 压缩冷却 | 10 分钟 | `PI_CONTEXT_COMPACT_COOLDOWN_MS` |
 | 空闲判定 | 关闭（0） | `PI_CONTEXT_IDLE_MS` |
 | 任务门总开关 | 开 | `PI_CONTEXT_TASK_GATE=off` |
+| 每轮擦除总开关 | **关** | `PI_CONTEXT_ERASE=on` |
 | 工具擦除保护带 | 60K | `PI_CONTEXT_PRUNE_PROTECT_TOKENS` |
 | 工具擦除最小回收 | 30K | `PI_CONTEXT_PRUNE_MINIMUM_TOKENS` |
 | thinking 保留量 | 64K | `PI_CONTEXT_KEEP_THINKING_TOKENS` |
@@ -44,18 +45,24 @@
 
 ## 缓存纪律
 
-- 擦除与压缩**同样断裂一次前缀缓存**：擦除零 LLM 成本，压缩要发一次全价摘要请求 → 顺序固定「先擦除、后压缩」。
+- **每轮擦除默认关闭**（`PI_CONTEXT_ERASE=on` 才启用）。2026-09-26 成本审计：`context` 钩子每轮
+  都用**未改写的历史**重算擦除计划，擦除边界随会话增长前移，于是每轮请求序列都在更靠后的位置
+  与上一轮不同——该点之后全部 token 失去前缀缓存。实测某真实会话 105 请求中 13 个因此以全价
+  重发 190K–250K（单次 $0.03，占该会话 67% 成本），而当轮真正回收只有几千 token。
+  盈亏平衡需 `49×S/F` 次后续请求（S≈上下文、F≈回收量；S=200K/F=10K → 约 1000 次），不可达。
+  回收上下文交给压缩（压缩本就要重建前缀）。详见 `task-gate.ts` 的 `PER_TURN_ERASE` 注释。
 - 压力档文案按档位**固定文本**，且不再写入 system prompt：由 `context/index.ts` 以 `my-pi-context-advice`
   消息 append-only 追加（仅在内容变化时），避免前缀最前处变动导致整段缓存失效。
 - 禁止时间戳/精确数值进入注入面；token 估算统一走 `estimateTokens`。
 - 缓存断裂归因用 `prefix-fingerprint.ts`（记录到 `portable/memory/logs/prefix-fingerprints.jsonl`，`/context fingerprint` 查看）。
+  已知断裂源按代价排序：每轮擦除（已关闭）> 会话中途 `enable_tool` 改工具集 > system prompt 变化 > 记忆注入刷新。
 
 ## 已知限制：warm-prefix 是死代码
 
 `warm-prefix.ts` 的纯逻辑完整，但触发它的 `before_provider_request` 事件只挂在主 agent 循环的 `onPayload` 上；
 压缩走 `agent.streamFunction` 直连且不带 `onPayload`，因此 `isSummarizationMessage` 分支**永不触发**，
 摘要请求按全价计费。补丁点已定位在 vendor `core/sdk.ts` 的 `buildRequestOptions`（需改上游关键路径），
-收益已因擦除生效而下降，**有意延后**——见 [MIGRATION-AUDIT.md](../../../../docs/development/MIGRATION-AUDIT.md) 的 G3
+**有意延后**——见 [MIGRATION-AUDIT.md](../../../../docs/development/MIGRATION-AUDIT.md) 的 G3
 与 DECISIONS 的上下文优化条目。
 
 ## 相关

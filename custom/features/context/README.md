@@ -44,8 +44,12 @@
   一次 256K 压缩的自身开销约 `256K × $0.15/M = $0.038`，而它省下的命中 token 仅值约
   `230K × $0.003/M = $0.0007/请求` → **回本约需 55 个后续请求**。此前"压缩可省 61%"的估算按 1/10 比例算，
   **该结论已作废**（详见 [CONTEXT-MANAGEMENT-COMPARISON.md](../../../docs/development/CONTEXT-MANAGEMENT-COMPARISON.md) 第六节）。
-- 真正的杠杆是**免费擦除**（见下节）：稳态上下文 -53.6%、零 LLM 调用、不依赖回本计算。
-  压缩保留是为了避免超窗与冷缓存后的大额重算，不再是省钱主力。
+- **每轮擦除已默认关闭**（`PI_CONTEXT_ERASE=on` 可开）：它和压缩一样断裂前缀缓存，但压缩只断一次
+  并顺带摘要（一次全价请求），而每轮擦除**每轮都断**——且擦除点随会话增长前移，其后 190K–250K
+  token 全部按全价重发。2026-09-26 实测：某真实会话 105 请求 / 13 个冷请求 / 占该会话 67% 成本，
+  而当轮回收仅几千 token。缓存命中价是未命中价的 1/50，擦除回本需约 `49×S/F` 次后续请求，不可达。
+  见 [budget/README.md](budget/README.md#缓存纪律) 与 `task-gate.ts` 的 `PER_TURN_ERASE`。
+- 压缩保留是为了避免超窗与冷缓存后的大额重算，不再是省钱主力。
 - 如需保守行为（只在长时间空闲后压缩），设 `PI_CONTEXT_IDLE_MS>0`（毫秒）；此时由
   `passesIdleGateAtTurnEnd` 按「回合开始前的空闲」正确判定。打断风险仍由门1/门2 承担。
 
@@ -59,7 +63,12 @@
   重启提示）**不再写入 system prompt**，而是在 `before_agent_start` 以 `my-pi-context-advice` 消息
   **仅在内容变化时追加**（append-only，不删除旧的）：变化点落在尾部，只影响其后的少量 token，
   避免"前缀最前处变化 → 整段缓存失效"（实测单次 170K–316K 全价重算）。
-- 记忆注入同理（`shouldInjectMemory`：内容未变不重插）。
+- 记忆注入同理（`shouldInjectMemory`：内容未变不重插；**原项目 `pi-tools` 每轮都重插，无去抖**，
+  my-pi 是更省的那一侧）。移除旧注入的位移点是**上一条注入的位置**（注入总追加在轮末，故通常就是
+  上一次请求的尾部 → 只影响尾部少量 token）；唯一例外是会话中的**首次**刷新：上一条注入还是第 1 轮
+  注入（消息序列第 3 条，属头部）→ 整段失效一次。实测该次 cacheRead 10.6K/199.5K（$0.029/会话），
+  之后刷新位移点在 198.5K 处（cacheRead 198.5K/244K）。`filterInjectedMessages` 与原项目逐字一致
+  （防注入累积），**保持不变**。
 
 ## 运行时前缀指纹（诊断整段缓存失效）
 
@@ -71,9 +80,9 @@
 
 ## 关键环境变量
 
-`PI_CONTEXT_THINKING_AUTO=off`（关自动切档）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
+`PI_CONTEXT_THINKING_AUTO=off`（关自动切档）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_ERASE=on`（开每轮擦除，默认关）、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
 
-## 确定性擦除（零 LLM 成本，压缩之前）
+## 确定性擦除（零 LLM 成本，默认关闭）
 
 `context` 钩子每轮按序执行三层，**都不产生 LLM 调用**；只有它们兜不住时才轮到 auto-compact：
 
@@ -81,16 +90,22 @@
    会话累计 20K 预算约束，超出后压到 300 token 档。**`read` 豁免会话预算**——它是"凭占位符路径
    读回归档原文"的唯一手段，若也被压到 300 token，`output-archive` 的"可读回"承诺即失效
    （实测长会话后期 read 输出均值仅 155 token）。截断内容经 `archivedStub` 落盘并附路径。
-2. **工具输出擦除**（`budget.pruneToolResults`）：保留最近 2 轮 + 60K 保护带，更早的 toolResult
-   替换为 `[pruned: N chars → ref]`（ref 落盘，14 天/50MB 清理）；可回收量 <30K 时不擦（避免小碎擦）。
-3. **历史 thinking 擦除**（`budget.pruneThinkingBudget`）：保留最近 64K thinking，更早的删除。
+2. **工具输出擦除**（`budget.pruneToolResults`，**仅 `PI_CONTEXT_ERASE=on` 时生效**）：保留最近 2 轮 + 60K 保护带，
+   更早的 toolResult 替换为 `[pruned: N chars → ref]`（ref 落盘，14 天/50MB 清理）；可回收量 <30K 时不擦。
+3. **历史 thinking 擦除**（`budget.pruneThinkingBudget`，同上门控）：保留最近 64K thinking，更早的删除。
 
 落盘引用由 `session_start` 一并清理：`sweepPruneRefs`（擦除 ref，14 天/50MB）与
 `sweepArchive`（工具输出归档，14 天/200MB，此前无任何上限，实测 442 文件仍在增长）。
 
 校准依据（2026-09-25 成本审计，10 小时 / 341K 上下文会话）：thinking 占 **50%**、工具输出占 **46%**；
-而原阈值（120K/80K）与未接线的 thinking 擦除导致**两者全程未生效**，回收压力全落在有损的写入时截断上。
-擦除虽会断裂一次前缀缓存，但比压缩便宜（无 LLM 调用），故顺序固定为"先擦除、后压缩"。
+原阈值（120K/80K）与未接线的 thinking 擦除导致两者全程未生效，回收压力全落在有损的写入时截断上。
+
+**2026-09-26 成本审计推翻了"擦除比压缩便宜"的结论**：离线重放真实会话（105 请求 / 250K 上下文）显示，
+`context` 钩子每轮都从未改写的历史重算擦除计划，擦除边界随会话增长不断前移，于是**每轮**请求序列都在
+一个更靠后的位置与上一轮不同 → 其后全部 token 失去前缀缓存。13 个请求因此以全价重发 190K–250K
+（单次约 $0.03），占该会话成本的 **67%**，而当轮实际回收仅几千 token。缓存命中价是未命中价的 1/50，
+擦除需 `49×S/F` 次后续请求才回本（S=200K、F=10K → 约 1000 次），不可达。故改为默认关闭，仅
+`PI_CONTEXT_ERASE=on` 时按旧行为执行；无前缀缓存的 provider（本地模型）仍可用。
 
 ## 缓存纪律
 

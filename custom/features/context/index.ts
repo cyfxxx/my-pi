@@ -71,6 +71,7 @@ import {
   PRUNE_PROTECT,
   PRUNE_MINIMUM,
   KEEP_THINKING_TOKENS,
+  PER_TURN_ERASE,
   readEnvRatio,
   resolveContext,
   hasBackgroundTask,
@@ -405,23 +406,27 @@ export function register(pi: ExtensionAPI): void {
         modified = true;
       }
 
-      const dumpRef = buildPruneDumpRef(ctx as { sessionManager?: { getSessionId?: () => string | null } });
-      const pruned = pruneToolResults(working as PruneMessage[], {
-        protectTokens: PRUNE_PROTECT,
-        minimumTokens: PRUNE_MINIMUM,
-        dumpRef,
-      });
-      if (pruned.modified) {
-        working = pruned.messages as unknown[];
-        modified = true;
-      }
+      // 每轮擦除默认关闭（PI_CONTEXT_ERASE=on 打开）：它会每轮改写历史中靠前的消息，
+      // 使其后所有 token 失去前缀缓存（实测占单会话 67% 成本）。见 budget/task-gate.ts。
+      if (PER_TURN_ERASE) {
+        const dumpRef = buildPruneDumpRef(ctx as { sessionManager?: { getSessionId?: () => string | null } });
+        const pruned = pruneToolResults(working as PruneMessage[], {
+          protectTokens: PRUNE_PROTECT,
+          minimumTokens: PRUNE_MINIMUM,
+          dumpRef,
+        });
+        if (pruned.modified) {
+          working = pruned.messages as unknown[];
+          modified = true;
+        }
 
-      // 历史 thinking 块按 token 预算擦除。实测长会话中 thinking 可占上下文 ~50%
-      // （10 小时会话：155K/310K），且无 LLM 成本即可回收，必须在压缩之前做。
-      const thinkTrimmed = pruneThinkingBudget(working as PruneMessage[], KEEP_THINKING_TOKENS);
-      if (thinkTrimmed.modified) {
-        working = thinkTrimmed.messages as unknown[];
-        modified = true;
+        // 历史 thinking 块按 token 预算擦除。实测长会话中 thinking 可占上下文 ~50%
+        // （10 小时会话：155K/310K）。注意：擦除点在会话前部，代价是其后全量缓存失效。
+        const thinkTrimmed = pruneThinkingBudget(working as PruneMessage[], KEEP_THINKING_TOKENS);
+        if (thinkTrimmed.modified) {
+          working = thinkTrimmed.messages as unknown[];
+          modified = true;
+        }
       }
 
       if (modified) return { messages: working };

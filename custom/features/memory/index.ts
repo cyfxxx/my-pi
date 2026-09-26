@@ -56,8 +56,11 @@ import type { MemoryCategory, MemoryEntry, RuntimeEnv } from './logic';
 
 export function register(pi: ExtensionAPI): void {
   // 上一次注入块内容。用于"内容未变则不重插"：注入消息由 before_agent_start 追加、
-  // 旧注入由 context 钩子移除，每轮重插会使消息序列在注入点发生位移，位移点之后的前缀
-  // 缓存全部失效（实测单次 170K–316K 全价重算）。内容不变时保留历史中的旧注入即可。
+  // 旧注入由 context 钩子移除，重插会使消息序列在**上一条注入的位置**发生位移，
+  // 该点之后的前缀缓存失效。注入总追加在轮末，故该位置通常就是上一次请求的尾部（便宜）；
+  // 会话语境下的例外是**首次**刷新——上一条注入仍是第 1 轮注入（序列第 3 条，属头部），
+  // 整段失效一次（2026-09-26 实测 $0.029）。故去抖的价值是减少刷新次数，而非消除位移。
+  // 原项目 pi-tools 无去抖（每轮重插），my-pi 更省；filterInjectedMessages 保持一致以防注入累积。
   let lastInjectedBlock: string | null = null;
   // ── ctx_note / ctx_list（便笺，跨压缩存活）──
   registerNotesTools(pi);

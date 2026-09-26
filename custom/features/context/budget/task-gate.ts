@@ -55,6 +55,23 @@ export const PRUNE_MINIMUM = envNum('PI_CONTEXT_PRUNE_MINIMUM_TOKENS', DEFAULT_P
 /** thinking 块保留预算（默认 64K）：更早的 thinking 块删除 */
 export const KEEP_THINKING_TOKENS = envNum('PI_CONTEXT_KEEP_THINKING_TOKENS', DEFAULT_KEEP_THINKING_TOKENS);
 
+/**
+ * 每轮历史擦除开关（PI_CONTEXT_ERASE=on 启用；默认 off）。
+ *
+ * 成本审计（2026-09-26，真实会话：105 请求 / 约 250K 上下文 / 自动压缩 1 次）：
+ * `context` 钩子每轮都拿**未被改写的历史**重算擦除计划，而擦除边界随会话增长前移，
+ * 于是每轮的请求序列都在一个更靠后的位置与上一轮不同——该位置之后全部 token 失去
+ * 前缀缓存。实测 16 个请求因此以全价重发 190K–250K（单次 $0.03，占该会话 67% 成本），
+ * 而每轮真正回收的只有几千 token。
+ *
+ * 盈亏平衡：擦除 F token 的收益 = F×cacheRead 价/请求；断裂一次 = S×input 价（S≈上下文）。
+ * DeepSeek 命中价是未命中价的 1/50，故需 N=49×S/F 次后续请求才回本
+ * （S=200K、F=10K → 约 1000 次），实际会话不可能达到 → 每轮擦除是净亏。
+ * 需要回收上下文时应交给压缩（压缩本来就要重建前缀，附带一次摘要请求）。
+ * 无前缀缓存的 provider（本地模型等）可 PI_CONTEXT_ERASE=on 恢复旧行为。
+ */
+export const PER_TURN_ERASE = process.env.PI_CONTEXT_ERASE === 'on';
+
 /** 读取 0-1 比例环境变量 */
 export function readEnvRatio(name: string): number | undefined {
   const raw = process.env[name];

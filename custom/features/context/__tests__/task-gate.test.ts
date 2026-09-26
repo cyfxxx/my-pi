@@ -1,7 +1,7 @@
 /**
  * task-gate / context-resolver 纯逻辑测试
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -151,5 +151,35 @@ describe('passesIdleGateAtTurnEnd（门3 在 turn_end 的正确判定）', () =>
     expect(
       passesIdleGateAtTurnEnd({ idleMs: IDLE, preTurnIdleAnchor: 0, lastUserActivityTs: now - 1_000, now }),
     ).toBe(false);
+  });
+});
+
+describe('PER_TURN_ERASE（每轮历史擦除开关）', () => {
+  afterEach(() => {
+    delete process.env.PI_CONTEXT_ERASE;
+    vi.resetModules();
+  });
+
+  it('默认关闭：缓存计费下每轮擦除净亏（单会话实测占 67% 成本）', async () => {
+    delete process.env.PI_CONTEXT_ERASE;
+    vi.resetModules();
+    const mod = await import('../budget/task-gate');
+    expect(mod.PER_TURN_ERASE).toBe(false);
+  });
+
+  it('PI_CONTEXT_ERASE=on 才启用（无前缀缓存的 provider）', async () => {
+    process.env.PI_CONTEXT_ERASE = 'on';
+    vi.resetModules();
+    const mod = await import('../budget/task-gate');
+    expect(mod.PER_TURN_ERASE).toBe(true);
+  });
+
+  it('其它取值（1/true/yes）不启用，避免误开', async () => {
+    for (const v of ['1', 'true', 'yes', 'ON']) {
+      process.env.PI_CONTEXT_ERASE = v;
+      vi.resetModules();
+      const mod = await import('../budget/task-gate');
+      expect(mod.PER_TURN_ERASE, `PI_CONTEXT_ERASE=${v} 不应启用`).toBe(false);
+    }
   });
 });

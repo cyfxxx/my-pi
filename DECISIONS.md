@@ -550,3 +550,45 @@ pi-tools 依赖 `agentDir/extensions` 自动发现，my-pi 没有该目录，于
 依赖不可用平台（微信 CLI）与已被自有脚本覆盖（体积审计）的包，只会稀释索引、误导后续选择。
 **替代**：仓库体积/卫生检查用 `bash scripts/doctor.sh`、`git count-objects -vH`、`.gitignore` 纪律；
 如需重新引入，从 pi-tools `packs/` 目录取回即可（git 历史亦保留本次删除）。
+
+### [2026-09-26] 每轮历史擦除默认关闭（缓存计费下的成本反转）
+**背景**：用户报告 my-pi 的 API 消耗与 DSH 相比"明显不正常"（本机后台 ¥8.04 / 544 请求 / 42.3M tokens，
+DSH ¥18.01 / 1765 请求 / 472.9M tokens）。用本机会话记录复原真实调用序列后定位到：单个真实会话
+（`2026-09-26T11-31-12`，105 请求、约 250K 上下文、自动压缩 1 次）计费 $0.645，其中 **16 个请求**
+的输入缓存命中率 < 50%，它们贡献了 **$0.481（75%）**；若这些请求按正常命中率计费，只需 $0.048。
+离线重放这些请求（把真实会话喂给 `pruneToolResults`/`pruneThinkingBudget`，逐条比对相邻请求变换后的消息序列）
+证明：`context` 钩子每轮都从未改写的历史重算擦除计划，而擦除边界随会话增长前移，
+于是**每轮**请求都在一个更靠后的位置与上一轮分叉 → 其后 190K–250K token 全价重发（单次约 $0.03）。
+**选项**：
+1. 保留现状（擦除省 token 数量，TUI 的 `Σ` 好看）
+2. 提高擦除阈值（少擦几次，但每次仍要付一次全量重算）
+3. 只在压缩时擦除（压缩本就要重建前缀）
+4. 每轮擦除默认关闭，`PI_CONTEXT_ERASE=on` 保留旧行为
+**决策**：选项 4，并在 `budget/task-gate.ts` 写明盈亏平衡推导。
+**理由**：缓存命中价是未命中价的 1/50（$0.003 vs $0.15 每 M）。擦除 F token 每请求只省
+`F×0.003/M`，断裂一次却付 `S×0.15/M`（S≈上下文长度）→ 回本需 `49×S/F` 次后续请求
+（S=200K、F=10K → 约 1000 次），真实会话不可达。**在缓存计费下，"减少 token 数量"与"降低费用"
+是两个目标**：擦除改善前者、恶化后者。回收上下文交给压缩（一次全价摘要 + 前缀重建）。
+无前缀缓存的 provider（本地 llama 等）仍可用环境变量恢复。
+**验证**：`tsc` 通过；vitest 48 文件 565 用例全绿（新增 `PER_TURN_ERASE` 三例）；
+`bash scripts/golden-tasks.sh --fast` 全绿；离线重放脚本见 `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md`。
+
+### [2026-09-26] 重启续接参数跨轮保留 + 重启通知注入（对齐 pi-tools）
+**背景**：用户报告"模型调用重启工具后回不到之前的会话，重启后也没有自动注入重启信息"。
+排查确认两处迁移缺口：
+① `scripts/pi-supervisor.sh` 主循环在**每轮开头**执行 `EXTRA_ARGS=()` 重置，而重启/切换会话分支
+是在**轮末**把 `--session`/`--continue` 写入 `EXTRA_ARGS` 后 `continue` → 下一轮开头被清空，
+pi 永远以空参启动（新建会话）。原项目 `pi-wrapper.sh` 是在启动前同一处重置+赋值，故无此问题。
+② `consumeRestartLog()` 在 my-pi 里**只有定义没有调用**（pi-tools 在 `session_start` 消费并注入
+"系统已重启。操作: … | 原因: …"），所以即使续接成功，模型也无从得知进程重启过。
+**决策**：
+1. 主循环改为 `EXTRA_ARGS=("${PENDING_ARGS[@]}")` 后立即清空 `PENDING_ARGS`，各分支写入 `PENDING_ARGS`；
+   参数映射抽成纯函数 `build_admin_args`（`ADMIN_ARGS` 全局数组）。
+2. `custom/features/autopilot/index.ts` 的 `session_start` 消费 `consumeRestartLog()`，`ctx.ui.notify` +
+   `sendUserMessage` 注入恢复提示（仅交互会话消费，避免 headless `-p` 子进程抢先吃掉）。
+3. supervisor 增加 `MY_PI_CLI` / `MY_PI_AGENT_DIR` 覆盖点，供端到端回归测试用 stub CLI 跑**真实主循环**。
+**理由**：这是"功能看起来在工作（重启确实发生了）但契约断裂"的静默失效——必须由测试锁死：
+`test-supervisor.sh` 新增 9 例 `build_admin_args` 单测 + 6 例端到端断言（去掉修复后第 2 轮启动
+确实丢失 `--session`，已验证测试会失败）。
+**验证**：`bash scripts/test-supervisor.sh` 44 项通过（原 29 项）；`tsc` 通过；vitest 全绿
+（新增 `restart-log.test.ts` 4 例，覆盖 supervisor 清 action 后 restartLog 仍可消费的跨语言契约）。
