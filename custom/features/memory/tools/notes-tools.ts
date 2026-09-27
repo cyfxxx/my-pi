@@ -103,7 +103,7 @@ export function registerNotesTools(pi: PiApi): void {
         type: 'string',
         description: "便笺键（点号命名空间，如 'task.current'）。追加 '@ttl=ISO_TIMESTAMP' 自动过期。",
       },
-      value: { type: 'string', description: '存储值。省略=读取；null=删除。', optional: true },
+      value: { type: 'string|null', description: '存储值。省略=读取；null 或 "null"=删除。', optional: true },
     },
     execute: async (params) => {
       const key = params.key as string | undefined;

@@ -16,7 +16,7 @@ import { Type, type TSchema } from 'typebox';
 
 /** 简化的参数声明：features 只描述类型与说明，由适配器编译成 TypeBox schema */
 export interface ToolParameter {
-  type: 'string' | 'number' | 'boolean' | 'string[]' | 'json';
+  type: 'string' | 'string|null' | 'number' | 'boolean' | 'string[]' | 'json';
   description: string;
   /** 缺省为必填；显式置 true 表示可选 */
   optional?: boolean;
@@ -80,6 +80,10 @@ function buildParameterSchema(parameters: Record<string, ToolParameter>): TSchem
       base = Type.Array(Type.String(), { description: spec.description });
     } else if (spec.type === 'json') {
       base = Type.Unknown({ description: spec.description });
+    } else if (spec.type === 'string|null') {
+      // pi-ai validateToolArguments 的 normalizeOptionalNulls 会删除「可选 + null
+      // 不被 schema 接受」的字段；联合 Null 让 null 通过校验直达 execute。
+      base = Type.Union([Type.String(), Type.Null()], { description: spec.description });
     } else if (spec.enum && spec.enum.length > 0) {
       base = Type.Union(
         spec.enum.map((v) => Type.Literal(v)),
