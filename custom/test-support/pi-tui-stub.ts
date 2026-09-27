@@ -9,7 +9,21 @@
  * 本文件不 import 任何 Pi 包，不触碰 custom/ 隔离边界（check-isolation 检查 4）。
  */
 
-export class Key {}
+export class Key {
+  /** 快捷键构造器（plan-mode 等用它注册 Ctrl+Alt+P）；测试只关心返回值可用于注册 */
+  static ctrlAlt(key: string): string {
+    return `ctrl-alt-${key}`;
+  }
+  static ctrl(key: string): string {
+    return `ctrl-${key}`;
+  }
+  static alt(key: string): string {
+    return `alt-${key}`;
+  }
+  static shift(key: string): string {
+    return `shift-${key}`;
+  }
+}
 export class Container {}
 export class Markdown {}
 export class Spacer {}
