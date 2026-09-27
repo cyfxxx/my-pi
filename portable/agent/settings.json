@@ -2,7 +2,7 @@
   "lastChangelogVersion": "0.87.0",
   "defaultProvider": "freellmapi",
   "defaultModel": "auto",
-  "defaultThinkingLevel": "max",
+  "defaultThinkingLevel": "high",
   "steeringMode": "all",
   "followUpMode": "all",
   "packages": [],
