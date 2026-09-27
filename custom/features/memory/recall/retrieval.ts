@@ -222,7 +222,7 @@ export function searchEntries(
 }
 
 export interface SearchTraceInput {
-  caller: 'memory_search' | 'memory_recall';
+  caller: 'memory_search';
   query?: string;
   category?: string;
   tags?: string[];
