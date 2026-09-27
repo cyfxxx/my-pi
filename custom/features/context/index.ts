@@ -11,7 +11,7 @@
 import { join, dirname } from 'node:path';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { registerCommand, sendMessage, getAllToolNames, getThinkingLevel, setThinkingLevel } from '../../adapters/ui-adapter';
+import { registerCommand, sendMessage, getAllToolNames, getActiveTools, getThinkingLevel, setThinkingLevel } from '../../adapters/ui-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
@@ -320,6 +320,18 @@ export function register(pi: ExtensionAPI): void {
       } else if (dormantToolsActive(pi)) {
         // 计划模式退出等会恢复全量工具，这里自愈回分层
         applyToolLayering(pi);
+      }
+      // 统一本次渲染的工具顺序：重启恢复的首轮 options 可能仍是 transcript 顺序，
+      // 而 pi 的 setActiveTools 会以 getActiveToolNames() 重建 _baseSystemPromptOptions；
+      // 两者不一致时，system 的 tools 清单会在后续回合整体重排 -> 整段缓存失效
+      // （2026-09-27 实测：重启后第二个新回合一次 ~80k 全量重放）。
+      // 这里把本次渲染对齐到当前激活顺序，使首轮与后续回合 system 文本一致，
+      // 把两次失效收敛回首轮一次。
+      const sysOptions = (event as { systemPromptOptions?: { selectedTools?: string[] } })
+        .systemPromptOptions;
+      if (sysOptions && Array.isArray(sysOptions.selectedTools)) {
+        const active = getActiveTools(pi);
+        if (active.length > 0) sysOptions.selectedTools = active;
       }
       const usage = ctx.getContextUsage?.();
       let compactThreshold: number | null = null;
