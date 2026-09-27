@@ -167,6 +167,29 @@ describe('context-budget: 真实校准与输出累计', () => {
     expect(report).toContain('bash');
     expect(report).toMatch(/工具输出预算: \d+/);
   });
+
+  it('输出预算按窗口比例缩放（5%，下限 20K、上限 200K，env 覆盖优先）', async () => {
+    const { pruneToolOutput } = await import('../budget/budget');
+    const budgetOf = (): number => {
+      pruneToolOutput('x', 'bash');
+      const m = getOutputReport().match(/工具输出预算: [\d,]+\/([\d,]+)/);
+      return Number((m?.[1] ?? '0').replace(/,/g, ''));
+    };
+    resetAllBudgets();
+    setContextWindow(200_000); // 5% = 10K → 下限 20K
+    expect(budgetOf()).toBe(20_000);
+    resetAllBudgets();
+    setContextWindow(1_000_000); // 5% = 50K
+    expect(budgetOf()).toBe(50_000);
+    resetAllBudgets();
+    setContextWindow(10_000_000); // 5% = 500K → 上限 200K
+    expect(budgetOf()).toBe(200_000);
+    resetAllBudgets();
+    setContextWindow(1_000_000);
+    process.env.PI_CONTEXT_OUTPUT_BUDGET_TOKENS = '12345';
+    expect(budgetOf()).toBe(12_345);
+    delete process.env.PI_CONTEXT_OUTPUT_BUDGET_TOKENS;
+  });
 });
 
 describe('context-budget: 头+尾截断（保留尾部错误）', () => {

@@ -258,10 +258,26 @@ export function truncateByTokens(text: string, maxTokens: number): string {
 
 // ── 输出预算（按 token） ──
 
-/** 会话累计输出预算（env `PI_CONTEXT_OUTPUT_BUDGET_TOKENS` 可覆盖） */
+/** 输出预算占窗口比例（默认 5%）与上下限（防小窗过紧 / 大窗失效） */
+export const OUTPUT_BUDGET_RATIO = 0.05;
+export const OUTPUT_BUDGET_MIN = 20_000;
+export const OUTPUT_BUDGET_MAX = 200_000;
+
+/**
+ * 会话累计输出预算：默认按上下文窗口比例（5%），下限 20K、上限 200K。
+ * env `PI_CONTEXT_OUTPUT_BUDGET_TOKENS` 显式设定时优先于比例。
+ * 窗口取自 setContextWindow 校准后的 totalBudget；未校准（未调 setContextWindow）
+ * 时其默认值较小，比例结果低于下限 → 落到 20K，与旧行为一致。
+ */
 function outputBudgetTokens(): number {
   const n = Number(process.env.PI_CONTEXT_OUTPUT_BUDGET_TOKENS);
-  return Number.isFinite(n) && n > 0 ? n : 20_000;
+  if (Number.isFinite(n) && n > 0) return n;
+  const window = getState().totalBudget;
+  if (Number.isFinite(window) && window > 0) {
+    const scaled = Math.floor(window * OUTPUT_BUDGET_RATIO);
+    return Math.min(OUTPUT_BUDGET_MAX, Math.max(OUTPUT_BUDGET_MIN, scaled));
+  }
+  return OUTPUT_BUDGET_MIN;
 }
 const PER_TOOL_TOKENS = 5_000;
 /**
