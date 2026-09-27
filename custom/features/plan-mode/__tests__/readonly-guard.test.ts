@@ -2,7 +2,8 @@
  * 计划模式只读保护（tool_call 拦截）测试
  *
  * 背景：plan 模式改为在 tool_call 阶段拦截，不再 setActiveTools 切换工具集
- * （切换会让整段前缀缓存失效）。bash 不整体禁用，只放行 isSafeCommand 白名单。
+ * （切换会让整段前缀缓存失效）。bash 判定沿用 core/readonly.ts 的
+ * isReadonlyBashCommand（fail-closed，仅放行只读单命令）。
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
@@ -55,16 +56,15 @@ async function setup(): Promise<{ pi: FakePi; guard: Handler }> {
   const { register } = await import('../index');
   const pi = makeFakePi();
   register(pi as unknown as ExtensionAPI);
-  const guard = (pi.hooks.get('tool_call') ?? [])[0];
-  expect(guard).toBeTruthy();
-  return { pi, guard };
+  const guards = pi.hooks.get('tool_call') ?? [];
+  expect(guards.length).toBe(1);
+  return { pi, guard: guards[0] };
 }
 
 describe('计划模式只读保护', () => {
   it('进入计划模式不切换工具集（避免前缀缓存断裂）', async () => {
     const { pi } = await setup();
-    const planEnter = pi.tools.get('plan_enter')!;
-    await planEnter.execute('c1', {}, undefined, undefined, {});
+    await pi.tools.get('plan_enter')!.execute('c1', {}, undefined, undefined, {});
     expect(pi.setActiveToolsCalls).toBe(0);
   });
 
@@ -81,7 +81,7 @@ describe('计划模式只读保护', () => {
     expect(await guard({ toolName: 'write', input: {} })).toMatchObject({ block: true });
   });
 
-  it('计划模式下 bash 只放行白名单只读命令', async () => {
+  it('计划模式下 bash 只放行只读单命令', async () => {
     const { pi, guard } = await setup();
     await pi.tools.get('plan_enter')!.execute('c1', {}, undefined, undefined, {});
     expect(await guard({ toolName: 'bash', input: { command: 'ls -la' } })).toBeUndefined();

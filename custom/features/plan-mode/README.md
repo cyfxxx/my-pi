@@ -1,6 +1,6 @@
 # plan-mode — 计划模式
 
-只读探索 + 任务面板：进入后在 `tool_call` 阶段拦截 edit/write，bash 只放行只读白名单命令（`isSafeCommand`），**不改工具集**（变更 selectedTools 会让整段前缀缓存失效），用 `todo` 工具维护任务，TUI 显示进度面板。
+只读探索 + 任务面板：进入后在 `tool_call` 阶段拦截 edit/write，bash 只放行只读单命令（`isReadonlyBashCommand`），**不改工具集**（变更 selectedTools 会让整段前缀缓存失效），用 `todo` 工具维护任务，TUI 显示进度面板。
 
 ## 注册面
 

@@ -10,7 +10,6 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { runAskUser } from './core/ask-user';
-import { isSafeCommand } from './core/safe-command';
 import { syncPlanFile, restoreStateFromPlans, listPlans } from './core/plans';
 import type { AskUserParams } from './core/ask-user';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
@@ -97,36 +96,12 @@ export function register(pi: ExtensionAPI): void {
     }
   }
 
-  // 只读保护在 tool_call 阶段拦截（见下方 hook），不再改工具集：
+  // 只读保护在 tool_call 阶段拦截（见下方「只读强制」hook），不再改工具集：
   // 变更 selectedTools 会让整段前缀缓存失效（实测 ~140k 全量重放/次）。
-  // bash 不整体禁用，只放行只读白名单命令（isSafeCommand，迁自 pi-tools）。
   const applyPlanMode = (enabled: boolean): void => {
     planModeEnabled = enabled;
     appendEntry(pi, 'plan-mode', { enabled, timestamp: Date.now() });
   };
-
-  registerHook(pi, {
-    event: 'tool_call',
-    handler: (event) => {
-      if (!planModeEnabled) return;
-      const e = event as { toolName?: string; input?: { command?: unknown } };
-      if (e.toolName === 'edit' || e.toolName === 'write') {
-        return {
-          block: true,
-          reason: `计划模式: ${e.toolName} 被阻止（只读探索，文件修改已禁用）。退出请用 /plan exit 或 plan_exit。`,
-        };
-      }
-      if (e.toolName === 'bash') {
-        const command = typeof e.input?.command === 'string' ? e.input.command : '';
-        if (!isSafeCommand(command)) {
-          return {
-            block: true,
-            reason: `计划模式: 命令被阻止（不在只读白名单中）。退出请用 /plan exit 或 plan_exit。\n命令: ${command}`,
-          };
-        }
-      }
-    },
-  });
 
   // ── ask_user（向用户提问取回选择）──
   registerTool(pi, {
@@ -164,7 +139,7 @@ export function register(pi: ExtensionAPI): void {
       if (planModeEnabled) return '已在计划模式（只读）。';
       applyPlanMode(true);
       ctx?.notify?.('规划模式已启用（模型主动）。');
-      return '已进入计划模式（只读）。用 read/bash/grep 探索后，可调用 plan_exit 退出（需用户确认）。';
+      return '已进入计划模式（只读）。可用 read/grep 与 bash 只读单命令（ls、cat、grep、git status 等，不支持管道与 && 拼接）探索，可调用 plan_exit 退出（需用户确认）。';
     },
   });
 
