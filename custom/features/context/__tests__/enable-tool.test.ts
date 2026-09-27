@@ -6,20 +6,6 @@
  * TOOL_LAYERING 是 task-gate.ts 的模块级常量，需 vi.resetModules() 后在目标 env 下重新 import。
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-
-// 同 search-tool.test.ts：绕过 vendor/pi 的 TUI/主题模块（注册期不涉及渲染）
-vi.mock('@earendil-works/pi-tui', () => ({
-  Key: {},
-  Container: class {},
-  Markdown: class {},
-  Spacer: class {},
-  Text: class {},
-  truncateToWidth: (s: string) => s,
-  visibleWidth: (s: string) => s.length,
-}));
-vi.mock('@earendil-works/pi-coding-agent', () => ({
-  getMarkdownTheme: () => ({}),
-}));
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
 interface FakeTool {

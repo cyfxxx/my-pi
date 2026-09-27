@@ -6,22 +6,7 @@
  * 故用 fake pi 驱动 register() 捕获工具定义后直接调用 execute。
  * 数据目录经 PI_MEMORY_DIR 隔离。
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-
-// Pi 的 TUI/主题模块属于 vendor/pi，运行时由 pi 的 jiti 加载，测试环境解析不到；
-// 工具 execute 不涉及渲染，用最小 mock 绕过（execute 路径不使用这些导出）。
-vi.mock('@earendil-works/pi-tui', () => ({
-  Key: {},
-  Container: class {},
-  Markdown: class {},
-  Spacer: class {},
-  Text: class {},
-  truncateToWidth: (s: string) => s,
-  visibleWidth: (s: string) => s.length,
-}));
-vi.mock('@earendil-works/pi-coding-agent', () => ({
-  getMarkdownTheme: () => ({}),
-}));
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
