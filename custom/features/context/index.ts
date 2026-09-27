@@ -204,26 +204,25 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // 注册工具：enable_tool —— 仅在按需加载开启时有意义（默认全部常驻，见 TOOL_LAYERING）
-  registerTool(pi, {
-    name: 'enable_tool',
-    description: TOOL_LAYERING
-      ? `启用休眠工具组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）。启用后工具列表更新一次（前缀缓存重算），本会话内保持，重启恢复默认；已启用组再次启用无副作用。`
-      : '工具按需加载已关闭（默认）：全部工具 schema 已常驻，无需调用本工具。',
-    parameters: {
-      group: {
-        type: 'string',
-        enum: SLEEPING_GROUPS.map((g) => g.name),
-        description: '要启用的休眠工具组名（按需加载关闭时无操作）',
+  // 注册工具：enable_tool —— 仅在按需加载开启时注册
+  // 默认（TOOL_LAYERING=false）全部工具 schema 常驻，工具本身无操作，注册只会造成模型空转，故不注册
+  if (TOOL_LAYERING) {
+    registerTool(pi, {
+      name: 'enable_tool',
+      description: `启用休眠工具组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）。启用后工具列表更新一次（前缀缓存重算），本会话内保持，重启恢复默认；已启用组再次启用无副作用。`,
+      parameters: {
+        group: {
+          type: 'string',
+          enum: SLEEPING_GROUPS.map((g) => g.name),
+          description: '要启用的休眠工具组名',
+        },
       },
-    },
-    execute: async (args) => {
-      const group = typeof args.group === 'string' ? args.group : '';
-      const r = enableGroup(pi, group);
-      if (!r.ok) return r.message;
-      return r.message;
-    },
-  });
+      execute: async (args) => {
+        const group = typeof args.group === 'string' ? args.group : '';
+        return enableGroup(pi, group).message;
+      },
+    });
+  }
 
   // 注册工具：thinking_level —— 模型建议切档，规则审批（死区/压力方向）
   registerTool(pi, {

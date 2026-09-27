@@ -52,7 +52,6 @@
       "ctx_note",
       "ctx_snap",
       "memory_forget",
-      "memory_recall",
       "memory_search",
       "memory_stats",
       "memory_store"

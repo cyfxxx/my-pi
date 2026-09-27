@@ -25,10 +25,10 @@ if (!existsSync(SEEDS)) {
 
 /** 扩展提供的工具名（pi 内置 read/bash/edit/write/grep/find/ls 不在此列） */
 const EXT_TOOLS = [
-  'memory_store', 'memory_search', 'memory_recall', 'memory_stats', 'memory_forget',
+  'memory_store', 'memory_search', 'memory_stats', 'memory_forget',
   'ctx_exec', 'ctx_list', 'ctx_note', 'ctx_snap',
   'tmux_run', 'tmux_status', 'tmux_read', 'tmux_send', 'tmux_stop', 'tmux_wait',
-  'enable_tool', 'thinking_level', 'subagent', 'ask_user', 'plan_enter', 'plan_exit', 'todo',
+  'thinking_level', 'subagent', 'ask_user', 'plan_enter', 'plan_exit', 'todo',
   'link_send', 'link_status',
   'browser_navigate', 'browser_screenshot', 'browser_click', 'browser_type', 'browser_close',
   'voice_transcribe', 'voice_speak', 'voice_record',

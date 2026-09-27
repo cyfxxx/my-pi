@@ -5,7 +5,7 @@
 
 ## 注册面
 
-- 工具：`enable_tool`（按需加载默认关闭，此时恒为无操作）、`thinking_level`
+- 工具：`thinking_level`；`enable_tool` 仅在 `PI_CONTEXT_TOOL_LAYERING=on` 时注册（默认全部工具常驻，注册亦无操作）
 - 命令：`/context <usage|report|fingerprint|help>`、`/tools <list|enable <组>|help>`
 - 钩子：`session_start`、`before_agent_start`、`input`、`turn_start`、`context`、`tool_call`、`tool_result`、`message_update`、`turn_end`、`before_provider_request`（前缀指纹）、`session_compact`、`session_before_compact`（快照）、`agent_settled`
 

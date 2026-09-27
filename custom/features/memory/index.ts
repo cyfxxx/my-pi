@@ -2,7 +2,7 @@
  * Memory Feature — 入口（只通过 adapters 与 Pi 交互）
  *
  * 迁移自 pi-tools `agent/extensions/pi-memory/{index,tools,commands}.ts`。
- * 提供 5 个记忆工具（store/search/recall/stats/forget）+ 4 个 ctx_* 工具
+ * 提供 4 个记忆工具（store/search/stats/forget；recall 已并入 search 的 summaries 参数）+ 4 个 ctx_* 工具
  * （ctx_note/ctx_list、ctx_snap、ctx_exec）、`/memory` 命令、
  * 每轮注入块（消息注入，缓存友好）、以及 compaction 标记。
  *
@@ -180,7 +180,7 @@ export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
     name: 'memory_search',
     description:
-      '从持久记忆库检索知识。支持关键词/类别/标签过滤，结果按相关度排序（BM25 + 置信度/时效/引用频率）。',
+      '从持久记忆库检索知识。支持关键词/类别/标签过滤，结果按相关度排序（BM25 + 置信度/时效/引用频率）；summaries=true 附带最近会话摘要（跨会话衔接）。',
     parameters: {
       query: { type: 'string', description: '搜索关键词（匹配标题、标签、内容）', optional: true },
       category: { type: 'string', enum: CATEGORIES, description: '按类别过滤', optional: true },
@@ -188,6 +188,7 @@ export function register(pi: ExtensionAPI): void {
       limit: { type: 'number', description: '返回条数上限（默认 5）', optional: true },
       env: { type: 'string', enum: ENVIRONMENTS, description: '按运行环境过滤（缺省=当前环境+all）', optional: true },
       asOf: { type: 'string', description: 'ISO 时间点：返回该时刻有效的记忆（回溯查询）', optional: true },
+      summaries: { type: 'boolean', description: '附带最近会话摘要（跨会话衔接用，默认 false）', optional: true },
     },
     execute: async (params) => {
       const t0 = Date.now();
@@ -213,7 +214,6 @@ export function register(pi: ExtensionAPI): void {
         hits: scored.map((x) => ({ id: x.entry.id, title: x.entry.title, score: x.score })),
         tookMs: Date.now() - t0,
       });
-      if (!results.length) return '(无匹配的记忆)';
       const lines = results.map((e, i) => {
         const age = Math.round((Date.now() - new Date(e.createdAt).getTime()) / (1000 * 60 * 60 * 24));
         const linkNote = e.links?.length ? ` ↔关联${e.links.length}条` : '';
@@ -221,49 +221,17 @@ export function register(pi: ExtensionAPI): void {
    置信度: ${e.confidence} | 引用: ${e.recurrence} 次 | ${age} 天前
    ${e.content.length > 200 ? e.content.slice(0, 200) + '...' : e.content}`;
       });
-      return `记忆搜索结果 (${results.length} 条):\n${lines.join('\n')}`;
-    },
-  });
-
-  // ── memory_recall ──
-  registerTool(pi, {
-    name: 'memory_recall',
-    description: '综合检索长期记忆与历史会话摘要，用于跨会话衔接。',
-    parameters: {
-      query: { type: 'string', description: '检索关键词（可空：仅返回高质量记忆）', optional: true },
-      limit: { type: 'number', description: '记忆条数上限（默认 3）', optional: true },
-      summaries: { type: 'boolean', description: '是否附带最近会话摘要（默认 false）', optional: true },
-    },
-    execute: async (params) => {
-      const t0 = Date.now();
-      const entries = loadEntries();
-      const limit = typeof params.limit === 'number' ? params.limit : 3;
-      const scored = searchEntriesWithScores(entries, params.query as string | undefined, undefined, undefined, limit, detectEnvironment());
-      const results = scored.map((x) => x.entry);
-      touchAccessedAt(entries, results.map((e) => e.id));
-      logSearchTrace({
-        caller: 'memory_recall',
-        query: params.query as string | undefined,
-        limit,
-        hits: scored.map((x) => ({ id: x.entry.id, title: x.entry.title, score: x.score })),
-        tookMs: Date.now() - t0,
-      });
-      const blocks: string[] = [];
-      blocks.push(
-        results.length
-          ? '相关记忆:\n' + results.map((e, i) => `${i + 1}. [${e.category}] ${e.title}: ${e.content.slice(0, 200)}`).join('\n')
-          : '(无相关记忆)',
-      );
+      const base = results.length
+        ? `记忆搜索结果 (${results.length} 条):\n${lines.join('\n')}`
+        : '(无匹配的记忆)';
       if (params.summaries === true) {
         const summaries = [...loadSummaries()].sort((a, b) => (a.ts < b.ts ? 1 : -1)).slice(0, 5);
-        blocks.push(
-          summaries.length
-            ? '最近会话摘要:\n' +
-                summaries.map((s, i) => `${i + 1}. ${s.ts.slice(0, 10)} 「${s.title}」 — ${s.fullText.slice(0, 150)}`).join('\n')
-            : '(暂无会话摘要)',
-        );
+        const block = summaries.length
+          ? '最近会话摘要:\n' + summaries.map((s, i) => `${i + 1}. ${s.ts.slice(0, 10)} 「${s.title}」 — ${s.fullText.slice(0, 150)}`).join('\n')
+          : '(暂无会话摘要)';
+        return `${base}\n\n${block}`;
       }
-      return blocks.join('\n\n');
+      return base;
     },
   });
 

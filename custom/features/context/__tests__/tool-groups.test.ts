@@ -58,7 +58,7 @@ describe('tool-groups: 摘要缓存友好', () => {
   });
 
   it('groupsWithTools 过滤未迁移功能的分组', () => {
-    const present = new Set(['browser_navigate', 'memory_recall', 'web_fetch', 'read']);
+    const present = new Set(['browser_navigate', 'memory_stats', 'web_fetch', 'read']);
     const names = groupsWithTools(present).map((g) => g.name);
     expect(names).toContain('browser-core');
     expect(names).toContain('memory-advanced');

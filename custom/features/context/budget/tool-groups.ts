@@ -90,8 +90,8 @@ export const SLEEPING_GROUPS: ToolGroup[] = [
   // memory-advanced：记忆扩展工具（5 工具），需要跨会话笔记/历史查询时启用
   {
     name: 'memory-advanced',
-    description: '记忆扩展：笔记存储/列表/快照/历史召回/统计（5 工具）',
-    tools: ['ctx_note', 'ctx_list', 'ctx_snap', 'memory_recall', 'memory_stats'],
+    description: '记忆扩展：笔记存储/列表/快照/统计（4 工具）',
+    tools: ['ctx_note', 'ctx_list', 'ctx_snap', 'memory_stats'],
   },
   // tmux-advanced：Tmux 扩展工具（3 工具），需要状态查询/交互/等待时启用
   {
