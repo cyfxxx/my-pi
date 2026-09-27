@@ -1,16 +1,16 @@
 {
   "device": "localhost",
-  "generatedAt": "2026-09-26T11:39:05.903Z",
+  "generatedAt": "2026-09-27T10:06:27.090Z",
   "windowDays": 30,
-  "totalCalls": 826,
+  "totalCalls": 1015,
   "tools": {
     "read": {
-      "calls": 122,
+      "calls": 164,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068800068,
-      "lastTs": 1790422558102
+      "lastTs": 1790427169095
     },
     "find": {
       "calls": 1,
@@ -53,20 +53,20 @@
       "lastTs": 1790293388468
     },
     "edit": {
-      "calls": 82,
+      "calls": 110,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810151,
-      "lastTs": 1790293344550
+      "lastTs": 1790427206046
     },
     "bash": {
-      "calls": 550,
+      "calls": 621,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810163,
-      "lastTs": 1790422575110
+      "lastTs": 1790503581532
     },
     "memory_search": {
       "calls": 3,
@@ -77,12 +77,12 @@
       "lastTs": 1790260360635
     },
     "memory_store": {
-      "calls": 5,
+      "calls": 9,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068815591,
-      "lastTs": 1790293442402
+      "lastTs": 1790427205954
     },
     "web_search": {
       "calls": 2,
@@ -101,12 +101,12 @@
       "lastTs": 1790260872827
     },
     "todo": {
-      "calls": 13,
+      "calls": 33,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068826204,
-      "lastTs": 1790422566011
+      "lastTs": 1790424636701
     },
     "voice_transcribe": {
       "calls": 1,
@@ -149,20 +149,20 @@
       "lastTs": 1790068838788
     },
     "subagent": {
-      "calls": 6,
+      "calls": 12,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068870686,
-      "lastTs": 1790292046993
+      "lastTs": 1790425731621
     },
     "enable_tool": {
-      "calls": 3,
+      "calls": 7,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068875919,
-      "lastTs": 1790086955324
+      "lastTs": 1790427129027
     },
     "web_fetch": {
       "calls": 1,
@@ -181,12 +181,52 @@
       "lastTs": 1790086958052
     },
     "admin_restart": {
-      "calls": 3,
+      "calls": 4,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790258998965,
-      "lastTs": 1790290060210
+      "lastTs": 1790426834498
+    },
+    "autopilot_status": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1790423415802,
+      "lastTs": 1790423415802
+    },
+    "link_status": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1790423415805,
+      "lastTs": 1790423415805
+    },
+    "ctx_exec": {
+      "calls": 5,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1790423462711,
+      "lastTs": 1790426099998
+    },
+    "browser_navigate": {
+      "calls": 4,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1790426500770,
+      "lastTs": 1790427140103
+    },
+    "browser_evaluate": {
+      "calls": 2,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1790427144364,
+      "lastTs": 1790427157710
     }
   }
 }
