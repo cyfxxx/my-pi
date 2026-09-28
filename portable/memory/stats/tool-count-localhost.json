@@ -1,16 +1,16 @@
 {
   "device": "localhost",
-  "generatedAt": "2026-09-28T10:44:28.573Z",
+  "generatedAt": "2026-09-28T11:09:55.899Z",
   "windowDays": 30,
-  "totalCalls": 1412,
+  "totalCalls": 1493,
   "tools": {
     "read": {
-      "calls": 206,
+      "calls": 213,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068800068,
-      "lastTs": 1790513021586
+      "lastTs": 1790593366828
     },
     "find": {
       "calls": 1,
@@ -53,20 +53,20 @@
       "lastTs": 1790513466191
     },
     "edit": {
-      "calls": 135,
+      "calls": 138,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810151,
-      "lastTs": 1790513461642
+      "lastTs": 1790593371182
     },
     "bash": {
-      "calls": 839,
+      "calls": 905,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810163,
-      "lastTs": 1790513735134
+      "lastTs": 1790593734172
     },
     "memory_search": {
       "calls": 4,
@@ -117,12 +117,12 @@
       "lastTs": 1790511864905
     },
     "tmux_run": {
-      "calls": 8,
+      "calls": 9,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068832781,
-      "lastTs": 1790510658052
+      "lastTs": 1790593033367
     },
     "memory_forget": {
       "calls": 2,
@@ -133,12 +133,12 @@
       "lastTs": 1790510469738
     },
     "tmux_read": {
-      "calls": 4,
+      "calls": 5,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068838731,
-      "lastTs": 1790510669973
+      "lastTs": 1790593123956
     },
     "tmux_stop": {
       "calls": 3,
@@ -237,12 +237,12 @@
       "lastTs": 1790510433357
     },
     "ask_user": {
-      "calls": 4,
+      "calls": 5,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790504163075,
-      "lastTs": 1790511063121
+      "lastTs": 1790592597625
     },
     "ctx_note": {
       "calls": 9,
@@ -333,12 +333,12 @@
       "lastTs": 1790510452285
     },
     "schedule_task": {
-      "calls": 2,
+      "calls": 4,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790510460184,
-      "lastTs": 1790510464600
+      "lastTs": 1790593373130
     },
     "ctx_snap": {
       "calls": 2,
