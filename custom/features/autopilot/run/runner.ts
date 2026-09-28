@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderPrompt } from '../store/storage';
+import { logDir } from '../store/paths';
 import type { Task } from '../types';
 
 export interface TaskRunResult {
@@ -82,9 +83,19 @@ export function runTaskOnce(task: Task, cwd: string, timeoutMs = task.maxRunTime
       settled = true;
       clearTimeout(timer);
       const output = extractRunOutput(stdout.split('\n'));
+      const failed = exitCode !== 0 || !!errMsg;
+      // Patch (runner-failure-log): 失败/超时先把完整 stdout/stderr 落盘。
+      // 超时路径 SIGKILL 子进程后内存输出即消失，tasks.json 只剩一句「任务超时」，
+      // 无法区分卡在脚本、pre-push hook 还是模型回合。
+      const logFile = failed
+        ? writeRunLog(task, { exitCode, errMsg, durationMs: Date.now() - started, stdout, stderr })
+        : null;
+      const base =
+        (errMsg ? `${errMsg}\n${output}` : output).slice(0, 4000) ||
+        (exitCode === 0 ? '(无输出)' : `exit ${exitCode}`);
       resolve({
         result: exitCode === 0 && !errMsg && output ? 'success' : 'failed',
-        output: (errMsg ? `${errMsg}\n${output}` : output).slice(0, 4000) || (exitCode === 0 ? '(无输出)' : `exit ${exitCode}`),
+        output: logFile ? `${base}\n[诊断日志] ${logFile}` : base,
         // 保留真实退出码：124=超时（ops.errClassOf 依赖它判定 timeout），不要被 errMsg 覆盖为 1
         exitCode,
         durationMs: Date.now() - started,
@@ -123,6 +134,63 @@ export function runTaskOnce(task: Task, cwd: string, timeoutMs = task.maxRunTime
     proc.on('error', (err: Error) => finish(1, `子进程启动失败: ${err.message}`));
     proc.on('close', (code) => finish(code ?? 0));
   });
+}
+
+interface RunLogInfo {
+  exitCode: number;
+  errMsg?: string;
+  durationMs: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * 失败/超时诊断落盘到 scheduler/logs/<taskId>-<ISO>.log（按任务保留最近 10 份）。
+ * 失败返回 null，不阻断任务结果。
+ */
+export function writeRunLog(task: Task, info: RunLogInfo): string | null {
+  try {
+    const dir = logDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `${task.id}-${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
+    fs.writeFileSync(
+      file,
+      [
+        '# autopilot run log',
+        `task: ${task.name} (${task.id})`,
+        `time: ${new Date().toISOString()}`,
+        `exitCode: ${info.exitCode}`,
+        `durationMs: ${info.durationMs}`,
+        `reason: ${info.errMsg ?? ''}`,
+        '',
+        '## stderr',
+        info.stderr || '(empty)',
+        '',
+        '## stdout (pi JSONL)',
+        info.stdout || '(empty)',
+        '',
+      ].join('\n'),
+    );
+    pruneRunLogs(task.id, 10);
+    return file;
+  } catch {
+    return null;
+  }
+}
+
+function pruneRunLogs(taskId: string, keep: number): void {
+  const dir = logDir();
+  const own = fs
+    .readdirSync(dir)
+    .filter((f) => f.startsWith(`${taskId}-`) && f.endsWith('.log'))
+    .sort();
+  for (const f of own.slice(0, Math.max(0, own.length - keep))) {
+    try {
+      fs.unlinkSync(path.join(dir, f));
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /** 任务运行临时目录（隔离，含 pid） */
