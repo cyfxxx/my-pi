@@ -1,0 +1,83 @@
+diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
+index 59e64492c..ae7e56f8b 100644
+--- a/packages/coding-agent/src/modes/interactive/components/footer.ts
++++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
+@@ -86,20 +86,12 @@ export class FooterComponent implements Component {
+ 
+ 		// Calculate cumulative usage from ALL session entries (not just post-compaction messages)
+ 		const usageTotals = createUsageTotals();
+-		let latestCacheHitRate: number | undefined;
+-		const recentTurnUsage: Array<{ promptTokens: number; cacheRead: number }> = [];
+ 
+ 		for (const entry of this.session.sessionManager.getEntries()) {
+ 			if (entry.type === "usage") {
+ 				addUsageToTotals(usageTotals, entry.usage);
+ 			} else if (entry.type === "message" && entry.message.role === "assistant") {
+ 				addUsageToTotals(usageTotals, entry.message.usage);
+-
+-				const latestPromptTokens =
+-					entry.message.usage.input + entry.message.usage.cacheRead + entry.message.usage.cacheWrite;
+-				latestCacheHitRate =
+-					latestPromptTokens > 0 ? (entry.message.usage.cacheRead / latestPromptTokens) * 100 : undefined;
+-				recentTurnUsage.push({ promptTokens: latestPromptTokens, cacheRead: entry.message.usage.cacheRead });
+ 			} else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
+ 				addUsageToTotals(usageTotals, entry.message.usage);
+ 			} else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
+@@ -131,36 +123,19 @@ export class FooterComponent implements Component {
+ 
+ 		// Build stats line
+ 		// Patch (004-footer-tweaks): 前 3 字段改为 Σ总输入(prompt 总量=命中+未命中) / ↑累计未命中 / ↓累计输出；R/W 并入 Σ。
++		// Patch (007-footer-reorder): 顺序定为 Σ总输入 → ↓输出 → CH会话累计 → ¥费用 → 上下文 → ⇅速度；
++		// 去掉与 Σ 重复的 ↑未命中，CH 由「最近一轮/20 轮窗口」双值收敛为单一会话累计命中率。
+ 		const sessionPromptTotal = usageTotals.input + usageTotals.cacheRead + usageTotals.cacheWrite;
+ 		const statsParts = [];
+ 		if (sessionPromptTotal > 0) statsParts.push(`Σ${formatTokens(sessionPromptTotal)}`);
+-		if (usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
+ 		if (usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
+-		// Patch (006-footer-cost-and-cache-window): CH 左=最近一轮，右=最近 20 轮滑动窗口。
+-		// 会话累计值被早期未命中轮次稀释（重启/压缩后首轮全量重发），长期停在 95% 附近，
+-		// 无法反映当前缓存健康状况；滑动窗口对应当前上下文规模，健康时应稳定在 99%+。
+-		const CACHE_WINDOW_TURNS = 20;
+-		const cacheWindow = recentTurnUsage.slice(-CACHE_WINDOW_TURNS);
+-		const windowPromptTokens = cacheWindow.reduce((sum, turn) => sum + turn.promptTokens, 0);
+-		const windowCacheHitRate =
+-			windowPromptTokens > 0
+-				? (cacheWindow.reduce((sum, turn) => sum + turn.cacheRead, 0) / windowPromptTokens) * 100
+-				: undefined;
+-		if (
+-			(usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) &&
+-			(latestCacheHitRate !== undefined || windowCacheHitRate !== undefined)
+-		) {
+-			const hitRates = [];
+-			if (latestCacheHitRate !== undefined) hitRates.push(latestCacheHitRate.toFixed(1));
+-			if (windowCacheHitRate !== undefined) hitRates.push(windowCacheHitRate.toFixed(1));
+-			statsParts.push(`CH${hitRates.join("/")}%`);
++		// Patch (007-footer-reorder): CH 取会话累计命中率（cacheRead / prompt 总量）。
++		const sessionCacheHitRate =
++			sessionPromptTotal > 0 ? (usageTotals.cacheRead / sessionPromptTotal) * 100 : undefined;
++		if ((usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) && sessionCacheHitRate !== undefined) {
++			statsParts.push(`CH${sessionCacheHitRate.toFixed(1)}%`);
+ 		}
+ 
+-		// Patch (005-footer-speed-and-scrollback): 输出速度并入 stats 行——与 token 指标同类，
+-		// 沿用 dim 风格；此前它作为独立 status 行且未 dim，与上下两行视觉不一致。
+-		const speedStatus = this.footerData.getExtensionStatuses().get("tps");
+-		if (speedStatus) statsParts.push(sanitizeStatusText(speedStatus));
+-
+ 		// Kimi Coding is subscription-backed despite using API-key authentication.
+ 		const usingSubscription = state.model
+ 			? state.model.provider === "kimi-coding" || this.session.modelRuntime.isUsingSubscription(state.model.provider)
+@@ -216,6 +191,13 @@ export class FooterComponent implements Component {
+ 			statsParts.push(`${theme.fg("dim", "•")} ${theme.bold(theme.fg("warning", "xp"))}`);
+ 		}
+ 
++		// Patch (005-footer-speed-and-scrollback): 输出速度并入 stats 行——与 token 指标同类，
++		// 沿用 dim 风格；此前它作为独立 status 行且未 dim，与上下两行视觉不一致。
++		// Patch (007-footer-reorder): 速度移到 stats 行末位；因上下文色码 reset 会清掉外层 dim，
++		// 这里显式自带 dim 以保证着色一致。
++		const speedStatus = this.footerData.getExtensionStatuses().get("tps");
++		if (speedStatus) statsParts.push(theme.fg("dim", sanitizeStatusText(speedStatus)));
++
+ 		let statsLeft = statsParts.join(" ");
+ 
+ 		// Add model name on the right side, plus thinking level if model supports it

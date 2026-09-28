@@ -12,7 +12,8 @@ patches/
 ├── 003-tab-completion-fix.patch  # Tab 斜杠命令参数补全
 ├── 004-footer-tweaks.patch    # footer 增强（实时上下文/双缓存率/人民币成本/重启提示）
 ├── 005-footer-speed-and-scrollback.patch  # 速度并入 footer stats 行 + regular 模式保留 scrollback
-└── 006-footer-cost-and-cache-window.patch  # 汇率可配置 + CH 右值改最近 20 轮滑动窗口
+├── 006-footer-cost-and-cache-window.patch  # 汇率可配置 + CH 右值改最近 20 轮滑动窗口
+└── 007-footer-reorder.patch   # stats 行重排 + 去掉 ↑未命中 + CH 收敛为会话累计单值
 ```
 
 ## 补丁命名规范
@@ -31,6 +32,7 @@ patches/
 | `004-footer-tweaks.patch` | footer 增强（合并 pi-tools 四个 dist 补丁）：实时上下文 token 显示+双指标着色（黄=压缩参考线 `PI_CONTEXT_ABSOLUTE_TOKENS` 默认 256K，红=超窗口 80%）；CH 实时/会话双命中率；`Σ/↑/↓` 字段与人民币成本；>40% 窗口追加 `⚠` 重启提示 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `005-footer-speed-and-scrollback.patch` | ① 输出速度（status key `tps`）并入 footer stats 行并沿用 dim 风格（此前为独立未着色行），其余扩展状态行统一 dim；② regular 模式 `fullRender(true)` 去掉 `ESC[3J`，宽度变化/内容收缩不再清空 scrollback（解决工作过程中无法向上滚动查看历史） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts`、`vendor/pi/packages/tui/src/tui-main-screen.ts` |
 | `006-footer-cost-and-cache-window.patch` | ① 成本换算汇率 `CNY_PER_USD` 由硬编码 6.77 改为可配置（`PI_CNY_PER_USD`，默认 7.05）；② CH 右值由“会话累计命中率”改为“最近 20 轮滑动窗口命中率”——累计值被早期未命中轮次稀释（重启/压缩后首轮全量重发）长期停在 95% 附近，滑动窗口随上下文规模贴近真实健康度（正常 99%+） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
+| `007-footer-reorder.patch` | footer stats 行顺序定为 `Σ总输入 → ↓输出 → CH会话累计 → ¥费用 → 上下文 → ⇅速度`（速度移末位并自带 dim，抵消上下文色码 reset）；移除与 Σ 重复的 `↑` 未命中；CH 由「最近一轮/20 轮窗口」双值收敛为单一会话累计命中率 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 
 ## 验证补丁
 
@@ -41,7 +43,7 @@ bash scripts/check-features.sh          # 补丁可应用或已应用（含顺�
 bash scripts/golden-tasks.sh --fast     # 同上 + 补丁行为标记守门
 ```
 
-> 不要用 `git apply --check --reverse` 逐个判定：004/005/006 都改 `footer.ts`，顺序叠加后
+> 不要用 `git apply --check --reverse` 逐个判定：004/005/006/007 都改 `footer.ts`，顺序叠加后
 > 单个补丁的 reverse-check 会假失败。判定以**提交历史**为准（`scripts/lib-vendor.sh` 的
 > `vendor_patch_applied`，匹配 `local: NNN-*` 本地提交）；行为是否还在由
 > `scripts/check-patches-behavior.mjs` 断言关键符号/自标记。
