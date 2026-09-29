@@ -114,7 +114,17 @@ async function main() {
   );
 
   const index = await fetch(`${BASE}/`, { headers: { cookie } });
-  check('GET / 带 cookie 返回前端页面', index.status === 200 && (await index.text()).includes('id="terminal"'));
+  const indexHtml = await index.text();
+  check('GET / 带 cookie 返回前端页面', index.status === 200 && indexHtml.includes('id="terminal"'));
+
+  // 资源缓存穿透：第三方资源带 immutable 长缓存，URL 必须带版本戳，否则换 xterm 版本后
+  // 浏览器会继续用旧副本（升级 xterm 时曾因此让"触摸滚动修复"看起来没生效）。
+  const versionMatch = /\/assets\/xterm\.js\?v=([0-9a-f]{10})/.exec(indexHtml);
+  check('index.html 的第三方资源带内容版本戳', versionMatch !== null && !indexHtml.includes('__ASSET_V__'));
+  if (versionMatch !== null) {
+    const versioned = await fetch(`${BASE}/assets/xterm.js?v=${versionMatch[1]}`);
+    check('带版本戳的资源 URL 仍可访问（路由按 pathname 匹配）', versioned.status === 200);
+  }
 
   for (const [path, needle] of [
     ['/assets/xterm.js', 'Terminal'],

@@ -12,7 +12,8 @@
  * 且会话 cookie 刻意不带 `Secure`（回环 HTTP 下浏览器会丢弃带 Secure 的 cookie）。
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 
@@ -50,7 +51,7 @@ function loadOrCreateSecret(agentDir: string): Buffer {
   return secret
 }
 
-function resolveAssets(): Record<string, WebTerminalAsset> {
+function resolveAssets(): { assets: Record<string, WebTerminalAsset>; version: string } {
   const require = createRequire(import.meta.url)
   const resolveAsset = (specifier: string): string => {
     try {
@@ -59,12 +60,21 @@ function resolveAssets(): Record<string, WebTerminalAsset> {
       throw new Error(`找不到前端资源 ${specifier}：请先在项目根运行 npm install`)
     }
   }
-  return {
+  const assets: Record<string, WebTerminalAsset> = {
     '/assets/xterm.js': { path: resolveAsset('@xterm/xterm/lib/xterm.js'), immutable: true },
     '/assets/xterm.css': { path: resolveAsset('@xterm/xterm/css/xterm.css'), immutable: true },
     '/assets/addon-fit.js': { path: resolveAsset('@xterm/addon-fit/lib/addon-fit.js'), immutable: true },
   }
+  // 版本戳取自资源文件的大小+mtime：换 xterm 版本后 URL 变化，浏览器不会继续用旧副本。
+  const fingerprint = createHash('sha1')
+  for (const [url, asset] of Object.entries(assets)) {
+    const stat = statSync(asset.path)
+    fingerprint.update(`${url}:${stat.size}:${stat.mtimeMs}`)
+  }
+  return { assets, version: fingerprint.digest('hex').slice(0, 10) }
 }
+
+const resolvedAssets = resolveAssets()
 
 const args = parseArgs(process.argv.slice(2))
 if (args.help) {
@@ -97,7 +107,8 @@ const handle = await startWebTerminalServer({
   trustedHosts: args.trustedHosts,
   session,
   publicDir: join(projectRoot, 'custom', 'web-terminal', 'public'),
-  assets: resolveAssets(),
+  assets: resolvedAssets.assets,
+  assetVersion: resolvedAssets.version,
 })
 
 process.stdout.write(

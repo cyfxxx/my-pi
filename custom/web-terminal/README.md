@@ -131,6 +131,14 @@ v6 移除了 `.xterm-scroll-area` 占位元素，`.xterm-viewport` 里没有任�
 升级 xterm 前请先复验这一项：`node scripts/test-web-terminal.mjs` 不含滚动断言，
 需手工确认 `/assets/xterm.js` 里仍能搜到 `xterm-scroll-area`。
 
+### 资源缓存与版本戳
+
+`/assets/xterm.js` / `xterm.css` / `addon-fit.js` 是第三方产物，带 `immutable` 长缓存
+（手机经隧道取 480 KB 不该每次重来）。但它们的 URL 固定，换版本后浏览器会继续用旧副本——
+升级 xterm 时曾因此让修复"看起来没生效"。所以服务启动时按资源文件的**大小+mtime**算一个 10 位
+版本戳，渲染 `index.html` 时替换 `__ASSET_V__`，得到 `/assets/xterm.js?v=<戳>`；换版本即换 URL，
+旧缓存自然失效。`test-web-terminal.mjs` 断言这一条（占位符必须已被替换、带戳 URL 仍可访问）。
+
 ## 与后端的消息约定
 
 | 方向 | 帧类型 | 内容 |

@@ -53,6 +53,13 @@ export interface WebTerminalServerOptions {
   publicDir: string
   /** 额外资源映射：URL 路径（以 `/assets/` 开头）→ 磁盘路径。 */
   assets: Readonly<Record<string, WebTerminalAsset>>
+  /**
+   * 第三方资源的版本戳，替换 index.html 里的 `__ASSET_V__`。
+   *
+   * 必要性：这些资源带 `immutable` 长缓存（手机上经隧道取 480KB 不该每次重来），
+   * 但它们的 URL 固定，换版本后浏览器会继续用旧副本——升级 xterm 时曾因此让修复"看起来没生效"。
+   */
+  assetVersion: string
   pingIntervalMs?: number
 }
 
@@ -173,7 +180,11 @@ export async function startWebTerminalServer(
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
       if (!authorize(req, res, authority, url)) return
-      await serveFile(res, join(options.publicDir, 'index.html'), { head, immutable: false })
+      await serveFile(res, join(options.publicDir, 'index.html'), {
+        head,
+        immutable: false,
+        replace: [['__ASSET_V__', options.assetVersion]],
+      })
       return
     }
 
@@ -345,10 +356,15 @@ function toBuffer(data: RawData): Buffer {
 async function serveFile(
   res: ServerResponse,
   filePath: string,
-  options: { head: boolean; immutable: boolean },
+  options: { head: boolean; immutable: boolean; replace?: ReadonlyArray<readonly [string, string]> },
 ): Promise<void> {
   try {
-    const body = await readFile(filePath)
+    let body = await readFile(filePath)
+    if (options.replace !== undefined) {
+      let text = body.toString('utf8')
+      for (const [from, to] of options.replace) text = text.split(from).join(to)
+      body = Buffer.from(text, 'utf8')
+    }
     res.writeHead(200, {
       'content-type': mimeTypeFor(filePath),
       'content-length': String(body.length),
