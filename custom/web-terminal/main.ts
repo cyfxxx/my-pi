@@ -7,6 +7,12 @@
  *   --trusted-host <h>    额外允许的 Host（可重复）。默认只信任回环地址。
  *   --command <shell>     覆盖被拉起的命令（调试用），默认 `bash <root>/my-pi.sh`
  *   --cwd <dir>           工作目录，默认项目根
+ *   --sweep               只回收孤儿 pty 会话后退出（不起服务）
+ *
+ * 启动时会先回收**孤儿 pty 会话**：服务器若被 SIGKILL/崩溃，`dispose()` 来不及运行，
+ * `script` → supervisor → pi 会被 reparent 到 PID 1 后永不退出。属主 pid 内嵌在临时
+ * 文件名里，故"属主不存在"即"无人管理"，可安全回收（详见 stale-sessions.ts）。
+ * `PI_WEB_TERMINAL_SWEEP=off` 关闭该行为。
  *
  * 只绑定 127.0.0.1：远程访问请走 SSH 隧道。这不是"保守默认"，而是本服务没有 TLS，
  * 且会话 cookie 刻意不带 `Secure`（回环 HTTP 下浏览器会丢弃带 Secure 的 cookie）。
@@ -20,7 +26,7 @@ import { join, resolve } from 'node:path'
 import { getAgentDir, getProjectRoot } from '../core/config'
 import { HELP_TEXT, parseArgs } from './args'
 import { mintLaunchToken, newSigningSecret } from './auth'
-import { PtySession } from './pty-session'
+import { PtySession, reapStaleSessions } from './pty-session'
 import { startWebTerminalServer, type WebTerminalAsset } from './server'
 
 const SECRET_FILE = 'web-terminal-secret.json'
@@ -80,6 +86,32 @@ const args = parseArgs(process.argv.slice(2))
 if (args.help) {
   process.stdout.write(HELP_TEXT)
   process.exit(0)
+}
+
+const sweepEnabled = process.env.PI_WEB_TERMINAL_SWEEP !== 'off'
+if (args.sweep) {
+  if (!sweepEnabled) {
+    process.stdout.write('孤儿回收已由 PI_WEB_TERMINAL_SWEEP=off 关闭，未做任何事。\n')
+    process.exit(0)
+  }
+  const swept = await reapStaleSessions()
+  process.stdout.write(
+    `扫描到 ${swept.scanned} 个会话文件，回收孤儿 ${swept.reaped.length} 个` +
+      (swept.reaped.length > 0 ? `：\n${swept.reaped.map((n) => `  ${n}`).join('\n')}\n` : '\n'),
+  )
+  process.exit(0)
+}
+
+if (sweepEnabled) {
+  try {
+    const swept = await reapStaleSessions()
+    if (swept.reaped.length > 0) {
+      process.stdout.write(`已回收 ${swept.reaped.length} 个孤儿 pty 会话（属主服务器已消失）\n`)
+    }
+  } catch (error) {
+    // 回收失败不阻塞启动：最坏情况与旧行为一致（留着孤儿）
+    process.stdout.write(`孤儿会话回收失败（忽略）: ${(error as Error).message}\n`)
+  }
 }
 
 const projectRoot = getProjectRoot()

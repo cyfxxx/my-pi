@@ -422,6 +422,25 @@ du -sh portable/agent/sessions/ portable/memory/
 
 **解决：** 会话数据不会自动收缩，长期运行后应归档或清理 `portable/agent/sessions/`；清理前用 `pi-backup` 技能留档。
 
+### 6.2b 有多个 `pi` / `script` 进程杀不掉（浏览器终端孤儿会话）
+
+**症状：** `ps` 里有一串 `script -q -e -f -E never -c tty > '/tmp/mypi-web-tty-…'` 与 `pi` 进程，
+父进程是 1，`kill` 掉又没影响界面；`/tmp/mypi-web-tty-*` 越积越多。
+
+**原因：** 浏览器终端（`npm run web`）的 teardown 只在**正常退出**时运行。服务器被 `SIGKILL`、
+崩溃或断电时，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到 PID 1 后**永远不会自己退出**。
+每个孤儿约占 20 MB（一个 my-pi TUI）。
+
+**解决：** 服务启动时会自动回收属主已消失的孤儿会话；也可手动只跑回收：
+
+```bash
+bash scripts/run-ts.sh custom/web-terminal/main.ts --sweep
+```
+
+判据是临时文件名内嵌的属主 pid（`mypi-web-tty-<serverPid>-<hex>`）——属主进程不存在即孤儿，
+**活着的**实例（含另一台实例）不会被误回收。详见
+[custom/web-terminal/README.md](../custom/web-terminal/README.md)。
+
 ### 6.3 校验命令本身很慢
 
 **症状：** `npm run check` / `npx tsc --noEmit -p custom/` / `npx vitest run` 耗时过长。

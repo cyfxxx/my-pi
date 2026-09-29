@@ -206,15 +206,163 @@ async function main() {
   ws2.close();
 }
 
+// ── 孤儿 pty 回收：服务器被 SIGKILL（teardown 来不及跑）后，下次启动必须能清掉 ──
+// 纯单测覆盖不到：需要真实进程被强杀后成为 PID 1 的孤儿，再验证回收。
+// 用独立的 TMPDIR 隔离：临时文件只落在 box 里，既不受真实服务干扰，也不污染 /tmp。
+async function orphanSweepChecks() {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const { execFileSync } = await import('node:child_process');
+
+  const boxes = [];
+  const servers = [];
+  const newBox = () => {
+    const b = fs.mkdtempSync(`${os.tmpdir()}/mypi-sweep-`);
+    boxes.push(b);
+    return b;
+  };
+  const listIn = (dir) => fs.readdirSync(dir).filter((n) => n.startsWith('mypi-web-tty-'));
+  const sweepIn = (dir) => {
+    try {
+      return execFileSync('bash', ['scripts/run-ts.sh', 'custom/web-terminal/main.ts', '--sweep'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 30000,
+        env: { ...process.env, TMPDIR: dir },
+      });
+    } catch (err) {
+      return String(err?.stdout ?? '') + String(err?.message ?? '');
+    }
+  };
+  const startIn = async (dir, port, command) => {
+    const s = spawn('bash', ['scripts/web-terminal.sh', '--port', String(port), '--command', command], {
+      cwd: ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+      env: { ...process.env, TMPDIR: dir },
+    });
+    servers.push(s);
+    let out = '';
+    s.stdout.on('data', (d) => (out += d.toString()));
+    s.stderr.on('data', (d) => (out += d.toString()));
+    const up = await waitUntil(() => /访问地址（含一次性令牌）/.test(out), 25000);
+    return { up, out: () => out };
+  };
+  const killGroup = async (s) => {
+    try {
+      process.kill(-s.pid, 'SIGKILL');
+    } catch {
+      try {
+        s.kill('SIGKILL');
+      } catch {
+        /* 已退出 */
+      }
+    }
+    await waitUntil(() => {
+      try {
+        process.kill(s.pid, 0);
+        return false;
+      } catch {
+        return true;
+      }
+    }, 5000);
+  };
+
+  try {
+    // ── 场景 1：强杀服务器 → 会话变孤儿 → 下次 sweep 回收 ──
+    const box = newBox();
+    const started = await startIn(box, PORT + 1, `bash -c 'echo ORPHAN-READY; sleep 300'`);
+    check('孤儿回收前置：隔离 TMPDIR 下的服务实例已启动', started.up, started.out().slice(-200));
+    if (!started.up) return;
+
+    const files = listIn(box);
+    check('新实例在隔离 TMPDIR 写出恰好一个 pty 临时文件', files.length === 1, files.join(','));
+    if (files.length !== 1) return;
+    const ttyFile = files[0];
+    const ownerPid = Number(/^mypi-web-tty-(\d+)-/.exec(ttyFile)?.[1]);
+    check('临时文件可解析出属主 pid', Number.isInteger(ownerPid) && ownerPid > 0, ttyFile);
+
+    const scriptPids = psMatching(`${box}/${ttyFile}`);
+    check('存在持有该 pty 的 script 进程', scriptPids.length >= 1, ttyFile);
+
+    await killGroup(servers[servers.length - 1]);
+    await sleep(400);
+
+    const orphanAlive = scriptPids.filter((pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    check('强杀服务器后 pty 子进程成为孤儿（仍在运行，故必须主动回收）', orphanAlive.length >= 1, orphanAlive.join(','));
+    check('孤儿临时文件仍在', fs.existsSync(`${box}/${ttyFile}`));
+
+    const swept = sweepIn(box);
+    check('--sweep 报告回收了该孤儿会话', swept.includes(ttyFile), swept.trim().slice(-160));
+    check('孤儿临时文件已被删除', !fs.existsSync(`${box}/${ttyFile}`));
+    check('孤儿进程已被清除', psMatching(`${box}/${ttyFile}`).length === 0, psMatching(`${box}/${ttyFile}`).join(','));
+
+    // ── 场景 2：存活实例的会话绝不能被误回收（属主 pid 仍在）──
+    const box2 = newBox();
+    const live = await startIn(box2, PORT + 2, `bash -c 'echo LIVE; sleep 120'`);
+    if (!live.up) {
+      check('存活实例的会话不被误回收（属主 pid 仍存在）', false, '实例未起来');
+      return;
+    }
+    const liveFile = listIn(box2)[0];
+    const out = sweepIn(box2);
+    check('存活实例的会话不被回收', !out.includes(String(liveFile)), out.trim().slice(-160));
+    check('存活实例的临时文件仍在', liveFile !== undefined && fs.existsSync(`${box2}/${liveFile}`), String(liveFile));
+    check('存活实例的 pty 仍可用', psMatching(`${box2}/${liveFile}`).length >= 1, String(liveFile));
+  } finally {
+    // 先杀服务器（其进程组），再用 sweep 回收 pty 负载：`script` 会 setsid 另立会话，
+    // 杀服务器进程组波及不到它；属主死后它正是 sweep 的回收对象。
+    for (const s of servers) await killGroup(s);
+    for (const b of boxes) {
+      sweepIn(b);
+      fs.rmSync(b, { recursive: true, force: true });
+    }
+  }
+}
+
+/** 命令行中出现指定临时文件路径的进程 pid */
+function psMatching(path) {
+  try {
+    const { execFileSync } = require('node:child_process');
+    return execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' })
+      .split('\n')
+      .filter((l) => l.includes(path))
+      .map((l) => Number(/^\s*(\d+)\s/.exec(l)?.[1]))
+      .filter((n) => Number.isInteger(n) && n > 0);
+  } catch {
+    return [];
+  }
+}
+
 let crashed = null;
 try {
   await main();
+  await orphanSweepChecks();
 } catch (err) {
   crashed = err;
 } finally {
   child.kill('SIGTERM');
   await sleep(600);
   child.kill('SIGKILL');
+  // 主实例用真实 TMPDIR；它被强杀后同样会留下孤儿 pty 负载，这里顺手回收，
+  // 避免守门脚本自己制造泄漏（其它存活实例不受影响：属主 pid 仍在）。
+  try {
+    const { execFileSync } = await import('node:child_process');
+    execFileSync('bash', ['scripts/run-ts.sh', 'custom/web-terminal/main.ts', '--sweep'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      timeout: 30000,
+    });
+  } catch {
+    /* 回收失败不影响守门结论 */
+  }
 }
 
 const failed = results.filter((r) => !r.ok);

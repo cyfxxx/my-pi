@@ -19,10 +19,12 @@
 
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+
+import { TTY_FILE_PREFIX, isPidAlive, selectStaleSessions } from './stale-sessions'
 
 /** 尺寸下限/上限：防止前端传 0 或异常大值把 TUI 挤坏。 */
 export const PTY_MIN_COLS = 20
@@ -124,7 +126,7 @@ export class PtySession {
   /** 启动 `script` 并等待 pty 从设备路径被发现（通常 < 100ms）。 */
   async start(): Promise<void> {
     if (this.child !== null) throw new Error('pty 会话已启动')
-    this.ttyFile = join(tmpdir(), `mypi-web-tty-${process.pid}-${randomBytes(4).toString('hex')}`)
+    this.ttyFile = join(tmpdir(), `${TTY_FILE_PREFIX}${process.pid}-${randomBytes(4).toString('hex')}`)
     rmSync(this.ttyFile, { force: true })
     this.exitInfo = null
 
@@ -397,6 +399,78 @@ function descendantProcessGroups(pid: number): Promise<number[]> {
         }
       }
       resolve([...groups])
+    })
+  })
+}
+
+export interface SweepResult {
+  /** 扫描到的本服务临时文件数 */
+  scanned: number
+  /** 被回收的孤儿会话文件名 */
+  reaped: string[]
+}
+
+/**
+ * 回收**属主进程已消失**的孤儿 pty 会话（服务器启动时调用）。
+ *
+ * 场景：服务器被 SIGKILL / 崩溃 / 断电时 `dispose()` 来不及运行，`script` → supervisor → pi
+ * 被 reparent 到 PID 1 后永不退出。文件名内嵌属主 pid，故"属主不存在"即"无人管理"。
+ *
+ * 安全边界：
+ *   - 只处理 `tmpdir()` 下带本服务前缀的文件；
+ *   - 属主 pid 仍存在（含 EPERM）→ 不动（另一台实例的活会话）；
+ *   - 击杀目标只取自 `ps` 中**命令行含该临时文件路径**的进程（即那个 `script`）及其后代进程组，
+ *     不按键名/模糊匹配，不会波及其它进程。
+ *
+ * 先对全部目标发 SIGTERM、**只等一个**宽限期再统一 SIGKILL：批量回收的启动延迟恒为
+ * 一次 `ps` + 一个 `TERMINATE_GRACE_MS`，不随孤儿数量线性增长。
+ */
+export async function reapStaleSessions(options: { dir?: string; selfPid?: number } = {}): Promise<SweepResult> {
+  const dir = options.dir ?? tmpdir()
+  const result: SweepResult = { scanned: 0, reaped: [] }
+
+  let names: string[]
+  try {
+    names = readdirSync(dir).filter((name) => name.startsWith(TTY_FILE_PREFIX))
+  } catch {
+    return result
+  }
+  result.scanned = names.length
+
+  const stale = selectStaleSessions(names, isPidAlive, options.selfPid ?? process.pid)
+  if (stale.length === 0) return result
+
+  const targets = new Set<number>()
+  for (const candidate of stale) {
+    for (const pid of await pidsReferencing(join(dir, candidate.name))) targets.add(pid)
+  }
+
+  for (const pid of targets) signalGroup(pid, 'SIGTERM')
+  if (targets.size > 0) await delay(TERMINATE_GRACE_MS)
+  for (const pid of targets) signalGroup(pid, 'SIGKILL')
+
+  for (const candidate of stale) {
+    rmSync(join(dir, candidate.name), { force: true })
+    result.reaped.push(candidate.name)
+  }
+  return result
+}
+
+/** 命令行中出现指定临时文件路径的进程（即持有该 pty 的 `script`）。 */
+function pidsReferencing(path: string): Promise<number[]> {
+  return new Promise<number[]>((resolve) => {
+    execFile('ps', ['-eo', 'pid=,args='], (error, stdout) => {
+      if (error !== null) {
+        resolve([])
+        return
+      }
+      const pids: number[] = []
+      for (const line of stdout.split('\n')) {
+        if (!line.includes(path)) continue
+        const match = /^\s*(\d+)\s/.exec(line)
+        if (match !== null) pids.push(Number(match[1]))
+      }
+      resolve(pids)
     })
   })
 }

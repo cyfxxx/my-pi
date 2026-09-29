@@ -1150,3 +1150,26 @@ DSH 相比明显异常（本机 ¥8.04 / 544 请求 / 42.3M tokens vs DSH ¥18.0
 - 文档同步：`custom/features/context/README.md`、`custom/features/memory/README.md`、
   `memory/recall/README.md`、`docs/FAQ.md`（订正"擦除已默认开启"的错误说法）、
   `STRUCTURE.md`、`scripts/README.md`、`portable/agent/AGENTS.md`。
+
+## 浏览器终端：孤儿 pty 会话回收（第 61 批追加，2026-09-29）
+
+起因：用户问"界面上一直显示有一个后台任务在运行"，查证是此前按需启动的浏览器终端服务（正常）。
+但顺手检查进程时发现**我自己的排查脚本泄漏了 12 个 pty 会话（24 个进程，PPID=1）**——探针
+SIGKILL 服务器后，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到 PID 1 且永不退出。
+
+- **判据**：临时文件名内嵌属主 pid（`mypi-web-tty-<serverPid>-<hex>`），故"属主不存在"即
+  "无人管理"。属主仍存在（含 EPERM）→ 不动，天然支持多实例；pid 复用只会造成漏回收，不会误杀。
+- **实现**：新增 `custom/web-terminal/stale-sessions.ts`（纯逻辑：`parseOwnerPid` /
+  `selectStaleSessions` / `isPidAlive`）与 `pty-session.ts` 的 `reapStaleSessions`（`ps` 定位
+  持有该文件的 `script` + 后代进程组 → 全体 SIGTERM → 一个宽限期 → 全体 SIGKILL → 删文件）。
+  服务启动时自动执行，`--sweep` 可手动只跑回收，`PI_WEB_TERMINAL_SWEEP=off` 关闭。
+- **批量语义**：只等**一个** `TERMINATE_GRACE_MS`，启动延迟恒为一次 `ps` + 400ms，不随孤儿数增长。
+- **验证**：`scripts/test-web-terminal.mjs` 从 24 项扩到 **36 项**，新增真实孤儿场景（用独立
+  `TMPDIR` 隔离）：启动实例 → `script` 确认持有 pty → `SIGKILL` 服务器进程组 → 断言 pty 子进程
+  仍在（真的成了孤儿）→ `--sweep` → 断言 `script` 进程与临时文件都消失 → 再断言**存活实例的
+  会话不被误回收**。单测新增 `stale-sessions.test.ts`（13 例）；`args.test.ts` 补 `--sweep`。
+  顺手修掉守门脚本自身的进程泄漏（杀掉服务器进程组**波及不到** setsid 后的 pty 负载，现于
+  teardown 用 sweep 回收），跑完零残留。
+- **文档**：`custom/web-terminal/README.md`（新章节「孤儿会话回收」+ 文件表 + 用法）、
+  `docs/TROUBLESHOOTING.md`（6.2b：杀不掉的 `pi`/`script` 进程）、`STRUCTURE.md`、
+  `scripts/README.md`、`DECISIONS.md` 同日条目。

@@ -14,7 +14,10 @@
 bash scripts/web-terminal.sh                 # 默认 7717 端口
 bash scripts/web-terminal.sh --port 0        # 由系统分配端口
 npm run web                                  # 等价快捷方式
+bash scripts/web-terminal.sh --sweep         # 只回收孤儿 pty 会话后退出（不起服务）
 ```
+
+启动时会先自动回收孤儿 pty 会话（见下文「孤儿会话回收」），`PI_WEB_TERMINAL_SWEEP=off` 可关闭。
 
 启动后打印一行**带一次性令牌的地址**：
 
@@ -105,7 +108,8 @@ bash my-pi.sh  →  scripts/pi-supervisor.sh  →  pi TUI（原样，含全部 1
 |---|---|
 | `auth.ts` | 纯逻辑：令牌、cookie 签名/校验、Home/Origin 信任栅栏、Cookie 头解析 |
 | `static.ts` | 纯逻辑：URL 路径 → 磁盘路径（含穿越防护）、MIME |
-| `pty-session.ts` | pty 会话：`script` 启动、tty 发现、输出回放缓冲、改尺寸/强制重绘、重启、进程组回收 |
+| `pty-session.ts` | pty 会话：`script` 启动、tty 发现、输出回放缓冲、改尺寸/强制重绘、重启、进程组回收、孤儿会话回收 |
+| `stale-sessions.ts` | 纯逻辑：孤儿 pty 会话判据（从临时文件名解析属主 pid + 存活判定），不做任何进程操作 |
 | `server.ts` | HTTP 路由与鉴权接线、WebSocket 数据面与控制消息 |
 | `args.ts` | 命令行解析（非法值回退默认，不把 NaN 传进 `listen()`） |
 | `main.ts` | 进程入口：密钥读写、资源解析、启动横幅、信号处理 |
@@ -161,10 +165,40 @@ v6 移除了 `.xterm-scroll-area` 占位元素，`.xterm-viewport` 里没有任�
 - **移动端软键盘**：依赖 `interactive-widget=resizes-content`（Chrome 108+ / iOS 16.4+）；更老的
   引擎上键盘弹出可能遮挡最后几行。
 
+## 孤儿会话回收（服务器被强杀后的自清理）
+
+`dispose()` 只在**正常退出**时运行（SIGINT/SIGTERM → `handle.close()`）。服务器若被 `SIGKILL`、
+崩溃或断电，`script` → `pi-supervisor.sh` → `pi` 这条链会被 reparent 到 PID 1，**永远不会自己退出**
+——每发生一次就永久泄漏一个 my-pi TUI 与一个 pty。实测代价：一次排查中探针 SIGKILL 服务器，
+留下 12 个孤儿会话（24 个进程）。
+
+识别依据是临时文件名内嵌的属主 pid：
+
+```
+<tmpdir>/mypi-web-tty-<serverPid>-<8 位 hex>
+```
+
+于是**属主 pid 已不存在**即"该会话已无人在管"，可安全回收：
+
+- 同一机器上的另一个**活着的**服务器，其 pid 存在 → 不会被误回收（天然支持多实例）；
+- pid 复用只会造成**漏回收**（保守失败），不会误杀活会话；
+- 击杀目标只取自 `ps` 中**命令行含该临时文件路径**的进程及其后代进程组，不按键名/模糊匹配。
+
+服务启动时自动执行（`PI_WEB_TERMINAL_SWEEP=off` 关闭）；也可手动只跑回收：
+
+```bash
+bash scripts/run-ts.sh custom/web-terminal/main.ts --sweep
+```
+
+批量回收只等**一个** `TERMINATE_GRACE_MS`（SIGTERM 全体 → 宽限 → SIGKILL 全体），启动延迟恒为
+一次 `ps` + 400ms，不随孤儿数量增长。
+
 ## 验证
 
-- 单测（vitest）：`custom/web-terminal/__tests__/` 4 个文件 33 例，覆盖纯函数与真实 pty 的
-  改尺寸/SIGWINCH；真实 pty 部分在缺 `script`/`stty` 时自动跳过。
-- 进程级守门：`node scripts/test-web-terminal.mjs`（22 项），被 `scripts/golden-tasks.sh` 第 12 步
+- 单测（vitest）：`custom/web-terminal/__tests__/` 5 个文件 43 例，覆盖纯函数（含孤儿判据
+  `parseOwnerPid`/`selectStaleSessions`）与真实 pty 的改尺寸/SIGWINCH；真实 pty 部分在缺
+  `script`/`stty` 时自动跳过。
+- 进程级守门：`node scripts/test-web-terminal.mjs`（36 项），被 `scripts/golden-tasks.sh` 第 12 步
   调用；覆盖鉴权、cookie 属性、穿越防护、Host 栅栏、方法限制、WS 双向数据、resize、未授权升级拒绝、
-  restart。零 LLM 消耗。
+  restart，以及**孤儿回收的真实场景**（用独立 `TMPDIR` 隔离：启动实例 → `SIGKILL` 制造孤儿 →
+  断言孤儿仍在 → `--sweep` 回收 → 断言进程与文件都消失 → 并存活实例不被误回收）。零 LLM 消耗。

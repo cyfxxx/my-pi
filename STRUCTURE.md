@@ -114,7 +114,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `check-injection-surface.sh`：system prompt 注入面前缀指纹基线守门（`--update` 更新基线）
 - `check-doc-links.mjs`：文档内部相对链接一致性校验
 - `web-terminal.sh`：浏览器终端启动器（在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务；只绑回环），见 [custom/web-terminal/README.md](custom/web-terminal/README.md)
-- `test-web-terminal.mjs`：web-terminal 的进程级守门（鉴权/栅栏/穿越/WS 双向/resize），零 LLM 消耗；缺 `script`/`stty` 时显式 SKIP
+- `test-web-terminal.mjs`：web-terminal 的进程级守门（鉴权/栅栏/穿越/WS 双向/resize/孤儿会话回收），零 LLM 消耗；缺 `script`/`stty` 时显式 SKIP
 - `test-usage-metrics.mjs`：成本度量口径守门（合成数据驱动 `daily-health.mjs`，锁定命中率取自每轮用量而非工具级台账、前缀前端变更会告警），零 LLM 消耗
 - `golden-tasks.sh`：行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟）
 - `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）

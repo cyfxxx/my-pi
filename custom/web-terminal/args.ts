@@ -16,6 +16,8 @@ export interface WebTerminalArgs {
   /** 覆盖被拉起的命令（调试用）；undefined 表示使用默认的 my-pi.sh。 */
   command: string | undefined
   cwd: string | undefined
+  /** 只回收孤儿 pty 会话后退出（不起服务）：清理服务器被 SIGKILL 后留下的 my-pi TUI。 */
+  sweep: boolean
   help: boolean
 }
 
@@ -26,6 +28,7 @@ export function parseArgs(argv: readonly string[]): WebTerminalArgs {
     trustedHosts: [],
     command: undefined,
     cwd: undefined,
+    sweep: false,
     help: false,
   }
   // `Number('')` 是 0、`Number('abc')` 是 NaN：这里把"缺值/空值"显式排除，
@@ -64,6 +67,9 @@ export function parseArgs(argv: readonly string[]): WebTerminalArgs {
         args.cwd = value
         i++
         break
+      case '--sweep':
+        args.sweep = true
+        break
       case '--help':
       case '-h':
         args.help = true
@@ -86,8 +92,11 @@ export const HELP_TEXT = `my-pi web-terminal — 用浏览器访问 my-pi（只�
   --trusted-host <h>  额外允许的 Host，可重复（默认只信任回环）
   --command <shell>   覆盖被拉起的命令（调试用）
   --cwd <dir>         工作目录，默认项目根
+  --sweep             只回收孤儿 pty 会话（服务器被强杀后留下的 my-pi TUI）后退出，不起服务
   -h, --help          显示本帮助
 
 远程访问：先建隧道，再用打印出的带 token 地址打开
   ssh -N -L ${DEFAULT_PORT}:127.0.0.1:${DEFAULT_PORT} <user>@<host>
+
+启动时会自动回收孤儿会话（属主服务器已消失的 pty）；设 PI_WEB_TERMINAL_SWEEP=off 可关闭。
 `

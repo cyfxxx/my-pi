@@ -14,6 +14,7 @@ describe('args: parseArgs', () => {
       trustedHosts: [],
       command: undefined,
       cwd: undefined,
+      sweep: false,
       help: false,
     });
   });
@@ -24,6 +25,8 @@ describe('args: parseArgs', () => {
     expect(parseArgs(['--cookie-days', '7']).cookieDays).toBe(7);
     expect(parseArgs(['--command', 'echo hi']).command).toBe('echo hi');
     expect(parseArgs(['--cwd', '/tmp']).cwd).toBe('/tmp');
+    expect(parseArgs(['--sweep']).sweep).toBe(true);
+    expect(parseArgs([]).sweep).toBe(false);
     expect(parseArgs(['-h']).help).toBe(true);
     expect(parseArgs(['--help']).help).toBe(true);
   });
