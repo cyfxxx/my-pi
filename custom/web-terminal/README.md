@@ -38,6 +38,43 @@ bash scripts/web-terminal.sh --sweep         # 只回收孤儿 pty 会话后退�
 | `--cwd <dir>` | 项目根 | 工作目录 |
 | `-h, --help` | | 查看帮助 |
 
+## 常驻与停止
+
+服务是**前台进程**，会一直占着终端。日常用建议放 tmux 里常驻：
+
+```bash
+# 后台起一个名为 mypi-web 的会话（在项目根执行，$PWD 即项目根）
+tmux new-session -d -s mypi-web -c "$PWD" 'bash scripts/web-terminal.sh'
+
+# 取带一次性令牌的地址（不必 attach）
+tmux capture-pane -pt mypi-web | grep token
+
+# 需要看实时输出时进入，Ctrl-b d 脱离
+tmux attach -t mypi-web
+```
+
+停止：
+
+```bash
+# 前台运行：Ctrl-C
+tmux kill-session -t mypi-web          # tmux 常驻时
+```
+
+正常退出会走 `dispose()`，连带结束 pty 里的 my-pi（含进程组）。若服务是被 `SIGKILL`、崩溃或
+断电带走的，`dispose()` 来不及运行，会留下孤儿会话——下次启动会自动回收，也可手动清理：
+
+```bash
+bash scripts/run-ts.sh custom/web-terminal/main.ts --sweep
+```
+
+几点在运维上有用的性质：
+
+- **同端口重启不需要重新授权**：cookie 名按 authority 派生、签名密钥持久化（见下文「安全模型」），
+  所以首次用令牌换过 cookie 后，把 `http://127.0.0.1:7717/` 加书签即可；**换端口要重新授权一次**。
+- **agent 崩溃不会打断浏览器会话**：pty 里跑的是 `my-pi.sh`，它经 `scripts/pi-supervisor.sh`
+  启动，崩溃会被自动拉起；页面重连即回到原会话，不必重启服务。
+- **一个服务 = 一个会话**：单 pty 单 TUI。要并行多个就起多个实例（不同端口，各自授权一次）。
+
 ## 远程访问
 
 只绑定 `127.0.0.1`，远程访问走 SSH 隧道：

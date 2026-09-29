@@ -1173,3 +1173,15 @@ SIGKILL 服务器后，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到
 - **文档**：`custom/web-terminal/README.md`（新章节「孤儿会话回收」+ 文件表 + 用法）、
   `docs/TROUBLESHOOTING.md`（6.2b：杀不掉的 `pi`/`script` 进程）、`STRUCTURE.md`、
   `scripts/README.md`、`DECISIONS.md` 同日条目。
+
+### 追加：补齐运维操作文档（同日）
+
+复查"这些启动方式有没有写进文档"时发现两个缺口——**后台常驻（tmux）配方**与**停止方法**
+（文档里 0 处，`Ctrl-C` 只出现在运行时横幅）。已补：
+
+- `custom/web-terminal/README.md` 新增「常驻与停止」小节：tmux 一行启动 / `capture-pane` 取令牌地址 /
+  attach 与脱离 / 两种停止方式 / 被强杀后靠 `--sweep` 回收；并写明三条运维性质——同端口重启免
+  重新授权（换端口要重授权）、agent 崩溃由 supervisor 自动拉起（页面重连即可）、一服务一会话。
+- `docs/FAQ.md` 的浏览器条目补上"同端口重启免重授权"与指向该小节的交叉引用。
+- 其余操作点（启动命令、隧道、令牌流程、参数表、首屏 20 秒、单会话、多标签镜像、
+  每环境独立密钥、xterm 5.5.0 约束）复核后确认**原本已有记录**，不再重复。

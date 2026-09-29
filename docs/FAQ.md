@@ -50,8 +50,10 @@ npm run web         # 或 bash scripts/web-terminal.sh
 ```
 
 打印出带一次性令牌的地址，浏览器打开即可；服务只监听 `127.0.0.1`，远程先建隧道
-（`ssh -N -L 7717:127.0.0.1:7717 <user>@<host>`）。用法与安全模型见
-[custom/web-terminal/README.md](../custom/web-terminal/README.md)。
+（`ssh -N -L 7717:127.0.0.1:7717 <user>@<host>`）。首次用令牌换过 cookie 后，**同一端口重启
+不需要重新授权**（把 `http://127.0.0.1:7717/` 加书签即可；换端口则要重新授权一次）。日常常驻
+与停止方式（tmux / Ctrl-C）见 [custom/web-terminal/README.md](../custom/web-terminal/README.md)
+的「常驻与停止」，用法与安全模型同文档。
 
 开发模式（tsx 直接运行 TS，不依赖构建产物）：
 
