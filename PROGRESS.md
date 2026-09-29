@@ -1084,3 +1084,19 @@ DSH 相比明显异常（本机 ¥8.04 / 544 请求 / 42.3M tokens vs DSH ¥18.0
   其中 pty 集成测试在缺 `script`/`stty` 时自动跳过）；新增 `scripts/test-web-terminal.mjs`
   **22 项**进程级守门并接入 `golden-tasks.sh` 第 12 步；`bash scripts/golden-tasks.sh` 全量通过。
   真实 TUI 经此通道在 headless Chromium 中渲染成功（CJK 与 UI 正常，控制台零错误）。
+
+## 浏览器终端：移动端滑动修复（第 60 批追加，2026-09-29）
+
+用户反馈"滑动屏幕不顺畅"。按"先量后改"处理，结论与证据见 `DECISIONS.md` 同日条目。
+
+- **根因**：xterm 6.0.0 移除了 `.xterm-scroll-area` 占位元素，`.xterm-viewport` 内无子元素，
+  `scrollHeight === clientHeight` —— 浏览器侧没有可滚动区域，触摸滑动无作用对象。
+- **排查过程**（每步都可证伪）：① 先排除自家 `fit()`/`visualViewport` 抖动（实测滚动期间
+  resize 帧 0 次）；② DOM 量出无滚动区域；③ 纯 xterm 页面隔离复现，换 5.5.0 即有
+  `scrollHeight 7014 / clientHeight 476`；④ 发现 `Input.synthesizeScrollGesture` 绕过页面触摸
+  监听（在朴素 div 上也不动），改用 `Input.dispatchTouchEvent` 投递真实触摸序列。
+- **修复**：`@xterm/xterm` 5.5.0 + `@xterm/addon-fit` 0.10.0（5.x 线），恢复原生滚动与
+  系统级惯性滑动。
+- **验证**：真实应用第二个实例上，手指下滑后首行 350 → 348、再上滑回 350；`tsc` 通过；
+  `scripts/test-web-terminal.mjs` 22 项通过；`custom/web-terminal/README.md` 记录"升级前需复验
+  滚动占位元素"这一约束。

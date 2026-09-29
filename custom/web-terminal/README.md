@@ -114,6 +114,23 @@ bash my-pi.sh  →  scripts/pi-supervisor.sh  →  pi TUI（原样，含全部 1
 前端依赖 `@xterm/xterm`、`@xterm/addon-fit`（来自 `node_modules`，服务直接映射到 `/assets/`），
 服务端依赖 `ws`。三者精确锁版本在 `custom/package.json`；`npm install` 后即可用。
 
+### 为什么 xterm 锁在 5.5.0
+
+**xterm 6.0.0 移动端无法滑动查看历史**，所以刻意不上 6.x。实测（隔离页面 + 真实触摸事件）：
+
+| 版本 | viewport `scrollHeight` / `clientHeight` | 滚动占位元素 | 手指下滑后 |
+|---|---|---|---|
+| 6.0.0 | 476 / 476 | 不存在 | `scrollTop` 恒 0，缓冲区不动 |
+| 5.5.0 | 7515 / 465 | `.xterm-scroll-area` | `scrollTop` 4900 → 4840，首行前移 |
+
+v6 移除了 `.xterm-scroll-area` 占位元素，`.xterm-viewport` 里没有任何子元素，于是
+**浏览器侧根本不存在可滚动区域**——触摸滑动没有可作用的对象，回滚只存在于 xterm 内部 buffer，
+只能靠它自己的手势路径（在移动端同样无效）。5.x 保留占位元素，走的是原生滚动，因此手机上是
+系统级的惯性滑动。`@xterm/addon-fit` 相应锁 `0.10.0`（5.x 兼容线）。
+
+升级 xterm 前请先复验这一项：`node scripts/test-web-terminal.mjs` 不含滚动断言，
+需手工确认 `/assets/xterm.js` 里仍能搜到 `xterm-scroll-area`。
+
 ## 与后端的消息约定
 
 | 方向 | 帧类型 | 内容 |

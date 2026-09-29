@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@types/node": "26.6.2",
-    "@xterm/addon-fit": "0.11.0",
-    "@xterm/xterm": "6.0.0",
+    "@xterm/addon-fit": "0.10.0",
+    "@xterm/xterm": "5.5.0",
     "cloakbrowser": "0.5.10",
     "playwright-core": "1.63.0",
     "tinyglobby": "0.2.17",

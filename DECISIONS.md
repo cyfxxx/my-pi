@@ -649,3 +649,26 @@ WebUI **不是自包含应用**：`/plugins/??…&rev=…` 组合包路由与 `w
 新增 `scripts/test-web-terminal.mjs` 22 项进程级守门并接入 `golden-tasks.sh` 第 12 步（鉴权/cookie
 属性/穿越防护/Host 栅栏/方法限制/WS 双向数据/resize/未授权升级拒绝/restart，零 LLM 消耗）；
 `golden-tasks.sh` 全量通过；真实 my-pi TUI 经此通道在 headless Chromium 中渲染成功（截图确认）。
+
+### [2026-09-29] xterm 锁 5.5.0：v6 移除了滚动占位元素，移动端滑不动
+**背景**：浏览器终端上线后用户反馈"滑动屏幕不顺畅"。先在真实触摸事件下量清楚，而不是按现象猜。
+**诊断**（每一步都做了可证伪的实验）：
+1. 先怀疑是自家接线：滚动时反复 `fit()`／`visualViewport` 抖动。装上探针后测得滚动期间
+   `resize` 帧为 0、静置重绘约 7 次/秒，**排除**。
+2. 再看 DOM：`.xterm-viewport` 的 `scrollHeight === clientHeight`（806/806），且
+   `.xterm-scroll-area` 不存在、viewport 子元素数为 0 —— **根本没有可滚动区域**。
+3. 隔离到纯 xterm 页面（不带本项目 CSS/JS）复现同样结果；换 5.5.0 则 `scrollHeight` 7014 /
+   `clientHeight` 476、`.xterm-scroll-area` 存在。确认是 xterm 版本差异，不是本项目接线。
+4. 排除测量手段本身的假象：`Input.synthesizeScrollGesture` 走合成器识别，**绕过**页面触摸监听
+   （在朴素可滚动 div 上也测不出滚动），故改用 `Input.dispatchTouchEvent` 逐帧投递真实触摸事件。
+5. 最终判据（原始触摸序列：touchStart → 14×touchMove → touchEnd）：6.0.0 `scrollTop` 恒 0、
+   缓冲区不动；5.5.0 `scrollTop` 4900 → 4840、首行前移。**触摸滚动在 v6 上完全无效。**
+**决策**：`@xterm/xterm` 锁 `5.5.0`、`@xterm/addon-fit` 锁 `0.10.0`（5.x 兼容线）。
+**理由**：v6 没有滚动占位元素 → 浏览器侧不存在可滚动区域 → 触摸滑动没有作用对象，回滚只存在于
+xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效）。5.x 保留占位元素，走原生滚动，
+手机上是系统级惯性滑动——"顺畅"这件事上没有比原生更好的实现。社区亦有项目因同类问题从 v6 回退
+5.5.0。
+**代价与约束**：放弃 v6 的改动；升级 xterm 前必须复验 `/assets/xterm.js` 里仍能搜到
+`xterm-scroll-area`（`scripts/test-web-terminal.mjs` 不覆盖滚动，故写进 README 提醒）。
+**验证**：真实应用（第二实例）触摸下滑后首行 350 → 348 再滑回；`tsc` 通过；
+`scripts/test-web-terminal.mjs` 22 项通过。
