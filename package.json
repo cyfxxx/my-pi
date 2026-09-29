@@ -16,7 +16,8 @@
     "check": "bash scripts/check-isolation.sh",
     "golden": "bash scripts/golden-tasks.sh",
     "test": "vitest run --config vitest.config.ts",
-    "sync": "bash scripts/sync-upstream.sh"
+    "sync": "bash scripts/sync-upstream.sh",
+    "web": "bash scripts/web-terminal.sh"
   },
   "workspaces": [
     "custom"

@@ -612,3 +612,40 @@ pi 永远以空参启动（新建会话）。原项目 `pi-wrapper.sh` 是在启
 **验证**：tsc 通过；vitest 全绿（新增 `effectiveActiveTools` 4 例、`TOOL_LAYERING` 3 例）；
 `check-injection-surface.sh --update` 刷新（AGENTS.md 的 `web_fetch` 说明不再要求 enable）；
 `golden-tasks.sh` 全量通过。
+
+### [2026-09-29] 浏览器接入通道选 pty + xterm.js，不移植 DSH WebUI
+**背景**：需求是"能远程/移动端用 my-pi"。同时评估了"把 DSH 的 WebUI 移植过来"。先把 DSH 那套
+量清楚（源码 MIT、公开，npm 包可读未压缩）：dist 4.71 MB + 55 个 `dsh-client-*` 浏览器插件
+10.6 MB ≈ **15.3 MB 资产**；宿主侧是 **140 包闭包**（宿主半 ~50K 行），域契约含 ~45 个 RPC 方法、
+56 个会话事件类型、20+ 投影键；浏览器对每个结果用**生成的 strict zod codec** 解码。关键的是
+WebUI **不是自包含应用**：`/plugins/??…&rev=…` 组合包路由与 `window.__DSH_BOOT__` 启动图全部由宿主
+进程产出，且 `assertEntriesActive` 会让任一行 bundle 缺失或 `inject` 服务无人提供时**整页失败**
+（实测：起静态服务器 + headless Chromium 加载原始 dist，唯一报错是
+`web boot: window.__ModuleLoader__ bootstrap facade is missing`，随后只有失败卡，不重试、无降级）。
+**选项**：
+1. 移植 DSH 前端（C1 最小 17 包闭包 / C2 全量 53 行 roster + 全部 remotes）
+2. 自建 Web GUI，跑在 pi 的 `--mode rpc` 上（33 命令 + 9 个扩展 UI 方法，双向 JSONL，官方支持接口）
+3. pty + xterm.js：服务在 pty 里拉起**原样的 TUI**，浏览器接管该终端
+4. 反向平台化：把 pi 接成 DSH 的 agent 后端，或把 my-pi 改写成 cordis 插件
+**决策**：选项 3（`custom/web-terminal/`）。选项 2 保留为"要 GUI 质感而非终端质感"时的后续路径。
+**理由**：
+- 需求是"远程能用 my-pi"，不是"要 DSH 那套界面"。选项 1 要 1–2 个月换来一个 DSH 界面，而 my-pi 的
+  12 个功能里 context 成本仪表、记忆注入、autopilot 会话管理、plan-mode、tmux 在 DSH 界面里**没有槽位**，
+  仍要另写 UI；选项 4 等于放弃 my-pi 身份（全部 hook 重写成 cordis 插件）。
+- 选项 3 的保真度是 100%：跑的就是同一个 TUI，没有第二套渲染路径、没有契约翻译层，因此不存在
+  "DSH 升版即碎"的维护面。接线量为零架构债——它是独立进程，不碰 `features/`，也不需要 Pi 扩展。
+- 这正是"少一层抽象"的判断：`--mode rpc` 方案（选项 2）虽有现成 `RpcClient`，但要重写 127 处
+  `ctx.ui` 的渲染语义；而 pty 方案把它们原样带给浏览器。
+**实现要点（两条硬结论都来自实测）**：
+- **不用 node-pty**：Node 无分配 pty 的 API，而 node-pty 需本地编译（平台范围含 Termux/PRoot）。改用
+  util-linux `script(1)` 分配 pty；prelude 把 tty 路径写进临时文件并设置初始行列，之后改尺寸用
+  `stty -F <pts> rows R cols C`——实测内核会对该 pty 前台进程组发 SIGWINCH，TUI 随之重绘
+  （初始 0×0 → 28×90 → 外部改 50×132 全部生效）。
+- **鉴权对齐 dsh-client-connection**：进程级随机 token 随 URL 打印 → `GET /?token=` 换 HMAC-SHA256
+  签名 cookie（`v1.<payload>.<mac>`，`HttpOnly; SameSite=Strict; Path=/`，按 authority 摘要命名）
+  → 每请求过 Host/Origin 栅栏。**只绑 127.0.0.1**：cookie 刻意不带 `Secure`（回环 HTTP 下浏览器会
+  丢弃带 Secure 的 cookie），故不得暴露到非回环网络；远程走 SSH 隧道。
+**验证**：vitest 56 文件 621 用例全绿（新增 4 文件 33 例，含真实 pty 的 resize/SIGWINCH 集成测试）；
+新增 `scripts/test-web-terminal.mjs` 22 项进程级守门并接入 `golden-tasks.sh` 第 12 步（鉴权/cookie
+属性/穿越防护/Host 栅栏/方法限制/WS 双向数据/resize/未授权升级拒绝/restart，零 LLM 消耗）；
+`golden-tasks.sh` 全量通过；真实 my-pi TUI 经此通道在 headless Chromium 中渲染成功（截图确认）。

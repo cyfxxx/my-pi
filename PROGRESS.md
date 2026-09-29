@@ -1055,3 +1055,32 @@ DSH 相比明显异常（本机 ¥8.04 / 544 请求 / 42.3M tokens vs DSH ¥18.0
 - **验证**：tsc 通过；vitest 全绿（新增 `effectiveActiveTools` 4 例 + `TOOL_LAYERING` 3 例）；
   注入面基线已 `--update` 刷新（`portable/agent/AGENTS.md` 的 `web_fetch` 不再要求 `enable_tool`）；
   `golden-tasks.sh` 全量通过。
+
+## 浏览器接入通道（第 60 批，2026-09-29）
+
+承接"远程/移动端用 my-pi"的需求，并先量化了"移植 DSH WebUI"的代价（结论与依据见 `DECISIONS.md`
+同日条目）。本批落 `custom/web-terminal/`：服务在 pty 里拉起**原样的 TUI**，浏览器用 xterm.js 接管。
+
+- **pty 层**（`pty-session.ts`）：`script -q -e -f -E never -c '<prelude>; exec <cmd>' /dev/null`
+  分配 pty；prelude 写 tty 路径到临时文件并设初始行列；改尺寸用 `stty -F <pts>`（内核发 SIGWINCH）；
+  `forceRedraw()` 用"行数抖动"在尺寸未变时强制整屏重绘（重连场景）；输出 4 MiB 回放缓冲；
+  `attach()` 原子地"注册监听 + 取快照"，避免重连时丢块或重复；`dispose()` 用 `kill(-pid)` 回收整个进程组。
+  不用 node-pty（无本地编译依赖）。
+- **鉴权**（`auth.ts`，纯逻辑）：256 位随机 token 随 URL 打印 → `GET /?token=` 换 HMAC-SHA256 签名
+  cookie（`v1.<payload>.<mac>`，载荷含 authority 与起止时间，`HttpOnly; SameSite=Strict; Path=/`，
+  名字按 authority 摘要）→ 每请求与每次 WS 升级过 Host/Origin 栅栏（拒 `sec-fetch-site: cross-site`、
+  Origin 必须等于 Host）。密钥落 `portable/agent/web-terminal-secret.json`（0600，已被 gitignore 覆盖），
+  故重启不掉线。**只绑 127.0.0.1**：cookie 不带 `Secure`，暴露到非回环等于明文承载长期 bearer cookie。
+- **服务与前端**：`server.ts` 路由只有 `/`（鉴权+页面）、`/assets/*`（xterm 由 node_modules 直接映射，
+  无打包器）、`/healthz`（免鉴权、不含会话内容）、`WS /ws`（二进制帧 = pty 字节，文本帧 = JSON 控制：
+  `resize`/`restart`/`redraw`/`ping`）。前端原生 ES 脚本 + xterm.js，移动端按 `visualViewport` 与
+  `interactive-widget=resizes-content` 适配，断线指数退避重连、多标签共享同一会话。
+- **首屏反馈**：pi 自身启动约 19 秒（jiti 编译 `custom/` + 加载模型，实测无 web 层同样如此），故前端按
+  **输出字节阈值**（400 B）而非"有任意输出"判定 TUI 就绪——supervisor 会先打一行 23 字节横幅，用后者
+  会误报"已连接"。等待期间显示"agent 启动中… Ns"。
+- **新增依赖**：`ws`、`@xterm/xterm`、`@xterm/addon-fit`（+ `@types/ws`，均精确锁版本在 `custom/package.json`）。
+- **验证**：`npx tsc --noEmit -p custom/` 通过；vitest **56 文件 621 用例**全绿（新增
+  `custom/web-terminal/__tests__/` 4 文件 33 例：auth 16 / static 6 / args 5 / pty-session 6，
+  其中 pty 集成测试在缺 `script`/`stty` 时自动跳过）；新增 `scripts/test-web-terminal.mjs`
+  **22 项**进程级守门并接入 `golden-tasks.sh` 第 12 步；`bash scripts/golden-tasks.sh` 全量通过。
+  真实 TUI 经此通道在 headless Chromium 中渲染成功（CJK 与 UI 正常，控制台零错误）。

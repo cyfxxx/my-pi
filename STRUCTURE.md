@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 32 个运维脚本（含共享库 lib-vendor.sh）
+├── scripts/             # 34 个运维脚本（含共享库 lib-vendor.sh）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -46,7 +46,7 @@ for p in patches/*.patch; do git -C vendor/pi apply --3way "$p"; done
 > 环境体检与缺口修复用 `bash scripts/doctor.sh [--fix]`。
 
 ### `custom/`
-my-pi 的自定义代码。三层结构：
+my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 
 - `adapters/`：唯一允许 runtime import `vendor/pi/` 的地方（`import type` 除外）
 - `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`（原子写）、`net-guard.ts`（SSRF 防护）
@@ -54,6 +54,7 @@ my-pi 的自定义代码。三层结构：
   - 小功能直接把模块铺在功能根目录（如 `tmux/logic.ts`、`browser/impl.ts`）
   - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine}`、`voice/{audio,stt,tts}`、`autopilot/{store,run,tools}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/{budget,usage-diag}`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`
   - 子包内互引用用相对路径；跨功能引用只走对方 `logic.ts`
+- `web-terminal/`：**浏览器接入通道**（独立进程，不是 pi 扩展）。服务在 pty 里拉起原样的 `my-pi.sh` TUI，浏览器用 xterm.js 接管该终端。含鉴权/cookie 签名、静态资源、pty 会话与前端页面；零 Pi 依赖，见 [custom/web-terminal/README.md](custom/web-terminal/README.md)
 - `bootstrap.ts`：入口，组装所有功能
 - 另有 `package.json`、`tsconfig.json`（工作区与编译配置），`dist/`（构建产物，gitignored）
 
@@ -92,7 +93,7 @@ my-pi 的自定义代码。三层结构：
 - `006-footer-cost-and-cache-window.patch`：成本汇率与缓存命中率窗口调整（20 轮）
 
 ### `scripts/`
-共 32 个运维脚本（含 1 个共享库 `lib-vendor.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 34 个运维脚本（含 1 个共享库 `lib-vendor.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
@@ -112,7 +113,9 @@ my-pi 的自定义代码。三层结构：
 - `vendor-bundle.sh`：vendor/pi 离线归档 `create|restore|status`（bundle 不入库，`doctor` 会提示缺失）
 - `check-injection-surface.sh`：system prompt 注入面前缀指纹基线守门（`--update` 更新基线）
 - `check-doc-links.mjs`：文档内部相对链接一致性校验
-- `golden-tasks.sh`：行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟）
+- `web-terminal.sh`：浏览器终端启动器（在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务；只绑回环），见 [custom/web-terminal/README.md](custom/web-terminal/README.md)
+- `test-web-terminal.mjs`：web-terminal 的进程级守门（鉴权/栅栏/穿越/WS 双向/resize），零 LLM 消耗；缺 `script`/`stty` 时显式 SKIP
+- `golden-tasks.sh`：行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟）
 - `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
 - `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg shim）
 - `searxng-config.sh`：生成 SearXNG `settings.yml`（禁用不可达引擎、bing 指向 cn.bing.com；`--force/--probe`）

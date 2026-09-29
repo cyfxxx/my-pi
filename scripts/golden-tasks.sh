@@ -87,8 +87,13 @@ if bash scripts/test-supervisor.sh >/tmp/golden-supervisor.log 2>&1; then pass "
 step "11. 定时任务提示词（headless 可用）"
 if node scripts/check-seeds-headless.mjs >/tmp/golden-seeds.log 2>&1; then pass "$(tail -1 /tmp/golden-seeds.log)"; else fail "种子提示词引用了 headless 不存在的扩展工具（见 /tmp/golden-seeds.log）"; cat /tmp/golden-seeds.log; fi
 
+step "12. 浏览器终端（鉴权 + 传输）"
+# 安全边界（令牌换 cookie、Host/Origin 栅栏、穿越防护）与 pty 传输（双向数据、resize→SIGWINCH）
+# 都是单测覆盖不到的进程级行为。缺 script/stty 时该脚本显式 SKIP 并 exit 0。
+if node scripts/test-web-terminal.mjs >/tmp/golden-webterm.log 2>&1; then pass "$(tail -1 /tmp/golden-webterm.log)"; else fail "web-terminal 守门（见 /tmp/golden-webterm.log）"; tail -15 /tmp/golden-webterm.log; fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "12. 无头会话冒烟"
+  step "13. 无头会话冒烟"
   # 已知现象：带扩展的 `-p` 一次性运行在本环境**产出回复后不退出**（进程挂住，实测 >60s）。
   # 故这里以"是否产出回复"为准，超时但有回复算通过并说明；进程能正常退出更好。
   smoke_log=/tmp/golden-smoke.log

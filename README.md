@@ -46,6 +46,7 @@ my-pi/
 │   │   └── atomic-write.ts           # 原子 JSON 写入
 │   │
 │   ├── bootstrap.ts                  # 唯一入口
+│   ├── web-terminal/                 # 浏览器接入通道（独立进程：pty + HTTP/WS + xterm.js）
 │   ├── package.json                  # 工作区配置
 │   └── tsconfig.json                 # TypeScript 配置
 │
@@ -61,7 +62,7 @@ my-pi/
 ├── packs/                            # 外部技能包仓库（按需读取，不注入系统提示词）
 ├── docs/                             # 项目文档（使用/开发/运维）
 │
-├── scripts/                          # 运维脚本（32 个，见 scripts/README.md）
+├── scripts/                          # 运维脚本（34 个，见 scripts/README.md）
 │   ├── build.sh                      # 一键重建/引导（新设备可复现）
 │   ├── doctor.sh                     # 本地环境 vs 仓库体检（--fix 自动修复）
 │   ├── sync-upstream.sh              # 上游同步 + 自动修复（重建/刷缓存/类型检查）
@@ -77,6 +78,8 @@ my-pi/
 │   ├── check-doc-links.mjs           # 文档链接一致性
 │   ├── install-hooks.sh              # 启用 .githooks（pre-commit/pre-push）
 │   ├── setup-external.sh             # 外部服务/依赖安装（可选）
+│   ├── web-terminal.sh               # 浏览器终端启动器（pty + HTTP/WS，只绑回环）
+│   ├── test-web-terminal.mjs         # 浏览器终端守门（鉴权/栅栏/传输）
 │   └── run-ts.sh · memory-*.mjs …    # headless 入口等（完整清单见 scripts/README.md）
 │
 ├── patches/                          # 上游补丁（6 个）
@@ -112,9 +115,16 @@ bash scripts/doctor.sh --fix
 # 4. 查看版本
 ./my-pi.sh --version
 
+# 5. 浏览器访问（只绑回环；远程走 SSH 隧道）
+npm run web
+
 # 开发模式（直接跑 TypeScript 源码，无需构建）
 bash scripts/dev.sh
 ```
+
+浏览器终端在 pty 里拉起**原样的 TUI**，因此功能与本地终端完全一致；用途是手机/远程接入。
+只监听 `127.0.0.1`，远程访问请建隧道（`ssh -N -L 7717:127.0.0.1:7717 <user>@<host>`）。
+安全模型、消息约定与已知限制见 [custom/web-terminal/README.md](custom/web-terminal/README.md)。
 
 ## 核心功能
 

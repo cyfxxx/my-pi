@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!-- interactive-widget=resizes-content：移动端软键盘弹出时收缩布局视口，终端才能跟着变矮 -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#0f1216" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>my-pi</title>
+    <link rel="stylesheet" href="/assets/xterm.css" />
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <header id="bar">
+      <span id="status" class="pill pill--connecting">连接中…</span>
+      <span id="meta" class="meta"></span>
+      <span class="spacer"></span>
+      <button id="restart" type="button" class="btn">重启 agent</button>
+      <button id="reconnect" type="button" class="btn">重连</button>
+    </header>
+    <main id="screen">
+      <div id="terminal"></div>
+      <p id="boot" class="boot" hidden></p>
+      <div id="overlay" class="overlay" hidden>
+        <p id="overlay-text" class="overlay__text"></p>
+        <button id="overlay-action" type="button" class="btn btn--primary">重启 agent</button>
+      </div>
+    </main>
+    <script src="/assets/xterm.js"></script>
+    <script src="/assets/addon-fit.js"></script>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

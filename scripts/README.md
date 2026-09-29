@@ -26,7 +26,8 @@
 | `check-injection-surface.sh` | system prompt 注入面前缀指纹基线守门（`--update` 更新基线） |
 | `check-doc-links.mjs` | 文档内部相对链接一致性 |
 | `check-seeds-headless.mjs` | 定时任务提示词 headless 可用性守门（不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令） |
-| `golden-tasks.sh` | 行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
+| `golden-tasks.sh` | 行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
+| `test-web-terminal.mjs` | 浏览器终端进程级守门（鉴权/cookie 属性/Host 栅栏/穿越防护/WS 双向数据/resize/restart，22 项，零 LLM）；缺 `script`/`stty` 时显式 SKIP |
 | `patch-playwright-core.mjs` | Termux 下把 playwright-core 的 linux 分支扩展至 android（幂等） |
 | `install-hooks.sh` | 启用 `.githooks/`（pre-commit → `golden --fast`，pre-push → 全量）；本地无 CI，钩子是唯一自动防线 |
 | `vendor-bundle.sh` | vendor/pi 离线归档（`create`/`restore`/`status`）；bundle 不入库 |
@@ -42,6 +43,7 @@
 
 | 脚本 | 用途 |
 |------|------|
+| `web-terminal.sh` | 浏览器终端启动器：在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务（只绑 127.0.0.1，远程走 SSH 隧道）；见 [custom/web-terminal/README.md](../custom/web-terminal/README.md) |
 | `pi-supervisor.sh` | 崩溃自愈外壳（分类/修复者 pi/健康检查/熔断）；`MY_PI_NO_SUPERVISOR=1` 直启 |
 | `test-supervisor.sh` | supervisor 纯函数行为测试（崩溃分类 / admin state 解析；库模式 source，无需网络/provider） |
 | `memory-store.mjs` | 记忆入库（零 LLM，直调 memory 逻辑层 `storeEntry`，内置标题去重）；`--json`/`--file`/stdin，`--dry-run` |
