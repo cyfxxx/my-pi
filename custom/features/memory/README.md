@@ -6,7 +6,18 @@
 
 - 工具：`memory_store`、`memory_search`（`summaries=true` 附带会话摘要）、`memory_stats`、`memory_forget`（记忆）；`ctx_note`、`ctx_list`、`ctx_snap`、`ctx_exec`（便笺/检查点/执行记录）
 - 命令：`/memory <search|stats|summary|lifecycle|mine [--ingest]|prune|cleanup|help>`
-- 钩子：`session_start`、`before_agent_start`、`context`、`session_compact`
+- 钩子：`session_start`、`before_agent_start`、`session_compact`
+
+## 注入策略：append-only（2026-09-29 起）
+
+每轮在 `before_agent_start` 追加一条 `my-pi-memory-injection` 消息，**仅在块内容变化时**才追加
+（`shouldInjectMemory`）；历史中的旧注入**全部保留**，块首声明"以最新一块为准"。
+
+旧实现在 `context` 钩子里用 `filterInjectedMessages` 移除除最新一条外的全部注入，会在舊注入
+所处位置截断消息序列，使其后**整段前缀缓存失效**——实测注入后的 83 次请求命中率仅 61.1%，
+占全部未命中的 39.0%（其余请求 96.2%）。保留旧注入的代价是每轮多几百 token 的 cacheRead
+（约为全价的 1/50），远低于一次 150K–320K 的全价重算；旧注入随压缩折叠，因此有界。
+`filterInjectedMessages` 仍导出供离线分析，但**不再参与请求构建**（有源码级回归测试锁定）。
 
 ## 文件
 

@@ -351,3 +351,32 @@ describe('memory: merge 写入 contentHash', () => {
     expect(entries[0].contentHash).toBe(computeContentHash(entries[0].content));
   });
 });
+
+/**
+ * 回归（2026-09-29）：注入序列必须 append-only。
+ *
+ * 旧实现在 `context` 钩子里调用 `filterInjectedMessages`（只保留最新一条注入），
+ * 删除旧注入会让消息序列在**上一条注入的位置**发生位移，该点之后整段前缀缓存失效。
+ * 实测：注入后的 83 次请求命中率 61.1%，占全部未命中的 39.0%（其余请求 96.2%）；
+ * 2026-09-26 12:41–12:52 连续 10 次请求命中率仅 4%–25%（ctx 250K）。
+ *
+ * 这里做源码级断言：生产路径（index.ts）不得再出现该调用。
+ * 函数本身保留导出（纯逻辑，供离线分析）。
+ */
+describe('memory: 注入 append-only 不变量', () => {
+  it('memory/index.ts 生产代码不再调用 filterInjectedMessages', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const src = readFileSync(fileURLToPath(new URL('../index.ts', import.meta.url)), 'utf-8');
+    // 去掉注释后再断言，避免文档性提及造成误报
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+    expect(code).not.toContain('filterInjectedMessages');
+  });
+
+  it('注入块首声明"以最新一块为准"，旧注入留在历史中仍有正确语义', async () => {
+    const { buildInjectionBlock } = await import('../recall/inject');
+    const entries: MemoryEntry[] = [entry({ title: 'T', content: '正文内容足够长以避免被截断为空' })];
+    const { block } = buildInjectionBlock(entries, []);
+    if (block) expect(block).toContain('以最新一块为准');
+  });
+});

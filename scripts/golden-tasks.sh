@@ -92,8 +92,13 @@ step "12. 浏览器终端（鉴权 + 传输）"
 # 都是单测覆盖不到的进程级行为。缺 script/stty 时该脚本显式 SKIP 并 exit 0。
 if node scripts/test-web-terminal.mjs >/tmp/golden-webterm.log 2>&1; then pass "$(tail -1 /tmp/golden-webterm.log)"; else fail "web-terminal 守门（见 /tmp/golden-webterm.log）"; tail -15 /tmp/golden-webterm.log; fi
 
+step "13. 用量度量口径（成本告警的有效性）"
+# 度量读错数据源会让所有阈值告警静默失效（2026-09-26..29 日报连续 n/a，命中率跌到 80.66%
+# 也没告警）。这里用合成数据驱动真实 daily-health，锁定命中率来源与前端变更告警。
+if node scripts/test-usage-metrics.mjs >/tmp/golden-usage.log 2>&1; then pass "$(tail -1 /tmp/golden-usage.log)"; else fail "用量度量守门（见 /tmp/golden-usage.log）"; tail -15 /tmp/golden-usage.log; fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "13. 无头会话冒烟"
+  step "14. 无头会话冒烟"
   # 已知现象：带扩展的 `-p` 一次性运行在本环境**产出回复后不退出**（进程挂住，实测 >60s）。
   # 故这里以"是否产出回复"为准，超时但有回复算通过并说明；进程能正常退出更好。
   smoke_log=/tmp/golden-smoke.log

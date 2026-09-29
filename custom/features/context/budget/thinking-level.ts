@@ -9,8 +9,18 @@
  * 比例分母为真实上下文窗口（getContextUsage().contextWindow），不对齐压缩阈值。
  *
  * 记账：每次切换追加 JSONL（`portable/memory/logs/level-changes.jsonl`，可用
- * `PI_LEVEL_CHANGE_FILE` 覆盖；`PI_DISABLE_LEVEL_AUDIT=1` 关闭）。档位是运行时
- * provider 设置、不进注入面，切换不额外破坏缓存前缀。
+ * `PI_LEVEL_CHANGE_FILE` 覆盖；`PI_DISABLE_LEVEL_AUDIT=1` 关闭）。
+ *
+ * ⚠️ 2026-09-29 实测更正：曾以为"档位是运行时 provider 设置、不进注入面，切换不破坏
+ * 缓存前缀"——**该结论是错的**。DeepSeek 的前缀缓存键包含 `reasoning_effort`，
+ * 切档会使**整段前缀失效**：
+ *   - 2026-09-27 12:05:59 切到 low 前一次请求 cacheRead 141,184/141,406（99.8%）；
+ *     切档后下一次请求 cacheRead 0/142,075（0%），其间前缀指纹无任何变化（空闲 7.2s）。
+ *   - 2026-09-27 12:13:30 切回 high，下一次请求 4,480/146,630（3.1%）。
+ * 一次切档 ≈ 整段上下文全价重算（实测一次 140K–250K token）。因此：
+ *   - 自动切档默认关闭（`PI_CONTEXT_THINKING_AUTO=on` 才开启，见 features/context/index.ts）；
+ *   - 运行时档位一律经 `clampForCacheSafety` 夹到 `PI_THINKING_MAX_LEVEL`（默认 high）以下，
+ *     避免模型切换时被自动抬到 max（实测切到 deepseek-flash 必落 max）。
  */
 
 import { join } from 'node:path';
@@ -66,6 +76,44 @@ export function clampToLadder(level: string, fallback: AutoThinkLevel = 'high'):
   if (level === 'max') return 'high';
   if (level === 'minimal' || level === 'off') return 'low';
   return fallback;
+}
+
+/**
+ * 运行时档位上限（缓存安全）：默认 `high`，可用 `PI_THINKING_MAX_LEVEL` 覆盖。
+ *
+ * 高于该上限的档位会在 `thinking_level_select` 时被夹回。这是必要的，因为切换到
+ * deepseek-flash 会被自动解析成 `max`（实测 2026-09-24/09-26/09-27 四次模型切换
+ * 全部落到 max），而 max 只增加 reasoning token、不改变能力上限，却让输出成本显著上升。
+ *
+ * 显式设 `PI_THINKING_MAX_LEVEL=max` 表示**自愿承担**该代价（夹档关闭，恢复原行为）。
+ */
+export function cacheSafeMaxLevel(): AutoThinkLevel | 'max' {
+  const raw = (process.env.PI_THINKING_MAX_LEVEL || '').trim().toLowerCase();
+  if (raw === 'low' || raw === 'medium' || raw === 'high' || raw === 'max') return raw;
+  return 'high';
+}
+
+/**
+ * 把运行时档位夹进缓存安全上限。
+ * 返回需要切换到的档位；`null` 表示无需任何动作（保持当前档位，不制造切档事件）。
+ *
+ * - `PI_THINKING_MAX_LEVEL=max`：显式放开上限，永不夹档。
+ * - `max`/`xhigh`：超上限 → 夹到上限（这是本函数存在的主要原因）。
+ * - `off`/`minimal`：低于阶梯下限，比上限便宜，不动。
+ * - 阶梯内档位：超过上限才夹（仅当 `PI_THINKING_MAX_LEVEL` 被调低时发生）。
+ * - 未知档位：不擅自改动。
+ */
+export function clampForCacheSafety(level: string): AutoThinkLevel | null {
+  const max = cacheSafeMaxLevel();
+  if (max === 'max') return null;
+  const l = String(level ?? '')
+    .trim()
+    .toLowerCase();
+  if (l === 'max' || l === 'xhigh') return max;
+  if (l === 'off' || l === 'minimal') return null;
+  const i = LEVEL_LADDER.indexOf(l as AutoThinkLevel);
+  if (i < 0) return null;
+  return i > idx(max) ? max : null;
 }
 
 export function createState(initialLevel: string): ThinkLevelState {
@@ -201,7 +249,11 @@ export function proposeThinkingLevel(
     pressure,
     source: 'model',
   });
-  return { ok: true, message: `已按模型提议切换到 ${level} 档（reason: ${reason || '未注明'}）。`, level };
+  return {
+    ok: true,
+    message: `已按模型提议切换到 ${level} 档（reason: ${reason || '未注明'}）。注意本次切档使整段前缀缓存失效，下一次请求将按全价重算当前上下文。`,
+    level,
+  };
 }
 
 // ── 审计落盘 ──

@@ -26,8 +26,9 @@
 | `check-injection-surface.sh` | system prompt 注入面前缀指纹基线守门（`--update` 更新基线） |
 | `check-doc-links.mjs` | 文档内部相对链接一致性 |
 | `check-seeds-headless.mjs` | 定时任务提示词 headless 可用性守门（不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令） |
-| `golden-tasks.sh` | 行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
+| `golden-tasks.sh` | 行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
 | `test-web-terminal.mjs` | 浏览器终端进程级守门（鉴权/cookie 属性/Host 栅栏/穿越防护/WS 双向数据/resize/restart，22 项，零 LLM）；缺 `script`/`stty` 时显式 SKIP |
+| `test-usage-metrics.mjs` | 成本度量口径守门（13 项，零 LLM）：合成数据驱动 `daily-health.mjs`，锁定命中率取自**每轮用量**而非工具级台账、前缀前端变更（system/tools/head/level）会触发告警、缺数据时记 n/a 而非瞎算 |
 | `patch-playwright-core.mjs` | Termux 下把 playwright-core 的 linux 分支扩展至 android（幂等） |
 | `install-hooks.sh` | 启用 `.githooks/`（pre-commit → `golden --fast`，pre-push → 全量）；本地无 CI，钩子是唯一自动防线 |
 | `vendor-bundle.sh` | vendor/pi 离线归档（`create`/`restore`/`status`）；bundle 不入库 |
@@ -49,7 +50,7 @@
 | `memory-store.mjs` | 记忆入库（零 LLM，直调 memory 逻辑层 `storeEntry`，内置标题去重）；`--json`/`--file`/stdin，`--dry-run` |
 | `memory-lifecycle.mjs` | 记忆生命周期只读报告（零 LLM，调 `analyzeLifecycle`：淘汰/升格/冲突/垃圾/聚合候选）；`--json`/`--limit`；headless 下替代 `/memory lifecycle` |
 | `reseed-seeds.mjs` | 把 `scheduled-seeds.json` 的定义显式应用到已存在的同名任务（种子对账只补缺失不覆盖；改提示词后用它；保留 id/enabled/lastRun/runCount/history，默认预演，`--apply` 先备份） |
-| `daily-health.mjs` | 每日健康检查（命中率/记忆库/种子失配/守门脏改） |
+| `daily-health.mjs` | 每日健康检查（**加权命中率/未命中每次/输出占比/前缀前端变更次数**/记忆库/种子失配/守门脏改；阈值 `PI_HEALTH_HIT_FLOOR`=0.97、`PI_HEALTH_UNCACHED_CEIL`=3000。数据源是每轮用量 `.usage-diag.jsonl` 与 `prefix-fingerprints.jsonl`——**不要改用工具级台账 `usage.jsonl`**，它没有缓存字段，会让命中率恒为 n/a） |
 | `knowledge-fetch.py` | 知识源抓取（落 `portable/memory/knowledge/`） |
 | `knowledge-ingest.mjs` | 知识订阅入库（零 LLM，`storeEntry` 内置去重） |
 | `tool-stats-sync.mjs` | 工具使用统计汇总（`usage.jsonl` → 跨设备计数） |

@@ -37,7 +37,6 @@ import {
   logSearchTrace,
   buildInjectionBlock,
   INJECT_TAG,
-  filterInjectedMessages,
   shouldInjectMemory,
   detectEnvironment,
   formatEnvironments,
@@ -55,12 +54,14 @@ import {
 import type { MemoryCategory, MemoryEntry, RuntimeEnv } from './logic';
 
 export function register(pi: ExtensionAPI): void {
-  // 上一次注入块内容。用于"内容未变则不重插"：注入消息由 before_agent_start 追加、
-  // 旧注入由 context 钩子移除，重插会使消息序列在**上一条注入的位置**发生位移，
-  // 该点之后的前缀缓存失效。注入总追加在轮末，故该位置通常就是上一次请求的尾部（便宜）；
-  // 会话语境下的例外是**首次**刷新——上一条注入仍是第 1 轮注入（序列第 3 条，属头部），
-  // 整段失效一次（2026-09-26 实测 $0.029）。故去抖的价值是减少刷新次数，而非消除位移。
-  // 原项目 pi-tools 无去抖（每轮重插），my-pi 更省；filterInjectedMessages 保持一致以防注入累积。
+  // 上一次注入块内容。用于"内容未变则不重注"：内容不变时历史里的块照常可见，不重复追加。
+  // ⚠️ 2026-09-29 更正（实测）：旧设计用 context 钩子移除旧注入（"只保留最新一条"），
+  // 会在**上一条注入所处位置**截断消息序列，使该点之后整段前缀缓存失效。注释里曾认为
+  // 该位置通常在上次请求尾部（便宜），但实测不成立：注入后的 83 次请求命中率仅 61.1%，
+  // 占全部未命中的 39.0%；09-26 12:41–12:52 连续 10 次命中率 4%–25%（ctx 250K）。
+  // 现改为 **append-only**：不再移除旧注入，模型以最新块为准（块首已注明）。
+  // 代价：每轮多几百 token 的 cacheRead（≈1/50 全价）；收益：不再有 150K–320K 全价重算。
+  // 旧注入会在压缩时随历史一并折叠，因此有界。
   let lastInjectedBlock: string | null = null;
   // ── ctx_note / ctx_list（便笺，跨压缩存活）──
   registerNotesTools(pi);
@@ -380,15 +381,11 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // ── 过滤历史注入消息（只保留最新一条）──
-  registerHook(pi, {
-    event: 'context',
-    handler: async (event) => {
-      const e = event as { messages?: object[] };
-      if (!Array.isArray(e.messages)) return undefined;
-      return { messages: filterInjectedMessages(e.messages) };
-    },
-  });
+  // ── 历史注入消息：**不再**做"只保留最新一条"的过滤（2026-09-29）──
+  // 旧实现在此调用 filterInjectedMessages(e.messages)，移除除最新一条外的全部注入，
+  // 造成消息序列在旧注入位置发生位移 → 该点之后的前缀缓存整段失效（实测单次 150K–320K
+  // token 全价重算，占全部未命中的 39%）。现改为 append-only：所有注入留在历史中，
+  // 模型以最新一块为准。旧注入随压缩折叠，不会无限增长。
 
   // ── compaction 完成：记录时间戳并持久化会话摘要（L2）──
   registerHook(pi, {

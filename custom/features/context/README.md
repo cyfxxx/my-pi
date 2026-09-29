@@ -72,24 +72,44 @@
   **仅在内容变化时追加**（append-only，不删除旧的）：变化点落在尾部，只影响其后的少量 token，
   避免"前缀最前处变化 → 整段缓存失效"（实测单次 170K–316K 全价重算）。其中**休眠组摘要只在
   `PI_CONTEXT_TOOL_LAYERING=on` 时出现**——默认全部工具常驻，再列"休眠组"只会误导模型去 enable。
-- 记忆注入同理（`shouldInjectMemory`：内容未变不重插；**原项目 `pi-tools` 每轮都重插，无去抖**，
-  my-pi 是更省的那一侧）。移除旧注入的位移点是**上一条注入的位置**（注入总追加在轮末，故通常就是
-  上一次请求的尾部 → 只影响尾部少量 token）；唯一例外是会话中的**首次**刷新：上一条注入还是第 1 轮
-  注入（消息序列第 3 条，属头部）→ 整段失效一次。实测该次 cacheRead 10.6K/199.5K（$0.029/会话），
-  之后刷新位移点在 198.5K 处（cacheRead 198.5K/244K）。`filterInjectedMessages` 与原项目逐字一致
-  （防注入累积），**保持不变**。
+- 记忆注入同理（`shouldInjectMemory`：内容未变不重注）。**2026-09-29 更正**：旧实现在 `context`
+  钩子里用 `filterInjectedMessages` 移除除最新一条外的全部注入（防累积），其注释认为位移点"通常是
+  上一次请求的尾部 → 只影响尾部少量 token"，**实测不成立**：注入后的 83 次请求命中率仅 **61.1%**，
+  占全部未命中的 **39.0%**（其余 567 次为 96.2%）；2026-09-26 12:41–12:52 连续 10 次请求命中率
+  4%–25%（ctx 250K，cacheRead 9K–60K），说明删除旧注入是**从会话头部附近截断整段缓存**。
+  现已改为 **append-only**：不再移除旧注入，块首声明"以最新一块为准"，旧注入随压缩折叠（有界）。
+  代价是每轮多几百 token 的 cacheRead（≈1/50 全价），远低于一次 150K–320K 全价重算。
+
+### 切档与工具集（2026-09-29 实测新增）
+
+- **切档 = 整段失效**：DeepSeek 的前缀缓存键包含 `reasoning_effort`，
+  切 thinking 档位后下一次请求 `cacheRead` 归零（2026-09-27 12:05:59 切 `low`：141,184/141,406
+  → 0/142,075，其间其它分段指纹无变化）。故：
+  - **自动切档默认关闭**（`PI_CONTEXT_THINKING_AUTO=on` 才开启）——降一档省下的 thinking token
+    远小于一次整段全价重算；
+  - 运行时档位经 `clampForCacheSafety` 夹到 `PI_THINKING_MAX_LEVEL`（默认 `high`）：切换到
+    `deepseek-flash` 会被自动解析成 `max`（实测 4/4 次），而 `max` 只烧 reasoning token。
+    夹档发生在模型切换的同一次，模型切换本身已使缓存失效，故不产生额外代价。
+- **`applyToolLayering` 只在集合真的变化时才调 `setActiveTools`**：工具数组位于请求最前部，
+  一次变更使 system prompt + 整段消息前缀全部失效（2026-09-26 四次 `enable_tool` 各触发一次
+  140K–250K 全价重算）。计划模式自 2026-09-27（`08ea930b2`）起改用 `tool_call` 拦截，不再切工具集。
 
 ## 运行时前缀指纹（诊断整段缓存失效）
 
-`before_provider_request` 时对请求分段落指纹（system / tools / 消息头 / 总序列 + 消息条数 + **距上一条请求的间隔 `sinceLastMs`**），
-逐条追加到 `logs/prefix-fingerprints.jsonl`，`changed` 字段直接给出本次哪一段发生变化。
-用于定位「单次 170K–316K 全价重算」这类整段失效：若 `system`/`tools` 变化 → 前缀最前处变了；
-若仅 `messages` 变化 → 压缩/裁剪或注入位移；若 `sinceLastMs` 很大 → 属空闲后缓存失效（provider 侧）。
+`before_provider_request` 时对请求分段落指纹（system / tools / 消息头 / **thinking 档位** / 消息条数
+/ 总序列 + 距上一条请求的间隔 `sinceLastMs`），逐条追加到 `logs/prefix-fingerprints.jsonl`，
+`changed` 字段直接给出本次哪一段发生变化。用于定位「单次 170K–316K 全价重算」这类整段失效：
+`system`/`tools`/`head`/**`level`** 变化 → 前缀最前处变了；`total` → 变化点在 head 覆盖的前 6 条
+之外的消息内容里（中段改写）；仅 `messages` → 追加或压缩；`sinceLastMs` 很大 → 空闲后缓存失效。
+
+**2026-09-29 补齐的两处盲区**：旧实现 `total` 算了却从不比较、`messages` 仅在条数变化时标记，
+于是"中段消息内容被改写但条数不变"会被记成 `changed: []`（看起来前缀没变，实际整段失效）；
+且未记录档位，使切档导致的失效看起来"无原因"。现在 `total` 作为兜底标记，档位单独标记 `level`。
 `PI_PREFIX_FINGERPRINT=off` 关闭，`/context fingerprint` 查看最近一次。
 
 ## 关键环境变量
 
-`PI_CONTEXT_THINKING_AUTO=off`（关自动切档）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_ERASE=on`（开每轮擦除，默认关）、`PI_CONTEXT_TOOL_LAYERING=on`（开休眠分层，默认关=全部工具常驻）、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
+`PI_CONTEXT_THINKING_AUTO=on`（**开**自动切档，默认关）、`PI_THINKING_MAX_LEVEL`（运行时档位上限，默认 `high`）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_ERASE=on`（开每轮擦除，默认关）、`PI_CONTEXT_TOOL_LAYERING=on`（开休眠分层，默认关=全部工具常驻）、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
 
 ## 确定性擦除（零 LLM 成本，默认关闭）
 

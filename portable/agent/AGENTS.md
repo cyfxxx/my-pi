@@ -15,7 +15,7 @@ custom/                    # 自定义层（adapters/core/features + web-termina
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
 deploy/                    # 可选系统级部署产物（systemd 等）
-scripts/                   # 34 个运维脚本
+scripts/                   # 35 个运维脚本
 patches/                   # 上游补丁
 ```
 
@@ -67,6 +67,7 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存�
 - **上游隔离**：`vendor/pi/` 不直接修改，改动通过 `patches/` 记录。
 - **接口隔离**：Pi API 只出现在 `custom/adapters/`。
 - **缓存友好**：system prompt 注入禁止时间戳/精确数值；压力提示按档位固定文案（<75% 不注入、≥75%/≥90% 用固定文本）；token 估算统一用 `features/context/budget/budget.ts` 的 `estimateTokens`。
+- **前缀缓存是第一成本杠杆**（DeepSeek 命中价仅为未命中价的 1/50）：**任何改写已发送历史的动作**（删注入、擦除旧消息、压缩）或**改变请求前部的动作**（切 thinking 档位、改工具数组、改 system prompt）都会让其后整段上下文按全价重算。新增功能若需插入历史信息，一律 **append-only（追加到尾部）**，不得移除旧项——实测记忆注入的"删旧插新"占全部未命中的 39%。成本自查：`node scripts/daily-health.mjs --print`（加权命中率 / 未命中每次 / **前缀前端变更次数**）。
 - **后台任务（禁止阻塞前台）**：长任务用 `tmux_run` 启动，**启动后立即结束回合**，不同轮内不等待；同轮内禁止 `tmux_wait`，确需等待只用 `pattern=` 匹配且 `timeout≤60s`。会话结束后由 `features/tmux/watcher.ts` 自动注入通知并触发新回合（不必等用户下一条消息）。子代理（`subagent`）是同步阻塞的，只适合必须立即拿到结果的短任务。
 - **git 提交**：暂存显式路径，只提交本次会话更改的文件；不提交 `auth.json` 等敏感配置。
 

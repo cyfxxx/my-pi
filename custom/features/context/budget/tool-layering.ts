@@ -19,10 +19,26 @@ import { TOOL_LAYERING } from './task-gate';
 /** 已启用工具组（进程内存态；仅在 TOOL_LAYERING=on 时参与裁剪） */
 export const enabledGroups = new Set<string>();
 
-/** 应用工具集：按需加载开启时裁掉未启用休眠组，默认（关闭）全部工具常驻 */
+/**
+ * 应用工具集：按需加载开启时裁掉未启用休眠组，默认（关闭）全部工具常驻。
+ *
+ * 只有当目标集合与当前活跃集合**不同**时才调用 `setActiveTools`：工具数组位于请求最前部，
+ * 一次变更会使 system prompt 与整段消息前缀全部失效（实测单次 140K–250K 全价重算，
+ * 2026-09-26 四次 `enable_tool` 各触发一次）。空操作调用在这里是纯代价。
+ */
 export function applyToolLayering(pi: PiApi): void {
   const all = getAllToolNames(pi);
-  setActiveTools(pi, effectiveActiveTools(all, enabledGroups, TOOL_LAYERING));
+  const target = effectiveActiveTools(all, enabledGroups, TOOL_LAYERING);
+  if (sameToolSet(getActiveTools(pi), target)) return;
+  setActiveTools(pi, target);
+}
+
+/** 工具集合比较：顺序无关（顺序变化同样破坏前缀缓存，故按排序后比较） */
+function sameToolSet(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((x, i) => x === sb[i]);
 }
 
 /** 是否存在"已启用但处于休眠名单"的工具（用于计划模式退出等场景自愈） */

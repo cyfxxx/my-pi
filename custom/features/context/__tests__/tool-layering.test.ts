@@ -104,3 +104,63 @@ describe('tool-layering：PI_CONTEXT_TOOL_LAYERING=on 恢复休眠分层', () =>
     expect(active()).toContain('browser_navigate');
   });
 });
+
+/**
+ * 回归（2026-09-29）：`applyToolLayering` 过去无条件调用 `setActiveTools`。
+ * 工具数组在请求最前部，任何一次调用（即使集合没变）都会重写 system prompt 与整段
+ * 消息前缀 → 整段缓存失效。这里锁定"集合相同则不调用"与"顺序无关比较"。
+ */
+describe('applyToolLayering 空操作防护', () => {
+  afterEach(() => {
+    delete process.env.PI_CONTEXT_TOOL_LAYERING;
+    vi.resetModules();
+  });
+
+  it('目标集合与当前一致 → 不调用 setActiveTools', async () => {
+    delete process.env.PI_CONTEXT_TOOL_LAYERING;
+    vi.resetModules();
+    const mod = await import('../budget/tool-layering');
+    const { pi } = fakePi();
+    let calls = 0;
+    const orig = pi.setActiveTools;
+    pi.setActiveTools = (names: string[]) => {
+      calls++;
+      orig(names);
+    };
+    mod.applyToolLayering(pi);
+    expect(calls).toBe(0);
+  });
+
+  it('顺序不同但集合相同 → 仍不调用（顺序变化同样破坏前缀缓存）', async () => {
+    delete process.env.PI_CONTEXT_TOOL_LAYERING;
+    vi.resetModules();
+    const mod = await import('../budget/tool-layering');
+    const { pi } = fakePi();
+    pi.getActiveTools = () => [...ALL].reverse();
+    let calls = 0;
+    const orig = pi.setActiveTools;
+    pi.setActiveTools = (names: string[]) => {
+      calls++;
+      orig(names);
+    };
+    mod.applyToolLayering(pi);
+    expect(calls).toBe(0);
+  });
+
+  it('集合确实不同 → 调用一次', async () => {
+    process.env.PI_CONTEXT_TOOL_LAYERING = 'on';
+    vi.resetModules();
+    const mod = await import('../budget/tool-layering');
+    const { pi } = fakePi();
+    // 预留一个休眠组未启用 → 目标集合小于当前全量
+    let calls = 0;
+    const orig = pi.setActiveTools;
+    pi.setActiveTools = (names: string[]) => {
+      calls++;
+      orig(names);
+    };
+    mod.applyToolLayering(pi);
+    expect(calls).toBe(1);
+    expect(pi.getActiveTools()).not.toContain('browser_navigate');
+  });
+});

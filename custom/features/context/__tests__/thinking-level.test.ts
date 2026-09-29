@@ -16,6 +16,8 @@ import {
   pressureOf,
   inferTaskType,
   loadLevelChanges,
+  clampForCacheSafety,
+  cacheSafeMaxLevel,
   MIN_INTERVAL_MS,
   type AutoThinkLevel,
 } from '../budget/thinking-level';
@@ -217,5 +219,59 @@ describe('proposeThinkingLevel（模型提议·规则审批）', () => {
     expect(r.ok).toBe(true);
     expect(r.message).toContain('无需切换');
     expect(calls).toEqual([]);
+  });
+});
+
+/**
+ * 回归（2026-09-29）：切档使整段前缀缓存失效，且切换到 deepseek-flash 会被自动解析成
+ * max（实测 4/4 次）。这里锁定"超上限一律夹回、低档位不动、合规档位不制造切档事件"。
+ */
+describe('缓存安全档位钳制', () => {
+  const saved = process.env.PI_THINKING_MAX_LEVEL;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.PI_THINKING_MAX_LEVEL;
+    else process.env.PI_THINKING_MAX_LEVEL = saved;
+  });
+
+  it('默认上限为 high', () => {
+    delete process.env.PI_THINKING_MAX_LEVEL;
+    expect(cacheSafeMaxLevel()).toBe('high');
+  });
+
+  it('max/xhigh → 夹到上限（这是本功能的主要原因）', () => {
+    delete process.env.PI_THINKING_MAX_LEVEL;
+    expect(clampForCacheSafety('max')).toBe('high');
+    expect(clampForCacheSafety('xhigh')).toBe('high');
+  });
+
+  it('合规档位与廉价档位不产生切档', () => {
+    delete process.env.PI_THINKING_MAX_LEVEL;
+    expect(clampForCacheSafety('high')).toBeNull();
+    expect(clampForCacheSafety('medium')).toBeNull();
+    expect(clampForCacheSafety('low')).toBeNull();
+    expect(clampForCacheSafety('minimal')).toBeNull();
+    expect(clampForCacheSafety('off')).toBeNull();
+    expect(clampForCacheSafety('')).toBeNull();
+    expect(clampForCacheSafety('unknown-level')).toBeNull();
+  });
+
+  it('上限可调低，此时 medium/high 也被夹回', () => {
+    process.env.PI_THINKING_MAX_LEVEL = 'low';
+    expect(cacheSafeMaxLevel()).toBe('low');
+    expect(clampForCacheSafety('high')).toBe('low');
+    expect(clampForCacheSafety('medium')).toBe('low');
+    expect(clampForCacheSafety('low')).toBeNull();
+  });
+
+  it('非法上限值回落 high', () => {
+    process.env.PI_THINKING_MAX_LEVEL = 'bogus';
+    expect(cacheSafeMaxLevel()).toBe('high');
+  });
+
+  it('显式设 max = 自愿承担代价，永不夹档', () => {
+    process.env.PI_THINKING_MAX_LEVEL = 'max';
+    expect(cacheSafeMaxLevel()).toBe('max');
+    expect(clampForCacheSafety('max')).toBeNull();
+    expect(clampForCacheSafety('high')).toBeNull();
   });
 });

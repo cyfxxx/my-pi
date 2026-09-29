@@ -119,3 +119,70 @@ describe('systemTextOf', () => {
     expect(systemTextOf({ messages: [{ role: 'user', content: 'x' }] })).toBe('');
   });
 });
+
+/**
+ * 回归（2026-09-29）：两处盲区曾让"整段缓存失效"查不出原因——
+ *   1. `total` 算了但从不比较，中段消息内容被改写（条数不变）时记为 changed: []；
+ *   2. 未记录 thinking 档位，而 DeepSeek 的缓存键含 reasoning_effort，切档即整段失效
+ *      （实测 2026-09-27 12:05:59 切 low → cacheRead 0/142,075，其间其它分段无变化）。
+ */
+describe('prefix-fingerprint 盲区回归', () => {
+  it('中段消息内容被改写、条数不变 → changed 含 total（旧实现为 []）', () => {
+    const a = fingerprintRequest(
+      {
+        messages: [
+          { role: 'system', content: 'SYS' },
+          { role: 'user', content: 'hi' },
+          { role: 'assistant', content: 'ok' },
+          { role: 'user', content: 'again' },
+          { role: 'assistant', content: 'ok2' },
+          { role: 'user', content: 'third' },
+          { role: 'user', content: 'TAIL-OLD' },
+        ],
+        tools: [{ name: 'bash' }],
+      },
+      null,
+      1,
+      'high',
+    );
+    // 只改第 7 条（超出 head 覆盖的前 6 条），条数不变
+    const b = fingerprintRequest(
+      {
+        messages: [
+          { role: 'system', content: 'SYS' },
+          { role: 'user', content: 'hi' },
+          { role: 'assistant', content: 'ok' },
+          { role: 'user', content: 'again' },
+          { role: 'assistant', content: 'ok2' },
+          { role: 'user', content: 'third' },
+          { role: 'user', content: 'TAIL-NEW' },
+        ],
+        tools: [{ name: 'bash' }],
+      },
+      a,
+      2,
+      'high',
+    );
+    expect(b.messageCount).toBe(a.messageCount);
+    expect(b.head).toBe(a.head);
+    expect(b.total).not.toBe(a.total);
+    expect(b.changed).toEqual(['total']);
+  });
+
+  it('thinking 档位变化 → changed 含 level', () => {
+    const a = fingerprintRequest(base(), null, 1, 'high');
+    const b = fingerprintRequest(base(), a, 2, 'low');
+    expect(b.changed).toContain('level');
+    expect(b.level).toBe('low');
+  });
+
+  it('档位未变时不产生 level 标记', () => {
+    const a = fingerprintRequest(base(), null, 1, 'high');
+    const b = fingerprintRequest(base(), a, 2, 'high');
+    expect(b.changed).toEqual([]);
+  });
+
+  it('formatFingerprint 输出档位', () => {
+    expect(formatFingerprint(fingerprintRequest(base(), null, 1, 'high'))).toContain('lvl=high');
+  });
+});

@@ -41,6 +41,9 @@ import {
   createState,
   tickThinkingLevel,
   proposeThinkingLevel,
+  clampForCacheSafety,
+  cacheSafeMaxLevel,
+  recordLevelChange,
   inferTaskType,
   type ThinkLevelState,
 } from './budget/thinking-level';
@@ -115,7 +118,7 @@ export function register(pi: ExtensionAPI): void {
   let lastVolatileContext: string | null = null;
   const recordFingerprint = (payload: { messages?: unknown[]; tools?: unknown }): void => {
     try {
-      const fp = fingerprintRequest(payload, lastFingerprint);
+      const fp = fingerprintRequest(payload, lastFingerprint, Date.now(), getThinkingLevel(pi));
       lastFingerprint = fp;
       ensureDir(dirname(fingerprintFile));
       appendJSONLRotating(fingerprintFile, fp, 1_000_000);
@@ -138,7 +141,11 @@ export function register(pi: ExtensionAPI): void {
   // 而手动 /compact（不经过本路径）仍会走 session_before_compact 落快照。
   let snapshotDoneForCompact = false;
   let thinkState: ThinkLevelState | null = null;
-  const thinkingAutoEnabled = process.env.PI_CONTEXT_THINKING_AUTO !== 'off';
+  // 自动切档默认**关闭**（PI_CONTEXT_THINKING_AUTO=on 才开启）。
+  // 原因（2026-09-27 实测）：切档使整段前缀缓存失效（切档后 cacheRead 0/141K），
+  // 一次切档 ≈ 整段全价重算；而降一档省下的 thinking token 远小于该代价。
+  // 手动档位（/thinking、thinking_level 工具、/mode）不受影响。
+  const thinkingAutoEnabled = process.env.PI_CONTEXT_THINKING_AUTO === 'on';
   const speedTracker = createSpeedTracker();
   let lastSpeedUiAt = 0;
   // 门3（空闲判定）状态：用户上次输入时刻、任务忙→闲的转折时刻、上轮任务是否忙
@@ -228,7 +235,7 @@ export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
     name: 'thinking_level',
     description:
-      '建议切换 thinking 档位（low/medium/high）。程序做防抖死区与压力方向审批：死区内或上下文压力 critical 时升档会被拒绝；通过后记账。默认由程序自动切档，本工具供模型在需要更强/更省推理时主动申请。',
+      '建议切换 thinking 档位（low/medium/high）。程序做防抖死区与压力方向审批：死区内或上下文压力 critical 时升档会被拒绝；通过后记账。**注意：切档会使整段前缀缓存失效（≈当前上下文全价重算），非必要不要切**；自动切档默认已关闭（PI_CONTEXT_THINKING_AUTO=on 开启）。',
     parameters: {
       level: { type: 'string', enum: ['low', 'medium', 'high'], description: '目标档位' },
       reason: { type: 'string', description: '切换理由（将记入审计日志）' },
@@ -242,6 +249,28 @@ export function register(pi: ExtensionAPI): void {
         (l) => setThinkingLevel(pi, l),
       );
       return r.message;
+    },
+  });
+
+  // 缓存安全钳制：运行时档位高于 PI_THINKING_MAX_LEVEL（默认 high）时夹回。
+  // 必须挂在 thinking_level_select 上：切换到 deepseek-flash 会被自动解析成 max
+  // （实测 4/4 次），而 max 只烧 reasoning token。夹档发生在**模型切换的同一次**，
+  // 模型切换本身已使缓存失效，因此这次夹档不产生额外代价；之后再无切档。
+  registerHook(pi, {
+    event: 'thinking_level_select',
+    handler: (event, ctx) => {
+      const level = String((event as { level?: string }).level ?? '');
+      const clamped = clampForCacheSafety(level);
+      if (!clamped) return;
+      recordLevelChange({
+        from: level,
+        to: clamped,
+        reason: `缓存安全上限 PI_THINKING_MAX_LEVEL=${cacheSafeMaxLevel()}`,
+        pressure: 'n/a',
+        source: 'auto',
+      });
+      setThinkingLevel(pi, clamped);
+      if (ctx?.hasUI) ctx.ui.notify(`thinking 档位由 ${level} 夹到 ${clamped}（缓存安全上限）`, 'info');
     },
   });
 

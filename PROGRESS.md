@@ -1100,3 +1100,53 @@ DSH 相比明显异常（本机 ¥8.04 / 544 请求 / 42.3M tokens vs DSH ¥18.0
 - **验证**：真实应用第二个实例上，手指下滑后首行 350 → 348、再上滑回 350；`tsc` 通过；
   `scripts/test-web-terminal.mjs` 22 项通过；`custom/web-terminal/README.md` 记录"升级前需复验
   滚动占位元素"这一约束。
+
+## 成本归因与缓存不变量加固（第 61 批，2026-09-29）
+
+起因：加权缓存命中率 94.10%（逐请求中位数 99.65%），但实际费用约 ¥11/亿 token，DSH 为 ¥4/亿。
+完整归因与证据见 `DECISIONS.md` 同日四条条目；结论是**钱不在命中率上，而在 3.4% 请求的
+"前缀前端变更"**（每次把 15K–32K…15万–32万 token 上下文按全价重算）。
+
+**归因要点**
+
+- 按日拆解（667 次调用）：94.10% 被 **09-26 单日**（命中 80.66%、未命中 337 万 = 57.5%、
+  ¥26.11/亿）拖低，而那天踩的是两个**已删除的默认值**（每轮擦除、工具按需加载）。09-27 ¥9.85、
+  09-28 ¥8.49、09-24 ¥6.01；DSH 参照 ¥4.03。
+- 未命中高度集中：≥100K 的 23 次（3.4%）占 78.5%，≥200K 的 10 次占 41.3%，中位数仅 421。
+- **不是缓存过期**：23 次大未命中距上次请求的间隔中位数 **16 秒**。
+- `prefix-fingerprints.jsonl` 499 条中 17 条（3.4%）`system`/`tools`/`head` 变化，与 23 次
+  大未命中比例一致、时间戳逐条对齐。
+- **新发现**：切 thinking 档位使整段前缀失效——09-27 12:05:59 切 `low`，前一次 141,184/141,406
+  （99.8%）→ 下一次 0/142,075（0%），其间其它分段无变化、空闲 7.2 秒。切换到 `deepseek-flash`
+  会被自动解析成 `max`（4/4 次）。
+- 记忆注入"删旧插新"占全部未命中 **39.0%**（注入后 83 次命中 61.1% vs 其余 96.2%）。
+- 剩余差距的第二来源是**输出强度**：09-28 缓存读成本/亿已与 DSH 持平（$0.293 vs $0.297），
+  差距 84% 在输出 token（$0.721 vs $0.186）；单位上下文输出是 DSH 的 3.88 倍。
+
+**已实施的修复**
+
+- **注入 append-only**：`memory/index.ts` 不再调用 `filterInjectedMessages`（只保留最新一条会让
+  历史在旧注入处位移）。块首改为"以最新一块为准"。旧注入随压缩折叠，因此有界。
+- **切档默认关闭 + 档位钳制**：`PI_CONTEXT_THINKING_AUTO` 改为 **opt-in**；新增
+  `clampForCacheSafety`/`PI_THINKING_MAX_LEVEL`（默认 `high`），在 `thinking_level_select`
+  钩子上夹档（模型切换本身已使缓存失效，故夹档免费）。工具描述与返回值提示缓存代价。
+- **工具集空操作防护**：`applyToolLayering` 只在集合真的变化时才调 `setActiveTools`（顺序无关比较）。
+- **探针补盲区**：`prefix-fingerprint` 增加 `level` 分段与 `total` 兜底标记（旧实现 `total` 算了
+  从不比较、`messages` 仅按条数判断，中段改写会记成 `changed: []`）。
+- **度量修复**：`daily-health.mjs` 改读 `.usage-diag.jsonl`（每轮用量）而非 `usage.jsonl`
+  （工具级台账无缓存字段，导致日报连续 `命中=n/a(无数据)`、命中率跌到 80.66% 也不告警）；
+  新增加权命中率/未命中每次/输出占比/**前缀前端变更次数**与三项阈值告警。
+
+**守门与验证**
+
+- 新增 `scripts/test-usage-metrics.mjs`（13 项，零 LLM，合成数据驱动真实脚本），接入
+  `golden-tasks.sh` 第 13 步（无头冒烟顺延为第 14 步）。
+- 新增/扩充单测 14 例：`clampForCacheSafety`/`cacheSafeMaxLevel` 5 例、
+  `fingerprintRequest` 的 `level`/`total` 标记 4 例、`applyToolLayering` 空操作防护 3 例、
+  memory 注入 append-only 源码级不变量 2 例。
+- `npx tsc --noEmit -p custom/` 通过；vitest 全绿；`npm run check`、`check-features`、
+  `check-dead-exports`、`check-doc-links` 通过；`check-injection-surface.sh --update` 刷新基线
+  （AGENTS.md 脚本数与缓存约定有变）。
+- 文档同步：`custom/features/context/README.md`、`custom/features/memory/README.md`、
+  `memory/recall/README.md`、`docs/FAQ.md`（订正"擦除已默认开启"的错误说法）、
+  `STRUCTURE.md`、`scripts/README.md`、`portable/agent/AGENTS.md`。

@@ -211,12 +211,19 @@ TTL 笔记另有自动回收（`notes.json`）。
 
 ### Q: 如何提高响应速度？
 
-1. 上下文成本主要是「每请求都为全量上下文计费」，而不是压缩次数：确定性擦除
-   （旧 thinking / 旧工具输出）已默认开启且**零 LLM 调用**，无需手动干预；
-   用 `/context usage` 看预算与阈值占比。
+1. 上下文成本主要是「每请求都为全量上下文计费」，而不是压缩次数：注意
+   **确定性擦除（旧 thinking / 旧工具输出）默认是关闭的**（`PI_CONTEXT_ERASE=on` 才开启）。
+   它会改写历史前部，使其后整段前缀缓存失效，而缓存读单价只有全价的 1/50，因此
+   **剪枝通常是净亏**——实测它占单个会话成本的 67%。用 `/context usage` 看预算与阈值占比。
 2. 长会话确需压缩时用 `/compact`；压缩会发一次全价摘要请求，是否划算取决于后续轮数
    （见 [CONTEXT-MANAGEMENT-COMPARISON.md](development/CONTEXT-MANAGEMENT-COMPARISON.md)）。
-3. 工具输出归档/裁剪阈值可用 `PI_CONTEXT_*` 调整（见
+3. **不要动 thinking 档位**：DeepSeek 的前缀缓存键包含 `reasoning_effort`，切档会使整段
+   前缀失效（实测切档后 `cacheRead` 归零，下一次请求全价重算）。自动切档默认已关闭
+   （`PI_CONTEXT_THINKING_AUTO=on` 开启），运行时档位被 `PI_THINKING_MAX_LEVEL`（默认
+   `high`）夹住，避免切到 `deepseek-flash` 时被自动抬到 `max` 白烧 reasoning token。
+4. 想知道钱花在哪：`node scripts/daily-health.mjs --print` 给出加权命中率、未命中每次、
+   输出占比与**前缀前端变更次数**；前端变更每一次都等于一次整段重算。
+5. 工具输出归档/裁剪阈值可用 `PI_CONTEXT_*` 调整（见
    [custom/features/context/README.md](../custom/features/context/README.md)），归档落在
    `portable/memory/tool-outputs/`（14 天/200MB 自动清理）。
 
