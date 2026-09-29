@@ -43,6 +43,16 @@ bash scripts/build.sh
 ./my-pi.sh          # 便携启动脚本：自动解析项目根目录并注入路径变量
 ```
 
+浏览器访问（手机/远程）：
+
+```bash
+npm run web         # 或 bash scripts/web-terminal.sh
+```
+
+打印出带一次性令牌的地址，浏览器打开即可；服务只监听 `127.0.0.1`，远程先建隧道
+（`ssh -N -L 7717:127.0.0.1:7717 <user>@<host>`）。用法与安全模型见
+[custom/web-terminal/README.md](../custom/web-terminal/README.md)。
+
 开发模式（tsx 直接运行 TS，不依赖构建产物）：
 
 ```bash
@@ -141,6 +151,8 @@ pi /reload                  # 重载 keybindings、功能、技能、提示词�
 12 个功能模块位于 `custom/features/`，由 `custom/bootstrap.ts` 统一注册：
 autopilot、browser、context、intervention、link、memory、mode、plan-mode、
 subagent、tmux、voice、web-search。
+
+此外还有一个**接入通道**（不是扩展）：`custom/web-terminal/` 让你能用浏览器访问同一个 TUI。
 
 ### Q: 如何开发新功能？
 
@@ -255,7 +267,7 @@ TTL 笔记另有自动回收（`notes.json`）。
 npm run check                 # 隔离边界验证
 npx tsc --noEmit -p custom/   # 类型检查
 npx vitest run                # 单元测试
-npm run golden                # 行为防退化基准（11 步；--fast 仅结构守门，--smoke 加无头冒烟）
+npm run golden                # 行为防退化基准（12 步；--fast 仅结构守门，--smoke 加无头冒烟）
 bash scripts/install-hooks.sh # 启用 git 钩子（提交前自动跑上述快检）
 ```
 

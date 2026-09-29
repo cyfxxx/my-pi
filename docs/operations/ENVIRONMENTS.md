@@ -45,7 +45,7 @@ grep -qi microsoft /proc/version && echo WSL2
 
 ## 二、运行时数据布局
 
-所有运行时数据都在仓库内的 `portable/` 下，通过启动脚本 `my-pi.sh`（或 `scripts/dev.sh`）把 `PI_CODING_AGENT_DIR` 指向 `portable/agent`；技能由 pi 从 `agentDir/skills`（即 `portable/agent/skills/`）自动发现。
+所有运行时数据都在仓库内的 `portable/` 下，通过启动脚本 `my-pi.sh`（或 `scripts/dev.sh`）、以及浏览器接入通道 `scripts/web-terminal.sh`（`npm run web`，在 pty 里拉起同一个 `my-pi.sh`）把 `PI_CODING_AGENT_DIR` 指向 `portable/agent`；技能由 pi 从 `agentDir/skills`（即 `portable/agent/skills/`）自动发现。
 
 | 路径 | 入库策略 | 说明 |
 |------|----------|------|
@@ -100,6 +100,7 @@ grep -qi microsoft /proc/version && echo WSL2
 | `portable/agent/models-store.json` | 每环境独立（gitignore） | provider 密钥等运行时数据 |
 | `portable/agent/trust.json` | 每环境独立（gitignore） | 项目信任状态，随本机使用变化 |
 | `portable/agent/pi-link-*.json` | 每环境独立（gitignore） | 多设备互联的设备清单与运行时状态（`pi-link-active.json`/`pi-link-state.json`/`pi-link-outbox.json`） |
+| `portable/agent/web-terminal-secret.json` | 每环境独立（gitignore） | 浏览器终端的 cookie 签名密钥（0600，首次启动自动生成；每环境各自一份，不跨机同步） |
 | `portable/agent/sessions/` / `portable/agent/{extensions,npm,git}/` / `portable/memory/` | 每环境独立（gitignore） | 会话历史、第三方扩展、自定义功能数据 |
 
 跨机迁移每环境独立项时三选一：① 用 `pi-backup create` 打包后 `restore`；② 直接 `scp`/`rsync` 拷贝对应文件或目录；③ 在新环境手动重建。日常同步**不要**用归档覆盖新环境的独立配置。

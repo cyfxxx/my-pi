@@ -75,7 +75,7 @@ my-pi 现有硬约束：`custom/features/context/budget/budget.ts` 的预算与�
 ### 3.3 防退化第一
 进化的最大风险不是慢，是退化：一条错误教训入库后会自我强化污染后续行为。
 一切结构性改动以回归测试为安全网；记忆写操作走"报告→确认→快照→执行→验证"。
-my-pi 当前安全网 = `npm run golden`（11 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词，共 514 用例）+ `.githooks/`（pre-commit 快检、pre-push 全量；本地无 CI）。
+my-pi 当前安全网 = `npm run golden`（12 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端，共 622 用例）+ `.githooks/`（pre-commit 快检、pre-push 全量；本地无 CI）。
 
 ### 3.4 执行-知识分离（2026-08-31 加入，源自 WikiSkill 论文消融实证）
 生产执行路径不直接消费记忆库/教训/干预记录等 wiki 式知识解题：知识只经"沉淀→升格通道"间接影响行为。回顾与训练回路中允许访问知识库，但生产任务会话若直接从知识库取答案，会令执行轨迹失去信息量，长期看降低技能质量（论文实测：训练期开放 wiki 访问使最终技能降质 63.7%→60.9%）。
@@ -88,7 +88,7 @@ my-pi 当前安全网 = `npm run golden`（11 步：隔离/注册面/死导出/�
 | 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有**：`custom/features/context/usage-stats.ts` 持久化工具 token/缓存读写（`usage.jsonl`），`/context usage` 产出命中率；`scripts/check-injection-surface.sh` 注入面前缀指纹守门 |
 | 干预 | abort 快照留存率 / corrective 关联率 | pi-intervention → `memory/interventions.jsonl` | **已有**：`custom/features/intervention/` 落盘 `portable/memory/interventions.jsonl`，`/intervention stats` 产出关联率/近 7 天 |
 | 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **已有**：autopilot telemetry（按模型/任务成功率 + 预算）`/auto stats` |
-| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh` 11 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词）+ 死导出与补丁行为守门 + `.githooks/`；514 单测用例 |
+| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh` 12 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端）+ 死导出与补丁行为守门 + `.githooks/`；622 单测用例 |
 | 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 / 垃圾与聚合 | memory-lifecycle.mjs（只读报告） | **已有**：`memory/store/storage.ts` 治理字段就绪；`memory/mine/lifecycle.ts` + `/memory lifecycle` 出六类候选，`scripts/memory-lifecycle.mjs --json` 供 headless 定时任务消费 |
 
 结论：度量层已基本建成（P1/P2/P3 达成）；仅 P4 升格通道待推进。落地顺序见 §6。

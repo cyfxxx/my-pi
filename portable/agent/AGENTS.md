@@ -11,11 +11,11 @@ portable/agent/           # pi 的运行时根目录（agentDir）：配置 + �
 portable/agent/skills/    # 技能目录（pi 从 agentDir/skills 发现，随仓库分发）
 portable/memory/           # 自定义功能数据（记忆笔记、工具输出归档）
 vendor/pi/                 # 上游 Pi 代码（独立 clone，只读）
-custom/                    # 自定义层（adapters/core/features/bootstrap.ts）
+custom/                    # 自定义层（adapters/core/features + web-terminal 浏览器接入）
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
 deploy/                    # 可选系统级部署产物（systemd 等）
-scripts/                   # 32 个运维脚本
+scripts/                   # 34 个运维脚本
 patches/                   # 上游补丁
 ```
 
@@ -78,6 +78,7 @@ npx tsc --noEmit -p custom/        # 自定义层类型检查
 bash scripts/golden-tasks.sh       # 行为防退化基准（--fast 仅结构守门，跳过 tsc/vitest）
 bash scripts/install-hooks.sh      # 启用 git 钩子（pre-commit 快检 / pre-push 全量；本地无 CI）
 bash scripts/dev.sh                # 开发模式（tsx 直接运行 TS）
+npm run web                        # 浏览器访问（pty 拉起原样 TUI；只绑 127.0.0.1，远程走 SSH 隧道）
 bash scripts/build.sh              # 构建 vendor/pi(coding-agent)；vendor 缺失时自动引导（custom/ 不编译）
 ./my-pi.sh                         # 便携启动
 bash scripts/sync-upstream.sh      # 上游同步（vendor/pi 为独立 git clone，上游 earendil-works/pi-mono）
@@ -108,6 +109,7 @@ bash scripts/sync-upstream.sh      # 上游同步（vendor/pi 为独立 git clon
 | `custom/adapters/` | 适配器层（隔离 Pi API） | 唯一允许 import vendor/pi |
 | `custom/features/` | 功能模块（从 pi-tools 迁移） | 零 Pi 依赖 |
 | `custom/core/` | 核心服务（路径解析/注册表） | 允许 |
+| `custom/web-terminal/` | 浏览器接入通道（独立进程，pty + HTTP/WS + xterm.js；非 pi 扩展） | 允许 |
 | `portable/` | 运行时数据 | 允许 |
 
 ### 添加新功能

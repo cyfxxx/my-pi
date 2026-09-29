@@ -54,7 +54,7 @@
 | docs | 18 篇 | 迁移 9 篇 + 2 篇新增 | ✅ 9 篇丢弃均有记录 |
 | deploy | systemd ×2 + tmux ×3 | systemd ×1 + tmux ×3 + README | ⚠ `pi-whisper.service` 有意延后（有记录） |
 | 上游补丁 | 13 类 dist 补丁 | `patches/*.patch` 6 个 + 2 个脚本 | ⚠ 4 类未覆盖（见 G1/G3/G4/G7） |
-| 运维脚本 | 32 个（6 子目录） | 32 个（扁平） | ✅ 能力映射核对完成，多数为拆分/重设计；本轮补齐 `memory-lifecycle.mjs` |
+| 运维脚本 | 32 个（6 子目录） | 34 个（扁平） | ✅ 能力映射核对完成，多数为拆分/重设计；迁移期补齐 `memory-lifecycle.mjs`；另有 2 个 my-pi 后续新增（`web-terminal.sh`、`test-web-terminal.mjs`） |
 
 ## 四、完全迁移与有意适配
 

@@ -28,6 +28,7 @@ custom/
 │       ├── store/          # 存储/合并/摘要
 │       ├── recall/         # 检索/注入
 │       └── mine/           # 治理/教训挖掘
+├── web-terminal/       # 浏览器接入通道（独立进程，非 pi 扩展；pty + HTTP/WS + xterm.js）
 ├── bootstrap.ts        # 唯一入口（默认导出扩展工厂函数）
 └── README.md
 ```
@@ -43,6 +44,13 @@ custom/
 - [core/README.md](core/README.md) — 核心服务层（纯逻辑底座）
 - [adapters/README.md](adapters/README.md) — 适配器层（唯一接触 Pi API）
 - [features/README.md](features/README.md) — 功能层（12 个扩展与规范）
+- [web-terminal/README.md](web-terminal/README.md) — 浏览器接入通道（独立进程：在 pty 里拉起原样 TUI，由 xterm.js 接管）
+
+## 分层之外的接入通道
+
+`web-terminal/` **不是 pi 扩展**，而是与 `my-pi.sh` 并列的独立进程入口：它起一个只监听回环的
+HTTP/WS 服务，在 pty 里拉起 `my-pi.sh`，浏览器用 xterm.js 接管该终端。因此它不注册工具/钩子，
+不进 `bootstrap.ts` 的 `FEATURES`，也不受"三层结构"约束（但同样零 Pi 依赖）。
 
 ## 核心原则
 

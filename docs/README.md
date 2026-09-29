@@ -6,7 +6,7 @@
 
 | 属性 | 值 |
 |------|-----|
-| 更新日期 | 2026-09-25 |
+| 更新日期 | 2026-09-29 |
 | 适用范围 | my-pi 项目文档索引 |
 | 相关文档 | [README.md](../README.md)、[STRUCTURE.md](../STRUCTURE.md)、[DECISIONS.md](../DECISIONS.md) |
 
@@ -69,6 +69,7 @@
 代码目录内附有 `README.md`，覆盖该层职责、文件清单与约定：
 [custom/core](../custom/core/README.md)、[custom/adapters](../custom/adapters/README.md)、
 [custom/features](../custom/features/README.md)（含 12 个功能各自的 README）、
+[custom/web-terminal](../custom/web-terminal/README.md)（浏览器接入通道：pty + xterm.js，含鉴权模型与 xterm 版本约束）、
 [custom/features/context/budget](../custom/features/context/budget/README.md)、
 [custom/features/autopilot/store](../custom/features/autopilot/store/README.md)、
 [custom/features/memory/store](../custom/features/memory/store/README.md)、

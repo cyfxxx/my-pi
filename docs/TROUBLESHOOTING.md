@@ -46,7 +46,7 @@ npx tsc --noEmit -p custom/
 # 4. 运行单元测试
 npx vitest run
 
-# 5. 行为防退化基准（11 步：含隔离/注册面/死导出/补丁行为/注入面/定时任务提示词等）
+# 5. 行为防退化基准（12 步：含隔离/注册面/死导出/补丁行为/注入面/定时任务提示词/浏览器终端等）
 npm run golden
 
 # 6. 校验 portable/agent/ 下所有 JSON 合法性

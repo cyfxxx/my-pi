@@ -166,7 +166,7 @@ Layer 0 ─ 基础层 ───────────── vendor/pi/ (上游
 | 任务成功率 | `/auto stats`、`/auto metrics` | autopilot telemetry（按模型/任务） |
 | 记忆治理 | `/memory lifecycle`、`scripts/memory-lifecycle.mjs --json` | 只读报告：淘汰/升格/冲突/垃圾/聚合候选（后者供 headless 定时任务消费） |
 | 教训闭环 | `/memory mine [--ingest]` | 从纠正意图挖掘教训并入库（自动去重） |
-| 防退化 | `npm run golden`（`--fast` / `--smoke`） | 11 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词（`--smoke` 追加无头冒烟） |
+| 防退化 | `npm run golden`（`--fast` / `--smoke`） | 12 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端（`--smoke` 追加无头冒烟） |
 
 ## 上游同步
 
@@ -236,7 +236,7 @@ bash scripts/check-isolation.sh
 # 功能完整性检查
 bash scripts/check-features.sh
 
-# 行为防退化基准（11 步；--fast 仅结构守门，--smoke 追加无头冒烟）
+# 行为防退化基准（12 步；--fast 仅结构守门，--smoke 追加无头冒烟）
 npm run golden
 npm run golden -- --fast
 
@@ -299,6 +299,7 @@ sudo yum install tmux
 - [项目愿景](docs/design/VISION.md)（开发目标、方法论、落地路线）
 - [文档索引](docs/README.md)（FAQ / 故障排除 / 开发 / 运维）
 - [外部技能包说明](packs/README.md)、[技能包索引](packs/INDEX.md)
+- [浏览器终端](custom/web-terminal/README.md)（pty + xterm.js；用法、安全模型与限制）
 - [目录结构说明](STRUCTURE.md)
 - [架构修复进度](PROGRESS.md)
 - [架构决策记录](DECISIONS.md)

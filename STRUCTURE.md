@@ -152,6 +152,7 @@ custom/features/*/logic.ts
 
 - `custom/core/README.md`、`custom/adapters/README.md`、`custom/features/README.md`：三层底座与规范
 - `custom/features/<功能>/README.md`：全部 12 个功能的注册面、文件、数据与配置
+- `custom/web-terminal/README.md`：浏览器接入通道（pty + xterm.js）的设计、鉴权模型、消息约定、xterm 版本约束与已知限制
 - 大功能的子包：`context/{budget,usage-diag}/`、`autopilot/{store,run,tools}/`、`memory/{store,recall,mine}/`、`plan-mode/{core,ui}/`、`subagent/{core,ui}/`、`voice/{audio,stt,tts}/` 各自有 `README.md`
 - 语音服务脚本（whisper/sherpa）随仓库分发在 `custom/features/voice/scripts/`，见 `custom/features/voice/README.md`
 - `scripts/README.md`：运维脚本分类索引
