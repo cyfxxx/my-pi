@@ -425,7 +425,9 @@ export function register(pi: ExtensionAPI): void {
       }
     };
     try {
-      for (const task of due) {
+      // 拿到锁后重新读盘：持锁前的 due 快照可能已过期（另一实例刚完成同一任务并推进了 nextRun）
+      const dueNow = listTasks().filter((t) => t.enabled && isDue(t));
+      for (const task of dueNow) {
         const { provider, model } = currentModel();
         const budget = checkBudget(c.budget, `${provider}/${model}`);
         if (!budget.allowed) {
