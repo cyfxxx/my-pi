@@ -89,8 +89,25 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 # ── 在临时 worktree 上重建补丁栈（全部成功才移动 vendor 分支）──
-if [ "$TARGET_COMMIT" = "$LAST_SYNC" ] && git merge-base --is-ancestor "$LAST_SYNC" HEAD 2>/dev/null; then
+# 补丁完整性：即使基线未变，patches/ 新增补丁也必须重建，否则新补丁不会进入
+# vendor（历史缺口：新增 008 后重跑同步会被「基线未变」分支直接跳过）。
+PATCHES_PENDING=0
+for _p in "$ROOT"/patches/*.patch; do
+    [ -e "$_p" ] || continue
+    _base="$(basename "$_p" .patch)"
+    if ! git log --format=%s -n 500 | grep -qxF "local: $_base"; then
+        PATCHES_PENDING=1
+        break
+    fi
+done
+
+if [ "$PATCHES_PENDING" = "0" ] && [ "$TARGET_COMMIT" = "$LAST_SYNC" ] && git merge-base --is-ancestor "$LAST_SYNC" HEAD 2>/dev/null; then
     echo "基线未变，跳过补丁栈重建（仅重建/刷缓存）"
+    # 幂等校正引导基线：fresh checkout 依赖 PINNED_COMMIT 与 patches/ 同源
+    if [ "$(cat "$ROOT/vendor/PINNED_COMMIT" 2>/dev/null || true)" != "$TARGET_COMMIT" ]; then
+        echo "$TARGET_COMMIT" > "$ROOT/vendor/PINNED_COMMIT"
+        echo "  ↻ 已校正 vendor/PINNED_COMMIT"
+    fi
 else
     TMP_BASE="$(mktemp -d /tmp/my-pi-sync.XXXXXX)"
     TMP_WT="$TMP_BASE/wt"
@@ -110,6 +127,14 @@ else
 
     git checkout -q -B main "$NEW_STACK"
     echo "$TARGET_COMMIT" > "$LAST_SYNC_FILE"
+    # 引导基线与文档同步：fresh checkout 用 PINNED_COMMIT + patches/ 引导，
+    # 两者必须与当前补丁栈同基线，否则 build.sh 引导会因补丁失配而失败。
+    echo "$TARGET_COMMIT" > "$ROOT/vendor/PINNED_COMMIT"
+    _new_short="$(git rev-parse --short=9 "$TARGET_COMMIT")"
+    _new_ver="$(git describe --tags --abbrev=0 "$TARGET_COMMIT" 2>/dev/null || echo unknown)"
+    if [ -f "$ROOT/STRUCTURE.md" ] && grep -q '锁定 commit：`vendor/PINNED_COMMIT`' "$ROOT/STRUCTURE.md"; then
+        sed -i -E "s|(- 锁定 commit：\`vendor/PINNED_COMMIT\`（当前 \`)[0-9a-f]+(\`，版本 )[^)]*(）)|\1${_new_short}\2${_new_ver}\3|" "$ROOT/STRUCTURE.md"
+    fi
     vendor_exclude_local "$VENDOR_PI"
     echo "✅ 补丁栈已重建：$(git rev-parse --short HEAD)（基线 $TARGET_COMMIT）"
 fi
