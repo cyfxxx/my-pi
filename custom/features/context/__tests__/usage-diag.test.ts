@@ -33,13 +33,13 @@ import {
   recomputeToolUsage,
   summarizeRecords,
   formatUsageSummary,
-  UsageRecord,
-  AutoCompactEvent,
-  PruneEvent,
-  UsageMissingEvent,
-  ThinkingMeterEvent,
-  LevelChangeEvent,
-  ToolUseEvent,
+  type UsageRecord,
+  type AutoCompactEvent,
+  type PruneEvent,
+  type UsageMissingEvent,
+  type ThinkingMeterEvent,
+  type LevelChangeEvent,
+  type ToolUseEvent,
 } from '../usage-diag/diag';
 
 let memDir: string;
