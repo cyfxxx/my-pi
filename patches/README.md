@@ -13,7 +13,8 @@ patches/
 ├── 004-footer-tweaks.patch    # footer 增强（实时上下文/双缓存率/人民币成本/重启提示）
 ├── 005-footer-speed-and-scrollback.patch  # 速度并入 footer stats 行 + regular 模式保留 scrollback
 ├── 006-footer-cost-and-cache-window.patch  # 汇率可配置 + CH 右值改最近 20 轮滑动窗口
-└── 007-footer-reorder.patch   # stats 行重排 + 去掉 ↑未命中 + CH 收敛为会话累计单值
+├── 007-footer-reorder.patch   # stats 行重排 + 去掉 ↑未命中 + CH 收敛为会话累计单值
+└── 008-footer-cache-var-cleanup.patch  # 清理 007 遗留的 latestCacheHitRate 引用（修复 tsc 编译）
 ```
 
 ## 补丁命名规范
@@ -33,6 +34,7 @@ patches/
 | `005-footer-speed-and-scrollback.patch` | ① 输出速度（status key `tps`）并入 footer stats 行并沿用 dim 风格（此前为独立未着色行），其余扩展状态行统一 dim；② regular 模式 `fullRender(true)` 去掉 `ESC[3J`，宽度变化/内容收缩不再清空 scrollback（解决工作过程中无法向上滚动查看历史） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts`、`vendor/pi/packages/tui/src/tui-main-screen.ts` |
 | `006-footer-cost-and-cache-window.patch` | ① 成本换算汇率 `CNY_PER_USD` 由硬编码 6.77 改为可配置（`PI_CNY_PER_USD`，默认 7.05）；② CH 右值由“会话累计命中率”改为“最近 20 轮滑动窗口命中率”——累计值被早期未命中轮次稀释（重启/压缩后首轮全量重发）长期停在 95% 附近，滑动窗口随上下文规模贴近真实健康度（正常 99%+） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `007-footer-reorder.patch` | footer stats 行顺序定为 `Σ总输入 → ↓输出 → CH会话累计 → ¥费用 → 上下文 → ⇅速度`（速度移末位并自带 dim，抵消上下文色码 reset）；移除与 Σ 重复的 `↑` 未命中；CH 由「最近一轮/20 轮窗口」双值收敛为单一会话累计命中率 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
+| `008-footer-cache-var-cleanup.patch` | 007 删除了 `latestCacheHitRate` 的声明与赋值，但漏删 `SessionStats` 接口字段、stats 对象属性与 render 解构三处引用，导致 `tsc` 报 TS18004；本补丁补齐删除 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 
 ## 验证补丁
 

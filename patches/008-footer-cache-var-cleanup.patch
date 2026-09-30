@@ -1,0 +1,38 @@
+diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
+index ac57dc758..1e80f1980 100644
+--- a/packages/coding-agent/src/modes/interactive/components/footer.ts
++++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
+@@ -44,6 +44,8 @@ export function formatCwdForFooter(cwd: string, home: string | undefined): strin
+ 	return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
+ }
+ 
++// Patch (008-footer-cache-var-cleanup): 007 弃用 latestCacheHitRate 后，补齐 SessionStats
++// 接口字段、stats 对象属性与 render 解构三处引用的删除（否则 tsc TS18004）。
+ interface SessionStats {
+ 	session: AgentSession;
+ 	sessionId: string;
+@@ -51,7 +53,6 @@ interface SessionStats {
+ 	entryCount: number;
+ 	limitsModel: unknown;
+ 	usageTotals: UsageTotals;
+-	latestCacheHitRate: number | undefined;
+ 	contextUsage: ContextUsage | undefined;
+ }
+ 
+@@ -142,7 +143,6 @@ export class FooterComponent implements Component {
+ 			entryCount,
+ 			limitsModel,
+ 			usageTotals,
+-			latestCacheHitRate,
+ 			contextUsage,
+ 		};
+ 		return this.sessionStats;
+@@ -150,7 +150,7 @@ export class FooterComponent implements Component {
+ 
+ 	render(width: number): string[] {
+ 		const state = this.session.state;
+-		const { usageTotals, latestCacheHitRate, contextUsage } = this.getSessionStats();
++		const { usageTotals, contextUsage } = this.getSessionStats();
+ 		const contextWindow = contextUsage?.contextWindow ?? state.model?.contextWindow ?? 0;
+ 		const contextPercentValue = contextUsage?.percent ?? 0;
+ 		const contextPercent = contextUsage?.percent !== null ? contextPercentValue.toFixed(1) : "?";
