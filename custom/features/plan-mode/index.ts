@@ -107,12 +107,12 @@ export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
     name: 'ask_user',
     description:
-      '向用户提问并获取选择回答。当需要用户决策、确认下一步操作、或获取用户偏好时使用。返回所选选项标签，或用户输入的补充说明（以「其他:」开头）。',
+      '向用户提问并获取选择回答。当需要用户决策、确认下一步操作、或获取用户偏好时使用。返回所选选项标签，或用户输入的补充说明（以「其他:」开头）。多选时用户按编号一次输入（如 1,3）。',
     parameters: {
       question: { type: 'string', description: '问题内容' },
       header: { type: 'string', description: '简短标签（显示在选择器标题）', optional: true },
       options: { type: 'json', description: '选项数组（至少 2 个）：[{label, description?}]' },
-      multiple: { type: 'boolean', description: '是否允许多选（默认 false）', optional: true },
+      multiple: { type: 'boolean', description: '是否允许多选（默认 false；多选时用户按编号输入，如 1,3）', optional: true },
     },
     execute: async (params, ctx) => {
       if (!ctx?.select || !ctx?.editor) return 'Error: 当前环境不支持交互式提问（无 UI）';

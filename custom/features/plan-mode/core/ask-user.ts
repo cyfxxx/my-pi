@@ -2,7 +2,11 @@
  * ask_user 的选项交互逻辑（纯逻辑，UI 经 {@link AskUserIO} 注入）
  *
  * 迁移自 pi-tools `plan-mode/tools.ts` 的 `registerAskUserTool`。单选：直接返回选择，
- * 选「其他」时弹输入框；多选：带 ✓ 标记的累积选择，直到「完成选择」。
+ * 选「其他」时弹输入框；多选：列出编号选项，用户一次输入编号（如 `1,3`）即完成多选。
+ *
+ * 多选不走「循环弹选择器 + ✓ 累积」：pi 扩展 UI 的 `select` 没有初始高亮索引参数
+ * （见 core/extensions/types.ts 的 ExtensionUIDialogOptions，只有 signal/timeout），
+ * 循环调用必然把光标弹回第一项。改用 editor 一次输入，交互更短、无光标问题。
  */
 
 export interface AskUserIO {
@@ -11,9 +15,6 @@ export interface AskUserIO {
 }
 
 export const OTHER_OPTION = '其他（请说明）';
-export const DONE_OPTION = '完成选择';
-export const CLEAR_OPTION = '取消全部';
-export const CHECK_MARK = '✓ ';
 
 export interface AskUserParams {
   question: string;
@@ -43,38 +44,67 @@ export async function askUserSingle(io: AskUserIO, title: string, labels: string
   }
 }
 
-/** 多选交互：累积 `✓` 标记的选项，「完成选择」返回逗号分隔结果 */
+/** 解析多选编号输入：支持 `1,3` / `1 3` / `1-3` / `0`（表示补充其它）；返回索引或错误 */
+export function parseSelectionInput(
+  raw: string,
+  count: number,
+): { indexes: number[]; other: boolean; error?: string } {
+  const tokens = raw.split(/[,，、;；\s]+/).filter(Boolean);
+  const indexes: number[] = [];
+  let other = false;
+  for (const token of tokens) {
+    if (token === '0') {
+      other = true;
+      continue;
+    }
+    const range = /^(\d+)[-~](\d+)$/.exec(token);
+    if (range) {
+      const from = Number(range[1]);
+      const to = Number(range[2]);
+      if (from < 1 || to > count || from > to) {
+        return { indexes: [], other: false, error: `范围超出：${token}（可选 1-${count}）` };
+      }
+      for (let i = from; i <= to; i += 1) indexes.push(i - 1);
+      continue;
+    }
+    if (!/^\d+$/.test(token)) {
+      return { indexes: [], other: false, error: `无法识别的输入：${token}` };
+    }
+    const n = Number(token);
+    if (n < 1 || n > count) {
+      return { indexes: [], other: false, error: `编号超出范围：${token}（可选 1-${count}）` };
+    }
+    indexes.push(n - 1);
+  }
+  if (!indexes.length && !other) return { indexes: [], other: false, error: '未输入有效编号' };
+  return { indexes: [...new Set(indexes)], other };
+}
+
+/** 多选交互：列出编号选项，用户一次输入编号（如 `1,3`）后返回逗号分隔结果 */
 export async function askUserMultiple(io: AskUserIO, title: string, labels: string[]): Promise<string> {
-  const selected: string[] = [];
+  const numbered = labels.map((l, i) => `  ${i + 1}. ${l}`).join('\n');
+  let notice = '';
   for (;;) {
-    // 固定选项顺序：仅给已选项加 ✓ 前缀，不上浮重排。
-    // 旧实现把已选项提到数组最前，而 ui.select 每次调用都从第 0 项开始高亮（无初始索引参数），
-    // 两者叠加导致“每次选择后光标跳回第一项、且选项位置乱动”。
-    const selectOptions = [
-      ...labels.map((l) => (selected.includes(l) ? `${CHECK_MARK}${l}` : l)),
-      OTHER_OPTION,
-      DONE_OPTION,
-      CLEAR_OPTION,
-    ];
-    const choice = await io.select(title, selectOptions);
-    if (choice === undefined) return '用户取消了选择';
-    if (choice === DONE_OPTION) {
-      if (selected.length === 0) continue;
-      return selected.join(', ');
-    }
-    if (choice === CLEAR_OPTION) {
-      selected.length = 0;
+    const prompt = `${title}\n${numbered}\n\n${notice}输入所选编号（逗号分隔如 1,3；范围如 1-3；0 表示补充其它内容）：`;
+    const raw = await io.editor(prompt, '');
+    if (raw === undefined) return '用户取消了选择';
+    const text = raw.trim();
+    if (!text) return '用户取消了选择';
+    const parsed = parseSelectionInput(text, labels.length);
+    if (parsed.error) {
+      notice = `⚠ ${parsed.error}\n`;
       continue;
     }
-    if (choice === OTHER_OPTION) {
-      const reason = await io.editor('请说明你的补充信息：', '');
-      if (reason && reason.trim()) selected.push(`其他: ${reason.trim()}`);
+    const picked = parsed.indexes.map((i) => labels[i]);
+    if (parsed.other) {
+      const extra = await io.editor('补充说明（留空则忽略）：', '');
+      if (extra && extra.trim()) picked.push(`其他: ${extra.trim()}`);
+    }
+    if (!picked.length) {
+      notice = '⚠ 至少选择一项\n';
       continue;
     }
-    const actual = choice.startsWith(CHECK_MARK) ? choice.slice(CHECK_MARK.length) : choice;
-    const idx = selected.indexOf(actual);
-    if (idx >= 0) selected.splice(idx, 1);
-    else selected.push(actual);
+    return picked.join(', ');
   }
 }
 

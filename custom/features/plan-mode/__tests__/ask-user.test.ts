@@ -5,11 +5,10 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   askUserSingle,
   askUserMultiple,
+  parseSelectionInput,
   validateAskUserParams,
   runAskUser,
   OTHER_OPTION,
-  DONE_OPTION,
-  CLEAR_OPTION,
 } from '../core/ask-user';
 
 describe('validateAskUserParams', () => {
@@ -50,33 +49,49 @@ describe('askUserSingle', () => {
 });
 
 describe('askUserMultiple', () => {
-  it('累积选择后「完成选择」返回逗号分隔', async () => {
-    const seq = ['A', 'B', DONE_OPTION];
-    const select = vi.fn(async () => seq.shift());
-    const r = await askUserMultiple({ select, editor: vi.fn() }, '标题', ['A', 'B', 'C']);
-    expect(r).toBe('A, B');
+  it('编号输入返回对应标签（逗号分隔）', async () => {
+    const editor = vi.fn(async () => '1,3');
+    await expect(askUserMultiple({ select: vi.fn(), editor }, '标题', ['A', 'B', 'C'])).resolves.toBe('A, C');
   });
 
-  it('再次选择同一项可取消（✓ 前缀回退）', async () => {
-    const seq = ['A', '✓ A', DONE_OPTION];
-    const select = vi.fn(async () => seq.shift());
-    const r = await askUserMultiple({ select, editor: vi.fn() }, '标题', ['A', 'B']);
-    // 取消后为空，再次「完成选择」被忽略 → 脚本耗尽返回 undefined → 视为取消
-    expect(r).toBe('A, B'.length >= 0 ? r : r);
-    expect(['A, B', '用户取消了选择']).toContain(r);
+  it('支持范围与顿号/空格分隔', async () => {
+    const editor = vi.fn(async () => '1-2、3');
+    await expect(askUserMultiple({ select: vi.fn(), editor }, '标题', ['A', 'B', 'C'])).resolves.toBe('A, B, C');
   });
 
-  it('「取消全部」清空已选', async () => {
-    const seq = ['A', CLEAR_OPTION, 'B', DONE_OPTION];
-    const select = vi.fn(async () => seq.shift());
-    await expect(askUserMultiple({ select, editor: vi.fn() }, '标题', ['A', 'B'])).resolves.toBe('B');
+  it('编号越界时提示并重试', async () => {
+    const editor = vi.fn();
+    editor.mockResolvedValueOnce('9').mockResolvedValueOnce('2');
+    await expect(askUserMultiple({ select: vi.fn(), editor }, '标题', ['A', 'B'])).resolves.toBe('B');
+    expect(editor).toHaveBeenCalledTimes(2);
+    expect(String(editor.mock.calls[1][0])).toContain('超出范围');
   });
 
-  it('多选时「其他」补充信息追加到已选', async () => {
-    const seq = [OTHER_OPTION, DONE_OPTION];
-    const select = vi.fn(async () => seq.shift());
-    const editor = vi.fn(async () => '补充');
-    await expect(askUserMultiple({ select, editor }, '标题', ['A', 'B'])).resolves.toBe('其他: 补充');
+  it('输入 0 追加「其他」补充说明', async () => {
+    const editor = vi.fn();
+    editor.mockResolvedValueOnce('1,0').mockResolvedValueOnce('补充');
+    await expect(askUserMultiple({ select: vi.fn(), editor }, '标题', ['A', 'B'])).resolves.toBe('A, 其他: 补充');
+  });
+
+  it('空输入视为取消', async () => {
+    const editor = vi.fn(async () => '   ');
+    await expect(askUserMultiple({ select: vi.fn(), editor }, '标题', ['A', 'B'])).resolves.toBe('用户取消了选择');
+  });
+});
+
+describe('parseSelectionInput', () => {
+  it('去重并展开范围', () => {
+    expect(parseSelectionInput('1,1,2-3', 3)).toEqual({ indexes: [0, 1, 2], other: false });
+  });
+
+  it('越界/非法/空输入返回错误', () => {
+    expect(parseSelectionInput('5', 3).error).toContain('超出范围');
+    expect(parseSelectionInput('abc', 3).error).toContain('无法识别');
+    expect(parseSelectionInput('   ', 3).error).toContain('未输入有效编号');
+  });
+
+  it('0 表示补充其它', () => {
+    expect(parseSelectionInput('0', 3)).toEqual({ indexes: [], other: true });
   });
 });
 
