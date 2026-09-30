@@ -10,6 +10,7 @@
 | `agents.ts` | 角色 `.md` 解析与发现、列表 | `parseFrontmatter`、`discoverAgents`、`formatAgentList` |
 | `helpers.ts` | 并发上限/环境、提示构建、输出截断、风险分级 | `getMaxParallelTasks`、`getMaxConcurrency`、`resolveAgentTools`、`buildAgentPrompt`、`classifyTaskRisk`、`riskToolRestrictions`、`mapWithConcurrencyLimit`、`truncateBytesKeepHead`、`formatTokens`（再导出）、`calculateContextTokens`、`formatUsageStats`、`getFinalOutput`、`capPreviousOutput` |
 | `runner.ts` | 子进程运行单个/批量 agent、临时提示文件 | `runSubprocessAgent`、`runSingleAgent` |
+| `usage-log.ts` | 子代理用量落盘（`<memoryDir>/subagent/usage.jsonl`，因 `--no-extensions` 不进 diag/TUI） | `recordSubagentUsage`、`buildUsageRecord`、`subagentUsageFile` |
 
 ## 约定
 

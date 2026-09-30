@@ -3,10 +3,11 @@
  * 迁移自 pi-tools subagent/tests 的核心语义（frontmatter/agents/helpers/concurrency）。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseFrontmatter, discoverAgents } from '../core/agents';
+import { buildUsageRecord, recordSubagentUsage } from '../core/usage-log';
 import {
   classifyTaskRisk,
   resolveAgentTools,
@@ -238,5 +239,54 @@ describe('getActivePlanSnippet（复用 plan-mode 活跃计划语义）', () => 
 
   it('无计划时返回 null', () => {
     expect(getActivePlanSnippet()).toBeNull();
+  });
+});
+
+describe('子代理用量落盘', () => {
+  const makeResult = (over: Partial<SingleResult> = {}): SingleResult => ({
+    agent: 'worker',
+    agentSource: 'user',
+    task: '任务',
+    exitCode: 0,
+    messages: [],
+    stderr: '',
+    usage: { input: 10, output: 20, cacheRead: 30, cacheWrite: 0, cost: 0.01, contextTokens: 0, turns: 2 },
+    ...over,
+  });
+
+  it('buildUsageRecord 保留用量并截断 task', () => {
+    const r = buildUsageRecord(makeResult({ task: 'x'.repeat(500) }), 123);
+    expect(r).toMatchObject({ ts: 123, agent: 'worker', turns: 2, input: 10, output: 20, cacheRead: 30, cost: 0.01 });
+    expect(r.task.length).toBe(200);
+  });
+
+  it('recordSubagentUsage 追加 JSONL（目录不存在时自动创建）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-usage-'));
+    const file = join(dir, 'nested', 'usage.jsonl');
+    process.env.PI_SUBAGENT_USAGE_FILE = file;
+    try {
+      recordSubagentUsage(makeResult());
+      recordSubagentUsage(makeResult({ agent: 'reviewer' }));
+      const lines = readFileSync(file, 'utf8').trim().split('\n');
+      expect(lines).toHaveLength(2);
+      expect(JSON.parse(lines[0]).agent).toBe('worker');
+      expect(JSON.parse(lines[1]).agent).toBe('reviewer');
+    } finally {
+      delete process.env.PI_SUBAGENT_USAGE_FILE;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('写入失败时静默，不抛错（父路径是普通文件 → ENOTDIR）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-usage-err-'));
+    const blocker = join(dir, 'blocker');
+    writeFileSync(blocker, 'x');
+    process.env.PI_SUBAGENT_USAGE_FILE = join(blocker, 'nested', 'usage.jsonl');
+    try {
+      expect(() => recordSubagentUsage(makeResult())).not.toThrow();
+    } finally {
+      delete process.env.PI_SUBAGENT_USAGE_FILE;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

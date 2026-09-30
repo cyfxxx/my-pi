@@ -12,6 +12,7 @@ import type { AgentConfig } from './agents';
 import type { SingleResult, SubagentDetails, OnUpdateCallback } from './types';
 import { getFinalOutput, resolveAgentTools, buildAgentPrompt, scheduleKillChain, calculateContextTokens } from './helpers';
 import { findActivePlan } from '../../plan-mode/logic';
+import { recordSubagentUsage } from './usage-log';
 
 /**
  * 子代理模型优先级（高 → 低）：
@@ -215,6 +216,8 @@ export async function runSubprocessAgent(
     });
 
     currentResult.exitCode = exitCode;
+    // 子代理用量单独落盘：它既不在主会话 jsonl，也不在 .usage-diag.jsonl
+    recordSubagentUsage(currentResult);
     if (wasAborted) throw new Error('Subagent was aborted');
     return currentResult;
   } finally {
