@@ -22,8 +22,12 @@ function envNum(name: string, fallback: number): number {
 
 /** 绝对压缩阈值（窗口大于该值时按绝对值；默认 256K） */
 export const ABSOLUTE_TOKENS = envNum('PI_CONTEXT_ABSOLUTE_TOKENS', 256_000);
-/** 重启提示阈值（超过后在回合开始注入"先 /compact 再重启"提示；默认 100K） */
-export const RESTART_TOKENS = envNum('PI_CONTEXT_RESTART_TOKENS', 100_000);
+/**
+ * 重启提示阈值（超过后注入“若准备重启，先 /compact”提示；默认 180K）。
+ * 实际生效值还会被压缩阈值的 90% 封顶（见 context/index.ts），避免窗口较小时
+ * （如 128K 窗口压缩阈值约 109K）阈值高于压缩阈值、提示永不触发。
+ */
+export const RESTART_TOKENS = envNum('PI_CONTEXT_RESTART_TOKENS', 180_000);
 /** 压缩冷却（默认 10 分钟） */
 export const COMPACT_COOLDOWN_MS = envNum('PI_CONTEXT_COMPACT_COOLDOWN_MS', 10 * 60_000);
 /**

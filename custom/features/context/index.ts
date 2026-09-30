@@ -390,10 +390,15 @@ export function register(pi: ExtensionAPI): void {
       const advice = pressureLine
         ? `${FULL_DELEGATION_ADVICE}\n${pressureLine}`
         : LOW_PRESSURE_DELEGATION;
-      // 重启提示：超过绝对阈值时给静态指引（先 /compact 再重启，避免首轮全量重发）
+      // 重启提示：锚定"重启后首轮全量重发前缀"的成本，取绝对阈值与压缩阈值 90% 的较小值，
+      // 避免阈值高于压缩阈值时提示永不触发（128K 窗口下压缩阈值约 109K）。
+      const restartCeiling =
+        compactThreshold && compactThreshold > 0
+          ? Math.min(RESTART_TOKENS, Math.floor(compactThreshold * 0.9))
+          : RESTART_TOKENS;
       const restartHint =
-        usage?.tokens != null && usage.tokens > RESTART_TOKENS
-          ? '[上下文已超过重启提示阈值：如需重启，建议先 /compact，可避免重启后首轮全量重发。]'
+        usage?.tokens != null && usage.tokens > restartCeiling
+          ? '[如需重启，建议先 /compact，可避免重启后首轮全量重发前缀。]'
           : '';
       // 易变运行时提示（压力档/休眠工具摘要/重启提示）**不再写入 system prompt**：
       // 它们位于前缀最前处，一旦变化就是整段缓存失效（实测单次 170K–316K 全价重算）。
