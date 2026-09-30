@@ -9,6 +9,7 @@ import {
   validateAskUserParams,
   runAskUser,
   OTHER_OPTION,
+  CANCEL_OPTION,
 } from '../core/ask-user';
 
 describe('validateAskUserParams', () => {
@@ -24,8 +25,19 @@ describe('askUserSingle', () => {
     const select = vi.fn(async () => 'A');
     const editor = vi.fn(async () => '');
     await expect(askUserSingle({ select, editor }, '标题', ['A', 'B'])).resolves.toBe('A');
-    expect(select).toHaveBeenCalledWith('标题', ['A', 'B', OTHER_OPTION]);
+    expect(select).toHaveBeenCalledWith('标题', ['A', 'B', OTHER_OPTION, CANCEL_OPTION]);
     expect(editor).not.toHaveBeenCalled();
+  });
+
+  it('调用方标签与内置项重名时不重复追加', async () => {
+    const select = vi.fn(async () => 'B');
+    await askUserSingle({ select, editor: vi.fn() }, '标题', ['A', 'B', OTHER_OPTION, CANCEL_OPTION]);
+    expect(select).toHaveBeenCalledWith('标题', ['A', 'B', OTHER_OPTION, CANCEL_OPTION]);
+  });
+
+  it('选「取消选择」返回取消文本', async () => {
+    const select = vi.fn(async () => CANCEL_OPTION);
+    await expect(askUserSingle({ select, editor: vi.fn() }, '标题', ['A', 'B'])).resolves.toBe('用户取消了选择');
   });
 
   it('选「其他」后返回用户输入', async () => {
@@ -109,6 +121,6 @@ describe('runAskUser', () => {
       { select, editor: vi.fn() },
       { question: '选哪个?', header: '构建', options: [{ label: 'A' }, { label: 'B' }] },
     );
-    expect(select).toHaveBeenCalledWith('构建: 选哪个?', ['A', 'B', OTHER_OPTION]);
+    expect(select).toHaveBeenCalledWith('构建: 选哪个?', ['A', 'B', OTHER_OPTION, CANCEL_OPTION]);
   });
 });

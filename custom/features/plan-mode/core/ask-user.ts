@@ -15,6 +15,7 @@ export interface AskUserIO {
 }
 
 export const OTHER_OPTION = '其他（请说明）';
+export const CANCEL_OPTION = '取消选择';
 
 export interface AskUserParams {
   question: string;
@@ -34,10 +35,14 @@ export function validateAskUserParams(params: Partial<AskUserParams>): string | 
 
 /** 单选交互：选择「其他」时弹输入框，未输入则重新选择；返回面向模型的文本 */
 export async function askUserSingle(io: AskUserIO, title: string, labels: string[]): Promise<string> {
-  const options = [...labels, OTHER_OPTION];
+  // 调用方传入的标签可能与内置项同名，去重后追加，避免列表出现两个相同条目
+  const options = [...labels];
+  if (!options.includes(OTHER_OPTION)) options.push(OTHER_OPTION);
+  if (!options.includes(CANCEL_OPTION)) options.push(CANCEL_OPTION);
   for (;;) {
     const choice = await io.select(title, options);
     if (choice === undefined) return '用户取消了选择';
+    if (choice === CANCEL_OPTION) return '用户取消了选择';
     if (choice !== OTHER_OPTION) return choice;
     const reason = await io.editor('请说明你的选择：', '');
     if (reason && reason.trim()) return `其他: ${reason.trim()}`;
@@ -85,7 +90,7 @@ export async function askUserMultiple(io: AskUserIO, title: string, labels: stri
   const numbered = labels.map((l, i) => `  ${i + 1}. ${l}`).join('\n');
   let notice = '';
   for (;;) {
-    const prompt = `${title}\n${numbered}\n\n${notice}输入所选编号（逗号分隔如 1,3；范围如 1-3；0 表示补充其它内容）：`;
+    const prompt = `${title}\n${numbered}\n\n${notice}输入所选编号（逗号分隔如 1,3；范围如 1-3；0 表示补充其它内容；留空取消）：`;
     const raw = await io.editor(prompt, '');
     if (raw === undefined) return '用户取消了选择';
     const text = raw.trim();
