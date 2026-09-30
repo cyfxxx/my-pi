@@ -4,7 +4,7 @@
 # 确定性的结构/类型/单测/边界守门，作为结构性改动的回归安全网。
 # 用法：
 #   bash scripts/golden-tasks.sh            # 确定性检查（无网络/无 LLM）
-#   bash scripts/golden-tasks.sh --fast     # 跳过 tsc/vitest（pre-commit 用，秒级）
+#   bash scripts/golden-tasks.sh --fast     # 跳过 tsc/vitest/web-term（pre-commit 用，秒级）
 #   bash scripts/golden-tasks.sh --smoke    # 追加无头会话冒烟（需已配置 provider）
 set -u
 
@@ -90,7 +90,9 @@ if node scripts/check-seeds-headless.mjs >/tmp/golden-seeds.log 2>&1; then pass 
 step "12. 浏览器终端（鉴权 + 传输）"
 # 安全边界（令牌换 cookie、Host/Origin 栅栏、穿越防护）与 pty 传输（双向数据、resize→SIGWINCH）
 # 都是单测覆盖不到的进程级行为。缺 script/stty 时该脚本显式 SKIP 并 exit 0。
-if node scripts/test-web-terminal.mjs >/tmp/golden-webterm.log 2>&1; then pass "$(tail -1 /tmp/golden-webterm.log)"; else fail "web-terminal 守门（见 /tmp/golden-webterm.log）"; tail -15 /tmp/golden-webterm.log; fi
+if [ "$FAST" = "1" ]; then
+  skip "web-terminal 守门（--fast 跳过，pre-push 全量跑）"
+elif node scripts/test-web-terminal.mjs >/tmp/golden-webterm.log 2>&1; then pass "$(tail -1 /tmp/golden-webterm.log)"; else fail "web-terminal 守门（见 /tmp/golden-webterm.log）"; tail -15 /tmp/golden-webterm.log; fi
 
 step "13. 用量度量口径（成本告警的有效性）"
 # 度量读错数据源会让所有阈值告警静默失效（2026-09-26..29 日报连续 n/a，命中率跌到 80.66%
@@ -118,7 +120,7 @@ fi
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   MSG=""
-  [ "$FAST" = "1" ] && MSG="（--fast：已跳过 tsc/vitest）"
+  [ "$FAST" = "1" ] && MSG="（--fast：已跳过 tsc/vitest/web-term）"
   echo "🎉 golden tasks 全部通过$MSG"
   exit 0
 fi
