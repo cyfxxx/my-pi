@@ -357,7 +357,8 @@ sections.push(() => {
 		['label: "Double-escape action"', "label: `双击 Esc 动作`"],
 		['label: "Tree filter mode"', "label: `树过滤器模式`"],
 		['label: "Warnings"', "label: `警告`"],
-		['label: "Thinking level"', "label: `思考深度`"],
+		// [过时 v0.99.1] 全局 "Thinking level" 设置项已从 /settings 移除（仅保留 "Default thinking level per model"，
+		// 思考级别选择见 thinking-selector.js）；上游 dist 已无该 label，故不再映射。
 		[
 			'label: "Default thinking level per model"',
 			"label: `按模型默认思考深度`",
@@ -382,7 +383,7 @@ sections.push(() => {
 			"description: `退出全屏模式时输出完整对话记录或仅会话恢复提示`",
 		],
 		['label: "Theme"', "label: `主题`"],
-		['label: "Automatic"', "label: `自动`"],
+		['label: "  automatic"', "label: `  自动`"], // v0.99.1: 主题项 "Automatic" → "  automatic"（前导两空格）
 		[
 			'description: "Use separate themes for light and dark terminal appearance"',
 			"description: `为浅色和深色终端分别使用不同主题`",
@@ -469,10 +470,7 @@ sections.push(() => {
 			'description: "Enable or disable individual warnings"',
 			"description: `启用或禁用单个警告`",
 		],
-		[
-			'description: "Reasoning depth for thinking-capable models"',
-			"description: `支持思考的模型的推理深度`",
-		],
+		// [过时 v0.99.1] 全局思考级别设置的 description 已随之移除，上游 dist 无 "Reasoning depth for thinking-capable models"。
 		[
 			'description: "Color theme for the interface"',
 			"description: `界面颜色主题`",
@@ -553,16 +551,10 @@ sections.push(() => {
 		],
 		['max: "Maximum reasoning"', "max: `最大推理`"],
 		// 子菜单标题/提示
-		['"Thinking Level"', '"思考深度"'],
-		[
-			'"Select reasoning depth for thinking-capable models"',
-			'"选择支持思考模型的推理深度"',
-		],
+		// [过时 v0.99.1] "Thinking Level" 标题已迁至 thinking-selector.js（见 [2.5]）；
+		// "Select reasoning depth for thinking-capable models" 随全局思考级别设置移除；
+		// "Enter to select · Esc to go back" 提示已迁至 settings-submenu.js（见 [2.7]）。
 		['"Theme"', '"主题"'],
-		[
-			'"  Enter to select \u00b7 Esc to go back"',
-			'"  回车选择 \u00b7 Esc 返回"',
-		],
 		['label: "Mermaid diagrams"', 'label: `Mermaid 图表`'],
 		[
 			'description: "Render Mermaid code blocks as Unicode diagrams"',
@@ -623,6 +615,8 @@ sections.push(() => {
 			"xhigh: `最大推理（约 32K token）`",
 		],
 		['max: "Maximum reasoning"', "max: `最大推理`"],
+		// 选择器标题（v0.99.1 由 settings-selector 的 SelectSubmenu 迁至 thinking-selector.js）
+		['"Thinking Level"', '"思考深度"'],
 	]);
 	return `思考深度选择器 (${n} 项)`;
 });
@@ -639,6 +633,22 @@ sections.push(() => {
 	return `状态指示器 (${n} 项)`;
 });
 
+// ---- [2.7] 子菜单提示（settings-submenu，v0.99.1 从 settings-selector 抽出） ----
+sections.push(() => {
+	const SUBMENU = `${PI}/dist/modes/interactive/components/settings-submenu.js`;
+	const n = apply(SUBMENU, [
+		[
+			'"  Enter to select \\u00b7 Esc to go back"',
+			'"  回车选择 \\u00b7 Esc 返回"',
+		],
+		[
+			'"  Type to filter \\u00b7 Enter to select \\u00b7 Esc to go back"',
+			'"  输入筛选 \\u00b7 回车选择 \\u00b7 Esc 返回"',
+		],
+	]);
+	return `子菜单提示 (${n} 项)`;
+});
+
 // ---- [3] 交互模式主组件 ----
 sections.push(() => {
 	let n = apply(INTERACTIVE_MODE, [
@@ -647,8 +657,7 @@ sections.push(() => {
 			'"Anthropic subscription auth is active. Third-party harness usage draws from extra usage and is billed per token, not your Claude plan limits. Manage extra usage at https://claude.ai/settings/usage. Disable this warning in /settings."',
 			'"Anthropic 订阅认证已激活。第三方调用消耗额外用量并按 token 计费，不计入 Claude 套餐限制。在 https://claude.ai/settings/usage 管理额外用量。可在 /settings 中禁用此警告。"',
 		],
-		['"Working..."', '"处理中..."'],
-		['"思考中..."', '"思考中..."'],
+		['"Working"', '"处理中"'], // v0.99.1: "Working..." → "Working"
 		['"What\'s New"', '"更新内容"'],
 		['"Unknown error occurred"', '"发生未知错误"'],
 		['"Failed to create session"', '"创建会话失败"'],
@@ -727,7 +736,7 @@ sections.push(() => {
 			'"已重新加载键盘绑定、扩展、技能、提示模板、主题和上下文文件"',
 		],
 		['"Import cancelled"', '"导入已取消"'],
-		['"Share cancelled"', '"分享已取消"'],
+		// [过时 v0.99.1] "Share cancelled" 已随会话分享逻辑迁至 session-share.js（见 [3.4]）。
 		[
 			'"Copied last agent message to clipboard"',
 			'"已复制上一条助手消息到剪贴板"',
@@ -743,7 +752,7 @@ sections.push(() => {
 		['"Skills"', '"技能"'],
 		['"Prompts"', '"提示词"'],
 		['"Extensions"', '"扩展"'],
-		['"Themes"', '"主题"'],
+		// [过时 v0.99.1] 启动横幅的 [Themes] 区段已移除（CHANGELOG：「Removed the [Themes] section from the startup banner」）。
 		['"Yes"', '"是"'],
 		['"No"', '"否"'],
 		[
@@ -752,7 +761,7 @@ sections.push(() => {
 		],
 		['"Select authentication method:"', '"选择认证方式："'],
 		['"Import session"', '"导入会话"'],
-		['"Creating gist..."', '"正在创建 Gist..."'],
+		// [过时 v0.99.1] "Creating gist..." 已随会话分享逻辑迁至 session-share.js（见 [3.4]）。
 		['"No agent messages to copy yet."', '"尚无助手消息可复制。"'],
 		['"Session Info"', '"会话信息"'],
 	]);
@@ -813,6 +822,23 @@ sections.push(() => {
 		],
 	]);
 	return `model-resolver 消息 (${n} 项)`;
+});
+
+// ---- [3.4] 分享会话（session-share，v0.99.1 从 interactive-mode 抽出） ----
+sections.push(() => {
+	const SESSION_SHARE = `${PI}/dist/modes/interactive/session-share.js`;
+	if (!existsSync(SESSION_SHARE)) return "分享会话 (跳过：不存在)";
+	const before = readFileSync(SESSION_SHARE, "utf-8");
+	// "Share cancelled" 在该文件出现两次，需全量替换
+	let content = before
+		.replaceAll('"Share cancelled"', '"分享已取消"')
+		.replaceAll('"Creating gist..."', '"正在创建 Gist..."');
+	if (content === before) return "分享会话 (0 项)";
+	let n = 0;
+	if (!before.includes('"分享已取消"')) n++;
+	if (!before.includes('"正在创建 Gist..."')) n++;
+	writeTarget(SESSION_SHARE, content);
+	return `分享会话 (${n} 项)`;
 });
 
 // ---- [4] 资源配置选择器 ----
