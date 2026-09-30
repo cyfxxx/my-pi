@@ -47,9 +47,11 @@ export async function askUserSingle(io: AskUserIO, title: string, labels: string
 export async function askUserMultiple(io: AskUserIO, title: string, labels: string[]): Promise<string> {
   const selected: string[] = [];
   for (;;) {
+    // 固定选项顺序：仅给已选项加 ✓ 前缀，不上浮重排。
+    // 旧实现把已选项提到数组最前，而 ui.select 每次调用都从第 0 项开始高亮（无初始索引参数），
+    // 两者叠加导致“每次选择后光标跳回第一项、且选项位置乱动”。
     const selectOptions = [
-      ...selected.map((l) => `${CHECK_MARK}${l}`),
-      ...labels.filter((l) => !selected.includes(l)),
+      ...labels.map((l) => (selected.includes(l) ? `${CHECK_MARK}${l}` : l)),
       OTHER_OPTION,
       DONE_OPTION,
       CLEAR_OPTION,
