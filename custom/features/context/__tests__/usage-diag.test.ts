@@ -14,7 +14,6 @@ import {
   recordUsageMissing,
   recordAutoCompact,
   recordPrune,
-  recordThinkingMeter,
   recordLevelChange,
   getToolEventsFile,
   recordToolEnable,
@@ -37,7 +36,6 @@ import {
   type AutoCompactEvent,
   type PruneEvent,
   type UsageMissingEvent,
-  type ThinkingMeterEvent,
   type LevelChangeEvent,
   type ToolUseEvent,
 } from '../usage-diag/diag';
@@ -125,14 +123,6 @@ describe('usage-diag 核心功能', () => {
     expect(ev1.type).toBe('prune');
     const ev2 = JSON.parse(lines[1]) as PruneEvent;
     expect(ev2.type).toBe('prune-think');
-  });
-
-  it('recordThinkingMeter 记录思考量', () => {
-    recordThinkingMeter(150);
-    const lines = readFileSync(diagFile, 'utf-8').trim().split('\n');
-    const ev = JSON.parse(lines[0]) as ThinkingMeterEvent;
-    expect(ev.type).toBe('thinking-meter');
-    expect(ev.tokens).toBe(150);
   });
 
   it('recordLevelChange 记录档位切换', () => {
@@ -260,6 +250,28 @@ describe('usage-diag 核心功能', () => {
     const text = formatUsageSummary(lines);
     expect(text).toContain('请求数: 2');
     expect(text).toContain('缓存命中:');
+  });
+
+  it('formatUsageSummary 渲染 auto-compact/prune/usage-missing（/usage-diag 的可观测面）', () => {
+    // 背景（P4 第三批）：这三类事件的生产者曾与消费者断开（auto-compact/prune 自 2026-09-24
+    // 起没人写，摘要恒显示 0 次）。生产者已在 context/index.ts 接线，这里锁住消费者一侧的渲染，
+    // 确保"事件写进来了就看得见"。
+    const now = Date.now();
+    recordUsage({ ts: now, input: 100, cacheRead: 50, cacheWrite: 0, output: 80, reasoning: 20, total: 250, contextTokens: 250 });
+    recordAutoCompact(320000, 300000);
+    recordPrune(1200, 4800, 3, 'tool');
+    recordPrune(800, 3200, 2, 'thinking');
+
+    // usage-missing 有节流（同进程内只记一次），这里直接补一条事件锁"消费侧渲染"，
+    // 生产侧的接线由 recordUsageMissing 被 index.ts 引用（死导出守门）保证。
+    const lines = readFileSync(diagFile, 'utf-8').trim().split('\n').map((l) => JSON.parse(l));
+    lines.push({ type: 'usage-missing', ts: now });
+    const text = formatUsageSummary(lines);
+    expect(text).toContain('自动压缩触发: 1 次');
+    expect(text).toContain('阈值 300.0K');
+    expect(text).toContain('分层擦除: 2 次');
+    expect(text).toContain('累计回收 2000 token');
+    expect(text).toContain('无用量记录: 1 轮');
   });
 
   it('环境变量覆盖路径', () => {

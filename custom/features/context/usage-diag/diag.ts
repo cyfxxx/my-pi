@@ -61,12 +61,6 @@ export interface UsageMissingEvent {
   ts: number;
 }
 
-export interface ThinkingMeterEvent {
-  type: "thinking-meter";
-  ts: number;
-  tokens: number;
-}
-
 export interface LevelChangeEvent {
   type: "level-change";
   ts: number;
@@ -124,7 +118,6 @@ export type DiagLine =
   | AutoCompactEvent
   | PruneEvent
   | UsageMissingEvent
-  | ThinkingMeterEvent
   | LevelChangeEvent
   | ToolEnableEvent
   | ToolCallRecordEvent
@@ -232,17 +225,6 @@ export function recordPrune(
       prunedChars,
       prunedCount,
     };
-    const f = getDiagFile();
-    mkdirSync(dirname(f), { recursive: true });
-    appendFileSync(f, JSON.stringify(event) + "\n");
-  } catch {
-    // ignore
-  }
-}
-
-export function recordThinkingMeter(tokens: number): void {
-  try {
-    const event: ThinkingMeterEvent = { type: "thinking-meter", ts: Date.now(), tokens };
     const f = getDiagFile();
     mkdirSync(dirname(f), { recursive: true });
     appendFileSync(f, JSON.stringify(event) + "\n");
@@ -548,6 +530,12 @@ export function formatUsageSummary(lines: DiagLine[]): string {
     ? summary.recentTrend.map((n, i) => (i > 0 && i % 4 === 3 ? `${fmt(n)}\n  ` : `${fmt(n)} → `)).join("")
     : "-";
 
+  const usageMissing = lines.filter((l) => "type" in l && l.type === "usage-missing").length;
+  const missingLine =
+    usageMissing > 0
+      ? `  无用量记录: ${usageMissing} 轮（provider 未返回 usage，命中率与成本为估算口径）`
+      : null;
+
   const compactEvents = lines.filter((l) => "type" in l && l.type === "auto-compact") as AutoCompactEvent[];
   const compactLines = compactEvents.length > 0
     ? `  自动压缩触发: ${compactEvents.length} 次（最近: ${fmt(compactEvents[compactEvents.length - 1].contextTokens)} @ 阈值 ${fmt(compactEvents[compactEvents.length - 1].threshold)}）`
@@ -567,6 +555,7 @@ export function formatUsageSummary(lines: DiagLine[]): string {
     `输出: ${fmt(summary.outputTotal)}（其中 reasoning ${fmt(summary.reasoningTotal)}）`,
     compactLines,
     pruneLine,
+    ...(missingLine ? [missingLine] : []),
     `最近 ${Math.min(20, summary.recentTrend.length)} 轮总输入(contextTokens):`,
     `  ${trend.trim()}`,
     "注: 平台统计量 = 输入未命中 + 缓存命中 + 输出；缓存命中按低价计费。",

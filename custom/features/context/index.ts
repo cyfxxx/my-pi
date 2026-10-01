@@ -66,7 +66,7 @@ import { sweepArchive } from './budget/output-archive';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate, computeCompactThreshold } from './budget/auto-compact';
 import { createSpeedTracker, formatSpeedCompact } from './budget/token-speed';
-import { recordUsage, loadDiagLines, formatUsageSummary } from './usage-diag/diag';
+import { recordUsage, recordAutoCompact, recordPrune, recordUsageMissing, loadDiagLines, formatUsageSummary } from './usage-diag/diag';
 import {
   ABSOLUTE_TOKENS,
   RESTART_TOKENS,
@@ -541,6 +541,9 @@ export function register(pi: ExtensionAPI): void {
         if (pruned.modified) {
           working = pruned.messages as unknown[];
           modified = true;
+          // 诊断事件接线（P4 第三批）：/usage-diag 的"分层擦除"一节消费 prune/prune-think 事件，
+          // 但生产者自 2026-09-24 起被断开（摘要恒显示 0 次）——这里恢复写入。
+          recordPrune(pruned.prunedTokens, pruned.prunedChars, pruned.prunedCount, 'tool');
         }
 
         // 历史 thinking 块按 token 预算擦除。实测长会话中 thinking 可占上下文 ~50%
@@ -549,6 +552,7 @@ export function register(pi: ExtensionAPI): void {
         if (thinkTrimmed.modified) {
           working = thinkTrimmed.messages as unknown[];
           modified = true;
+          recordPrune(thinkTrimmed.prunedTokens, thinkTrimmed.prunedChars, thinkTrimmed.prunedCount, 'thinking');
         }
       }
 
@@ -590,6 +594,8 @@ export function register(pi: ExtensionAPI): void {
       const bashCmd = name === 'bash' && typeof e.input?.command === 'string' ? (e.input.command as string) : undefined;
       const bashInfo = bashCmd !== undefined ? analyzeBashCommand(bashCmd) : undefined;
       // 度量：记录 token/缓存（用量统计度量基建；无 usage 时以输出估算兜底）
+      // provider 未返回 usage 时记一条 usage-missing（/usage-diag 会显示它，用于判断"命中率是否可信"）
+      if (!e.usage) recordUsageMissing();
       try {
         appendUsage({
           ts: new Date().toISOString(),
@@ -661,6 +667,8 @@ export function register(pi: ExtensionAPI): void {
       }
       // 压缩前快照（保留最近 8 份/7 天，失败不阻塞压缩）
       snapshotBeforeCompact(lastContextMessages, resolved.tokens, decision.threshold, 'threshold');
+      // 诊断事件接线（同上）：/usage-diag 的"自动压缩触发"一节消费 auto-compact 事件
+      recordAutoCompact(resolved.tokens, decision.threshold);
       snapshotDoneForCompact = true;
       compactedThisSettlement = true;
       autoContinueGate.arm();
