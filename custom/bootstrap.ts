@@ -46,9 +46,14 @@ const FEATURES = [
 
 export default function bootstrap(pi: ExtensionAPI): void {
   // 模式 = 启动档位：据此过滤注册的功能，并注入记忆命名空间。
+  // envWasSet 用来区分"外部注入的 PI_AGENT_MODE"与"上一次 bootstrap 的回写"：
+  // 回写值必须在 /reload 重新加载扩展时被忽略，否则仍按旧模式过滤（模式切不动）。
+  // 详见 features/mode/logic.ts 的 resolveEffectiveMode。
+  const envWasSet = Boolean(process.env.PI_AGENT_MODE);
   const mode = resolveEffectiveMode();
   const config = getEffectiveModeConfig();
-  if (!process.env.PI_AGENT_MODE) process.env.PI_AGENT_MODE = mode;
+  if (!envWasSet) process.env.PI_AGENT_MODE = mode;
+  process.env.PI_AGENT_MODE_SOURCE = envWasSet ? 'env' : 'file';
   if (config.memoryNamespace && !process.env.PI_MEMORY_NAMESPACE) {
     process.env.PI_MEMORY_NAMESPACE = config.memoryNamespace;
   }
