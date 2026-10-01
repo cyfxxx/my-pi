@@ -6,7 +6,7 @@
 
 | 文件 | 职责 | 主要导出 |
 |------|------|----------|
-| `retrieval.ts` | 检索打分与重排、检索台账 | `buildDoc`、`bm25Score`、`qualityScore`、`visibleAt`、`mmrDiversify`、`roundRobinBySession`、`searchEntriesWithScores`、`searchEntries`、`findSimilar`、`logSearchTrace` |
+| `retrieval.ts` | 检索打分与重排、检索台账 | `buildDoc`、`bm25Score`、`qualityScore`、`visibleAt`、`mmrDiversify`、`roundRobinBySession`、`searchEntriesWithScores`、`findSimilar`、`logSearchTrace` |
 | `inject.ts` | 注入块构建、预算、注入去抖；`filterInjectedMessages` 仅供离线分析（生产路径已改为 append-only） | `buildInjectionBlock`、`isInjectionBlock`、`filterInjectedMessages`、`getBudget`、`INJECT_TAG`、`truncateContent`/`truncateEntrySummary` |
 
 ## 约定

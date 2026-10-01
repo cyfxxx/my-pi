@@ -62,7 +62,7 @@ my-pi/
 ├── packs/                            # 外部技能包仓库（按需读取，不注入系统提示词）
 ├── docs/                             # 项目文档（使用/开发/运维）
 │
-├── scripts/                          # 运维脚本（34 个，见 scripts/README.md）
+├── scripts/                          # 运维脚本（37 个，见 scripts/README.md）
 │   ├── build.sh                      # 一键重建/引导（新设备可复现）
 │   ├── doctor.sh                     # 本地环境 vs 仓库体检（--fix 自动修复）
 │   ├── sync-upstream.sh              # 上游同步 + 自动修复（重建/刷缓存/类型检查）
@@ -138,7 +138,7 @@ bash scripts/dev.sh
 | intervention | 干预捕获 | 钩子型 |
 | link | 多设备互联（SSH 通道 + 远程 RPC） | 工具型 |
 | memory | 跨会话持久记忆 | 工具型 |
-| mode | 模式切换（full/minimal/roleplay） | 钩子型 |
+| mode | 模式切换（full/minimal/roleplay/lean） | 钩子型 |
 | plan-mode | 计划模式（TUI 计划/任务管理） | 钩子型 |
 | subagent | 子代理（delegate 给专门 agent） | 工具型 |
 | tmux | tmux 会话管理（后台任务/长任务） | 工具型 |
@@ -166,7 +166,7 @@ Layer 0 ─ 基础层 ───────────── vendor/pi/ (上游
 | 任务成功率 | `/auto stats`、`/auto metrics` | autopilot telemetry（按模型/任务） |
 | 记忆治理 | `/memory lifecycle`、`scripts/memory-lifecycle.mjs --json` | 只读报告：淘汰/升格/冲突/垃圾/聚合候选（后者供 headless 定时任务消费） |
 | 教训闭环 | `/memory mine [--ingest]` | 从纠正意图挖掘教训并入库（自动去重） |
-| 防退化 | `npm run golden`（`--fast` / `--smoke`） | 12 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端（`--smoke` 追加无头冒烟） |
+| 防退化 | `npm run golden`（`--fast` / `--smoke`） | 14 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门（`--smoke` 追加无头冒烟） |
 
 ## 上游同步
 
@@ -236,7 +236,7 @@ bash scripts/check-isolation.sh
 # 功能完整性检查
 bash scripts/check-features.sh
 
-# 行为防退化基准（12 步；--fast 仅结构守门，--smoke 追加无头冒烟）
+# 行为防退化基准（14 步；--fast 仅结构守门，--smoke 追加无头冒烟）
 npm run golden
 npm run golden -- --fast
 

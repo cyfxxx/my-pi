@@ -19,7 +19,7 @@
 | [context](context/README.md) | 钩子型 | 命令 + 钩子 | Token 优化中枢（预算/剪枝/压缩/工具分层/thinking/任务记录） |
 | [link](link/README.md) | 工具型 | 工具 + 命令 | 多设备互联（SSH 通道 + 远程 RPC） |
 | [memory](memory/README.md) | 工具型 | 工具 + 命令 | 跨会话持久记忆（存储/检索/注入/治理/教训挖掘） |
-| [mode](mode/README.md) | 钩子型 | 命令 | 模式切换（full/minimal/roleplay） |
+| [mode](mode/README.md) | 钩子型 | 命令 | 模式切换（full/minimal/roleplay/lean） |
 | [plan-mode](plan-mode/README.md) | 钩子型 | 工具 + 命令 + 快捷键 | 计划模式（只读探索 + 任务面板） |
 | [intervention](intervention/README.md) | 钩子型 | 命令 | 干预捕获（中断快照 + 纠正关联） |
 | [subagent](subagent/README.md) | 工具型 | 工具 | 子代理（delegate 给专门 agent） |

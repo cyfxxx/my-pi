@@ -58,12 +58,25 @@
 一步内同名工具多次调用会互相覆盖（时长失真）。改用 `toolCallId`（`tool_call`/`tool_result`
 事件都带该字段），并补了回归测试。
 
+## 转正通道执行（§3.1/§5，2026-10-01）
+
+**结论：当前无合格候选；治理动作已执行。**
+
+- **机制核对**（依据 `memory/mine/lifecycle.ts`）：升格候选 = `solutions`/`fact` 且 **recurrence ≥ `promoteRecurrence`（默认 5）**；`recurrence` 的语义是"同一教训被重复入库"的次数（`storeEntry` 去重命中时自增），召回/注入不计数——与 §5「反复有效」一致。
+- **实测**（`bash scripts/run-ts.sh scripts/memory-lifecycle.mjs --json`）：61 条（活跃 58），recurrence 分布 **1×54、2×7**，最大 2 → **promotionCandidates = 0**、aggregationCandidates = 0。通道不是坏的，是没有够格的条目。
+- **同期治理**：`conflictSuspects` 2 → **0**。两组冲突用**非破坏式 `supersededBy`** 解决（recall 会跳过被取代条目，可随时清字段回滚）：
+  - `63e8d109`（Termux playwright 补丁，"待重启验证"的旧态标题）← `da6380d3`（含"重启后实测通过"的完整结论）
+  - `tool-baseline-20260922` ← `6fcba969`（2026-09-27 全量基线）
+  写前快照：`portable/memory/checkpoints/entries-20261001T191520Z.json`（68 518 B，写入后 active 60 → 58）。
+- **下次触发条件**：同一教训被重复入库累计 5 次即出现在报告里；`daily-review` 定时任务每日跑该报告并把候选数量写进结论（该任务被明确禁止执行写操作，升格/淘汰/合并/聚合都需要用户确认）。
+- **不做的**：不降低阈值（§5 的 recurrence≥5 属愿景/方法论层，改动需用户确认）、不凭"感觉重要"手工升格（会破坏"反复有效"的证据链）。
+
 ## 待评（明确未硬化，附原因与前置条件）
 
 | 软引导 | 状态 | 原因 / 前置条件 |
 |---|---|---|
 | APPEND_SYSTEM.md「我提出的问题必须先回答再执行」 | 保持软（有意） | 用户对话纪律，硬化等于用代码替用户决定何时执行；与 P3-1 结论一致 |
-| AGENTS.md「不要在会话中途改工具集」 | 部分硬化 | 已硬化的是**默认行为**（工具分层默认关、模式切换走重启）；剩余"模型主动 `enable_tool`"属模型行为，正确硬化形态是**启动期按模式收窄工具面**（P2-1 记录的方向，未做） |
+| AGENTS.md「不要在会话中途改工具集」 | **已硬化** | 启动期收窄已交付：模式白名单在启动期过滤功能（未注册即 0 字节）、新增可选 `lean` 模式（去 14.5 KB）、`tools-payload.test.ts` 守住体积与"模式确有收窄"；"模型主动 `enable_tool`"由 `TOOL_LAYERING` 默认关闭（工具全常驻）约束，不再需要额外硬化 |
 | APPEND_SYSTEM.md「禁止 emoji / 简短精炼」 | 暂缓 | 硬化需输出侧校验器（成本高、误报多）；收益低于成本 |
 | §5「升格候选（recurrence≥5）」 | 通道就绪、尚无转正 | `/memory lifecycle` 已产出候选，但"候选 → 规则"这一步仍是人工判断；下一批候选来源 |
 | AGENTS.md「回答先于编辑」 | 保持软（有意） | 同"先回答再执行" |

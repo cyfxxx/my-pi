@@ -7,7 +7,7 @@
 | 文件 | 职责 | 主要导出 |
 |------|------|----------|
 | `state.ts` | 任务/状态类型与合法转移 | `EMPTY_STATE`、`VALID_TRANSITIONS`、`isTransitionValid`、`applyTaskMutation` |
-| `store.ts` | 进程内状态存储（模块级） | `getTodos`、`getState`、`replaceState`、`commitState`、`resetState`、`getNextId` |
+| `store.ts` | 进程内状态存储（模块级） | `getTodos`、`getState`、`commitState`、`resetState` |
 | `plans.ts` | 计划落盘与磁盘恢复（plan.md 渲染/解析/清理） | `renderPlanFile`、`parsePlanFile`、`writePlanFile`、`restoreStateFromPlans`、`cleanupOldPlans`、`listPlans` |
 | `readonly.ts` | 判断 bash 命令是否只读（plan 模式下放行） | `isReadonlyBashCommand` |
 | `selectors.ts` | 视图选择器 | `selectVisibleTasks`、`selectTasksByStatus`、`selectTodoCounts`、`selectHasActive`、`selectOverlayLayout` |

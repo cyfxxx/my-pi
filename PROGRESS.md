@@ -1756,3 +1756,33 @@ APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"
   （实测 150K–320K token/次）、描述裁剪收益已被 P2-1 否掉。
 - 模式白名单在**启动期**过滤功能注册（未注册即 0 字节，会话内工具数组不变 = 缓存安全）；
   `custom/features/mode/README.md` 的模式表补上 `lean` 与实测依据。
+
+## 转正执行 + 全流程审计（2026-10-01）
+
+### 转正（§3.1/§5 升格通道）
+
+- 机制核对：升格候选 = `solutions`/`fact` 且 recurrence ≥ 5（`promoteRecurrence` 默认值）；recurrence 由
+  `storeEntry` 去重命中时自增（"同一教训被重复入库"的次数），召回/注入不计数——与 §5「反复有效」一致。
+- 实测（`run-ts.sh scripts/memory-lifecycle.mjs --json`）：61 条 / 活跃 58，recurrence 分布 1×54、2×7，
+  **最大 2 → 无合格升格候选**；聚合候选同为 0。通道正常，是数据未达阈值。
+- 同期治理：`conflictSuspects` **2 → 0**，用非破坏式 `supersededBy`（recall 跳过被取代条目、可回滚）：
+  Termux playwright 旧态条目 ← 含实测结论的新条目；09-22 工具基线 ← 09-27 全量基线。
+  写前快照 `portable/memory/checkpoints/entries-20261001T191520Z.json`，写后 active 60 → 58。
+- 不降低阈值、不凭"感觉重要"手工升格（会破坏证据链）；下次触发条件与每日监控方式记入台账。
+
+### 审计与修复（流程 + 结构 + 文档）
+
+- **流程合规复核**：本程序所有硬化项都有"守门/测试 + 文档 + 降权或理由"三件套（台账逐条可查）；
+  VISION §1–§3、§5 的愿景与方法论未改动（只动 §4 数据、§6 路线、§9 变更记录）；默认行为未被单方面改变
+  （`lean` 为可选新增，默认仍 `full`）；记忆写操作先快照、非破坏、可回滚。
+- **结构**：12 个功能目录 README 齐备；子包 README 齐备（`memory/tools/` 无独立 README 但在
+  `memory/README.md` 有说明 → 补进 `STRUCTURE.md` 子包列表）；`docs/README.md` 索引覆盖全部 20 篇文档。
+- **文档残留修复**（上轮漏改 4 处 + 计数过时）：
+  `context/budget/README.md`（去掉 `recordOutput`/`buildWarmPrefixData`，补 `system-prompt.ts` 模块行、
+  `hard-rules.ts` 新增常量）、`memory/recall/README.md`（去 `searchEntries`）、`plan-mode/core/README.md`
+  （去 `replaceState`/`getNextId`）、`autopilot/run/README.md`（去 `isTurnBusy`/`isBackgroundBusy`）、
+  `README.md`（脚本 34→37、golden 12→14 步）、`STRUCTURE.md`（非脚本文件 4→5、补 `check-conventions.sh`、
+  golden/度量描述更新）、`docs/TROUBLESHOOTING.md`（12→14 步）、VISION §4（696→**732 用例 / 66 文件**）、
+  模式列表三处补 `lean`、MIGRATION-AUDIT 标注数字为历史快照。
+- **守门健壮性**：`tools-payload.test.ts` 改为 hermetic（临时 `PI_MEMORY_DIR`/`PI_CODING_AGENT_DIR`）——
+  该守门会注册全部功能，必须防止将来某个功能在 register 期写真实运行时数据。
