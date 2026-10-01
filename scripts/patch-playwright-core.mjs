@@ -22,14 +22,15 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
-// 已知承载平台判断的文件（存在才处理）
+// 已知承载平台判断的文件（存在才处理）。
+// 注意：1.53.x 的 `lib/server/utils/hostPlatform.js`、`lib/server/registry/index.js` 在 1.63.0
+// 已并入 `lib/coreBundle.js`（该文件已在此表中），故不再单列——留着它们只会让每次构建都打印
+// 一条"缺失目标，需人工核对"的假告警，久了就没人看构建输出了。
 const TARGET_FILES = [
   'lib/coreBundle.js',
   'lib/serverRegistry.js',
   'lib/utilsBundle.js',
   'lib/tools/cli-client/registry.js',
-  'lib/server/utils/hostPlatform.js',
-  'lib/server/registry/index.js',
 ];
 
 /** 纯函数：把沙箱/平台判断扩展至 android（幂等；便于单测） */
