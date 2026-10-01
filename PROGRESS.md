@@ -1675,3 +1675,20 @@ p50=1 / p90=2 / max=3（≥3 次的步仅 1.4%）。也就是说 APPEND_SYSTEM.m
 
 APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"压缩成一句（去掉解释，保留规则）：
 789 → **737 B**；注入面基线更新为 `2ca79271…`。
+
+## P4 升格通道第三批 · B-3 存量处置（2026-10-01，同日续做）
+
+死导出守门升级后扫出的"仅测试引用"存量里，第一批处置 4 个：
+
+- **发现一个静默诊断缺陷**：`/usage-diag` 摘要里的「自动压缩触发」「分层擦除」两节一直在读
+  `auto-compact`/`prune` 事件，但这两类事件的**生产者自 2026-09-24 起被断开**
+  （`recordAutoCompact`/`recordPrune` 在生产代码零调用，而旧守门因"测试引用"放行）
+  ——摘要恒显示 0 次。已接线到真实触发点（压缩决策处、擦除处含 thinking），`usage-missing`
+  一并接线并在摘要里渲染（provider 未返回 usage 时提示"命中率与成本为估算口径"）。
+- **删除** `recordThinkingMeter` 及其事件类型：两侧皆无（用量记录已含 `reasoning`，重复度量）。
+- 三个已接线的函数移出 `dead-exports-allowlist.txt` C 段——再被断开就是守门失败（棘轮）。
+- 新增摘要渲染测试（1 次压缩 / 2 次擦除 / 1 轮无用量），锁住"事件写进来就看得见"。
+
+剩余 legacy 工具台账（`recordToolEnable`/`recordToolCallEvent`/`recordToolCall`/`loadToolCallRecords`/
+`loadToolEnableEvents`/`pruneToolEvents`/`recomputeToolUsage` + 私有类型）消费方确认完成
+（`tool-stats-sync.mjs` 只读 `usage.jsonl` 与 `tool-count-*.json`），下一步整族删除。
