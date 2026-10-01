@@ -12,3 +12,4 @@ export * from './store/notifications';
 export * from './run/watchdog';
 export * from './run/verifier-logger';
 export * from './run/verifier';
+export * from './daily';

@@ -57,6 +57,10 @@ import {
   resetWatchdogState,
   collectMetrics,
   formatMetrics,
+  selectDailyTasks,
+  formatDailyOverview,
+  formatDailyLine,
+  formatDailyDetail,
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
 import { runTaskOnce } from './run/runner';
@@ -397,6 +401,113 @@ export function register(pi: ExtensionAPI): void {
       } catch (e) {
         ctx.ui.notify(`调度错误: ${(e as Error).message}`, 'error');
       }
+    },
+  });
+
+  // ── /daily 命令：每日任务视图（tags 含 daily，渲染逻辑在 daily.ts）──
+  registerCommand(pi, 'daily', {
+    description: '每日任务：查看执行情况与启停',
+    getArgumentCompletions: (prefix) => {
+      const subs = [
+        { value: 'list', label: 'list', description: '逐条列出每日任务' },
+        { value: 'show ', label: 'show', description: '任务详情与最近执行（/daily show <名>）' },
+        { value: 'on ', label: 'on', description: '启用（/daily on <名|all>）' },
+        { value: 'off ', label: 'off', description: '禁用（/daily off <名|all>）' },
+        { value: 'help', label: 'help', description: '显示用法' },
+      ];
+      const first = prefix.split(/\s+/)[0] ?? '';
+      if (!prefix.includes(' ')) {
+        const f = filterCompletions(subs, first);
+        return f.length ? f : null;
+      }
+      return null;
+    },
+    handler: async (args, ctx) => {
+      const { sub: subRaw, rest } = parseSubcommand(args);
+      const sub = subRaw || 'overview';
+      const now = new Date();
+      const usage =
+        '/daily                    每日任务概览（含今日进度）\n' +
+        '/daily list               逐条列出（时间/上次结果/下次/成功失败）\n' +
+        '/daily show <名>          详情：调度、统计、最近 5 次执行、提示词\n' +
+        '/daily on|off <名|all>    启用/禁用（all = 全部每日任务）\n' +
+        '/daily help               显示本帮助\n' +
+        '说明：每日任务 = tasks.json 中 tags 含 daily 的任务；无标签时显示全部调度任务。';
+
+      if (sub === 'help') {
+        ctx.ui.notify(usage, 'info');
+        return;
+      }
+
+      const sel = selectDailyTasks(listTasks());
+
+      if (sub === 'list') {
+        ctx.ui.notify(
+          sel.tasks.length ? sel.tasks.map((t) => formatDailyLine(t, now)).join('\n') : '暂无每日任务',
+          'info',
+        );
+        return;
+      }
+
+      if (sub === 'on' || sub === 'off') {
+        const name = rest.join(' ');
+        if (!name) {
+          ctx.ui.notify(`用法: /daily ${sub} <名|all>`, 'info');
+          return;
+        }
+        const enabled = sub === 'on';
+        const targets =
+          name === 'all' ? sel.tasks : sel.tasks.filter((t) => t.name === name || t.id === name);
+        if (targets.length === 0) {
+          ctx.ui.notify(`未找到每日任务: ${name}`, 'warning');
+          return;
+        }
+        // 只改 enabled、不重算 nextRun：已错过的触发点会在下一个调度轮次立即补跑
+        // （与 /schedule enable 语义一致；重算会静默吞掉一次本应补上的执行）
+        const changed: string[] = [];
+        for (const t of targets) {
+          if (t.enabled === enabled) continue;
+          await updateTask(t.id, { enabled });
+          changed.push(t.name);
+        }
+        ctx.ui.notify(
+          changed.length
+            ? `已${enabled ? '启用' : '禁用'} ${changed.length} 个：${changed.join('、')}`
+            : `无需改动：${targets.length} 个任务已是${enabled ? '启用' : '禁用'}状态`,
+          'info',
+        );
+        return;
+      }
+
+      if (sub === 'show') {
+        const name = rest.join(' ');
+        if (!name) {
+          ctx.ui.notify('用法: /daily show <名>', 'info');
+          return;
+        }
+        const t = sel.tasks.find((x) => x.name === name || x.id === name);
+        if (!t) {
+          ctx.ui.notify(`未找到每日任务: ${name}`, 'warning');
+          return;
+        }
+        ctx.ui.notify(formatDailyDetail(t, now), 'info');
+        return;
+      }
+
+      if (sub === 'overview' || sub === 'status') {
+        const ov = schedulerOverview();
+        ctx.ui.notify(
+          formatDailyOverview(
+            sel.tasks,
+            { autopilotEnabled: readAutopilotConfig().enabled, paused: ov.paused, byTag: sel.byTag },
+            now,
+          ),
+          'info',
+        );
+        return;
+      }
+
+      ctx.ui.notify(`未知子命令: ${sub}\n\n${usage}`, 'info');
     },
   });
 

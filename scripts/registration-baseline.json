@@ -87,6 +87,7 @@
   "commands": {
     "autopilot": [
       "auto",
+      "daily",
       "schedule"
     ],
     "context": [

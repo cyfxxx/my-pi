@@ -5,7 +5,7 @@
 ## 注册面
 
 - 工具：`autopilot_status`、`autopilot_stats`、`autopilot_failover`、`autopilot_policy`、`schedule_task`、`verify_report`、`verify_config`、`verify_test`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model`（16 个，见 [tools/README.md](tools/README.md)）
-- 命令：`/auto <status|stats|metrics|policy|failover|pause|resume|help>`、`/schedule <list|loop|remind|cron|edit|delete|enable|disable|preview|history|help>`
+- 命令：`/auto <status|stats|metrics|policy|failover|pause|resume|help>`、`/schedule <list|loop|remind|cron|edit|delete|enable|disable|preview|history|help>`、`/daily <list|show|on|off|help>`（默认概览）
 - 钩子：`session_start`、`session_shutdown`、`turn_start`、`turn_end`、`input`、`agent_settled`
 
 ## 文件
@@ -15,9 +15,33 @@
 | `index.ts` | 注册工具/命令/钩子；命令输出与 pending 任务启动 |
 | `logic.ts` | 纯逻辑 barrel |
 | `types.ts` | 类型与默认配置（`defaultAutopilotConfig`） |
+| `daily.ts` | `/daily` 的纯渲染逻辑（筛选/概览/详情，零 Pi 依赖），见下方「每日任务视图」 |
 | `store/` | 任务存储/配置/策略/预算/遥测/会话/通知/种子，见 [store/README.md](store/README.md) |
 | `run/` | 执行/看门狗/验证器，见 [run/README.md](run/README.md) |
 | `tools/` | 工具组（策略/状态/配置/会话/模型、`schedule_task`、`verify_*`），见 [tools/README.md](tools/README.md) |
+
+## 每日任务视图（`/daily`）
+
+「每日任务」= `tasks.json` 中 `tags` 含 `daily` 的任务（种子在 `portable/agent/scheduled-seeds.json`
+里统一打标；跨设备对账后本地 tasks.json 保留该标签）。一个 daily 标签都没有时**降级显示全部调度任务**
+并在标题里写明——否则用户自建的 cron 任务会在 `/daily` 里凭空消失。
+
+| 命令 | 输出 |
+|------|------|
+| `/daily` | 概览：任务数/启停 + 今日完成·待跑·失败 + 每条一行（时间/上次结果与耗时/下次/成败计数），末尾附「上次失败的任务」提示 |
+| `/daily list` | 只逐条列出，不折叠 |
+| `/daily show <名>` | 详情：调度与下次（含相对时间）、统计（成功/连续失败/重试/超时/标签）、最近 5 次执行、提示词摘要 |
+| `/daily on\|off <名\|all>` | 启停（`all` = 全部每日任务） |
+| `/daily help` | 用法 |
+
+口径与约定：
+
+- 「今日完成/失败」按 `lastRun` 的**本地日期**判定，与 cron 的自然日语义一致；昨天的成功不计入今天。
+- cron 只在形如 `M H * * *` 时显示为 `HH:MM`，含步进/区间/星期限定时**原样显示表达式**
+  （`cronClock` 返回 null 而非硬猜）。
+- `on` 只改 `enabled`，**不重算 `nextRun`**：已错过的触发点会在下一个调度轮次立即补跑
+  （与 `/schedule enable` 一致；重算会静默吞掉一次本应补上的执行）。
+- 渲染是纯函数（`daily.ts`），单测见 `__tests__/daily.test.ts`；命令层只做筛选与派发。
 
 ## 数据与配置
 
