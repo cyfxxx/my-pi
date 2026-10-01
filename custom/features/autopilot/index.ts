@@ -662,6 +662,17 @@ export function register(pi: ExtensionAPI): void {
     event: 'session_start',
     handler: async (_event, ctx) => {
       resetWatchdogState();
+      // 调度器**只在交互会话**里跑。`-p` 一次性运行（含 golden 的无头冒烟、临时提问）会在启动时
+      // 立刻跑 `runDueTasks`，而逾期的每日任务每个都是一次完整子代理会话（数分钟）——
+      // 于是"问一句就退出"会变成长期挂起，且**凭空触发若干不该发生的后台任务**（实测：一次
+      // 验收运行就触发了 tool-stats-daily，留下被 git add 的计数文件）。
+      // 无头会话只做种子对账（幂等、零 LLM），不启动调度器、也不消费通知（否则会把该给交互
+      // 会话看的未读报告标记成已读而丢失）。调度器自己的工作进程走 `--no-extensions -p`，
+      // 不加载扩展、不会回到这个钩子，故无副作用。
+      if (!ctx.hasUI) {
+        await syncSeedTasks();
+        return;
+      }
       if (tickTimer) clearInterval(tickTimer);
       tickTimer = setInterval(() => {
         void runDueTasks(ctx);

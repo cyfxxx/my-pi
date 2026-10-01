@@ -101,8 +101,11 @@ if node scripts/test-usage-metrics.mjs >/tmp/golden-usage.log 2>&1; then pass "$
 
 if [ "$SMOKE" = "1" ]; then
   step "14. 无头会话冒烟"
-  # 已知现象：带扩展的 `-p` 一次性运行在本环境**产出回复后不退出**（进程挂住，实测 >60s）。
-  # 故这里以"是否产出回复"为准，超时但有回复算通过并说明；进程能正常退出更好。
+  # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
+  # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
+  # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，
+  # "问一句就退出"变成长期挂起。已加 `if (!ctx.hasUI) { 只对账种子; return; }` 网关；
+  # 本步骤因此改为**严格要求 rc=0**，以锁住该修复（若再挂住，先查调度器网关）。
   smoke_log=/tmp/golden-smoke.log
   timeout 90 ./my-pi.sh -p "回复 OK" >"$smoke_log" 2>&1
   smoke_rc=$?
@@ -110,7 +113,8 @@ if [ "$SMOKE" = "1" ]; then
   if [ "$smoke_rc" -eq 0 ]; then
     pass "headless smoke（正常退出）"
   elif [ -n "$reply" ]; then
-    pass "headless smoke（已产出回复；进程未按期退出，属已知 headless 现象）"
+    fail "headless smoke（有回复但进程未退出：检查 autopilot 的无头调度网关与未 unref 的句柄）"
+    tail -10 "$smoke_log"
   else
     fail "headless smoke（无回复，见 $smoke_log）"
     tail -10 "$smoke_log"

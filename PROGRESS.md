@@ -1186,6 +1186,27 @@ SIGKILL 服务器后，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到
 - 其余操作点（启动命令、隧道、令牌流程、参数表、首屏 20 秒、单会话、多标签镜像、
   每环境独立密钥、xterm 5.5.0 约束）复核后确认**原本已有记录**，不再重复。
 
+## 成本与效率优化 Phase 3：headless 一次性运行不再引爆后台任务（第 68 批，2026-10-01）
+
+P3-5 完成，且**根因与最初猜测不同**——最初怀疑扩展里的 `setInterval` 未 `unref()`，实测两个定时器
+（autopilot tick、tmux watcher）**都已经 unref**；直接跑 `node cli.js --extension … -p` 也是干净退出。
+真正机制是：
+
+- `my-pi.sh -p` / golden 无头冒烟这类**一次性会话**里，autopilot 的 `session_start` 同样启动调度器
+  并立刻 `runDueTasks()`。当时 5 个每日任务全部逾期 → 立刻触发（每个都是一次完整子代理会话、
+  数分钟）→ 进程被拖住，表现成「产出回复后不退出」。
+- 更严重的是副作用：**一次「问一句就退出」的调用会凭空引爆若干后台任务**。旁证是
+  `portable/memory/stats/tool-count-localhost.json` 被自动任务 `git add` 过（那是 tool-stats-daily
+  的行为），而我从没让它跑。
+
+修法：`session_start` 开头加网关——无头会话只做种子对账（幂等、零 LLM）后返回，不启动调度器，
+也不消费未读通知（否则会把该给交互会话看的报告标记成已读而丢失）。调度器自己的工作进程走
+`--no-extensions -p`，不加载扩展、不会回到这个钩子。
+
+守门：golden 无头冒烟第 14 步从「容忍挂起（有回复即通过）」改为**严格要求 `rc=0`**，并写明若再挂住
+先查调度器网关。实测 `bash scripts/golden-tasks.sh --fast --smoke` → `✓ headless smoke（正常退出）`。
+文档：`docs/TROUBLESHOOTING.md` 新增 0.1 节。
+
 ## 成本与效率优化 Phase 1 主体：工作区指令移出 system 前缀（第 67 批，2026-10-01）
 
 P1-1 完成。用户已授权"自行决策与执行"，故按 VISION 的目标（缓存/成本不劣化、硬优先、防退化）自行决策实施。
