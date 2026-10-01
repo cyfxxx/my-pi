@@ -91,7 +91,7 @@ import {
   buildReplayedPayload,
   isSummarizationMessage,
 } from './budget/warm-prefix';
-import { appendUsage } from './usage-stats';
+import { analyzeBashCommand, appendUsage } from './usage-stats';
 
 
 
@@ -474,9 +474,11 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'tool_call',
     handler: async (event) => {
-      const toolEvent = event as { toolName?: string; input?: Record<string, unknown> };
-      if (toolEvent.toolName) {
-        toolState.toolCallStarts.set(toolEvent.toolName, Date.now());
+      const toolEvent = event as { toolName?: string; toolCallId?: string; input?: Record<string, unknown> };
+      // 用 toolCallId 计时：pi 默认并行执行工具，同一工具一轮多次调用时按名字键会互相覆盖（时长失真）
+      const callKey = toolEvent.toolCallId ?? toolEvent.toolName;
+      if (callKey) {
+        toolState.toolCallStarts.set(callKey, Date.now());
       }
       // ── bash 前台默认上限（硬约束，2026-10-01）──
       // 按工具拆解 1101 个可归属步：工具执行占墙钟 63.6%，其中 `bash` 一家占工具时间 63%
@@ -560,6 +562,8 @@ export function register(pi: ExtensionAPI): void {
     handler: async (event) => {
       const e = event as {
         toolName?: string;
+        toolCallId?: string;
+        input?: Record<string, unknown>;
         content?: unknown;
         details?: unknown;
         isError?: boolean;
@@ -576,10 +580,15 @@ export function register(pi: ExtensionAPI): void {
       }
       // 工具生命周期：结束计时、累计本轮工具调用与已进入上下文的输出估算
       const name = e.toolName ?? 'tool';
-      const start = toolState.toolCallStarts.get(name);
-      toolState.toolCallStarts.delete(name);
+      const callKey = e.toolCallId ?? name;
+      const start = toolState.toolCallStarts.get(callKey);
+      toolState.toolCallStarts.delete(callKey);
       toolState.runToolCount++;
       if (text) recordToolUsage(name, estimateTokens(text));
+      // bash 命令形态（P4 第三批）：把 APPEND_SYSTEM.md 的"合并独立检查"软规则变成可观测指标。
+      // tool_result 事件自带原始 input（见 pi `ToolResultEvent`），故无需配对表。
+      const bashCmd = name === 'bash' && typeof e.input?.command === 'string' ? (e.input.command as string) : undefined;
+      const bashInfo = bashCmd !== undefined ? analyzeBashCommand(bashCmd) : undefined;
       // 度量：记录 token/缓存（用量统计度量基建；无 usage 时以输出估算兜底）
       try {
         appendUsage({
@@ -592,6 +601,7 @@ export function register(pi: ExtensionAPI): void {
           cacheWrite: e.usage?.cacheWrite,
           outputTokens: e.usage?.output != null ? undefined : text ? estimateTokens(text) : 0,
           durationMs: start ? Date.now() - start : undefined,
+          ...(bashInfo ? { merged: bashInfo.merged, segments: bashInfo.segments } : {}),
         });
       } catch {
         /* fail-open */

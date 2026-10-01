@@ -23,6 +23,43 @@ export interface UsageEvent {
   /** 输出内容估算 token（无 usage 时的兜底） */
   outputTokens?: number;
   durationMs?: number;
+  /** 仅 bash：命令是否为"合并调用"（含 `;`/`&&`/`||`/`|`/换行 等连接符） */
+  merged?: boolean;
+  /** 仅 bash：命令段数（引号内的连接符不计） */
+  segments?: number;
+}
+
+/** 去掉引号内的内容，避免把 `echo "a;b"` 里的分号当成命令连接符 */
+function stripQuoted(cmd: string): string {
+  let out = '';
+  let i = 0;
+  while (i < cmd.length) {
+    const ch = cmd[i];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      i++;
+      while (i < cmd.length && cmd[i] !== ch) {
+        if (cmd[i] === '\\') i++;
+        i++;
+      }
+      i++;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/**
+ * 判断一条 bash 命令是否"合并调用"（P4 第三批：把 APPEND_SYSTEM.md 的软规则变成可度量指标）。
+ *
+ * 语义：引号外出现 `;`、`&&`、`||`、`|`、换行 任一即视为合并；段数 = 连接符数 + 1。
+ * 实测基线（1103 条真实命令）：单命令占比仅 1.4%——规则本身被稳定遵守，故只做**可观测**，不另加限制。
+ */
+export function analyzeBashCommand(cmd: string): { segments: number; merged: boolean } {
+  const bare = stripQuoted(cmd);
+  const connectors = (bare.match(/&&|\|\||;|\||\n/g) ?? []).length;
+  return { segments: connectors + 1, merged: connectors > 0 };
 }
 
 const MAX_SIZE = 4 * 1024 * 1024;

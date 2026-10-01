@@ -35,7 +35,7 @@ function check(name, cond, detail = '') {
 }
 
 /** 造一个临时 memory 目录：每轮用量 + 工具级台账 + 前缀指纹。同时造空的 agent 目录，保证用例自洽 */
-function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null }) {
+function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null }) {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-'));
   const mem = join(root, 'memory');
   const agent = join(root, 'agent');
@@ -55,11 +55,16 @@ function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes
   ];
   writeFileSync(join(mem, 'context', '.usage-diag.jsonl'), diag.map((r) => JSON.stringify(r)).join('\n') + '\n');
 
-  // 干扰项：工具级台账里有 input/cacheRead 字段但全是空值，旧实现会（错误地）尝试从这里取数
-  writeFileSync(
-    join(mem, 'context', 'usage.jsonl'),
-    JSON.stringify({ ts: now - 1000, tool: 'bash', ok: true, outputTokens: 191 }) + '\n',
-  );
+  // 干扰项：工具级台账里有 input/cacheRead 字段但全是空值，旧实现会（错误地）尝试从这里取数。
+  // 工具名用 read（不是 bash）：避免混进"回合内 bash 调用分布"的口径断言。
+  // bashCalls：可选的逐次 bash 调用样本（offsetMs 相对 now，正值＝最后一条边界之后）。
+  const usageLines = [JSON.stringify({ ts: now - 1000, tool: 'read', ok: true, outputTokens: 191 })];
+  for (const c of bashCalls ?? []) {
+    usageLines.push(
+      JSON.stringify({ ts: now + c.offsetMs, tool: 'bash', ok: true, outputTokens: 10, ...(c.merged !== undefined ? { merged: c.merged, segments: c.segments ?? 2 } : {}) }),
+    );
+  }
+  writeFileSync(join(mem, 'context', 'usage.jsonl'), usageLines.join('\n') + '\n');
 
   const seg = (tag) => [tag, 'b', 'c'];
   const changed = (extra) => [...(extra ? [extra] : []), 'messages'];
@@ -235,6 +240,49 @@ function runHealth({ mem, agent }, extraEnv = {}) {
     check('无体积字段时不臆造体积', !out.includes('工具声明='));
   } finally {
     rmSync(plain.root, { recursive: true, force: true });
+  }
+}
+
+// ── 用例：回合内 bash 调用分布（P4 第三批：碎调用软规则的可观测化）──
+{
+  // 桶边界 = 3 条每轮用量记录的 ts（now-3000/-2000/-1000）；调用落在"最后一个严格小于它的边界"之后
+  const calls = [
+    { offsetMs: -2500 }, // 桶 0：1 次
+    { offsetMs: -1500 }, { offsetMs: -1400 }, // 桶 1：2 次
+    { offsetMs: -500 }, { offsetMs: -400 }, { offsetMs: -300 }, // 桶 2：3 次
+  ];
+  const fixture = makeFixture({ frontChange: false, bashCalls: calls });
+  try {
+    const out = runHealth(fixture);
+    check('每步 bash 调用数分位（p50=2/p90=2/max=3，n=3）', out.includes('每步bash=p50=2/p90=2/max=3(n=3)'), out.trim().split('\n')[0]);
+    check('无 merged 字段时单命令占比记 n/a（不猜）', out.includes('单命令=n/a(旧记录无字段)'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+
+  // 带 merged 的样本：10 条里 1 条单命令 → 10.0%
+  const flagged = [
+    ...Array.from({ length: 9 }, (_, i) => ({ offsetMs: -500 - i, merged: true })),
+    { offsetMs: -400, merged: false },
+  ];
+  const f2 = makeFixture({ frontChange: false, bashCalls: flagged });
+  try {
+    const out = runHealth(f2);
+    check('单命令占比 = 1/10 = 10.0%', out.includes('单命令=10.0%(1/10)'), out.trim().split('\n')[0]);
+    check('低于阈值时不告警', !out.includes('碎命令占比'));
+  } finally {
+    rmSync(f2.root, { recursive: true, force: true });
+  }
+
+  // 漂移：样本数达判定门槛（30）且单命令占比 100% > 25% → alert 并点名
+  const drifted = Array.from({ length: 30 }, (_, i) => ({ offsetMs: -500 - i, merged: false }));
+  const f3 = makeFixture({ frontChange: false, bashCalls: drifted });
+  try {
+    const out = runHealth(f3);
+    check('单命令占比 100% 触发 alert', out.includes('结论=alert'));
+    check('告警原因点名碎命令占比', out.includes('碎命令占比 100.0%>25%'));
+  } finally {
+    rmSync(f3.root, { recursive: true, force: true });
   }
 }
 

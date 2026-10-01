@@ -143,6 +143,66 @@ const coldStartCost = (() => {
   return { sum, paired, avg };
 })();
 
+// 回合内 bash 调用分布（P4 第三批，2026-10-01）：把 APPEND_SYSTEM.md 的软规则
+// 「使用 bash 时优先合并多个独立检查为一次调用，避免逐条执行碎命令」变成**可观测指标**。
+// 口径：回合边界取每轮用量记录（`.usage-diag.jsonl` 写在每步响应之后），
+// 该步执行的工具调用落在 `usage.jsonl` 里、ts 晚于上一条边界。两个数字：
+//   · 每步 bash 调用数 p50/p90/max —— 一次一步里反复起 bash 是"碎调用"的直接形态；
+//   · 单命令占比 —— 命令里引号外没有连接符（`;`/`&&`/`||`/`|`/换行）的比例，越高越碎。
+// 基线（2026-10-01 实测 6 个会话 / 1103 条命令）：单命令占比 1.4%、每步 p50=1 p90=2 max=3
+// ——即规则本身被稳定遵守，故这里只告警"漂移"，不加限制。
+// 注意：最后一条边界之后的调用都归入最后一步（在飞的那一步），会略抬高最后一个桶。
+const SINGLE_CMD_CEIL = Number(process.env.PI_HEALTH_SINGLE_CMD_CEIL || 0.25);
+const SINGLE_CMD_MIN_EVENTS = Number(process.env.PI_HEALTH_SINGLE_CMD_MIN || 30);
+const bashStepCounts = (() => {
+  if (records.length === 0) return [];
+  const bounds = records.map((r) => r.ts).slice().sort((a, b) => a - b);
+  const counts = new Array(bounds.length).fill(0);
+  for (const u of usage) {
+    if (u.tool !== 'bash') continue;
+    // ts 可能是 ISO 字符串（生产写入）或 epoch 毫秒（测试夹具/手工补录），两者都收
+    const t = typeof u.ts === 'number' ? u.ts : Date.parse(u.ts);
+    if (!Number.isFinite(t)) continue;
+    // 二分找"最后一个严格小于 t 的边界"：那就是该调用所属的那一步
+    let lo = 0;
+    let hi = bounds.length;
+    let idx = -1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (bounds[mid] < t) {
+        idx = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    if (idx >= 0) counts[idx]++;
+  }
+  return counts.filter((c) => c > 0);
+})();
+/** 最近秩分位（偶数样本取下中位：p50 of [1,2] = 1），样本少时不外推 */
+function percentile(arr, p) {
+  if (arr.length === 0) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))];
+}
+const bashPerStep =
+  bashStepCounts.length > 0
+    ? {
+        p50: percentile(bashStepCounts, 0.5),
+        p90: percentile(bashStepCounts, 0.9),
+        max: Math.max(...bashStepCounts),
+        n: bashStepCounts.length,
+      }
+    : null;
+// 只有带 `merged` 字段的记录（2026-10-01 之后写入）可判合并与否；旧记录不猜。
+const bashFlagged = usage.filter((u) => u.tool === 'bash' && typeof u.merged === 'boolean');
+const singleCmd =
+  bashFlagged.length > 0
+    ? { single: bashFlagged.filter((u) => u.merged === false).length, total: bashFlagged.length }
+    : null;
+const singleRatio = singleCmd ? singleCmd.single / singleCmd.total : null;
+
 let entryCount = 0;
 let sizeMB = 0;
 try {
@@ -208,6 +268,11 @@ if (coldStarts.length > COLDSTART_CEIL) {
 if (toolsKB !== null && toolsKB > TOOLS_KB_CEIL) {
   reasons.push(`工具声明 ${toolsKB.toFixed(1)}KB>${TOOLS_KB_CEIL}KB（前缀最大构件膨胀）`);
 }
+if (singleCmd && singleCmd.total >= SINGLE_CMD_MIN_EVENTS && singleRatio > SINGLE_CMD_CEIL) {
+  reasons.push(
+    `碎命令占比 ${(singleRatio * 100).toFixed(1)}%>${(SINGLE_CMD_CEIL * 100).toFixed(0)}%（未合并的 bash 调用增多，实测基线 1.4%）`,
+  );
+}
 const verdict = reasons.length ? 'alert' : 'ok';
 
 const ts = new Date();
@@ -218,7 +283,11 @@ const unStr = uncachedPerCall === null ? 'n/a' : String(Math.round(uncachedPerCa
 const outPct = totInput + totCacheRead + totOutput > 0 ? ((totOutput / (totInput + totCacheRead + totOutput)) * 100).toFixed(1) : 'n/a';
 const coldStr = coldStartCost.paired > 0 ? `${coldStarts.length}(${coldStartCost.sum}/平均${coldStartCost.avg})` : `${coldStarts.length}`;
 const sizeStr = toolsKB !== null ? ` 工具声明=${toolsKB.toFixed(1)}KB${systemKB !== null ? `/system=${systemKB.toFixed(1)}KB` : ''}` : '';
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 结论=${verdict}`;
+const bashStepStr = bashPerStep ? `p50=${bashPerStep.p50}/p90=${bashPerStep.p90}/max=${bashPerStep.max}(n=${bashPerStep.n})` : 'n/a';
+const singleCmdStr = singleCmd
+  ? `${(singleRatio * 100).toFixed(1)}%(${singleCmd.single}/${singleCmd.total})`
+  : 'n/a(旧记录无字段)';
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 结论=${verdict}`;
 
 console.log(line);
 if (totalOnly.length > 0) console.log(`  └ 提示: ${totalOnly.length} 次请求中段内容被改写（changed=total，命中率之外的前缀风险）`);
