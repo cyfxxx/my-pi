@@ -56,6 +56,10 @@ export interface PrefixFingerprint {
   segments: string[];
   /** thinking 档位（DeepSeek 的缓存键包含 reasoning_effort，切档使整段前缀失效） */
   level: string;
+  /** 工具声明 JSON 的字节数（前缀里最大的构件；增长即成本增长） */
+  toolsBytes: number;
+  /** system 文本的字节数 */
+  systemBytes: number;
   /** 消息条数（压缩/裁剪会改变它） */
   messageCount: number;
   /** 与上一条指纹相比发生变化的段（首次为空） */
@@ -147,8 +151,10 @@ export function fingerprintRequest(
   level: string = '',
 ): PrefixFingerprint {
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
-  const system = sha(systemTextOf(payload));
-  const tools = sha(stable(payload.tools));
+  const systemText = systemTextOf(payload);
+  const system = sha(systemText);
+  const toolsJson = stable(payload.tools);
+  const tools = sha(toolsJson);
   const head = sha(messages.slice(0, FINGERPRINT_HEAD_MESSAGES).map(messageKey).join('\n'));
   const segments = messageSegments(messages);
   const total = sha([system, tools, sha(messages.map(messageKey).join('\n'))].join('|'));
@@ -179,6 +185,8 @@ export function fingerprintRequest(
     head,
     segments,
     level,
+    toolsBytes: Buffer.byteLength(toolsJson, 'utf-8'),
+    systemBytes: Buffer.byteLength(systemText, 'utf-8'),
     messageCount: messages.length,
     changed,
   };

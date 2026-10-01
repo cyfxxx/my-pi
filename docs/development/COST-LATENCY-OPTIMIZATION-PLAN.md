@@ -38,7 +38,7 @@
 | ~~**P1-2**~~ ✅ | 唯一**默认开启**的删历史动作：`≥2 条 compactionSummary` 时删除旧摘要 → **已改为默认关闭**（`PI_CONTEXT_DEDUP_SUMMARIES=on` 才启用） | `context/index.ts:463`、`budget/task-gate.ts` 的 `DEDUP_SUMMARIES` + 3 例门控测试 | 低频但代价 100%（其后全量重放） | 已修 |
 | **P1-3** | 会话中途断裂：**旧口径报 20 次（`tools` 8 / `system+head` 9 / `head` 1 / 混合 2）里有 19 次是误报**——`head` 只看前 6 条消息，分不清「改写」与「在头窗内追加」（实测：新会话第 2 次请求 msgs 3→5 即被记为 `['head','messages']`，而 segments 未分叉）。**按新口径重算 763 条：真实断裂 14 次 = `system` 9 + `tools` 5** | `prefix-fingerprints.jsonl` + `daily-health`（前端变更数 7 → 4，只剩 system） | 大头缩小到 9 次 system 重渲染（→ P1-1）+ 5 次工具面变化 | 低–中 |
 | **P1-4** | 启动 13 + 重启 9 次冷前缀（每次 8.7–23.2K）无预算、无提示 | 同上 | 自改闭环的固有代价 | 低 |
-| **P2-1** | 工具声明是前缀最大构件：63 个工具、schema 6–19K token（对照 DSH 27 个 / 6.8K） | 首请求 `input` − system 段 | 每次冷启动与每次 loadout 变化的成本基数 | 中 |
+| **P2-1**（已测量，优先级下调） | 工具声明是前缀最大构件：**实测真实 payload 62,454 字节 ≈ 15.6K token**（system 仅 7,380 字节 ≈ 1.8K），是 DSH（27,285 字节 ≈ 6.8K）的 2.3 倍；62 个自定义工具静态 schema ≈ 21,197 字符，按功能排序 browser 4,940 / autopilot 4,699 / memory 4,316 / tmux 1,944 / plan-mode 1,832 | `prefix-fingerprints.jsonl` 新增 `toolsBytes`/`systemBytes`（实测值）；静态排序用一次性脚本测得 | **ROI 修正**：砍 20% ≈ 省 3K token/次**冷启动**——而冷启动的大头是续接的**历史**（平均 22,128/次），不是静态前缀。故它从「最大杠杆」降为「顺手优化」：值得做的是便宜的部分（schema 瘦身/描述精简），不值得为它牺牲工具可用性 | 已降级 |
 | **P2-2** | `AGENTS.md` 段与 `skills` 段**无体积预算**（DSH 有 64KB `maxBytes` + 截断通知） | 对比 DSH `dsh-base/cordis.patch.yml:271` | 文档越长，前缀越贵且越常变 | 低 |
 | **P2-3** | 重试策略：agent 层重试前写 `context_edit` **删除失败的 assistant 投影**（前缀稳、历史被裁）；provider 层默认 0 次 | `agent-session.ts:3689`、`:1206` | 重试会丢上下文 | 低（观察项） |
 | **P3-1** | 自主度：14.8 步/轮 vs DSH 51.6；零工具调用步 9% vs 2%（部分反映任务类型差异，但也可能是规则在鼓励"早汇报"） | 会话统计；`AGENTS.md` 写着"先回答再动手、回答简短精炼" | "要一直推它"的体验差 | 中（行为变更需确认） |

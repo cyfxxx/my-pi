@@ -35,7 +35,7 @@ function check(name, cond, detail = '') {
 }
 
 /** 造一个临时 memory 目录：每轮用量 + 工具级台账 + 前缀指纹。同时造空的 agent 目录，保证用例自洽 */
-function makeFixture({ frontChange, segChange = null, coldStarts = 0 }) {
+function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null }) {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-'));
   const mem = join(root, 'memory');
   const agent = join(root, 'agent');
@@ -86,6 +86,7 @@ function makeFixture({ frontChange, segChange = null, coldStarts = 0 }) {
       // 段 0 与上一条相同；`messages@0-7` 由「段 0 分叉」造出（segChange='head' 时改为不同）
       segments: segChange === 'head' ? seg('sX') : seg('s0'),
       level: 'high',
+      ...(toolsBytes !== null ? { toolsBytes, systemBytes: 7400 } : {}),
       messageCount: 6,
       changed: changed(
         segChange === 'head' ? 'messages@0-7' : segChange === 'mid' ? 'messages@32-39' : frontChange ? 'tools' : null,
@@ -215,6 +216,25 @@ function runHealth({ mem, agent }, extraEnv = {}) {
     check('冷启动未命中被配对计数', /冷启动=1\(\d+\/平均\d+\)/.test(out), out.trim().split('\n')[0]);
   } finally {
     rmSync(few.root, { recursive: true, force: true });
+  }
+}
+
+// ── 用例 2d：前缀体积可见 + 工具声明上限告警（2026-10-01 实测：工具声明是前缀最大构件）──
+{
+  const big = makeFixture({ frontChange: false, toolsBytes: 90 * 1024 });
+  try {
+    const out = runHealth(big, { PI_HEALTH_TOOLS_KB_CEIL: '80' });
+    check('工具声明体积被报出', out.includes('工具声明=90.0KB'), out.trim().split('\n')[0]);
+    check('工具声明超上限触发 alert', out.includes('工具声明 90.0KB'));
+  } finally {
+    rmSync(big.root, { recursive: true, force: true });
+  }
+  const plain = makeFixture({ frontChange: false });
+  try {
+    const out = runHealth(plain);
+    check('无体积字段时不臆造体积', !out.includes('工具声明='));
+  } finally {
+    rmSync(plain.root, { recursive: true, force: true });
   }
 }
 

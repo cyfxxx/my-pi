@@ -112,6 +112,14 @@ const segBreaks = fps.filter((f) => (f.changed || []).some((c) => segStartOf(c) 
 const headBreaks = segBreaks.filter((f) => (f.changed || []).some((c) => segStartOf(c) === 0));
 const midBreaks = segBreaks.filter((f) => !headBreaks.includes(f));
 
+// 前缀体积（2026-10-01 实测口径）：工具声明是前缀里最大的构件，real payload 实测 62KB ≈ 15.6K token，
+// 而 system 只有 ~7KB。这里报最近一次的实测体积，并设上限告警，防止工具面无声膨胀。
+const TOOLS_KB_CEIL = Number(process.env.PI_HEALTH_TOOLS_KB_CEIL || 80);
+const sized = fps.filter((f) => typeof f.toolsBytes === 'number');
+const lastSize = sized.length > 0 ? sized[sized.length - 1] : null;
+const toolsKB = lastSize ? lastSize.toolsBytes / 1024 : null;
+const systemKB = lastSize && typeof lastSize.systemBytes === 'number' ? lastSize.systemBytes / 1024 : null;
+
 // 冷启动：进程首个请求（`fingerprintRequest` 在 prev=null 时不写 sinceLastMs）。
 // 每次冷启动都要把整个静态前缀按全价重发——my-pi 自己改代码/文档越频繁，这项越高。
 const coldStarts = fps.filter((f) => !('sinceLastMs' in f));
@@ -197,6 +205,9 @@ const COLDSTART_CEIL = Number(process.env.PI_HEALTH_COLDSTART_CEIL || 8);
 if (coldStarts.length > COLDSTART_CEIL) {
   reasons.push(`进程冷启动 ${coldStarts.length} 次>${COLDSTART_CEIL}（自改/重启代价）`);
 }
+if (toolsKB !== null && toolsKB > TOOLS_KB_CEIL) {
+  reasons.push(`工具声明 ${toolsKB.toFixed(1)}KB>${TOOLS_KB_CEIL}KB（前缀最大构件膨胀）`);
+}
 const verdict = reasons.length ? 'alert' : 'ok';
 
 const ts = new Date();
@@ -206,7 +217,8 @@ const hitStr = hit === null ? 'n/a(无数据)' : `${(hit * 100).toFixed(1)}%`;
 const unStr = uncachedPerCall === null ? 'n/a' : String(Math.round(uncachedPerCall));
 const outPct = totInput + totCacheRead + totOutput > 0 ? ((totOutput / (totInput + totCacheRead + totOutput)) * 100).toFixed(1) : 'n/a';
 const coldStr = coldStartCost.paired > 0 ? `${coldStarts.length}(${coldStartCost.sum}/平均${coldStartCost.avg})` : `${coldStarts.length}`;
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 结论=${verdict}`;
+const sizeStr = toolsKB !== null ? ` 工具声明=${toolsKB.toFixed(1)}KB${systemKB !== null ? `/system=${systemKB.toFixed(1)}KB` : ''}` : '';
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 结论=${verdict}`;
 
 console.log(line);
 if (totalOnly.length > 0) console.log(`  └ 提示: ${totalOnly.length} 次请求中段内容被改写（changed=total，命中率之外的前缀风险）`);
