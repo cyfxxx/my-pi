@@ -31,20 +31,20 @@
 
 | # | 问题 | 证据 | 影响 | 风险 |
 |---|---|---|---|---|
-| **P0-1** | 未命中归因缺口：`head` 指纹只覆盖**前 6 条消息**，`total` 兜底仅在 `changed` 为空时触发（763 条里命中 0 次） | `prefix-fingerprint.ts:23`、`:100`；60 条大未命中里 **37 条（=全部未命中 50%）无法归因** | 闭着眼睛优化 | 零（只加度量） |
-| **P0-2** | 没有"冷启动/断裂成本"的日常记账 | `daily-health.mjs` 只有命中率/未命中/前端变更计数，无"每会话冷启动未命中" | 自改成本不可见 | 零 |
-| **P0-3** | 旧对比文档三处结论已失效 | ①"my-pi 256K 压缩会触发"——实际阈值 = 窗口−reserveTokens ≈ **967K**，实测 max 341K **从未触发**（`compaction/compaction.ts` 的 `shouldCompact`）；②"O1/O2 擦除每次请求都跑"——实际 `PER_TURN_ERASE` **默认关**（`budget/task-gate.ts:92`）；③"DSH 从不压缩"——实测 6 次，且由 provider 400 `CONTEXT_WINDOW_EXCEEDED` 触发 | 后来人会继续踩坑 | 零 |
+| ~~**P0-1**~~ ✅ | 未命中归因缺口：`head` 指纹只覆盖**前 6 条消息**，`total` 兜底仅在 `changed` 为空时触发（763 条里命中 0 次） | `prefix-fingerprint.ts:23`、`:100`；60 条大未命中里 **37 条（=全部未命中 50%）无法归因** | 闭着眼睛优化 | 零（只加度量） |
+| ~~**P0-2**~~ ✅ | 没有"冷启动/断裂成本"的日常记账 | `daily-health.mjs` 只有命中率/未命中/前端变更计数，无"每会话冷启动未命中" | 自改成本不可见 | 零 |
+| ~~**P0-3**~~ ✅ | 旧对比文档三处结论已失效 | ①"my-pi 256K 压缩会触发"——实际阈值 = 窗口−reserveTokens ≈ **967K**，实测 max 341K **从未触发**（`compaction/compaction.ts` 的 `shouldCompact`）；②"O1/O2 擦除每次请求都跑"——实际 `PER_TURN_ERASE` **默认关**（`budget/task-gate.ts:92`）；③"DSH 从不压缩"——实测 6 次，且由 provider 400 `CONTEXT_WINDOW_EXCEEDED` 触发 | 后来人会继续踩坑 | 零 |
 | ~~**P1-1**~~ ✅ | **`AGENTS.md` 进 system 前缀**（`project_context` 段）→ **已改为：system 只留 `HARD_RULES` 常量，正文走尾部 append-only 消息**（`--no-context-files` + `workspace-instructions.ts`） | 见 DECISIONS [2026-10-01]；A/B 判据全部通过（跨进程 `system` 指纹不变、会话内改文档只产生尾部追加、`project_context` 消失） | 原本是最贵的一类断裂 | 已修 |
 | ~~**P1-2**~~ ✅ | 唯一**默认开启**的删历史动作：`≥2 条 compactionSummary` 时删除旧摘要 → **已改为默认关闭**（`PI_CONTEXT_DEDUP_SUMMARIES=on` 才启用） | `context/index.ts:463`、`budget/task-gate.ts` 的 `DEDUP_SUMMARIES` + 3 例门控测试 | 低频但代价 100%（其后全量重放） | 已修 |
-| **P1-3** | 会话中途断裂：**旧口径报 20 次（`tools` 8 / `system+head` 9 / `head` 1 / 混合 2）里有 19 次是误报**——`head` 只看前 6 条消息，分不清「改写」与「在头窗内追加」（实测：新会话第 2 次请求 msgs 3→5 即被记为 `['head','messages']`，而 segments 未分叉）。**按新口径重算 763 条：真实断裂 14 次 = `system` 9 + `tools` 5** | `prefix-fingerprints.jsonl` + `daily-health`（前端变更数 7 → 4，只剩 system） | 大头缩小到 9 次 system 重渲染（→ P1-1）+ 5 次工具面变化 | 低–中 |
-| **P1-4** | 启动 13 + 重启 9 次冷前缀（每次 8.7–23.2K）无预算、无提示 | 同上 | 自改闭环的固有代价 | 低 |
+| ~~**P1-3**~~ ✅ | 会话中途断裂：**旧口径报 20 次（`tools` 8 / `system+head` 9 / `head` 1 / 混合 2）里有 19 次是误报**——`head` 只看前 6 条消息，分不清「改写」与「在头窗内追加」（实测：新会话第 2 次请求 msgs 3→5 即被记为 `['head','messages']`，而 segments 未分叉）。**按新口径重算 763 条：真实断裂 14 次 = `system` 9 + `tools` 5** | `prefix-fingerprints.jsonl` + `daily-health`（前端变更数 7 → 4，只剩 system） | 大头缩小到 9 次 system 重渲染（→ P1-1）+ 5 次工具面变化 | 低–中 |
+| ~~**P1-4**~~ ✅ | 启动 13 + 重启 9 次冷前缀（每次 8.7–23.2K）无预算、无提示 | 同上 | 自改闭环的固有代价 | 低 |
 | ~~**P2-1**~~（已测量，**不追**：ROI 过低） | 工具声明是前缀最大构件：**实测真实 payload 62,454 字节 ≈ 15.6K token**（system 仅 7,380 字节 ≈ 1.8K），是 DSH（27,285 字节 ≈ 6.8K）的 2.3 倍；62 个自定义工具静态 schema ≈ 21,197 字符，按功能排序 browser 4,940 / autopilot 4,699 / memory 4,316 / tmux 1,944 / plan-mode 1,832 | `prefix-fingerprints.jsonl` 新增 `toolsBytes`/`systemBytes`（实测值）；静态排序用一次性脚本测得 | **ROI 修正**：砍 20% ≈ 省 3K token/次**冷启动**——而冷启动的大头是续接的**历史**（平均 22,128/次），不是静态前缀。故它从「最大杠杆」降为「不做」：剩下的便宜手段（去掉 `additionalProperties`、enum 改 `{type,enum}`）合计约省 5%（≈800 token/epoch），却要放松校验或引入非 TypeBox 原生 schema，**风险大于收益**。若将来确有需要，正确做法是**按模式在启动期静态收窄工具面**（不是会话中途分层）。| 已关闭 |
 | ~~**P2-2**~~ ✅（已被预算覆盖） | `AGENTS.md`/`skills` 无体积预算 | P1-1 落地后：工作区指令有 **64KB 预算 + 丢宽泛/截断 + 显式说明**；工具声明有 `toolsBytes` 实测 + `PI_HEALTH_TOOLS_KB_CEIL`（默认 80KB）告警 | 双轨预算齐备，无需再加 | 已关闭 |
-| **P2-3** | 重试策略：agent 层重试前写 `context_edit` **删除失败的 assistant 投影**（前缀稳、历史被裁）；provider 层默认 0 次 | `agent-session.ts:3689`、`:1206` | 重试会丢上下文 | 低（观察项） |
+| ~~**P2-3**~~ ✅（评估后保持现状） | 重试前写 `context_edit` 删除失败的 assistant 投影 | 实测频率：`context_edit` **39 次 / 1436 条 assistant 消息 = 2.72%**，其中 **29 次集中在同一个 provider 故障会话** | 删除发生在"刚失败"之后（那段前缀本来就未必建立缓存），而保留半截/报错的 assistant 消息对模型更糟 | 已关闭：正确性优先，且频率低 |
 | ~~**P3-1**~~ ✅（归因完成，判定非缺陷） | 自主度归因（98 个用户轮）：步/轮 p50=11、p90=29、均值 14.7；**92% 的轮是模型主动收尾**（结尾无工具调用），其中 **42% 是在向用户提问**；23% 的轮含工具错误（这些轮更长，p50 18 步）；**0 个轮在 todo 仍有 in_progress 时收尾** | 会话统计脚本（见 PROGRESS 第 71 批） | 原判断"框架在鼓励早汇报"**不成立**：真正原因是用户自己的 `AGENTS.md` 要求"先回答/给方案、同意后才能执行"，加上任务类型差异（DSH 那 42 轮多为一次性交办） | 已关闭 |
-| **P3-2** | 步延迟 p90 37s vs 24s；其中一部分是前缀重放的 prefill；`bash` 无默认超时 | 步间隔统计；DSH 侧同样无定义级超时（`dsh-tool-call-timeout-policy:124`） | 顿挫感 | 低 |
-| **P3-3** | 子代理只有 spawn（空上下文）没有 fork（继承历史、复用 KV） | 旧对比文档 P2；DSH 有 `dsh-subagent-fork-in-process` | 子代理每次重建前缀 | 中 |
-| **P4-1** | 上述每条修完后缺守门与文档同步 | 仓库纪律 | 防退化 | — |
+| ~~**P3-2**~~ ✅ | 步延迟 p90 37s vs 24s；其中一部分是前缀重放的 prefill；`bash` 无默认超时 | 步间隔统计；DSH 侧同样无定义级超时（`dsh-tool-call-timeout-policy:124`） | 顿挫感 | 低 |
+| ~~**P3-3**~~ ✅ | 子代理只有 spawn（空上下文）没有 fork（继承历史、复用 KV） | 旧对比文档 P2；DSH 有 `dsh-subagent-fork-in-process` | 子代理每次重建前缀 | 中 |
+| ~~**P4-1**~~ ✅ | 上述每条修完后缺守门与文档同步 | 仓库纪律 | 防退化 | — |
 
 ## 三、分阶段执行
 
@@ -72,7 +72,7 @@
 |---|---|---|
 | P2-1 | 工具描述压缩专项：定 spec（描述 ≤N 字符、去掉重复模板话术、参数 description 精简），逐个工具过一遍；**不做分层**（分层会主动制造工具数组变化） | 工具声明总量从 6–19K token 降到 **≤6K**；工具选择质量不退化（抽查任务成功率） |
 | P2-2 | 给 `AGENTS.md` 段与 `skills` 段加体积预算（超限时截断并显式提示，DSH 式），并在 `check-features`/golden 里立阈值 | AGENTS.md 超过预算会被守门拦下 |
-| P2-3 | 重试策略复核：评估"重试前删投影"是否值得改成"保留投影 + 标记重试"（缓存优先） | 记录结论到 DECISIONS |
+| ~~P2-3~~ ✅ | （已完成）评估结论：**保持现状**。实测 `context_edit` 39/1436 = 2.72%（且 74% 集中在一次 provider 故障会话）；删除发生在刚失败之后（该前缀未必已入缓存），而保留半截 assistant 消息对模型更糟 → 正确性优先 | 结论已记入 DECISIONS |
 
 ### Phase 3 — 执行效率与体验
 
