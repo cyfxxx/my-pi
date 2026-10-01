@@ -93,7 +93,7 @@ function makeFixture({ frontChange, segChange = null, coldStarts = 0 }) {
     },
     // 冷启动：无 sinceLastMs 的记录 = 进程首个请求（fingerprintRequest 在 prev=null 时省略该字段）
     ...Array.from({ length: coldStarts }, (_, i) => ({
-      ts: now - 500 + i,
+      ts: now - 2500 + i, // 必须早于最后一条用量记录，否则配不上对
       total: `cold${i}`,
       system: 's1',
       tools: 't2',
@@ -211,6 +211,8 @@ function runHealth({ mem, agent }, extraEnv = {}) {
   try {
     const out = runHealth(few, { PI_HEALTH_COLDSTART_CEIL: '8' });
     check('冷启动未超阈值不告警', !out.includes('进程冷启动'));
+    // 冷启动与"该指纹之后的第一条用量"配对 → 报出它的未命中量（自改/重启的实际代价）
+    check('冷启动未命中被配对计数', /冷启动=1\(\d+\/平均\d+\)/.test(out), out.trim().split('\n')[0]);
   } finally {
     rmSync(few.root, { recursive: true, force: true });
   }

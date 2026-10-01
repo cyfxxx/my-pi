@@ -115,6 +115,25 @@ const midBreaks = segBreaks.filter((f) => !headBreaks.includes(f));
 // 冷启动：进程首个请求（`fingerprintRequest` 在 prev=null 时不写 sinceLastMs）。
 // 每次冷启动都要把整个静态前缀按全价重发——my-pi 自己改代码/文档越频繁，这项越高。
 const coldStarts = fps.filter((f) => !('sinceLastMs' in f));
+// 把冷启动与它的未命中量配对：指纹记录在请求发出前写下，紧接着（5s 内）的第一条每轮用量
+// 就是这个冷启动请求。配对不上记 0（不猜）。
+const coldStartCost = (() => {
+  let sum = 0;
+  let paired = 0;
+  const costs = [];
+  for (const f of coldStarts) {
+    // 指纹写在请求发出前、用量写在响应结束后，故取"该指纹之后的第一条用量"即可对上，
+    // 只加一个宽上限防串到下一次会话（请求失败时本就没有用量记录 → 记为未配对）。
+    const hit = records.find((r) => r.ts >= f.ts && r.ts - f.ts < 300_000);
+    if (hit) {
+      sum += hit.input || 0;
+      paired++;
+      costs.push(hit.input || 0);
+    }
+  }
+  const avg = paired > 0 ? Math.round(sum / paired) : null;
+  return { sum, paired, avg };
+})();
 
 let entryCount = 0;
 let sizeMB = 0;
@@ -186,10 +205,14 @@ const stamp = `${ts.getFullYear()}-${p(ts.getMonth() + 1)}-${p(ts.getDate())} ${
 const hitStr = hit === null ? 'n/a(无数据)' : `${(hit * 100).toFixed(1)}%`;
 const unStr = uncachedPerCall === null ? 'n/a' : String(Math.round(uncachedPerCall));
 const outPct = totInput + totCacheRead + totOutput > 0 ? ((totOutput / (totInput + totCacheRead + totOutput)) * 100).toFixed(1) : 'n/a';
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStarts.length} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 结论=${verdict}`;
+const coldStr = coldStartCost.paired > 0 ? `${coldStarts.length}(${coldStartCost.sum}/平均${coldStartCost.avg})` : `${coldStarts.length}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 结论=${verdict}`;
 
 console.log(line);
 if (totalOnly.length > 0) console.log(`  └ 提示: ${totalOnly.length} 次请求中段内容被改写（changed=total，命中率之外的前缀风险）`);
+if (coldStarts.length > 0 && coldStartCost.paired === 0) {
+  console.log('  └ 冷启动未命中: 未能与本窗口的每轮用量配对（缺少 .usage-diag.jsonl 记录）');
+}
 if (segBreaks.length > 0) {
   const starts = segBreaks.flatMap((f) => (f.changed || []).map(segStartOf).filter((n) => n !== null));
   const near = starts.filter((n) => n <= 7).length;
