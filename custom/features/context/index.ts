@@ -75,6 +75,7 @@ import {
   PRUNE_MINIMUM,
   KEEP_THINKING_TOKENS,
   PER_TURN_ERASE,
+  DEDUP_SUMMARIES,
   TOOL_LAYERING,
   readEnvRatio,
   resolveContext,
@@ -455,7 +456,12 @@ export function register(pi: ExtensionAPI): void {
 
       let working = messages;
       let modified = false;
+      // 旧摘要去重**默认关闭**（PI_CONTEXT_DEDUP_SUMMARIES=on 打开）：它是当前唯一默认开启的
+      // 删历史动作，而被删的摘要位置通常靠前 → 从该点起整段前缀重放（一次全价）。
+      // 保留它每轮只花它自己的 token（cacheRead 价 ≈ 全价的 1/50），盈亏平衡要上千轮。
+      // 见 budget/task-gate.ts 的成本模型；残留的旧摘要由模型按「以最新一块为准」理解。
       if (
+        DEDUP_SUMMARIES &&
         latestSummary >= 0 &&
         messages.slice(0, latestSummary).some((m) => (m as { role?: string })?.role === 'compactionSummary')
       ) {

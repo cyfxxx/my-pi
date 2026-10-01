@@ -184,6 +184,36 @@ describe('PER_TURN_ERASE（每轮历史擦除开关）', () => {
   });
 });
 
+describe('DEDUP_SUMMARIES（旧压缩摘要去重开关）', () => {
+  afterEach(() => {
+    delete process.env.PI_CONTEXT_DEDUP_SUMMARIES;
+    vi.resetModules();
+  });
+
+  it('默认关闭：唯一默认开启的删历史动作，删除即从该点整段重放（保留只花 cacheRead 价）', async () => {
+    delete process.env.PI_CONTEXT_DEDUP_SUMMARIES;
+    vi.resetModules();
+    const mod = await import('../budget/task-gate');
+    expect(mod.DEDUP_SUMMARIES).toBe(false);
+  });
+
+  it('PI_CONTEXT_DEDUP_SUMMARIES=on 才启用（超长会话按需）', async () => {
+    process.env.PI_CONTEXT_DEDUP_SUMMARIES = 'on';
+    vi.resetModules();
+    const mod = await import('../budget/task-gate');
+    expect(mod.DEDUP_SUMMARIES).toBe(true);
+  });
+
+  it('其它取值不启用，避免误开', async () => {
+    for (const v of ['1', 'true', 'yes', 'ON']) {
+      process.env.PI_CONTEXT_DEDUP_SUMMARIES = v;
+      vi.resetModules();
+      const mod = await import('../budget/task-gate');
+      expect(mod.DEDUP_SUMMARIES, `PI_CONTEXT_DEDUP_SUMMARIES=${v} 不应启用`).toBe(false);
+    }
+  });
+});
+
 describe('TOOL_LAYERING（工具按需加载开关）', () => {
   afterEach(() => {
     delete process.env.PI_CONTEXT_TOOL_LAYERING;

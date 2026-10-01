@@ -91,6 +91,17 @@ export const TOOL_LAYERING = process.env.PI_CONTEXT_TOOL_LAYERING === 'on';
  */
 export const PER_TURN_ERASE = process.env.PI_CONTEXT_ERASE === 'on';
 
+/**
+ * 旧压缩摘要去重（`PI_CONTEXT_DEDUP_SUMMARIES=on` 启用；**默认 off**）。
+ *
+ * 它是目前**唯一默认开启的删历史动作**（`context/index.ts` 的 context 钩子）：历史里有 ≥2 条
+ * `compactionSummary` 时删掉旧的那些。但压缩摘要的位置通常在**靠前处**——删除即从该点起整段
+ * 前缀重放（一次全价），而保留它每轮只花它自己的 token（cacheRead 价，约全价的 1/50）。
+ * 同一个盈亏平衡公式（见上）：要跑约 49×S/F 次后续请求才回本，S=上下文、F=摘要长度。
+ * 故默认关闭；超长会话且摘要累计很多时按需打开。判据见 daily-health 的「首段分叉」。
+ */
+export const DEDUP_SUMMARIES = process.env.PI_CONTEXT_DEDUP_SUMMARIES === 'on';
+
 /** 读取 0-1 比例环境变量 */
 export function readEnvRatio(name: string): number | undefined {
   const raw = process.env[name];

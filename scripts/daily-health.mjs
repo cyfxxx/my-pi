@@ -86,17 +86,28 @@ const uncachedPerCall = records.length > 0 ? totInput / records.length : null;
 
 // 前端变更：system/tools/head/level 任一变化都会让整段前缀失效（每个都是一次全价重算）
 const fps = loadJSONL(FINGERPRINTS).filter(inWindow);
-const FRONT_SEGMENTS = new Set(['system', 'tools', 'head', 'level']);
-const frontChanges = fps.filter((f) => (f.changed || []).some((c) => FRONT_SEGMENTS.has(c)));
+const segStartOf = (c) => {
+  const m = /^messages@(\d+)-/.exec(String(c || ''));
+  return m ? Number(m[1]) : null;
+};
+const FRONT_SEGMENTS = new Set(['system', 'tools', 'level']);
+// `head` 只覆盖前 6 条消息，**分不清"改写"与"在头窗内追加"**：实测新会话第 2 次请求
+// msgs 3→5 就会被记成 changed=['head','messages']，而 segments 并未分叉——历史数据里那些
+// `head,messages @ msgs≈6-7` 大多是这类误报。故：新记录（有 segments）用分叉定位取代 head；
+// 没有 segments 的旧记录保持原判据，以便继续读历史。
+const isFrontBreak = (f) => {
+  const ch = f.changed || [];
+  if (ch.some((c) => FRONT_SEGMENTS.has(c))) return true;
+  // 新记录用分叉定位取代 head；旧记录（无 segments）**不再**用 head 判定——
+  // 它与"在头窗内追加"无法区分，继续计入只会把误报留下去。
+  return Array.isArray(f.segments) && ch.some((c) => segStartOf(c) === 0);
+};
+const frontChanges = fps.filter(isFrontBreak);
 const totalOnly = fps.filter((f) => (f.changed || []).includes('total'));
 
 // 分段分叉（2026-10-01 新增）：`messages@<start>-…` 给出前缀失效的**起点消息下标**。
 // 起点在头部（start=0）等价于整段重放——最贵的一类，旧口径只认 system/tools/head/level，
 // 会把这类漏掉；起点越靠后代价越小，单独计数，不再与"整段失效"混为一谈。
-const segStartOf = (c) => {
-  const m = /^messages@(\d+)-/.exec(String(c || ''));
-  return m ? Number(m[1]) : null;
-};
 const segBreaks = fps.filter((f) => (f.changed || []).some((c) => segStartOf(c) !== null));
 const headBreaks = segBreaks.filter((f) => (f.changed || []).some((c) => segStartOf(c) === 0));
 const midBreaks = segBreaks.filter((f) => !headBreaks.includes(f));
@@ -156,7 +167,7 @@ if (records.length >= 3 && uncachedPerCall !== null && uncachedPerCall > UNCACHE
   reasons.push(`未命中/轮 ${Math.round(uncachedPerCall)}>${UNCACHED_PER_CALL_CEIL}（疑似整段重算）`);
 }
 if (frontChanges.length > 0) {
-  const segs = [...new Set(frontChanges.flatMap((f) => f.changed.filter((c) => FRONT_SEGMENTS.has(c))))].join('+');
+  const segs = [...new Set(frontChanges.flatMap((f) => (f.changed || []).filter((c) => FRONT_SEGMENTS.has(c) || /^messages@0-/.test(c))))].join('+');
   reasons.push(`前缀前端变更 ${frontChanges.length} 次（${segs}）→ 每次整段缓存失效`);
 }
 // 起点在头部的中段分叉 = 整段重放（与前端变更同级），旧的 FRONT_SEGMENTS 口径看不到它

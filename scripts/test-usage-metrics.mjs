@@ -15,7 +15,7 @@
  * 用法：node scripts/test-usage-metrics.mjs
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -148,6 +148,26 @@ function runHealth({ mem, agent }, extraEnv = {}) {
     check('命中 98.5% 不低于安全线，不产生命中率告警', !out.includes('加权命中率'));
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+// ── 用例 2a：head 误报抑制（2026-10-01 实测）──
+// 实测：新会话第 2 次请求 msgs 3→5 会被记成 changed=['head','messages']，而 segments 并未分叉。
+// 历史里 `head,messages @ msgs≈6-7` 大多是"头窗内追加"，不是前缀断裂。
+{
+  const legacy = makeFixture({ frontChange: false });
+  try {
+    // 把第二条记录改成 legacy 形态（去掉 segments）且只含 head
+    const f = join(legacy.mem, 'logs', 'prefix-fingerprints.jsonl');
+    const recs = readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    delete recs[1].segments;
+    recs[1].changed = ['head', 'messages'];
+    writeFileSync(f, recs.map((r) => JSON.stringify(r)).join('\n') + '\n');
+    const out = runHealth(legacy);
+    check('旧记录只含 head 不计入前端变更（与追加无法区分）', out.includes('前端变更=0'), out.trim().split('\n')[0]);
+    check('旧记录 head 不触发前缀告警', !out.includes('前缀前端变更'));
+  } finally {
+    rmSync(legacy.root, { recursive: true, force: true });
   }
 }
 
