@@ -5,20 +5,45 @@
 > my-pi 侧数据来自 2026-09-24 的真实 10 小时会话（`portable/memory/context/.usage-diag.jsonl`
 > 与 `portable/agent/sessions/--root-my-pi--/2026-09-24T13-47-52-620Z_*.jsonl`）。
 
+---
+
+> ## 【2026-10-01 更正】本文档有三处结论已被代码与运行数据推翻
+>
+> 后续复核（[PI-RUNTIME-AUDIT.md](PI-RUNTIME-AUDIT.md)、[DSH-RUNTIME-AUDIT.md](DSH-RUNTIME-AUDIT.md)，
+> 均带 `file:line` 与真实会话实测）确认：
+>
+> 1. **"my-pi 压缩阈值 256K、会触发"不成立**。真实触发条件是
+>    `contextTokens > contextWindow - reserveTokens`（`vendor/pi/packages/coding-agent/src/core/compaction/compaction.ts`
+>    的 `shouldCompact`）。`deepseek-flash` 窗口 1M、`settings.json` 的 `reserveTokens=32768`
+>    → 阈值 ≈ **967K**；实测最大 `contextTokens` = 341,416 → **从未触发**（与 DSH 一样）。
+>    256K 只是我们 footer 补丁的**显示参考线**（`PI_CONTEXT_ABSOLUTE_TOKENS`），不是压缩阈值。
+> 2. **"O1/O2 的擦除已接线、每次请求都跑"作废**。`pruneToolResults` 与 `pruneThinkingBudget`
+>    都在 `if (PER_TURN_ERASE)` 之内，而 `PER_TURN_ERASE = process.env.PI_CONTEXT_ERASE === 'on'`
+>    **默认关闭**（`custom/features/context/budget/task-gate.ts:92`；`context/index.ts:468` 的注释写明
+>    原因：开启实测占单会话 67% 成本）。工具分层、自适应切档同样默认关（`task-gate.ts:75`、`context/index.ts:737`）。
+> 3. **"DSH 从不压缩"错**。实测 1 次自动 + 5 次手动 `/compact`；自动那次并非比例门触发，而是
+>    provider 400 `CONTEXT_WINDOW_EXCEEDED` 的 overflow 重试（`maxTokens=256K` 占窗口 25.6%，
+>    0.8 门留下的 20% 余量不够用）。
+>
+> 因此本文档标题里的"本轮优化"指的是**当时那一轮**；下表"优化后"一列中凡是依赖擦除/压缩的结论
+> 都以本更正块为准。**当前 my-pi 的真实策略是"不压缩、不擦除、靠窗口"**，与 DSH 趋同；
+> 差距回到"静态前缀稳定性"与"每轮自主度"，见
+> [COST-LATENCY-OPTIMIZATION-PLAN.md](COST-LATENCY-OPTIMIZATION-PLAN.md)。
+
 ## 一、结论摘要
 
-| 维度 | DSH | my-pi（本轮优化前） | my-pi（本轮优化后） |
+| 维度 | DSH | my-pi（当时那轮优化前） | my-pi（当时那轮优化后） |
 |------|-----|--------------------|--------------------|
-| 自动压缩触发 | **0.8 × 窗口**（1e6 → 800K），实测从不触发 | 绝对 **256K**，因门3 恒假**也从未触发** | 256K，门3 默认关闭 → **会触发** |
-| 历史 thinking 回收 | 无专用机制 | `pruneThinkingBudget` 已实现但**未接线** | ✅ 已接线（保留 64K） |
-| 旧工具输出回收 | 8,192 字符中段裁剪，**仅在压缩触发后才跑** | `pruneToolResults` 阈值 120K/80K，实测**从未触发** | ✅ 阈值降至 60K/30K，**每次请求都跑** |
+| 自动压缩触发 | **0.8 × 窗口**（1e6 → 800K），比例门从不触发；**但实测 overflow 触发过 6 次** | 绝对 **256K**，因门3 恒假**也从未触发** | 【已更正】阈值 = 窗口 − reserveTokens ≈ **967K**，实测从未触发 |
+| 历史 thinking 回收 | 无专用机制 | `pruneThinkingBudget` 已实现但**未接线** | 【已更正】接线了但 **默认关闭**（`PI_CONTEXT_ERASE=on` 才开） |
+| 旧工具输出回收 | 8,192 字符中段裁剪，**仅在压缩触发后才跑** | `pruneToolResults` 阈值 120K/80K，实测**从未触发** | 【已更正】阈值降至 60K/30K，但同样 **默认关闭** |
 | 写入时截断+归档 | spill >50KB 落盘 + 路径，**可读回**，`read` 豁免 | 单次 5K + **全会话 20K**，用完后一律 300 token，`read` 也被压 → 归档形同虚设 | ✅ `read` 豁免会话预算，归档可读回 |
 | 压缩摘要的缓存复用 | 摘要调用**重放前缀**，命中 KV 缓存 | `warm-prefix` 已有实现但因上游事件不覆盖压缩路径而**是死代码** | ⚠ 仍未修（需上游补丁） |
 | system prompt 变动 | `in-history` 路由**追加到缓存历史之后** | 每轮重写 system prompt（含 sleeping summary/压力档） | ✅ 易变段移出 system prompt（转为 append-only 消息），并加运行时前缀指纹做归因 |
 | 逐请求用量记账 | `inputTokens`（未命中）/`cacheReadTokens`/`cacheWriteTokens`/`reasoningTokens`，**无货币成本** | 同维度 + **¥ 成本** + 命中率 + `/usage-diag` | ✅ 领先 |
 | 子代理上下文 | fork（继承历史、复用 KV）与 spawn（空）两种 | 仅 spawn（`--no-session --no-extensions`） | ⚠ 缺 fork 模式 |
 
-一句话：**DSH 的默认策略是"几乎不压缩、靠窗口大 + 可恢复 spill"；my-pi 的策略是"早压缩 + 多层确定性擦除"。my-pi 的擦除层写好了却大半没生效，这是本轮的主要修复点。**
+一句话（**已按 2026-10-01 更正重写**）：两者的默认策略其实是**同一种**——"不压缩、不擦除、靠窗口 + 可恢复 spill"（DSH 靠 overflow 兜底压缩过 6 次，my-pi 一次没触发）。真正的差距不在上下文管理，而在 ① my-pi 的静态前缀（system + 工具声明）随自己改自己而变化，② 会话中途的前缀断裂，③ 每个用户轮的自主度。见 [COST-LATENCY-OPTIMIZATION-PLAN.md](COST-LATENCY-OPTIMIZATION-PLAN.md)。
 
 ## 二、实测：my-pi 那个 10 小时会话的上下文构成
 
@@ -38,13 +63,17 @@
 
 ## 三、本轮已实施的优化（均已验证）
 
-### O1 — 接通 thinking 擦除（收益最大，零 LLM 成本）
+### O1 — 接通 thinking 擦除（**已于后续默认关闭，见顶部更正**）
+
+> 现状：`pruneThinkingBudget` 在 `if (PER_TURN_ERASE)` 内，而该开关默认 off——因为它每轮改写历史前部，实测占单会话 67% 成本。
 
 - `context` 钩子在工具擦除之后调用 `pruneThinkingBudget(working, KEEP_THINKING_TOKENS)`。
 - 默认保留最近 **64K** thinking，更早的删除；`PI_CONTEXT_KEEP_THINKING_TOKENS` 可调。
 - 依据：该会话 thinking 155K → 64K，可回收 **~91K（占上下文 ~29%）**，且不产生任何 LLM 调用。
 
-### O2 — 下调工具输出擦除阈值（零 LLM 成本）
+### O2 — 下调工具输出擦除阈值（**同 O1：默认关闭**）
+
+> 现状：阈值仍在，但仅在 `PI_CONTEXT_ERASE=on` 时生效。
 
 - `PRUNE_PROTECT_TOKENS` 120K → **60K**、`PRUNE_MINIMUM_TOKENS` 80K → **30K**；
   `PI_CONTEXT_PRUNE_PROTECT_TOKENS` / `PI_CONTEXT_PRUNE_MINIMUM_TOKENS` 可调。
