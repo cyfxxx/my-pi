@@ -1209,6 +1209,11 @@ SIGKILL 服务器后，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到
   输出占比/前缀前端变更次数）"；回归 12 步 → **13 步、622 → 696 用例 / 60 文件**；新增「上游」行
   （`check-upstream.sh` 把升级代价变成同步前读数）；任务行补 `/daily`。§1–§3、§5 未动（需用户确认的
   部分不碰）。
+- **⑥ 钩子输出落盘（当天实测逼出来的补充）**：这次推送被 pre-push 拦了一次，而 golden 的分步日志
+  `/tmp/golden-*.log` 会被**下一次**运行覆盖，于是事后完全没有证据可查——重跑即过、无法归因。
+  现在 pre-commit / pre-push 都用 `tee` 把完整输出写到 `/tmp/my-pi-golden-{precommit,prepush}.log`
+  （配 `set -o pipefail` 保证管道返回 golden 的真实退出码），失败时打印该路径。这属于"防退化的
+  防退化"：一个间歇性变红的门如果无法归因，很快就会被当成噪音而失去作用。
 
 ## 模式切换修复：current 分离 + 自动重启（第 63 批，2026-10-01）
 

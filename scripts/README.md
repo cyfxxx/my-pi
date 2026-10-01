@@ -32,7 +32,7 @@
 | `test-web-terminal.mjs` | 浏览器终端进程级守门（鉴权/cookie 属性/Host 栅栏/穿越防护/WS 双向数据/resize/restart/孤儿会话回收，36 项，零 LLM）；缺 `script`/`stty` 时显式 SKIP |
 | `test-usage-metrics.mjs` | 成本度量口径守门（13 项，零 LLM）：合成数据驱动 `daily-health.mjs`，锁定命中率取自**每轮用量**而非工具级台账、前缀前端变更（system/tools/head/level）会触发告警、缺数据时记 n/a 而非瞎算 |
 | `patch-playwright-core.mjs` | Termux 下把 playwright-core 的 linux 分支扩展至 android（幂等） |
-| `install-hooks.sh` | 启用 `.githooks/`（pre-commit → `golden --fast`，pre-push → 全量）；本地无 CI，钩子是唯一自动防线 |
+| `install-hooks.sh` | 启用 `.githooks/`（pre-commit → `golden --fast`，pre-push → 全量）；本地无 CI，钩子是唯一自动防线。钩子会把完整输出 `tee` 到 `/tmp/my-pi-golden-{precommit,prepush}.log`——分步日志 `/tmp/golden-*.log` 会被下一次运行覆盖，偶发失败（实测发生过一次无法归因的拦截）需要留证据 |
 | `vendor-bundle.sh` | vendor/pi 离线归档（`create`/`restore`/`status`）；`status` 会标注每个归档**是否含当前 PINNED_COMMIT**（只报"存在"会假安全）；bundle 不入库 |
 
 ## 对外服务

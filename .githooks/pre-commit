@@ -5,6 +5,9 @@
 # 目的：拦住"红了几天没人知道"这类问题（本仓库历史上出现过 tsc 已红但无人察觉）。
 # 如需临时跳过：git commit --no-verify（不推荐）。
 set -u
+# 输出同时落盘（理由见 pre-push：分步日志会被下一次运行覆盖，偶发失败需留证据）
+set -o pipefail
+LOG="${TMPDIR:-/tmp}/my-pi-golden-precommit.log"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$ROOT" || exit 0
@@ -13,9 +16,10 @@ if [ ! -f scripts/golden-tasks.sh ]; then
   exit 0
 fi
 
-if ! bash scripts/golden-tasks.sh --fast; then
+if ! bash scripts/golden-tasks.sh --fast 2>&1 | tee "$LOG"; then
   echo ""
   echo "pre-commit：golden --fast 未通过，提交已阻止。"
+  echo "完整输出已保存：$LOG"
   echo "修复后重试；确实需要临时跳过用 git commit --no-verify（不推荐）。"
   exit 1
 fi

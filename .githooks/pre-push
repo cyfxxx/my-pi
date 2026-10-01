@@ -4,6 +4,11 @@
 # 本地无 CI（.github/ 已移除），推送前跑完整 golden 是最后一道自动防线。
 # 如需临时跳过：git push --no-verify（不推荐）。
 set -u
+# 输出同时落盘：golden 的分步日志写在 /tmp/golden-*.log，会被**下一次**运行覆盖，
+# 于是偶发失败（本仓库实测出现过一次无法归因的 pre-push 拦截）事后没有任何证据。
+# tee 保留实时输出，pipefail 保证管道返回 golden 的真实退出码。
+set -o pipefail
+LOG="${TMPDIR:-/tmp}/my-pi-golden-prepush.log"
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$ROOT" || exit 0
@@ -12,9 +17,10 @@ if [ ! -f scripts/golden-tasks.sh ]; then
   exit 0
 fi
 
-if ! bash scripts/golden-tasks.sh; then
+if ! bash scripts/golden-tasks.sh 2>&1 | tee "$LOG"; then
   echo ""
   echo "pre-push：golden 未通过，推送已阻止。"
+  echo "完整输出已保存：$LOG"
   echo "修复后重试；确实需要临时跳过用 git push --no-verify（不推荐）。"
   exit 1
 fi
