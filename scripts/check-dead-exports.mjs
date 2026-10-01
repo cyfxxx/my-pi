@@ -9,6 +9,11 @@
  * 规则：扫描 `custom/**\/*.ts` 的导出符号（function/const/class），统计它在**其它位置**的引用；
  * 零引用即报错。`scripts/dead-exports-allowlist.txt` 中的符号视为有意保留（逐行 `符号 理由`）。
  *
+ * 2026-10-01（P4 第二批）：补一条更严的规则——**测试里的引用不算接线**。
+ * 实测教训：`recordToolCallEvent` / `recordToolCall`（每工具调用事件落盘）只在单测里被调用，
+ * 生产路径从未接线，于是"工具调用分布"这个度量落点长期为空，而旧规则因为测试引用而放行。
+ * 现在零生产引用（但存在测试引用）同样报错，需接线/删除/写白名单。
+ *
  * 用法：
  *   node scripts/check-dead-exports.mjs            # 检查（有新增死导出则 exit 1）
  *   node scripts/check-dead-exports.mjs --list     # 只列出，不判失败
@@ -125,17 +130,30 @@ for (const [f, src] of code) {
   }
 }
 
+/** 测试文件不计入生产引用（`__tests__` 与 test-support stub） */
+function isTestFile(f) {
+  return /[/\\]__tests__[/\\]/.test(f) || /[/\\]test-support[/\\]/.test(f);
+}
+
 const allow = loadAllowlist();
 const dead = [];
+const testOnly = [];
 for (const [name, file] of declared) {
   const re = new RegExp(`\\b${name}\\b`, 'g');
   let refs = 0;
+  let refsProd = 0;
   for (const [f, src] of code) {
     const hits = (src.match(re) ?? []).length;
     // 减去声明处自身的一次
-    refs += f === file ? Math.max(0, hits - 1) : hits;
+    const n = f === file ? Math.max(0, hits - 1) : hits;
+    refs += n;
+    if (!isTestFile(f)) refsProd += n;
   }
-  if (refs === 0 && !allow.has(name)) dead.push({ name, file: relative(ROOT, file) });
+  if (refs === 0) {
+    if (!allow.has(name)) dead.push({ name, file: relative(ROOT, file) });
+  } else if (refsProd === 0 && !allow.has(name)) {
+    testOnly.push({ name, file: relative(ROOT, file), refs });
+  }
 }
 
 const allowlisted = [...allow.keys()].filter((n) => declared.has(n));
@@ -148,10 +166,16 @@ if (allowlisted.length > 0) {
 if (dead.length > 0) {
   console.log(`\n无引用导出（新增 ${dead.length} 个）：`);
   for (const d of dead) console.log(`  ${d.name}  (${d.file})`);
+}
+if (testOnly.length > 0) {
+  console.log(`\n仅测试引用的导出（生产未接线，${testOnly.length} 个）：`);
+  for (const d of testOnly) console.log(`  ${d.name}  (${d.file})`);
+}
+if (dead.length + testOnly.length > 0) {
   console.log('\n处理：接线调用它、删除它，或写入 scripts/dead-exports-allowlist.txt 并说明理由。');
 } else {
-  console.log('\n无未登记的死导出。');
+  console.log('\n无未登记的死导出（含"仅测试引用"规则）。');
 }
 
 if (LIST_ONLY) process.exit(0);
-process.exit(dead.length > 0 ? 1 : 0);
+process.exit(dead.length + testOnly.length > 0 ? 1 : 0);

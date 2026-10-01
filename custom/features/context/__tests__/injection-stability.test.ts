@@ -19,6 +19,7 @@ import {
   SYSTEM_INJECTION_MAX_BYTES,
   VOLATILE_PATTERNS,
   appendedSystemParts,
+  auditSystemInjection,
   buildSystemPrompt,
   findVolatileInjection,
 } from '../budget/system-prompt';
@@ -78,6 +79,29 @@ describe('易变内容守门', () => {
 
   it('纯英文十六进制单词不误报（defaced 不是 sha）', () => {
     expect(findVolatileInjection('the state was defaced')).toEqual([]);
+  });
+});
+
+describe('运行期注入面体检（auditSystemInjection）', () => {
+  it('仓库当前内容无告警（并回报追加段字节数）', () => {
+    const audit = auditSystemInjection({ appendSystemText: readFileSync(APPEND_SYSTEM, 'utf-8') });
+    expect(audit.warnings).toEqual([]);
+    expect(audit.appendedBytes).toBeGreaterThan(0);
+    expect(audit.appendedBytes).toBeLessThanOrEqual(SYSTEM_INJECTION_MAX_BYTES);
+  });
+
+  it('APPEND_SYSTEM.md 超预算 → 告警', () => {
+    const audit = auditSystemInjection({ appendSystemText: 'x'.repeat(SYSTEM_APPEND_MAX_BYTES + 1) });
+    expect(audit.warnings.join('\n')).toContain('超预算');
+  });
+
+  it('APPEND_SYSTEM.md 含易变内容 → 告警', () => {
+    const audit = auditSystemInjection({ appendSystemText: '生成于 2026-10-01' });
+    expect(audit.warnings.join('\n')).toContain('易变内容');
+  });
+
+  it('不传 appendSystemText 时不校验该文件（缺失也不报错）', () => {
+    expect(auditSystemInjection().warnings).toEqual([]);
   });
 });
 

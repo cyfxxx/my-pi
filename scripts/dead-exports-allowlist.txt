@@ -35,3 +35,39 @@ formatAgentList
 riskToolRestrictions
 voiceGuideError
 batchFetch
+#
+# ── C. 仅测试引用（生产未接线）——2026-10-01 P4 第二批由守门新发现 ──
+# 旧规则只统计"任何引用"，于是"只在单测里被调用"的函数被放行（实测 recordToolCallEvent 等
+# 工具事件落盘函数生产从未接线）。这些是历史存量，作为棘轮登记；**新增**仅测试引用会直接报错。
+parseJudgeScores Best-of-N 验证未迁移（同 DEFAULT_JUDGE_PROMPT/recordVerification 条目）
+shouldVerify Best-of-N 验证未迁移（同 DEFAULT_JUDGE_PROMPT/recordVerification 条目）
+ProgressTracker Best-of-N 验证未迁移（同 DEFAULT_JUDGE_PROMPT/recordVerification 条目）
+__resetSeedCache 测试专用重置钩子（缓存隔离用），生产不需要接线
+markCompacted 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+recordOutput 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+getOutputReport 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+compactJson 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+loadLevelChanges 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+formatSpeed 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+validateGroups 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+buildWarmPrefixData 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+updateCompactWarmAllowed 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+passesIdleGate 仅测试引用的预算/暖前缀公共 API：待接线或删除（P4 台账 B-3）
+recordUsageMissing 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+recordAutoCompact 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+recordPrune 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+recordThinkingMeter 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+recordToolEnable 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+recordToolCallEvent 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+loadToolCallRecords 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+loadToolEnableEvents 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+recordToolCall 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+pruneToolEvents 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+recomputeToolUsage 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+readUsage 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+summarizeUsage 工具事件/用量子系统历史 API：生产未接线（P4 台账 B-3：确认消费方后接线或整族删除）
+shadowReviewReport 仅测试引用（测试辅助或待接线）：P4 台账 B-3
+resetSendGuards 仅测试引用（测试辅助或待接线）：P4 台账 B-3
+filterInjectedMessages 仅测试引用（测试辅助或待接线）：P4 台账 B-3
+mergeCandidates 仅测试引用（测试辅助或待接线）：P4 台账 B-3
+resetWhisperHealthCache 仅测试引用（测试辅助或待接线）：P4 台账 B-3

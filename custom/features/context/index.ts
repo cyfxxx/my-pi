@@ -8,6 +8,7 @@
  * 迁移自 pi-tools pi-context：使用真实 contextWindow/用量校准上下文预算。
  */
 
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
@@ -17,7 +18,7 @@ import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
 import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
-import { buildSystemPrompt } from './budget/system-prompt';
+import { auditSystemInjection, buildSystemPrompt } from './budget/system-prompt';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
 import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
@@ -98,6 +99,17 @@ import { appendUsage } from './usage-stats';
 const VOLATILE_ADVICE_TAG = 'my-pi-context-advice';
 
 export function register(pi: ExtensionAPI): void {
+  // 注入面体检（P4）：测试守门只在提交时跑，而注入文本常在会话中被改。这里启动时做一次廉价审计，
+  // 超预算或出现日期/百分比等易变内容就显式告警（不改行为，只让"静默失效"变成可见）。
+  try {
+    const appendPath = join(getAgentDir(), 'APPEND_SYSTEM.md');
+    const audit = auditSystemInjection({
+      appendSystemText: existsSync(appendPath) ? readFileSync(appendPath, 'utf-8') : undefined,
+    });
+    for (const w of audit.warnings) console.warn(`[context] 注入面告警：${w}`);
+  } catch {
+    /* 体检失败不影响启动 */
+  }
   const toolState = createToolLifecycleState();
   // 连续失败熔断计数（进程内存态，成功即清零）
   const failStreak = new Map<string, number>();

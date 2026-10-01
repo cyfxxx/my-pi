@@ -14,14 +14,10 @@
  * 只写常量，不写时间戳/路径/版本号。
  */
 
-import { HARD_RULES } from './hard-rules';
+import { HARD_RULES, EFFICIENCY_ADVICE } from './hard-rules';
 
-/** 效率建议（system 层静态常量；原定义在 `logic.ts`，P4 归位到注入装配点） */
-export const EFFICIENCY_ADVICE = '效率建议：使用更具体的工具调用可以提高响应速度。';
-/** 低压力委派提示（易变提示文本，经尾部 append-only 消息注入） */
-export const LOW_PRESSURE_DELEGATION = '低压力委派：将简单任务委派给子代理可以提高效率。';
-/** 完全委派建议（同上） */
-export const FULL_DELEGATION_ADVICE = '完全委派建议：对于重复性任务，考虑使用自动化脚本。';
+// 注入文本常量住在 `hard-rules.ts`（注入面基线对象），这里只装配与守门；对外重导出保持导入路径。
+export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE } from './hard-rules';
 
 /**
  * system 层注入预算上限（字节）。
@@ -69,4 +65,40 @@ export function findVolatileInjection(text: string): string[] {
     if (m) hits.push(`${name}: ${m[0].trim()}`);
   }
   return hits;
+}
+
+export interface InjectionAudit {
+  /** system 追加段实际字节 */
+  appendedBytes: number;
+  warnings: string[];
+}
+
+/**
+ * 运行期注入面体检（生产路径也跑，不只靠守门测试）。
+ *
+ * 动机：测试守门只在 CI/提交时跑，而"改一行注入文本"往往发生在会话中——那时不会有人跑 golden。
+ * 这里在扩展注册时做一次廉价审计，超预算或出现易变内容就在启动输出里显式告警。
+ */
+export function auditSystemInjection(opts: { appendSystemText?: string } = {}): InjectionAudit {
+  const parts = appendedSystemParts();
+  const appendedBytes = Buffer.byteLength(parts.join('\n\n'), 'utf-8');
+  const warnings: string[] = [];
+  if (appendedBytes > SYSTEM_INJECTION_MAX_BYTES) {
+    warnings.push(
+      `system 追加段 ${appendedBytes}B 超预算 ${SYSTEM_INJECTION_MAX_BYTES}B（VISION §3.1：先降权删除或硬化，不得直接抬高上限）`,
+    );
+  }
+  for (const part of parts) {
+    for (const hit of findVolatileInjection(part)) warnings.push(`system 追加段含易变内容 ${hit}`);
+  }
+  if (opts.appendSystemText != null) {
+    const bytes = Buffer.byteLength(opts.appendSystemText, 'utf-8');
+    if (bytes > SYSTEM_APPEND_MAX_BYTES) {
+      warnings.push(`APPEND_SYSTEM.md ${bytes}B 超预算 ${SYSTEM_APPEND_MAX_BYTES}B`);
+    }
+    for (const hit of findVolatileInjection(opts.appendSystemText)) {
+      warnings.push(`APPEND_SYSTEM.md 含易变内容 ${hit}`);
+    }
+  }
+  return { appendedBytes, warnings };
 }

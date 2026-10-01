@@ -22,3 +22,16 @@ export const HARD_RULES = [
   '- 运行时/每环境状态不入库（如 `modes-state.json`、`deviceId`）；提交只暂存本会话的显式路径，禁止 `git add -A`。',
   '- 长任务用后台任务/tmux 启动后立即结束回合，同轮内不等待；用户提问先回答再动手。',
 ].join('\n');
+
+/**
+ * system 层注入的**其余静态文本**（并入本文件的原因：本文件是 `check-injection-surface.sh`
+ * 的基线对象之一，即"注入文本"的守门单位；装配器 `system-prompt.ts` 只放代码，其改动不该
+ * 触发注入面基线）。
+ *
+ * 纪律同 `HARD_RULES`：逐字节稳定，禁止时间戳/精确数值（守门见 `injection-stability.test.ts`）。
+ */
+export const EFFICIENCY_ADVICE = '效率建议：使用更具体的工具调用可以提高响应速度。';
+/** 低压力委派提示（易变提示文本，经尾部 append-only 消息注入） */
+export const LOW_PRESSURE_DELEGATION = '低压力委派：将简单任务委派给子代理可以提高效率。';
+/** 完全委派建议（同上） */
+export const FULL_DELEGATION_ADVICE = '完全委派建议：对于重复性任务，考虑使用自动化脚本。';
