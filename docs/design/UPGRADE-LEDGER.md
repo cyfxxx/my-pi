@@ -50,6 +50,8 @@
 
 | 12 | B-3 剩余 21 项"仅测试引用"导出 | **接线 3 / 删除 10 / 保留并写明理由** | 逐条判定"是被取代的重复实现，还是未接线但保留的能力"：**接线** = `getOutputReport`（→ `/context report`，数据本就由 `pruneToolOutput` 累计）、`loadLevelChanges`（→ `/context report`，档位切换正是前缀前端变更的直接原因）、`shadowReviewReport`（→ `/intervention stats`）；**删除** = `markCompacted`+`justCompacted`（`setUsedTokens` 直接覆盖后该标记已无人读）、`recordOutput`（`pruneToolOutput` 内的同一记账的第二份实现）、`formatSpeed`（footer 用 `formatSpeedCompact`）、`passesIdleGate`（被 `passesIdleGateAtTurnEnd` 取代）、`readUsage`/`summarizeUsage`/`formatUsageSummary`（脚本侧与 usage-diag 侧各有一份）、`buildWarmPrefixData`/`updateCompactWarmAllowed`/`canProvideWarmPrefix`（被 `buildReplayedPayload`/`canReplayWarmPrefix` 取代的第三份守卫）；**保留** = `compactJson`/`jsonBytes`/`shrinkHalf`（JSON 结构压缩能力，接入 R4 需产品决策）、`filterInjectedMessages`/`isInjectionBlock`（注入 append-only 不变量：生产禁止调用，保留供离线分析）、`resolveAndApply`/`mergeCandidates`、Best-of-N 3 项、4 个测试辅助 | 白名单按 A（能力/公共 API）/B（测试辅助）/C（待清理）三类重排，每条必须写理由；`compactJson` 曾被误判为可删，恢复后按"能力保留"登记 |
 
+| 13 | C 段 18 条历史"零引用"条目 | **删除 17 / 修正 1 条陈旧条目 / 1 条转为"能力保留"** | 删前先用守门口径复核真实引用数（关键：allowlist 只表示"登记过"，不代表现在仍死）：`consumeRestartLog` 实为**活代码**（`session_start` 消费 + 6 处测试引用）→ 条目陈旧，直接删条目不动代码；其余 17 个零引用（`taskTmpDir`/`isTurnBusy`/`isBackgroundBusy`/`lastActivityTs`/`listSchedulerFiles`/`loadTaskRecords`/`resetEnvironmentCache`/`searchEntries`/`clearCompactionFlag`/`resolveAppendPromptPath`/`getNextId`/`replaceState`/`formatPlanMessageLine`/`formatAgentList`/`riskToolRestrictions`/`voiceGuideError`/`batchFetch`）逐个确认"功能是否在别处活着"后删除；`createConcurrencyLimiter` 因 `batchFetch` 被删而变成仅测试引用，但它是有文档的**并发原语**（批量抓取场景），转 A 段登记 | 同步更新 6 个 feature README 的函数清单（避免文档指向已删符号）；**C 段清空** |
+
 顺带修掉一个计时缺陷：`toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具，
 一步内同名工具多次调用会互相覆盖（时长失真）。改用 `toolCallId`（`tool_call`/`tool_result`
 事件都带该字段），并补了回归测试。
@@ -63,9 +65,9 @@
 | APPEND_SYSTEM.md「禁止 emoji / 简短精炼」 | 暂缓 | 硬化需输出侧校验器（成本高、误报多）；收益低于成本 |
 | §5「升格候选（recurrence≥5）」 | 通道就绪、尚无转正 | `/memory lifecycle` 已产出候选，但"候选 → 规则"这一步仍是人工判断；下一批候选来源 |
 | AGENTS.md「回答先于编辑」 | 保持软（有意） | 同"先回答再执行" |
-| **B-3**：32 个"仅测试引用"导出 | **已闭环（32/32）**：接线 6、删除 11、保留并写明理由 15（能力 7 / Best-of-N 3 / 测试辅助 4 / 其他 1） | 剩余动作不在本项：C 段还有 18 条历史"零引用"条目（无理由），见「下一批复核」第 ④ 项 |
+| **B-3**：死导出存量（32 条"仅测试引用" + 18 条历史"零引用"） | **全部闭环（50/50）**：接线 6、删除 28、保留并写明理由 16（能力 8 / Best-of-N 3 / 测试辅助 4 / 公共 API 1）；白名单 C 段清空，A/B 段每条都有理由 | 无剩余动作 |
 
 ## 下一批复核
 
 - 每次日报（`node scripts/daily-health.mjs --print`）顺带看四项注入字节数；接近上限即启动降权评估。
-- 优先候选：① C 段 18 条历史"零引用"条目（`taskTmpDir`/`isTurnBusy`/`getNextId`/`formatPlanMessageLine` 等）逐条"接线或删除"——本批已把清单改成"每条必须写理由"，这些是最后一批无理由存量；② 启动期按模式收窄工具面（解锁"工具数组中途变更"硬化，并直接减小 tools 段 62 KB 的前缀开销）；③ B-3 存量清理（先确认消费方，再整族删除）。
+- 优先候选：① 启动期按模式收窄工具面（解锁"工具数组中途变更"硬化，并直接减小 tools 段 62 KB 的前缀开销）；③ B-3 存量清理（先确认消费方，再整族删除）。

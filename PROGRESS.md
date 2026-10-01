@@ -1723,3 +1723,19 @@ APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"
   Best-of-N 3 项、4 个测试辅助。
 - 白名单按 **A 能力/公共 API、B 测试辅助、C 待清理** 三类重排，每条必须写理由；
   C 段还剩 18 条历史"零引用"条目（无理由），列为下一批第一优先。
+
+### 最后一批：C 段 18 条历史"零引用"条目（同日续做）
+
+- **先复核再删**：allowlist 登记 ≠ 现在仍死。用守门口径（排除声明文件自身）重算引用数后发现
+  `consumeRestartLog` 其实是**活代码**（`session_start` 消费重启日志 + 6 处测试引用），
+  条目陈旧 → 只删条目、保留代码。
+- 其余 17 个零引用逐个确认"功能是否在别处活着"后删除：`taskTmpDir`、`isTurnBusy`、`isBackgroundBusy`、
+  `lastActivityTs`、`listSchedulerFiles`、`loadTaskRecords`、`resetEnvironmentCache`、`searchEntries`、
+  `clearCompactionFlag`、`resolveAppendPromptPath`、`getNextId`、`replaceState`（与 `commitState` 函数体完全相同）、
+  `formatPlanMessageLine`、`formatAgentList`、`riskToolRestrictions`、`voiceGuideError`、`batchFetch`；
+  连带清理因此变成未使用的 `os`/`readdirSync`/`schedulerDir` 借道导出/`readJSONL` 引用。
+- `createConcurrencyLimiter` 因 `batchFetch` 删除而变成仅测试引用，但它是有文档的并发原语
+  （批量抓取场景），按"能力保留"登记到 A 段并写明理由。
+- 同步更新 6 个 feature README 的函数清单（web-search / context-budget / plan-mode-ui / subagent /
+  subagent-core / autopilot-run），避免文档指向已删符号。
+- 结果：白名单 **C 段清空**，A 段 17 条 + B 段 4 条每条都有理由；死导出守门（含"仅测试引用"规则）绿。
