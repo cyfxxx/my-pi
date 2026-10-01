@@ -1704,3 +1704,22 @@ APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"
 - 同步删除 C 段白名单 7 行、测试里 6 个 legacy 用例（16 → 10 例）；`usage-diag` 只保留仍然活着的口径。
 - 剩余 21 个"仅测试引用"导出（预算/暖前缀族 10、`usage-stats` 2、Best-of-N 3、其他 6）已在台账写明，
   下一批逐条"接线或删除"。
+
+### B-3 收尾：剩余 21 项逐条判定（同日续做）
+
+判定标准：**是被活的实现取代的重复，还是未接线但保留的能力**——前者删，后者接线或写理由保留。
+
+- **接线 3**：`getOutputReport` → `/context report`（数据本就由 `pruneToolOutput` 累计，只是没人渲染）；
+  `loadLevelChanges` → `/context report`（档位切换正是"前缀前端变更"的直接原因，报告里正缺这条）；
+  `shadowReviewReport` → `/intervention stats`（影子审查在生产写、聚合报告无人读）。
+- **删除 10**：`markCompacted`+`justCompacted`（`setUsedTokens` 改为直接覆盖后，该标记无人读）、
+  `recordOutput`（与 `pruneToolOutput` 内部记账重复）、`formatSpeed`（footer 用 `formatSpeedCompact`）、
+  `passesIdleGate`（被 `passesIdleGateAtTurnEnd` 取代）、`readUsage`/`summarizeUsage`/`formatUsageSummary`
+  （脚本侧与 usage-diag 各有一份）、`buildWarmPrefixData`/`updateCompactWarmAllowed`/`canProvideWarmPrefix`
+  （被 `buildReplayedPayload`/`canReplayWarmPrefix` 取代的第三份守卫）；同步删对应用例。
+- **保留并写明理由 15**：`compactJson`/`jsonBytes`/`shrinkHalf`（JSON 结构压缩能力，接入 R4 需产品决策——
+  本批一度误删，已恢复）、`filterInjectedMessages`/`isInjectionBlock`（注入 append-only 不变量：
+  生产路径禁止调用并由回归测试断言，保留纯逻辑供离线分析）、`resolveAndApply`/`mergeCandidates`、
+  Best-of-N 3 项、4 个测试辅助。
+- 白名单按 **A 能力/公共 API、B 测试辅助、C 待清理** 三类重排，每条必须写理由；
+  C 段还剩 18 条历史"零引用"条目（无理由），列为下一批第一优先。

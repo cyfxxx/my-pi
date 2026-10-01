@@ -48,6 +48,8 @@
 
 | 11 | legacy 跨设备工具台账（`tool-events-*.jsonl` / `tool-use-*.jsonl` / `tool-usage.json` 的读写与类型） | **整族删除**（15 个导出 + 4 个接口 + 4 个常量 + 3 个类型守卫 + 3 个私有路径 helper，`diag.ts` 434 → 265 行） | 消费方确认：`scripts/tool-stats-sync.mjs` 自迁移起只读 `context/usage.jsonl` 与 `stats/tool-count-*.json`；磁盘上这些事件最后一笔是 **2026-09-24**；生产零调用（死导出守门扫出） | `tsc` 通过；`usage-diag` 测试 16 → 10 例（删掉 legacy 用例）；C 段白名单同步删除 7 行 |
 
+| 12 | B-3 剩余 21 项"仅测试引用"导出 | **接线 3 / 删除 10 / 保留并写明理由** | 逐条判定"是被取代的重复实现，还是未接线但保留的能力"：**接线** = `getOutputReport`（→ `/context report`，数据本就由 `pruneToolOutput` 累计）、`loadLevelChanges`（→ `/context report`，档位切换正是前缀前端变更的直接原因）、`shadowReviewReport`（→ `/intervention stats`）；**删除** = `markCompacted`+`justCompacted`（`setUsedTokens` 直接覆盖后该标记已无人读）、`recordOutput`（`pruneToolOutput` 内的同一记账的第二份实现）、`formatSpeed`（footer 用 `formatSpeedCompact`）、`passesIdleGate`（被 `passesIdleGateAtTurnEnd` 取代）、`readUsage`/`summarizeUsage`/`formatUsageSummary`（脚本侧与 usage-diag 侧各有一份）、`buildWarmPrefixData`/`updateCompactWarmAllowed`/`canProvideWarmPrefix`（被 `buildReplayedPayload`/`canReplayWarmPrefix` 取代的第三份守卫）；**保留** = `compactJson`/`jsonBytes`/`shrinkHalf`（JSON 结构压缩能力，接入 R4 需产品决策）、`filterInjectedMessages`/`isInjectionBlock`（注入 append-only 不变量：生产禁止调用，保留供离线分析）、`resolveAndApply`/`mergeCandidates`、Best-of-N 3 项、4 个测试辅助 | 白名单按 A（能力/公共 API）/B（测试辅助）/C（待清理）三类重排，每条必须写理由；`compactJson` 曾被误判为可删，恢复后按"能力保留"登记 |
+
 顺带修掉一个计时缺陷：`toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具，
 一步内同名工具多次调用会互相覆盖（时长失真）。改用 `toolCallId`（`tool_call`/`tool_result`
 事件都带该字段），并补了回归测试。
@@ -61,9 +63,9 @@
 | APPEND_SYSTEM.md「禁止 emoji / 简短精炼」 | 暂缓 | 硬化需输出侧校验器（成本高、误报多）；收益低于成本 |
 | §5「升格候选（recurrence≥5）」 | 通道就绪、尚无转正 | `/memory lifecycle` 已产出候选，但"候选 → 规则"这一步仍是人工判断；下一批候选来源 |
 | AGENTS.md「回答先于编辑」 | 保持软（有意） | 同"先回答再执行" |
-| **B-3**：32 个"仅测试引用"导出 | 已处理 **11 个**（接线 3：压缩/擦除/无用量事件；删除 1：`recordThinkingMeter`；整族删除 7：legacy 工具台账），C 段白名单同步瘦身 | 剩余 21 个：预算/暖前缀族 10（`markCompacted`/`recordOutput`/`getOutputReport`/`compactJson`/`loadLevelChanges`/`formatSpeed`/`validateGroups`/`buildWarmPrefixData`/`updateCompactWarmAllowed`/`passesIdleGate`）、`usage-stats` 的 `readUsage`/`summarizeUsage`（脚本侧已替代，可删）、Best-of-N 3（同 `DEFAULT_JUDGE_PROMPT`）、其余 6（测试辅助或待接线）。逐条"接线或删除"，不许长期滞留 |
+| **B-3**：32 个"仅测试引用"导出 | **已闭环（32/32）**：接线 6、删除 11、保留并写明理由 15（能力 7 / Best-of-N 3 / 测试辅助 4 / 其他 1） | 剩余动作不在本项：C 段还有 18 条历史"零引用"条目（无理由），见「下一批复核」第 ④ 项 |
 
 ## 下一批复核
 
 - 每次日报（`node scripts/daily-health.mjs --print`）顺带看四项注入字节数；接近上限即启动降权评估。
-- 优先候选：① 启动期按模式收窄工具面（解锁"工具数组中途变更"硬化，并直接减小 tools 段 62 KB 的前缀开销）；③ B-3 存量清理（先确认消费方，再整族删除）。
+- 优先候选：① C 段 18 条历史"零引用"条目（`taskTmpDir`/`isTurnBusy`/`getNextId`/`formatPlanMessageLine` 等）逐条"接线或删除"——本批已把清单改成"每条必须写理由"，这些是最后一批无理由存量；② 启动期按模式收窄工具面（解锁"工具数组中途变更"硬化，并直接减小 tools 段 62 KB 的前缀开销）；③ B-3 存量清理（先确认消费方，再整族删除）。
