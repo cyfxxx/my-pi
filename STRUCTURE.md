@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 36 个运维脚本（含共享库 lib-vendor.sh）
+├── scripts/             # 37 个运维脚本（含共享库 lib-vendor.sh、lib-mode.sh）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -69,7 +69,9 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
   - `sessions/`：会话历史（`sessions/<转义 cwd>/*.jsonl`，pi 自动创建，不入库）
   - `extensions/`：第三方扩展目录（`agentDir/extensions` 自动发现，放 `<name>/index.ts` 即生效）
   - `npm/`、`git/`：`./my-pi.sh install` 安装的 npm / git 扩展包（来源记入 `settings.json` 的 `packages`）
-  - `auth.json`、`models.json`、`models-store.json`、`trust.json`、`pi-link-*.json`：每环境独立、不入库（`modes.json`、`scheduled-seeds.json` 已白名单入库）
+  - `auth.json`、`models.json`、`models-store.json`、`trust.json`、`pi-link-*.json`：每环境独立、不入库
+  - **入库白名单**（配置类）：`modes.json`、`scheduled-seeds.json`、`settings.json`、`AGENTS.md`、`injection-baseline.json`
+  - **运行时状态**（刻意不入库）：`modes-state.json`（当前模式：`/mode` 写入；混进入库文件会被 git 操作静默回退，见 `custom/features/mode/README.md`）、`autopilot/state.json`、`recovery/`、`sessions/`
 - `memory/`：my-pi 自定义功能的数据（memory 功能的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
 
 `my-pi.sh` / `scripts/dev.sh` 只导出 `PI_CODING_AGENT_DIR`（pi 识别）与 `PI_MEMORY_DIR`（`custom/` 识别）；项目根不再有 `.pi/` 目录。
@@ -93,13 +95,14 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `006-footer-cost-and-cache-window.patch`：成本汇率与缓存命中率窗口调整（20 轮）
 
 ### `scripts/`
-共 36 个运维脚本（含 1 个共享库 `lib-vendor.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 37 个运维脚本（含 2 个共享库 `lib-vendor.sh`、`lib-mode.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
 - `dev.sh`：开发模式运行（tsx 直接跑 vendor 源码，不构建；tsx 来自根 `node_modules`）
 - `sync-upstream.sh`：上游同步 + 自动修复（merge → 幂等补丁 → 重建 dist → 刷新自愈缓存 → 类型检查；`PI_SYNC_DRY_RUN=1` 只读预演）
 - `lib-vendor.sh`：被 build/sync/doctor source 的共享逻辑（补丁幂等应用、依赖一致性判断）
+- `lib-mode.sh`：被 `pi-supervisor.sh` / `dev.sh` source 的模式解析共享逻辑（`modes.json` 配置 + `modes-state.json` 运行时 current → 模式名/记忆命名空间/人设绝对路径）；抽出来的原因是此前逻辑只在 supervisor 里，`dev.sh` 静默不注入人设
 - `check-isolation.sh`：验证隔离边界
 - `check-features.sh`：功能完整性（12 功能目录 + 生成式注册面基线 + 适配器 API + 钩子事件 + 配置/脚本/补丁）
 - `gen-registrations.mjs`：从代码生成/校验注册面基线（`registration-baseline.json`；`--update` 刷新）——替代原先手写清单，防漂移

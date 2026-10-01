@@ -5,6 +5,8 @@
 # 本脚本以库模式 source 它，只测不依赖网络/CLI/provider 的纯逻辑：
 #   - classify_crash：崩溃分类（transient / external / pi_self），含 ANSI 色码剥离
 #   - read_admin_action / clear_admin_action：admin state 的新鲜度与字段解析
+#   - apply_mode：模式解析（modes.json 配置 + modes-state.json 运行时状态、人设/命名空间、
+#     外部 PI_AGENT_MODE 覆盖优先级）与主循环命令行装配
 #
 # 用法：bash scripts/test-supervisor.sh
 set -uo pipefail
@@ -26,6 +28,8 @@ check() { # check <描述> <期望> <实际>
 }
 
 # 必须先设 admin state 路径：supervisor 在加载时读取该变量
+# （不覆盖 MY_PI_AGENT_DIR：RECOVERY_DIR 由它派生，救援 playbook 的断言要看真实仓库文件；
+#   模式解析一节改用局部 AGENT_DIR 指向临时目录）
 export PI_CODING_AGENT_DIR="$TMP/agent"
 export PI_ADMIN_STATE_FILE="$TMP/state.json"
 mkdir -p "$TMP/agent"
@@ -180,6 +184,64 @@ check "重启动作已被消费（不留 action）" "none" \
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).action))' "$LOOP/state.json" 2>/dev/null || echo missing)"
 check "restartLog 保留（供新进程注入重启通知）" "端到端测试" \
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).restartLog?.reason))' "$LOOP/state.json" 2>/dev/null || echo missing)"
+
+echo "=== apply_mode（模式解析：入库配置 + 运行时状态）==="
+# 配置与状态分离：modes.json 只放 default + 模式定义（入库）；current 放 modes-state.json（gitignored）。
+# 这层契约必须由 bash 侧也锁住——模式解析在 lib-mode.sh，pi 侧在 mode/logic.ts，两边读同一组文件。
+# 用局部 AGENT_DIR 指向临时目录，避免污染真实 agent 目录（也避开救援 playbook 对真实路径的断言）。
+MODE_AGENT="$TMP/mode-agent"
+mkdir -p "$MODE_AGENT/modes"
+AGENT_DIR="$MODE_AGENT"
+write_modes() { # write_modes <current>；传空串表示不写状态文件
+  rm -f "$AGENT_DIR/modes-state.json"
+  cat > "$AGENT_DIR/modes.json" <<'JSON'
+{
+  "default": "full",
+  "modes": {
+    "roleplay": {
+      "description": "rp",
+      "features": ["web-search", "memory"],
+      "thinking": "low",
+      "appendPrompt": "modes/roleplay.md",
+      "memoryNamespace": "roleplay"
+    }
+  }
+}
+JSON
+  printf '人设占位\n' > "$AGENT_DIR/modes/roleplay.md"
+  if [ -n "$1" ]; then
+    printf '{"current":"%s"}' "$1" > "$AGENT_DIR/modes-state.json"
+  fi
+}
+
+write_modes ""
+apply_mode
+check "无状态文件 → 回落 default(full)" "full" "$MODE_NAME"
+check "无状态文件 → 不注入人设" "" "${MODE_ARGS[*]:-}"
+check "无状态文件 → 命名空间为空" "" "$PI_MEMORY_NAMESPACE"
+
+write_modes roleplay
+apply_mode
+check "状态文件 roleplay → 模式名" "roleplay" "$MODE_NAME"
+check "状态文件 roleplay → 注入人设（绝对路径）" "--append-system-prompt $MODE_AGENT/modes/roleplay.md" "${MODE_ARGS[*]:-}"
+check "状态文件 roleplay → 记忆命名空间" "roleplay" "$PI_MEMORY_NAMESPACE"
+
+rm -f "$AGENT_DIR/modes-state.json"
+node -e 'const fs=require("fs");const p=process.argv[1];const j=JSON.parse(fs.readFileSync(p,"utf8"));j.current="roleplay";fs.writeFileSync(p,JSON.stringify(j,null,2))' "$AGENT_DIR/modes.json"
+apply_mode
+check "旧格式（current 在 modes.json）仍生效 — 迁移兼容" "roleplay" "$MODE_NAME"
+
+write_modes roleplay
+rm -f "$AGENT_DIR/modes/roleplay.md"
+apply_mode
+check "人设文件缺失 → 不注入 --append-system-prompt" "" "${MODE_ARGS[*]:-}"
+check "人设文件缺失 → 命名空间仍注入" "roleplay" "$PI_MEMORY_NAMESPACE"
+
+write_modes roleplay
+export PI_AGENT_MODE=minimal
+apply_mode
+unset PI_AGENT_MODE
+check "外部注入 PI_AGENT_MODE 优先于状态文件" "minimal" "$MODE_NAME"
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then

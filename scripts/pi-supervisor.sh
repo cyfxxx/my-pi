@@ -52,32 +52,20 @@ case "${1:-}" in
     ;;
 esac
 
-# ── 模式（modes.json）→ 环境与启动参数 ──
+# ── 模式（modes.json + modes-state.json）→ 环境与启动参数 ──
 # 每轮启动前重解析：注入记忆命名空间、按模式附加人设（--append-system-prompt）。
-# 功能过滤由 bootstrap.ts 读取同一文件完成；此处不导出 PI_AGENT_MODE，
-# 以免 supervisor 环境把首轮模式固化、导致 /mode 切换后无法刷新。
+# 解析逻辑抽到 lib-mode.sh，供 dev.sh 共用——此前只写在这里，导致 dev.sh 静默不注入人设。
+# 注意：此处不导出 PI_AGENT_MODE，以免 supervisor 环境把首轮模式固化、导致 /mode 切换后无法刷新；
+# current 存在运行时状态文件（modes-state.json，gitignored），git 操作不会回退它。
+# shellcheck source=scripts/lib-mode.sh
+. "$ROOT/scripts/lib-mode.sh"
 MODE_ARGS=()
 apply_mode() {
   MODE_ARGS=()
-  local out mode ns ap file
-  out=$(node -e '
-const fs=require("fs");
-let mode=process.env.PI_AGENT_MODE||"";
-let ns="",ap="";
-try{
-  const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
-  if(!mode) mode=j.current||j.default||"full";
-  const cfg=(j.modes&&j.modes[mode])||null;
-  if(cfg){ ns=cfg.memoryNamespace||""; ap=cfg.appendPrompt||""; }
-}catch(e){ if(!mode) mode="full"; }
-  // 用 US(\x1f) 分隔：TAB 属空白字符，IFS=$'\t' 会把连续分隔符折叠，
-  // 导致中间字段为空时整体错位（set_model 缺 targetSession 时 PROV/MODEL 串位）。
-process.stdout.write([mode,ns,ap].join("\u001f"));
-' "$AGENT_DIR/modes.json" 2>/dev/null)
-  IFS=$'\x1f' read -r mode ns ap <<<"$out"
-  export PI_MEMORY_NAMESPACE="$ns"
-  if [ -n "$ap" ] && [ -f "$AGENT_DIR/$ap" ]; then
-    MODE_ARGS=(--append-system-prompt "$AGENT_DIR/$ap")
+  mode_resolve "$AGENT_DIR"
+  export PI_MEMORY_NAMESPACE="$MODE_NS"
+  if [ -n "$MODE_APPEND_ABS" ]; then
+    MODE_ARGS=(--append-system-prompt "$MODE_APPEND_ABS")
   fi
 }
 
