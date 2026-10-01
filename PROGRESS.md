@@ -1692,3 +1692,15 @@ APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"
 剩余 legacy 工具台账（`recordToolEnable`/`recordToolCallEvent`/`recordToolCall`/`loadToolCallRecords`/
 `loadToolEnableEvents`/`pruneToolEvents`/`recomputeToolUsage` + 私有类型）消费方确认完成
 （`tool-stats-sync.mjs` 只读 `usage.jsonl` 与 `tool-count-*.json`），下一步整族删除。
+
+### B-3 整族删除：legacy 跨设备工具台账（同日续做）
+
+- 删除 `diag.ts` 里 legacy 工具台账整族：15 个导出（`recordToolEnable`/`recordToolCallEvent`/
+  `loadToolCallRecords`/`loadToolEnableEvents`/`recordToolCall`/`pruneToolEvents`/`recomputeToolUsage`/
+  `loadToolUsage`/`getToolEventsFile`/`getToolUsageFile`/`getToolEventsDir`/`toolUseFile`/`getDeviceId`/
+  `recordToolUsage`/私有默认路径 helper）+ 4 个接口 + 4 个常量 + 3 个类型守卫，**434 → 265 行**。
+- 消费方确认：`scripts/tool-stats-sync.mjs` 自迁移起只读 `context/usage.jsonl` 与 `stats/tool-count-*.json`；
+  磁盘上 `tool-use`/`tool-call`/`tool-enable` 事件最后一笔是 **2026-09-24**。
+- 同步删除 C 段白名单 7 行、测试里 6 个 legacy 用例（16 → 10 例）；`usage-diag` 只保留仍然活着的口径。
+- 剩余 21 个"仅测试引用"导出（预算/暖前缀族 10、`usage-stats` 2、Best-of-N 3、其他 6）已在台账写明，
+  下一批逐条"接线或删除"。

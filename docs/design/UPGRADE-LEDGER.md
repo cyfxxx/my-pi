@@ -46,6 +46,8 @@
 
 | 10 | `/usage-diag` 的「自动压缩触发 / 分层擦除」恒为 0 | 接线 `recordAutoCompact`（压缩触发处）与 `recordPrune`（擦除处，含 thinking），并把 `usage-missing` 一并接线 + 在摘要里渲染 | **消费者在、生产者被断开**：`formatUsageSummary` 一直读这三类事件，但自 **2026-09-24** 起没有任何生产调用（死导出守门因"测试引用"放行，正是第二批那条规则要抓的形态）；`thinking-meter` 两侧皆无 → 删除 | 新增摘要渲染测试（1 次压缩 / 2 次擦除 / 1 轮无用量）；三个函数移出白名单，再断开即守门失败 |
 
+| 11 | legacy 跨设备工具台账（`tool-events-*.jsonl` / `tool-use-*.jsonl` / `tool-usage.json` 的读写与类型） | **整族删除**（15 个导出 + 4 个接口 + 4 个常量 + 3 个类型守卫 + 3 个私有路径 helper，`diag.ts` 434 → 265 行） | 消费方确认：`scripts/tool-stats-sync.mjs` 自迁移起只读 `context/usage.jsonl` 与 `stats/tool-count-*.json`；磁盘上这些事件最后一笔是 **2026-09-24**；生产零调用（死导出守门扫出） | `tsc` 通过；`usage-diag` 测试 16 → 10 例（删掉 legacy 用例）；C 段白名单同步删除 7 行 |
+
 顺带修掉一个计时缺陷：`toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具，
 一步内同名工具多次调用会互相覆盖（时长失真）。改用 `toolCallId`（`tool_call`/`tool_result`
 事件都带该字段），并补了回归测试。
@@ -59,7 +61,7 @@
 | APPEND_SYSTEM.md「禁止 emoji / 简短精炼」 | 暂缓 | 硬化需输出侧校验器（成本高、误报多）；收益低于成本 |
 | §5「升格候选（recurrence≥5）」 | 通道就绪、尚无转正 | `/memory lifecycle` 已产出候选，但"候选 → 规则"这一步仍是人工判断；下一批候选来源 |
 | AGENTS.md「回答先于编辑」 | 保持软（有意） | 同"先回答再执行" |
-| **B-3**：32 个"仅测试引用"导出 | 棘轮锁住新增；存量已处理 4 个（接线 3 + 删除 1） | 剩余：legacy 工具台账整族（`recordToolEnable`/`recordToolCallEvent`/`loadToolCallRecords`/`loadToolEnableEvents`/`recordToolCall`/`pruneToolEvents`/`recomputeToolUsage` + 私有 helpers/types/`ToolUseEvent`/`ToolUsage`/`TOOL_RETENTION_DAYS`），**消费方确认已完成**（`tool-stats-sync.mjs` 只读 `usage.jsonl` 与 `tool-count-*.json`；`tool-use-*.jsonl` 最后一笔在 2026-09-24）→ 下一步直接整族删除并同步清 C 段白名单；其余（预算/暖前缀族、Best-of-N、测试辅助）逐条"接线或删除" |
+| **B-3**：32 个"仅测试引用"导出 | 已处理 **11 个**（接线 3：压缩/擦除/无用量事件；删除 1：`recordThinkingMeter`；整族删除 7：legacy 工具台账），C 段白名单同步瘦身 | 剩余 21 个：预算/暖前缀族 10（`markCompacted`/`recordOutput`/`getOutputReport`/`compactJson`/`loadLevelChanges`/`formatSpeed`/`validateGroups`/`buildWarmPrefixData`/`updateCompactWarmAllowed`/`passesIdleGate`）、`usage-stats` 的 `readUsage`/`summarizeUsage`（脚本侧已替代，可删）、Best-of-N 3（同 `DEFAULT_JUDGE_PROMPT`）、其余 6（测试辅助或待接线）。逐条"接线或删除"，不许长期滞留 |
 
 ## 下一批复核
 
