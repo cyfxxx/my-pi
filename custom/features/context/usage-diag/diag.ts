@@ -8,23 +8,16 @@
  * 纯逻辑，零 Pi 依赖。
  */
 
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getMemoryDir } from "../../../core/config";
 
 function defaultDiagFile(): string {
   return join(getMemoryDir(), 'context', '.usage-diag.jsonl');
 }
-function defaultToolEventsFile(): string {
-  return join(getMemoryDir(), 'stats', 'tool-events.jsonl');
-}
-function defaultToolUsageFile(): string {
-  return join(getMemoryDir(), 'stats', 'tool-usage.json');
-}
-function defaultToolEventsDir(): string {
-  return join(getMemoryDir(), 'stats');
-}
+// 2026-10-01（P4 第三批 B-3）：删除 legacy 跨设备工具台账（tool-events-/tool-use-*.jsonl 与
+// tool-usage.json 的读写、类型与私有 helper）。消费方确认完毕：`scripts/tool-stats-sync.mjs`
+// 只读 `context/usage.jsonl` 与 `stats/tool-count-*.json`；磁盘上这些事件最后一笔在 2026-09-24。
 
 const MAX_LINES = 20_000;
 let linesSinceCheck = 0;
@@ -71,59 +64,12 @@ export interface LevelChangeEvent {
   source?: "auto" | "model";
 }
 
-export interface ToolEnableEvent {
-  type: "tool-enable";
-  ts: number;
-  group: string;
-  via: "enable_tool" | "cmd";
-}
-
-export interface ToolCallRecordEvent {
-  type: "tool-call";
-  ts: number;
-  tool: string;
-  args: string;
-  result: string;
-  ok: boolean;
-  durationMs: number;
-}
-
-const MAX_TOOL_ARGS_LEN = 200;
-const MAX_TOOL_RESULT_LEN = 300;
-
-export interface ToolUsage {
-  calls: number;
-  input: number;
-  cacheRead: number;
-  cacheWrite: number;
-  firstTs: number;
-  lastTs: number;
-  byDevice: Record<string, { calls: number; input: number; lastTs: number }>;
-}
-
-export interface ToolUseEvent {
-  type: "tool-use";
-  eid: string;
-  device: string;
-  ts: number;
-  iso: string;
-  tool: string;
-  outputTokens: number;
-  input?: number;
-  cacheRead?: number;
-}
-
 export type DiagLine =
   | UsageRecord
   | AutoCompactEvent
   | PruneEvent
   | UsageMissingEvent
-  | LevelChangeEvent
-  | ToolEnableEvent
-  | ToolCallRecordEvent
-  | ToolUseEvent;
-
-const TOOL_RETENTION_DAYS = 30;
+  | LevelChangeEvent;
 
 export function getDiagFile(): string {
   return process.env.PI_USAGE_DIAG_FILE || defaultDiagFile();
@@ -244,253 +190,6 @@ export function recordLevelChange(e: Omit<LevelChangeEvent, "type" | "ts">): voi
   }
 }
 
-export function getToolEventsFile(): string {
-  return process.env.PI_TOOL_EVENTS_FILE || defaultToolEventsFile();
-}
-
-export function recordToolEnable(group: string, via: "enable_tool" | "cmd"): void {
-  try {
-    const ev: ToolEnableEvent = { type: "tool-enable", ts: Date.now(), group, via };
-    const f = getToolEventsFile();
-    mkdirSync(dirname(f), { recursive: true });
-    appendFileSync(f, JSON.stringify(ev) + "\n");
-  } catch {
-    // ignore（台账失败不影响工具启用功能）
-  }
-}
-
-export function recordToolCallEvent(ev: {
-  tool: string;
-  args: Record<string, unknown>;
-  result?: string;
-  ok: boolean;
-  durationMs: number;
-}): void {
-  try {
-    const argsStr = JSON.stringify(ev.args ?? {}).slice(0, MAX_TOOL_ARGS_LEN);
-    const resultStr = (ev.result ?? "").slice(0, MAX_TOOL_RESULT_LEN);
-    const record: ToolCallRecordEvent = {
-      type: "tool-call",
-      ts: Date.now(),
-      tool: ev.tool,
-      args: argsStr,
-      result: resultStr,
-      ok: ev.ok,
-      durationMs: ev.durationMs,
-    };
-    const f = getToolEventsFile();
-    mkdirSync(dirname(f), { recursive: true });
-    appendFileSync(f, JSON.stringify(record) + "\n");
-  } catch {
-    // 记录失败静默
-  }
-}
-
-export function loadToolCallRecords(max = 5000): ToolCallRecordEvent[] {
-  try {
-    const lines = readFileSync(getToolEventsFile(), "utf-8").trim().split("\n").filter(Boolean);
-    const out: ToolCallRecordEvent[] = [];
-    for (const line of lines.slice(-max)) {
-      try {
-        const e = JSON.parse(line);
-        if (isToolCallRecordEvent(e)) out.push(e);
-      } catch {
-        // 损坏行跳过
-      }
-    }
-    return out;
-  } catch {
-    return [];
-  }
-}
-
-export function loadToolEnableEvents(): ToolEnableEvent[] {
-  try {
-    return readFileSync(getToolEventsFile(), "utf-8")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => {
-        try {
-          const e = JSON.parse(l);
-          return isToolEnableEvent(e) ? e : null;
-        } catch {
-          return null;
-        }
-      })
-      .filter((e): e is ToolEnableEvent => e !== null);
-  } catch {
-    return [];
-  }
-}
-
-export function getToolUsageFile(): string {
-  return process.env.PI_TOOL_USAGE_FILE || defaultToolUsageFile();
-}
-
-export function loadToolUsage(): Record<string, ToolUsage> {
-  try {
-    const f = getToolUsageFile();
-    if (!existsSync(f)) return {};
-    return JSON.parse(readFileSync(f, "utf8")) as Record<string, ToolUsage>;
-  } catch {
-    return {};
-  }
-}
-
-export function recordToolUsage(
-  toolName: string,
-  usage: { input?: number; cacheRead?: number; cacheWrite?: number },
-): void {
-  try {
-    const all = loadToolUsage();
-    const cur: ToolUsage = all[toolName] ?? { calls: 0, input: 0, cacheRead: 0, cacheWrite: 0, firstTs: Date.now(), lastTs: Date.now(), byDevice: {} };
-    cur.calls += 1;
-    cur.input += usage.input ?? 0;
-    cur.cacheRead += usage.cacheRead ?? 0;
-    cur.cacheWrite += usage.cacheWrite ?? 0;
-    all[toolName] = cur;
-    const f = getToolUsageFile();
-    mkdirSync(dirname(f), { recursive: true });
-    const tmp = f + ".tmp." + process.pid;
-    writeFileSync(tmp, JSON.stringify(all), "utf8");
-    renameSync(tmp, f);
-  } catch {
-    /* 记录失败静默 */
-  }
-}
-
-export function getDeviceId(): string {
-  return process.env.PI_DEVICE_ID || hostname() || "host";
-}
-
-export function getToolEventsDir(): string {
-  return process.env.PI_TOOL_EVENTS_DIR || defaultToolEventsDir();
-}
-
-export function toolUseFile(device = getDeviceId()): string {
-  return join(getToolEventsDir(), `tool-use-${device.replace(/[^A-Za-z0-9._-]/g, "_")}.jsonl`);
-}
-
-let toolCallSeq = 0;
-
-export function recordToolCall(ev: {
-  tool: string;
-  outputTokens: number;
-  input?: number;
-  cacheRead?: number;
-}): void {
-  try {
-    const device = getDeviceId();
-    toolCallSeq += 1;
-    const ts = Date.now();
-    const record: ToolUseEvent = {
-      type: "tool-use",
-      eid: `${device}:${process.pid}:${toolCallSeq}`,
-      device,
-      ts,
-      iso: new Date(ts).toISOString(),
-      tool: ev.tool,
-      outputTokens: ev.outputTokens,
-      ...(ev.input !== undefined ? { input: ev.input } : {}),
-      ...(ev.cacheRead !== undefined ? { cacheRead: ev.cacheRead } : {}),
-    };
-    const f = toolUseFile(device);
-    mkdirSync(dirname(f), { recursive: true });
-    appendFileSync(f, JSON.stringify(record) + "\n", "utf8");
-  } catch {
-    // 记录失败静默
-  }
-}
-
-export function loadToolUseEvents(allDevices = true, maxDays = TOOL_RETENTION_DAYS): ToolUseEvent[] {
-  const dir = getToolEventsDir();
-  const cutoff = Date.now() - maxDays * 24 * 60 * 60 * 1000;
-  const out: ToolUseEvent[] = [];
-  try {
-    if (!existsSync(dir)) return out;
-    for (const name of readdirSync(dir)) {
-      if (!name.startsWith("tool-use-") || !name.endsWith(".jsonl")) continue;
-      if (!allDevices && !name.includes(getDeviceId().replace(/[^A-Za-z0-9._-]/g, "_"))) continue;
-      for (const line of readFileSync(join(dir, name), "utf8").split("\n")) {
-        if (!line) continue;
-        try {
-          const e = JSON.parse(line);
-          if (isToolUseEvent(e) && e.ts >= cutoff) out.push(e);
-        } catch {
-          /* 损坏行跳过 */
-        }
-      }
-    }
-    out.sort((a, b) => a.ts - b.ts);
-  } catch {
-    /* 静默 */
-  }
-  return out;
-}
-
-export function pruneToolEvents(maxDays = TOOL_RETENTION_DAYS, device = getDeviceId()): number {
-  const f = toolUseFile(device);
-  try {
-    if (!existsSync(f)) return 0;
-    const cutoff = Date.now() - maxDays * 24 * 60 * 60 * 1000;
-    const lines = readFileSync(f, "utf8").split("\n").filter(Boolean);
-    const kept = lines.filter((l) => {
-      try {
-        const e = JSON.parse(l);
-        return isToolUseEvent(e) ? e.ts >= cutoff : true;
-      } catch {
-        return true;
-      }
-    });
-    const removed = lines.length - kept.length;
-    if (removed > 0) {
-      const tmp = f + ".tmp." + process.pid;
-      writeFileSync(tmp, kept.join("\n") + (kept.length ? "\n" : ""), "utf8");
-      renameSync(tmp, f);
-    }
-    return removed;
-  } catch {
-    return 0;
-  }
-}
-
-export function recomputeToolUsage(maxDays = TOOL_RETENTION_DAYS): Record<string, ToolUsage> {
-  const events = loadToolUseEvents(true, maxDays);
-  const acc = new Map<string, ToolUsage>();
-  const seen = new Set<string>();
-  for (const e of events) {
-    if (seen.has(e.eid)) continue;
-    seen.add(e.eid);
-    let cur = acc.get(e.tool);
-    if (!cur) {
-      cur = { calls: 0, input: 0, cacheRead: 0, cacheWrite: 0, firstTs: e.ts, lastTs: e.ts, byDevice: {} };
-      acc.set(e.tool, cur);
-    }
-    cur.calls += 1;
-    cur.input += e.input ?? 0;
-    cur.cacheRead += e.cacheRead ?? 0;
-    cur.firstTs = Math.min(cur.firstTs, e.ts);
-    cur.lastTs = Math.max(cur.lastTs, e.ts);
-    const d = cur.byDevice[e.device] ?? { calls: 0, input: 0, lastTs: e.ts };
-    d.calls += 1;
-    d.input += e.input ?? 0;
-    d.lastTs = Math.max(d.lastTs, e.ts);
-    cur.byDevice[e.device] = d;
-  }
-  const all = Object.fromEntries(acc);
-  try {
-    const f = getToolUsageFile();
-    mkdirSync(dirname(f), { recursive: true });
-    const tmp = f + ".tmp." + process.pid;
-    writeFileSync(tmp, JSON.stringify(all, null, 2), "utf8");
-    renameSync(tmp, f);
-  } catch {
-    /* 静默 */
-  }
-  return all;
-}
-
 export interface UsageSummary {
   requests: number;
   inputTotal: number;
@@ -562,18 +261,3 @@ export function formatUsageSummary(lines: DiagLine[]): string {
   ].join("\n");
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isToolCallRecordEvent(value: unknown): value is ToolCallRecordEvent {
-  return isRecord(value) && value.type === "tool-call";
-}
-
-function isToolEnableEvent(value: unknown): value is ToolEnableEvent {
-  return isRecord(value) && value.type === "tool-enable";
-}
-
-function isToolUseEvent(value: unknown): value is ToolUseEvent {
-  return isRecord(value) && value.type === "tool-use";
-}

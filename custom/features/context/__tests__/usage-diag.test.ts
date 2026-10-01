@@ -3,7 +3,7 @@
  * 覆盖追加/汇总/截断/清理与跨设备事件
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,21 +15,6 @@ import {
   recordAutoCompact,
   recordPrune,
   recordLevelChange,
-  getToolEventsFile,
-  recordToolEnable,
-  recordToolCallEvent,
-  loadToolCallRecords,
-  loadToolEnableEvents,
-  getToolUsageFile,
-  recordToolUsage,
-  loadToolUsage,
-  getDeviceId,
-  getToolEventsDir,
-  toolUseFile,
-  recordToolCall,
-  loadToolUseEvents,
-  pruneToolEvents,
-  recomputeToolUsage,
   summarizeRecords,
   formatUsageSummary,
   type UsageRecord,
@@ -37,29 +22,21 @@ import {
   type PruneEvent,
   type UsageMissingEvent,
   type LevelChangeEvent,
-  type ToolUseEvent,
 } from '../usage-diag/diag';
 
 let memDir: string;
 let diagFile: string;
-let toolEventsFile: string;
 
 beforeEach(() => {
   memDir = mkdtempSync(join(tmpdir(), 'my-pi-usage-diag-'));
   process.env.PI_MEMORY_DIR = memDir;
   diagFile = join(memDir, 'context', '.usage-diag.jsonl');
-  toolEventsFile = join(memDir, 'stats', 'tool-events.jsonl');
   mkdirSync(dirname(diagFile), { recursive: true });
-  mkdirSync(dirname(toolEventsFile), { recursive: true });
 });
 
 afterEach(() => {
   delete process.env.PI_MEMORY_DIR;
   delete process.env.PI_USAGE_DIAG_FILE;
-  delete process.env.PI_TOOL_EVENTS_FILE;
-  delete process.env.PI_TOOL_USAGE_FILE;
-  delete process.env.PI_DEVICE_ID;
-  delete process.env.PI_TOOL_EVENTS_DIR;
   rmSync(memDir, { recursive: true, force: true });
 });
 
@@ -134,104 +111,6 @@ describe('usage-diag 核心功能', () => {
     expect(ev.source).toBe('auto');
   });
 
-  it('工具启用与调用事件追加与读取', () => {
-    recordToolEnable('web-search', 'enable_tool');
-    recordToolEnable('plan-mode', 'cmd');
-    recordToolCallEvent({ tool: 'bash', args: { cmd: 'ls' }, result: 'ok', ok: true, durationMs: 123 });
-
-    const lines = readFileSync(toolEventsFile, 'utf-8').trim().split('\n');
-    expect(lines).toHaveLength(3);
-
-    const enables = loadToolEnableEvents();
-    expect(enables).toHaveLength(2);
-    expect(enables[0].group).toBe('web-search');
-    expect(enables[0].via).toBe('enable_tool');
-
-    const calls = loadToolCallRecords();
-    expect(calls).toHaveLength(1);
-    expect(calls[0].tool).toBe('bash');
-    expect(calls[0].ok).toBe(true);
-  });
-
-  it('工具用量账单追加与重算', () => {
-    recordToolUsage('read', { input: 100, cacheRead: 50 });
-    recordToolUsage('read', { input: 200 });
-    recordToolUsage('bash', { cacheWrite: 30 });
-
-    const usage = loadToolUsage();
-    expect(usage.read.calls).toBe(2);
-    expect(usage.read.input).toBe(300);
-    expect(usage.read.cacheRead).toBe(50);
-    expect(usage.bash.calls).toBe(1);
-
-    // recomputeToolUsage 以 tool-use 事件流为唯一真源（不是 usage.json 聚合）：
-    // 写入一条事件后重算，账本应只含事件流的量
-    recordToolCall({ tool: 'read', outputTokens: 10, input: 100, cacheRead: 50 });
-    const recomputed = recomputeToolUsage(30);
-    expect(recomputed.read.input).toBe(100);
-  });
-
-  it('设备标识与工具事件文件路径', () => {
-    expect(getDeviceId()).toBeTruthy();
-    process.env.PI_DEVICE_ID = 'node1';
-    expect(getDeviceId()).toBe('node1');
-
-    const f = toolUseFile('node2');
-    expect(f).toContain('tool-use-node2.jsonl');
-    expect(f).toContain(memDir);
-  });
-
-  it('recordToolCall 追加跨设备事件', () => {
-    recordToolCall({ tool: 'web-search', outputTokens: 200, input: 150, cacheRead: 50 });
-    const f = toolUseFile();
-    const lines = readFileSync(f, 'utf-8').trim().split('\n');
-    expect(lines).toHaveLength(1);
-    const ev = JSON.parse(lines[0]) as ToolUseEvent;
-    expect(ev.type).toBe('tool-use');
-    expect(ev.device).toBe(getDeviceId());
-    expect(ev.input).toBe(150);
-    expect(ev.cacheRead).toBe(50);
-  });
-
-  it('loadToolUseEvents 加载本机与全部设备事件', () => {
-    // 设置固定的设备ID以确保测试的确定性
-    process.env.PI_DEVICE_ID = 'test-device';
-    // 写两个设备文件：一个匹配当前设备，一个不匹配
-    const f1 = toolUseFile('test-device'); // 当前设备
-    const f2 = toolUseFile('other-device'); // 其他设备
-    const old = Date.now() - 40 * 24 * 3600_000;
-    const recent = Date.now() - 10 * 24 * 3600_000;
-    writeFileSync(f1, JSON.stringify({ type: 'tool-use', eid: 'test-device:1:1', device: 'test-device', ts: recent, iso: new Date(recent).toISOString(), tool: 'recent', outputTokens: 200 }) + '\n', 'utf8');
-    writeFileSync(f2, JSON.stringify({ type: 'tool-use', eid: 'other-device:1:1', device: 'other-device', ts: old, iso: new Date(old).toISOString(), tool: 'old', outputTokens: 100 }) + '\n', 'utf8');
-
-    // 默认保留窗口 30 天：40 天前的 other-device 事件被过滤
-    const all = loadToolUseEvents(true);
-    expect(all).toHaveLength(1);
-    // 放宽窗口到 60 天：两个设备的事件都在
-    expect(loadToolUseEvents(true, 60)).toHaveLength(2);
-    const local = loadToolUseEvents(false);
-    expect(local).toHaveLength(1);
-    expect(local[0].device).toBe(getDeviceId());
-    expect(local[0].tool).toBe('recent'); // 应该是未过期的事件
-  });
-
-  it('pruneToolEvents 清理超期事件', () => {
-    const f = toolUseFile();
-    const old = Date.now() - 40 * 24 * 3600_000;
-    const recent = Date.now() - 10 * 24 * 3600_000;
-    writeFileSync(f, [
-      JSON.stringify({ type: 'tool-use', eid: 'x:1:1', device: getDeviceId(), ts: old, iso: new Date(old).toISOString(), tool: 'old', outputTokens: 100 }),
-      JSON.stringify({ type: 'tool-use', eid: 'x:1:2', device: getDeviceId(), ts: recent, iso: new Date(recent).toISOString(), tool: 'recent', outputTokens: 200 }),
-    ].join('\n') + '\n', 'utf8');
-
-    const removed = pruneToolEvents(30);
-    expect(removed).toBe(1);
-    const lines = readFileSync(f, 'utf-8').trim().split('\n').filter(Boolean);
-    expect(lines).toHaveLength(1);
-    const ev = JSON.parse(lines[0]) as ToolUseEvent;
-    expect(ev.tool).toBe('recent');
-  });
-
   it('summarizeRecords 与 formatUsageSummary', () => {
     const now = Date.now();
     const recs: UsageRecord[] = [
@@ -276,13 +155,6 @@ describe('usage-diag 核心功能', () => {
 
   it('环境变量覆盖路径', () => {
     process.env.PI_USAGE_DIAG_FILE = '/custom/diag.jsonl';
-    process.env.PI_TOOL_EVENTS_FILE = '/custom/events.jsonl';
-    process.env.PI_TOOL_USAGE_FILE = '/custom/usage.json';
-    process.env.PI_TOOL_EVENTS_DIR = '/custom/stats';
-
     expect(getDiagFile()).toBe('/custom/diag.jsonl');
-    expect(getToolEventsFile()).toBe('/custom/events.jsonl');
-    expect(getToolUsageFile()).toBe('/custom/usage.json');
-    expect(getToolEventsDir()).toBe('/custom/stats');
   });
 });
