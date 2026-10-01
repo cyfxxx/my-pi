@@ -160,43 +160,6 @@ export function buildReplayedPayload(
   return next;
 }
 
-// ── 暖前缀数据提供 ──
-
-/** 检查是否可以提供暖前缀数据 */
-export function canProvideWarmPrefix(state: WarmPrefixState, modelKey: string): boolean {
-  if (!state.compactWarmAllowed) return false;
-  if (!state.lastRequestPayload || state.lastRequestPayload.messages.length === 0) return false;
-  if (!needsWarmPrefix(modelKey)) return false;
-  
-  // 暖前缀需要 tools 数据
-  const tools = state.lastRequestPayload.tools;
-  if (!Array.isArray(tools) || tools.length === 0) return false;
-  
-  return true;
-}
-
-/** 构建暖前缀数据 */
-export function buildWarmPrefixData(state: WarmPrefixState): {
-  systemPrompt: string;
-  tools: unknown;
-  messages: unknown[];
-} | null {
-  if (!canProvideWarmPrefix(state, state.lastModelKey)) {
-    return null;
-  }
-  
-  // 安全访问 lastRequestPayload
-  if (!state.lastRequestPayload) {
-    return null;
-  }
-  
-  return {
-    systemPrompt: '',
-    tools: state.lastRequestPayload.tools,
-    messages: state.lastRequestPayload.messages,
-  };
-}
-
 // ── 状态更新 ──
 
 /** 保存主请求 payload */
@@ -216,18 +179,6 @@ export function saveMainRequestPayload(
 }
 
 /** 更新压缩暖前缀允许状态 */
-export function updateCompactWarmAllowed(
-  state: WarmPrefixState,
-  reason: string,
-  contextWindow: number,
-  tokensBefore: number,
-): void {
-  // 非 overflow 原因且 token 占用未达到 90% 时允许
-  state.compactWarmAllowed = 
-    reason !== 'overflow' && 
-    !(contextWindow > 0 && tokensBefore > contextWindow * 0.9);
-}
-
 // ── 导出 ──
 
 export {

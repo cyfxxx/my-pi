@@ -52,7 +52,6 @@ interface SharedBudgetState {
   usedTotal: number;
   totalBudget: number;
   compactThreshold: number | null;
-  justCompacted: boolean;
   outputEntries: OutputEntry[];
   outputTotalTokens: number;
   cacheReadTotal: number;
@@ -71,7 +70,6 @@ function getState(): SharedBudgetState {
       usedTotal: 0,
       totalBudget: DEFAULT_TOTAL,
       compactThreshold: null,
-      justCompacted: false,
       outputEntries: [],
       outputTotalTokens: 0,
       cacheReadTotal: 0,
@@ -104,17 +102,12 @@ export function setCompactThreshold(t: number): void {
 }
 
 // 压缩已发生标记：下一轮 setUsedTokens 直接覆盖为新基线（允许 usedTotal 回落）
-export function markCompacted(): void {
-  getState().justCompacted = true;
-}
-
 // 真实用量校准：真实 context 用量是权威值，直接覆盖累计估算。
 // （此前用 Math.max 会让工具估算的虚高量无法回落，导致压力单调上升。）
 export function setUsedTokens(used: number): void {
   const s = getState();
   if (Number.isFinite(used) && used >= 0) {
     s.usedTotal = used;
-    s.justCompacted = false;
   }
 }
 
@@ -288,13 +281,6 @@ const PER_TOOL_TOKENS = 5_000;
  * 对豁免工具只施加单次上限，不受也不消耗会话累计预算。
  */
 const SESSION_BUDGET_EXEMPT_TOOLS = new Set(['read']);
-
-export function recordOutput(tool: string, outputLength: number): void {
-  const tokens = Math.ceil(outputLength / 3.5);
-  const s = getState();
-  s.outputEntries.push({ tool, tokens, ts: Date.now() });
-  s.outputTotalTokens += tokens;
-}
 
 /**
  * 按会话累计输出预算裁剪工具输出，并把实际放行的输出计入预算。

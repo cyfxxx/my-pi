@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSpeedTracker, estimateTokensFromChars, formatSpeed, formatSpeedCompact } from '../budget/token-speed';
+import { createSpeedTracker, estimateTokensFromChars, formatSpeedCompact } from '../budget/token-speed';
 
 describe('token-speed', () => {
   it('estimateTokensFromChars 按 4 字符/token 估算', () => {
@@ -35,12 +35,6 @@ describe('token-speed', () => {
     t.startTurn(0);
     t.addOutputChars(400);
     expect(t.finishTurn(0, 1000)).toBeCloseTo(100, 5);
-  });
-
-  it('formatSpeed 低于 10 保留一位小数', () => {
-    expect(formatSpeed(8.25)).toBe('8.3 tok/s');
-    expect(formatSpeed(42.4)).toBe('42 tok/s');
-    expect(formatSpeed(0)).toBe('0 tok/s');
   });
 
   it('formatSpeedCompact 省略单位后缀，保留一位/整数精度', () => {

@@ -46,6 +46,7 @@ import {
   clampForCacheSafety,
   cacheSafeMaxLevel,
   recordLevelChange,
+  loadLevelChanges,
   inferTaskType,
   type ThinkLevelState,
 } from './budget/thinking-level';
@@ -58,6 +59,7 @@ import {
   recordToolUsage,
   estimateTokens,
   getBudgetReport,
+  getOutputReport,
   pruneToolOutput,
   getCacheStats,
 } from './budget/budget';
@@ -212,12 +214,23 @@ export function register(pi: ExtensionAPI): void {
       }
       if (subcommand === 'usage' || subcommand === 'report') {
         const r = getBudgetReport();
+        // 档位切换是"前缀前端变更"的直接原因之一（切档 = 其后整段缓存失效），
+        // 因此把切换历史放进报告——此前 recordLevelChange 在写、loadLevelChanges 无人读（P4 第三批接线）。
+        const changes = loadLevelChanges();
+        const lastChange = changes[changes.length - 1];
+        const levelLine =
+          changes.length > 0 && lastChange
+            ? `\n档位切换: ${changes.length} 次（最近 ${lastChange.from} → ${lastChange.to}，${lastChange.reason}）`
+            : '';
+        // 工具输出预算是真实生效的（pruneToolOutput 在裁剪时累计），把明细接进报告
+        // （getOutputReport 此前无消费者，P4 第三批接线）。
+        const outBudget = getOutputReport();
         ctx.ui.notify(
           `Token 使用报告:
 已使用: ${r.used.toLocaleString()} / ${r.total.toLocaleString()} 窗口 (${(r.ratio * 100).toFixed(1)}%)
 压缩阈值: ${r.budgetBase.toLocaleString()} token（压力 ${(r.pressureRatio * 100).toFixed(1)}%）
 压力级别: ${r.pressure}
-主要消耗: ${r.topConsumers.map((c) => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}`,
+主要消耗: ${r.topConsumers.map((c) => `${c.tool} (${c.tokens.toLocaleString()} token)`).join(', ') || '无'}${levelLine}${outBudget ? `\n${outBudget}` : ''}`,
           'info',
         );
         return;

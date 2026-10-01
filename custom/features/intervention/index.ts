@@ -14,7 +14,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { checkToolCall } from './shadow-review';
+import { checkToolCall, shadowReviewReport } from './shadow-review';
 import { registerCommand } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
@@ -150,12 +150,19 @@ export function register(pi: ExtensionAPI): void {
 
       if (sub === 'stats') {
         const s = summarize(records);
+        // 影子审查发现按规则聚合（P4 第三批接线：recordFinding/checkToolCall 在生产写，聚合报告此前无人读）
+        const shadow = shadowReviewReport(7);
+        const shadowRules = Object.entries(shadow);
+        const shadowLine = shadowRules.length
+          ? `影子审查(近7天): ${shadowRules.map(([rule, v]) => `${rule}×${v.count}`).join(', ')}`
+          : '影子审查(近7天): 无发现';
         ctx.ui.notify(
           [
             `中断快照总数: ${s.total}`,
             `已关联纠正意图: ${s.corrected}${s.total ? ` (${Math.round((s.corrected / s.total) * 100)}%)` : ''}`,
             `含 steering 纠正: ${s.withSteering}`,
             `近 7 天: ${s.lastWeek}`,
+            shadowLine,
             `数据文件: ${file}`,
           ].join('\n'),
           'info',

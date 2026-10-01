@@ -8,7 +8,6 @@ import {
   setContextWindow,
   setCompactThreshold,
   setUsedTokens,
-  markCompacted,
   recordToolUsage,
   getBudgetReport,
   getOutputReport,
@@ -36,8 +35,9 @@ describe('context-budget: 跨实例共享（jiti 隔离修复）', () => {
     vi.resetModules();
     const modB = await import('../budget/budget');
 
-    modA.recordOutput('bash', 1000);
-    modB.recordOutput('read', 500);
+    // 记账走真实入口 pruneToolOutput（recordOutput 是同一记账的第二份实现，已删除）
+    modA.pruneToolOutput('x'.repeat(1000), 'bash');
+    modB.pruneToolOutput('y'.repeat(500), 'read');
     expect(modA.getOutputReport()).toContain('bash');
     expect(modA.getOutputReport()).toContain('read');
 
@@ -132,15 +132,6 @@ describe('context-budget: 压力基准 = 压缩阈值（回退窗口）', () => 
     expect(getBudgetReport().pressure).toBe('critical');
   });
 
-  it('markCompacted 后 setUsedTokens 回落为新基线', () => {
-    setContextWindow(200_000);
-    setUsedTokens(180_000);
-    expect(getBudgetReport().pressure).toBe('high');
-    markCompacted();
-    setUsedTokens(60_000);
-    expect(getBudgetReport().ratio).toBeCloseTo(0.3);
-    expect(getBudgetReport().pressure).toBe('low');
-  });
 });
 
 describe('context-budget: 真实校准与输出累计', () => {

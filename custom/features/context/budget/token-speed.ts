@@ -17,11 +17,6 @@ export function estimateTokensFromChars(chars: number, charsPerToken = 4): numbe
   return chars / charsPerToken;
 }
 
-export function formatSpeed(tps: number): string {
-  if (!Number.isFinite(tps) || tps <= 0) return '0 tok/s';
-  return tps < 10 ? `${tps.toFixed(1)} tok/s` : `${Math.round(tps)} tok/s`;
-}
-
 /**
  * 紧凑速度标记（用于并入 footer stats 行）：`⇅` 前缀 + 数值，省略单位后缀，
  * 与 stats 行 `Σ/↑/↓/CH` 的符号风格保持一致。

@@ -1,11 +1,16 @@
 /**
  * usage-stats 纯逻辑回归测试（度量基建 P1）
+ *
+ * 2026-10-01（P4 第三批 B-3）：工具级台账的 TS 侧读/汇总（`readUsage`/`summarizeUsage`/
+ * `formatUsageSummary`）已删除——生产侧由 `scripts/daily-health.mjs` 与
+ * `scripts/tool-stats-sync.mjs` 直接读文件，`/usage-diag` 走 usage-diag 自己的口径。
+ * 这里只锁"写入契约"（其它消费方依赖它）与 bash 命令形态字段。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appendUsage, readUsage, summarizeUsage, formatUsageSummary } from '../usage-stats';
+import { appendUsage, usageFilePath } from '../usage-stats';
 import type { UsageEvent } from '../usage-stats';
 
 let dir: string;
@@ -22,42 +27,30 @@ function ev(over: Partial<UsageEvent> = {}): UsageEvent {
   return { ts: new Date().toISOString(), tool: 'bash', ok: true, ...over };
 }
 
+function lines(): UsageEvent[] {
+  return readFileSync(usageFilePath(), 'utf-8')
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l) as UsageEvent);
+}
+
 describe('usage-stats', () => {
-  it('append/read 往返', () => {
+  it('appendUsage 追加 JSONL（含失败标记与 token 字段）', () => {
     appendUsage(ev({ tool: 'read', input: 100, cacheRead: 50 }));
     appendUsage(ev({ tool: 'bash', outputTokens: 20, ok: false }));
-    const events = readUsage();
+    const events = lines();
     expect(events).toHaveLength(2);
     expect(events[0].tool).toBe('read');
+    expect(events[0].cacheRead).toBe(50);
     expect(events[1].ok).toBe(false);
   });
 
-  it('summarize 统计今日/命中率/高频工具', () => {
-    const now = Date.now();
-    const events: UsageEvent[] = [
-      ev({ ts: new Date(now).toISOString(), tool: 'read', input: 100, cacheRead: 100 }),
-      ev({ ts: new Date(now).toISOString(), tool: 'read', input: 100, cacheRead: 0, output: 50 }),
-      ev({ ts: new Date(now).toISOString(), tool: 'bash', outputTokens: 30, ok: false }),
-    ];
-    const s = summarizeUsage(events, now);
-    expect(s.total).toBe(3);
-    expect(s.failures).toBe(1);
-    expect(s.cacheHitRate).toBeCloseTo(100 / 300, 3);
-    expect(s.topTools[0].tool).toBe('read');
-    expect(s.topTools[0].count).toBe(2);
-    expect(s.todayCount).toBe(3);
+  it('usageFilePath 受 PI_USAGE_FILE 覆盖（脚本与 TS 侧读同一份）', () => {
+    expect(usageFilePath()).toBe(join(dir, 'usage.jsonl'));
   });
 
-  it('非今日事件不计入 today', () => {
-    const now = Date.now();
-    const old = new Date(now - 48 * 3600_000).toISOString();
-    const s = summarizeUsage([ev({ ts: old, input: 10 })], now);
-    expect(s.total).toBe(1);
-    expect(s.todayCount).toBe(0);
-  });
-
-  it('formatUsageSummary 含命中率', () => {
-    const text = formatUsageSummary(summarizeUsage([ev({ input: 1, cacheRead: 1 })], Date.now()));
-    expect(text).toContain('命中率');
+  it('bash 命令形态字段（merged/segments）随事件落盘', () => {
+    appendUsage(ev({ tool: 'bash', merged: true, segments: 3 }));
+    expect(lines()[0]).toMatchObject({ merged: true, segments: 3 });
   });
 });

@@ -7,10 +7,7 @@ import {
   extractTailFromSummarization,
   canReplayWarmPrefix,
   buildReplayedPayload,
-  canProvideWarmPrefix,
-  buildWarmPrefixData,
   saveMainRequestPayload,
-  updateCompactWarmAllowed,
   AUTO_PREFIX_CACHE_REGEX,
   CONV_TAG_REGEX,
 } from '../budget/warm-prefix';
@@ -45,21 +42,6 @@ describe('context/budget/warm-prefix: 状态管理', () => {
     }
   });
 
-  it('updateCompactWarmAllowed 更新压缩暖前缀允许状态', () => {
-    const state = createWarmPrefixState();
-
-    // 非 overflow 且 token 占用 < 90% 时允许
-    updateCompactWarmAllowed(state, 'idle', 1000, 800);
-    expect(state.compactWarmAllowed).toBe(true);
-
-    // overflow 原因时不允许
-    updateCompactWarmAllowed(state, 'overflow', 1000, 800);
-    expect(state.compactWarmAllowed).toBe(false);
-
-    // 非 overflow 但 token 占用 >= 90% 时不允许
-    updateCompactWarmAllowed(state, 'idle', 1000, 950);
-    expect(state.compactWarmAllowed).toBe(false);
-  });
 });
 
 describe('context/budget/warm-prefix: 模型匹配', () => {
@@ -289,102 +271,5 @@ describe('context/budget/warm-prefix: 重放构建', () => {
     };
 
     expect(buildReplayedPayload(state, payload.messages, payload)).toBeNull();
-  });
-});
-
-describe('context/budget/warm-prefix: 暖前缀数据提供', () => {
-  it('canProvideWarmPrefix 满足条件时返回 true', () => {
-    const state = createWarmPrefixState();
-    state.lastModelKey = 'gpt-3.5-turbo';
-    state.compactWarmAllowed = true;
-    state.lastRequestPayload = {
-      messages: [{ role: 'user', content: '测试消息' }],
-      tools: [{ name: 'tool1' }, { name: 'tool2' }], // 有 tools 数据
-    };
-
-    expect(canProvideWarmPrefix(state, 'gpt-3.5-turbo')).toBe(true);
-  });
-
-  it('canProvideWarmPrefix 各项条件不满足时返回 false', () => {
-    const baseState = createWarmPrefixState();
-    baseState.lastModelKey = 'gpt-3.5-turbo';
-    baseState.lastRequestPayload = {
-      messages: [{ role: 'user', content: '测试消息' }],
-      tools: [{ name: 'tool1' }, { name: 'tool2' }],
-    };
-
-    // compactWarmAllowed 为 false
-    let state = { ...baseState, compactWarmAllowed: false };
-    expect(canProvideWarmPrefix(state, 'gpt-3.5-turbo')).toBe(false);
-
-    // 模型不支持
-    state = { ...baseState, compactWarmAllowed: true, lastModelKey: 'llama2' };
-    expect(canProvideWarmPrefix(state, 'llama2')).toBe(false);
-
-    // 无 lastRequestPayload
-    state = { ...baseState, compactWarmAllowed: true, lastRequestPayload: null };
-    expect(canProvideWarmPrefix(state, 'gpt-3.5-turbo')).toBe(false);
-
-    // lastRequestPayload 消息为空
-    state = {
-      ...baseState,
-      compactWarmAllowed: true,
-      lastRequestPayload: { messages: [], tools: [{ name: 'tool1' }] },
-    };
-    expect(canProvideWarmPrefix(state, 'gpt-3.5-turbo')).toBe(false);
-
-    // 无 tools 数据
-    state = {
-      ...baseState,
-      compactWarmAllowed: true,
-      lastRequestPayload: { messages: [{ role: 'user', content: 'test' }], tools: [] },
-    };
-    expect(canProvideWarmPrefix(state, 'gpt-3.5-turbo')).toBe(false);
-
-    // tools 不是数组
-    state = {
-      ...baseState,
-      compactWarmAllowed: true,
-      lastRequestPayload: { messages: [{ role: 'user', content: 'test' }], tools: {} as any },
-    };
-    expect(canProvideWarmPrefix(state, 'gpt-3.5-turbo')).toBe(false);
-  });
-
-  it('buildWarmPrefixData 构建正确的暖前缀数据', () => {
-    const state = createWarmPrefixState();
-    state.lastModelKey = 'gpt-3.5-turbo';
-    state.compactWarmAllowed = true;
-    state.lastRequestPayload = {
-      messages: [
-        { role: 'user', content: '系统提示' },
-        { role: 'user', content: '用户问题' },
-      ],
-      tools: [{ name: 'tool1' }, { name: 'tool2' }],
-    };
-
-    const result = buildWarmPrefixData(state);
-    expect(result).not.toBeNull();
-
-    if (result) {
-      expect(result.systemPrompt).toBe('');
-      expect(Array.isArray(result.tools)).toBe(true);
-      expect(result.tools).toHaveLength(2);
-      expect(Array.isArray(result.messages)).toBe(true);
-      expect(result.messages).toHaveLength(2);
-      expect(result.messages[0]).toEqual({ role: 'user', content: '系统提示' });
-      expect(result.messages[1]).toEqual({ role: 'user', content: '用户问题' });
-    }
-  });
-
-  it('buildWarmPrefixData 条件不满足时返回 null', () => {
-    const state = createWarmPrefixState();
-    state.lastModelKey = 'llama2'; // 不支持的模型
-    state.compactWarmAllowed = true;
-    state.lastRequestPayload = {
-      messages: [{ role: 'user', content: 'test' }],
-      tools: [{ name: 'tool1' }],
-    };
-
-    expect(buildWarmPrefixData(state)).toBeNull();
   });
 });
