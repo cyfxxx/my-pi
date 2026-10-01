@@ -13,8 +13,10 @@
  *   2. pi 原生 `--tools/-t` 启动白名单（`vendor/pi/.../cli/args.ts:147`）。
  * 本守门只锁"不许无声膨胀"；是否默认收窄见 `DECISIONS.md` 与 `docs/design/UPGRADE-LEDGER.md`。
  */
-import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
@@ -83,6 +85,20 @@ function bytesOf(t: Captured): number {
     'utf-8',
   );
 }
+
+// 本守门会注册**全部**功能：必须把运行时目录指向临时目录，否则未来某个功能在 register 期
+// 写文件就会污染真实 `portable/memory`（只读当前实现不写，但守门要防的是将来）。
+let tmpRoot = '';
+beforeEach(() => {
+  tmpRoot = mkdtempSync(join(tmpdir(), 'my-pi-tools-'));
+  process.env.PI_MEMORY_DIR = join(tmpRoot, 'memory');
+  process.env.PI_CODING_AGENT_DIR = join(tmpRoot, 'agent');
+});
+afterEach(() => {
+  delete process.env.PI_MEMORY_DIR;
+  delete process.env.PI_CODING_AGENT_DIR;
+  rmSync(tmpRoot, { recursive: true, force: true });
+});
 
 describe('工具面体积守门', () => {
   it('总量/单项/数量都在预算内（超出时打印占比最高的工具）', async () => {
