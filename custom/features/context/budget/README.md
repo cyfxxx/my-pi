@@ -17,7 +17,7 @@
 | `compression.ts` | 压缩前快照（`checkpoints/compact/`，旧版根目录兼容清理）与 JSON 缩减 | `snapshotBeforeCompact`、`pruneSnapshots`、`shrinkHalf`、`compactJson`、`snapshotDir`、`legacySnapshotDir` |
 | `task-gate.ts` | 阈值/门限解析（含 env 覆盖）与后台任务判定 | `ABSOLUTE_TOKENS`/`RESTART_TOKENS`/`COMPACT_COOLDOWN_MS`/`IDLE_MS`/`TASK_GATE`、`resolveContext`、`hasBackgroundTask` |
 | `auto-compact.ts` | 压缩判定与阈值计算 | `computeCompactThreshold`、`makeCompactDecider`、`makeAutoContinueGate` |
-| `prefix-fingerprint.ts` | 逐请求前缀指纹（system/tools/消息头/总量分段哈希） | `fingerprintRequest`、`formatFingerprint`、`systemTextOf`、`FINGERPRINT_HEAD_MESSAGES` |
+| `prefix-fingerprint.ts` | 逐请求前缀指纹（system/tools/消息头/**全消息序列分段**/总量哈希） | `fingerprintRequest`、`formatFingerprint`、`systemTextOf`、`messageSegments`、`firstDivergentSegment`、`FINGERPRINT_HEAD_MESSAGES`、`FINGERPRINT_SEGMENT_MESSAGES` |
 | `thinking-level.ts` | 思考档位自动升降 | `tickThinkingLevel`、`proposeThinkingLevel`、`inferTaskType` |
 | `tool-groups.ts` / `tool-layering.ts` | 工具分层与休眠组 | `SLEEPING_GROUPS`、`buildSleepingSummary`、`applyToolLayering`、`enableGroup` |
 | `tool-health.ts` | 错误输出精简与失败熔断提示 | `dehydrateErrorOutput`、`updateFailStreak`、`FAIL_STREAK_LIMIT` |
@@ -56,6 +56,9 @@
   消息 append-only 追加（仅在内容变化时），避免前缀最前处变动导致整段缓存失效。
 - 禁止时间戳/精确数值进入注入面；token 估算统一走 `estimateTokens`。
 - 缓存断裂归因用 `prefix-fingerprint.ts`（记录到 `portable/memory/logs/prefix-fingerprints.jsonl`，`/context fingerprint` 查看）。
+  其中 `changed` 里的 `messages@<start>-<end>` 给出**前缀失效的起点消息下标**：`messages@0-7` 等价整段重放（最贵），
+  起点越靠后代价越小；**尾部追加不算分叉**（只记 `messages`），否则正常追加会被误报成整段失效。
+  2026-10-01 之前的记录没有 `segments` 字段，分叉统计只对新增记录有效。
   已知断裂源按代价排序：每轮擦除（已关闭）> 会话中途 `enable_tool` 改工具集（已关闭：全部常驻）> system prompt 变化 > 记忆注入首次刷新。
 - **工具 schema 常驻 vs 休眠分层**：schema 在请求最前处，会话中途 enable 一次 = 整段重算（实测 $0.01–0.04，
   重启后还要再 enable）；休眠组常驻只按命中价计费，一次 enable 的成本就超过整场会话的常驻成本。

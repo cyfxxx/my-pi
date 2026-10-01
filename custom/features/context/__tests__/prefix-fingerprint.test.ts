@@ -5,6 +5,8 @@ import { describe, it, expect } from 'vitest';
 import {
   fingerprintRequest,
   formatFingerprint,
+  messageSegments,
+  firstDivergentSegment,
   systemTextOf,
   FINGERPRINT_HEAD_MESSAGES,
 } from '../budget/prefix-fingerprint';
@@ -127,7 +129,7 @@ describe('systemTextOf', () => {
  *      （实测 2026-09-27 12:05:59 切 low → cacheRead 0/142,075，其间其它分段无变化）。
  */
 describe('prefix-fingerprint 盲区回归', () => {
-  it('中段消息内容被改写、条数不变 → changed 含 total（旧实现为 []）', () => {
+  it('中段消息内容被改写、条数不变 → 定位到首个分叉段（旧实现只记 total/messages，无法定位）', () => {
     const a = fingerprintRequest(
       {
         messages: [
@@ -166,7 +168,42 @@ describe('prefix-fingerprint 盲区回归', () => {
     expect(b.messageCount).toBe(a.messageCount);
     expect(b.head).toBe(a.head);
     expect(b.total).not.toBe(a.total);
-    expect(b.changed).toEqual(['total']);
+    // 第 7 条落在第 0 段（0-7）→ 分叉点就是段 0，说明这次改写让整段前缀作废
+    expect(b.changed).toEqual(['messages@0-7']);
+  });
+
+  it('分叉段随改写位置后移（越靠后越便宜）', () => {
+    const mk = (n: number, mutateAt = -1) =>
+      Array.from({ length: n }, (_, i) => ({ role: 'user', content: i === mutateAt ? 'MUT' : `m${i}` }));
+    const a = fingerprintRequest({ messages: mk(40) }, null, 1);
+    const b = fingerprintRequest({ messages: mk(40, 35) }, a, 2);
+    expect(b.changed).toContain('messages@32-39');
+    const c = fingerprintRequest({ messages: mk(40, 1) }, a, 3);
+    expect(c.changed).toContain('messages@0-7');
+  });
+
+  it('尾部追加（公共段一致、条数变）→ 只记 messages，不误报分叉', () => {
+    const base = Array.from({ length: 16 }, (_, i) => ({ role: 'user', content: `m${i}` }));
+    const a = fingerprintRequest({ messages: base }, null, 1);
+    const b = fingerprintRequest({ messages: [...base, { role: 'user', content: 'new' }] }, a, 2);
+    expect(b.changed).toEqual(['messages']);
+    expect(b.segments.slice(0, 2)).toEqual(a.segments.slice(0, 2));
+  });
+
+  it('messageSegments / firstDivergentSegment 边界', () => {
+    expect(messageSegments([])).toEqual([]);
+    expect(messageSegments(Array.from({ length: 17 }, (_, i) => ({ role: 'user', content: i })))).toHaveLength(3);
+    // prev 缺失（首次请求）或长度为零 → 不分叉
+    expect(firstDivergentSegment(undefined, ['x'], 0, 9)).toBeNull();
+    expect(firstDivergentSegment([], [], 0, 0)).toBeNull();
+    // 完整段（两条 8 条序列）第 1 段不同 → 分叉点 = 消息下标 8
+    expect(firstDivergentSegment(['a', 'b'], ['a', 'c'], 16, 16)).toBe(8);
+    // 完整段全同 + 条数相同 + 尾段不同 → 原地改写最后一小段
+    expect(firstDivergentSegment(['a', 'b'], ['a', 'z'], 9, 9)).toBe(8);
+    // 条数变化（9 → 10 追加）→ 不算分叉，交给 messages 计数
+    expect(firstDivergentSegment(['a', 'b'], ['a', 'z'], 9, 10)).toBeNull();
+    // 6 → 7 条：唯一那段是不完整段，内容虽然变了但属于追加
+    expect(firstDivergentSegment(['a'], ['z'], 6, 7)).toBeNull();
   });
 
   it('thinking 档位变化 → changed 含 level', () => {

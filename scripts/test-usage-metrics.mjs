@@ -35,7 +35,7 @@ function check(name, cond, detail = '') {
 }
 
 /** 造一个临时 memory 目录：每轮用量 + 工具级台账 + 前缀指纹。同时造空的 agent 目录，保证用例自洽 */
-function makeFixture({ frontChange }) {
+function makeFixture({ frontChange, segChange = null, coldStarts = 0 }) {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-'));
   const mem = join(root, 'memory');
   const agent = join(root, 'agent');
@@ -61,27 +61,57 @@ function makeFixture({ frontChange }) {
     JSON.stringify({ ts: now - 1000, tool: 'bash', ok: true, outputTokens: 191 }) + '\n',
   );
 
+  const seg = (tag) => [tag, 'b', 'c'];
+  const changed = (extra) => [...(extra ? [extra] : []), 'messages'];
   const fps = [
-    { ts: now - 3000, total: 'aaa', system: 's1', tools: 't1', head: 'h1', level: 'high', messageCount: 4, changed: ['messages'] },
+    {
+      ts: now - 3000,
+      sinceLastMs: 9000,
+      total: 'aaa',
+      system: 's1',
+      tools: 't1',
+      head: 'h1',
+      segments: seg('s0'),
+      level: 'high',
+      messageCount: 4,
+      changed: ['messages'],
+    },
     {
       ts: now - 1000,
+      sinceLastMs: 2000,
       total: 'bbb',
       system: 's1',
       tools: 't2',
       head: 'h1',
+      // 段 0 与上一条相同；`messages@0-7` 由「段 0 分叉」造出（segChange='head' 时改为不同）
+      segments: segChange === 'head' ? seg('sX') : seg('s0'),
       level: 'high',
       messageCount: 6,
-      changed: frontChange ? ['tools', 'messages'] : ['messages'],
+      changed: changed(
+        segChange === 'head' ? 'messages@0-7' : segChange === 'mid' ? 'messages@32-39' : frontChange ? 'tools' : null,
+      ),
     },
+    // 冷启动：无 sinceLastMs 的记录 = 进程首个请求（fingerprintRequest 在 prev=null 时省略该字段）
+    ...Array.from({ length: coldStarts }, (_, i) => ({
+      ts: now - 500 + i,
+      total: `cold${i}`,
+      system: 's1',
+      tools: 't2',
+      head: 'h1',
+      segments: seg('s0'),
+      level: 'high',
+      messageCount: 6,
+      changed: [],
+    })),
   ];
   writeFileSync(join(mem, 'logs', 'prefix-fingerprints.jsonl'), fps.map((r) => JSON.stringify(r)).join('\n') + '\n');
   return { root, mem, agent };
 }
 
-function runHealth({ mem, agent }) {
+function runHealth({ mem, agent }, extraEnv = {}) {
   const r = spawnSync('node', [join(ROOT, 'scripts', 'daily-health.mjs'), '--print'], {
     encoding: 'utf8',
-    env: { ...process.env, PI_MEMORY_DIR: mem, PI_CODING_AGENT_DIR: agent },
+    env: { ...process.env, PI_MEMORY_DIR: mem, PI_CODING_AGENT_DIR: agent, ...extraEnv },
     timeout: 30000,
   });
   return (r.stdout || '') + (r.stderr || '');
@@ -118,6 +148,51 @@ function runHealth({ mem, agent }) {
     check('命中 98.5% 不低于安全线，不产生命中率告警', !out.includes('加权命中率'));
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+// ── 用例 2b：分段分叉定位（2026-10-01 新增口径）──
+// 旧口径只认 system/tools/head/level，`messages@0-7`（整段重放）会被漏掉；
+// 起点靠后的分叉代价递减，不应与整段失效混为一谈。
+{
+  const head = makeFixture({ frontChange: false, segChange: 'head' });
+  try {
+    const out = runHealth(head);
+    check('首段分叉被计数', out.includes('首段分叉=1'), out.trim().split('\n')[0]);
+    check('首段分叉触发 alert', out.includes('结论=alert'));
+    check('首段分叉归因写明「等价整段重放」', out.includes('等价整段重放'));
+    check('分叉定位给出起点', out.includes('messages@0-7'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(head.root, { recursive: true, force: true });
+  }
+
+  const mid = makeFixture({ frontChange: false, segChange: 'mid' });
+  try {
+    const out = runHealth(mid);
+    check('中后段分叉单独计数', out.includes('中后段分叉=1'), out.trim().split('\n')[0]);
+    check('中后段分叉不报整段重放', !out.includes('等价整段重放'));
+    check('中后段分叉不产生前缀前端告警', !out.includes('前缀前端变更'));
+  } finally {
+    rmSync(mid.root, { recursive: true, force: true });
+  }
+}
+
+// ── 用例 2c：冷启动计数（自改/重启的固有代价）──
+{
+  const many = makeFixture({ frontChange: false, coldStarts: 3 });
+  try {
+    const out = runHealth(many, { PI_HEALTH_COLDSTART_CEIL: '1' });
+    check('冷启动被计数', out.includes('冷启动=3'), out.trim().split('\n')[0]);
+    check('冷启动超阈值触发 alert', out.includes('进程冷启动'));
+  } finally {
+    rmSync(many.root, { recursive: true, force: true });
+  }
+  const few = makeFixture({ frontChange: false, coldStarts: 1 });
+  try {
+    const out = runHealth(few, { PI_HEALTH_COLDSTART_CEIL: '8' });
+    check('冷启动未超阈值不告警', !out.includes('进程冷启动'));
+  } finally {
+    rmSync(few.root, { recursive: true, force: true });
   }
 }
 
