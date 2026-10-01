@@ -18,7 +18,7 @@
 
 | 脚本 | 用途 |
 |------|------|
-| `doctor.sh` | 本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin/vendor 离线归档）；`--fix` 自动修复，`--full`/`--no-net` |
+| `doctor.sh` | 本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin/**vendor 离线归档是否含当前 PINNED_COMMIT**）；`--fix` 自动修复，`--full`/`--no-net` |
 | `check-isolation.sh` | 隔离边界（symlink、禁用目录、逻辑层 Pi 依赖、vendor 干净等 9 项） |
 | `check-features.sh` | 功能完整性（12 feature 目录 + 生成式注册面基线 + 适配器 API + 钩子事件 + 配置/脚本/补丁） |
 | `gen-registrations.mjs` | 从代码生成/校验注册面基线 `registration-baseline.json`（`--update` 刷新）；替代手写清单防漂移 |
@@ -33,7 +33,7 @@
 | `test-usage-metrics.mjs` | 成本度量口径守门（13 项，零 LLM）：合成数据驱动 `daily-health.mjs`，锁定命中率取自**每轮用量**而非工具级台账、前缀前端变更（system/tools/head/level）会触发告警、缺数据时记 n/a 而非瞎算 |
 | `patch-playwright-core.mjs` | Termux 下把 playwright-core 的 linux 分支扩展至 android（幂等） |
 | `install-hooks.sh` | 启用 `.githooks/`（pre-commit → `golden --fast`，pre-push → 全量）；本地无 CI，钩子是唯一自动防线 |
-| `vendor-bundle.sh` | vendor/pi 离线归档（`create`/`restore`/`status`）；bundle 不入库 |
+| `vendor-bundle.sh` | vendor/pi 离线归档（`create`/`restore`/`status`）；`status` 会标注每个归档**是否含当前 PINNED_COMMIT**（只报"存在"会假安全）；bundle 不入库 |
 
 ## 对外服务
 

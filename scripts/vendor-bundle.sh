@@ -89,13 +89,21 @@ cmd_status() {
   else
     echo "vendor/pi: 不存在（fresh checkout，需引导）"
   fi
-  local found=0
+  local found=0 b heads
   for b in "$ROOT"/vendor/*.bundle; do
     [ -e "$b" ] || continue
     found=1
-    echo "离线归档: $b（$(du -h "$b" | cut -f1)）"
+    # 归档可用性 = 含当前 PINNED_COMMIT（否则 restore 后 checkout 必然失败）。
+    # 只报"存在"会给出假安全：实测同时存在 v0.87.0 与 v0.99.1 两个归档，只有后者可用。
+    if [ -n "$sha" ] && git bundle list-heads "$b" 2>/dev/null | awk '{print $1}' | grep -qxF "$sha"; then
+      echo "离线归档: $b（$(du -h "$b" | cut -f1)，含当前 PINNED ✅）"
+    else
+      heads="$(git bundle list-heads "$b" 2>/dev/null | awk '{print substr($1,1,9)}' | paste -sd, -)"
+      echo "离线归档: $b（$(du -h "$b" | cut -f1)，不含当前 PINNED ⚠ 归档头: ${heads:-读取失败}）"
+    fi
   done
   [ "$found" = "0" ] && echo "离线归档: 无 ⚠（上游若改写历史将无法引导；建议 bash scripts/vendor-bundle.sh create 并另存）"
+  return 0 # 前面的 `[ ] && echo` 在条件为假时会让脚本以 1 退出，破坏调用方的 && 链
 }
 
 case "${1:-status}" in

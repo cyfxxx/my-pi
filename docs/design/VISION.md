@@ -9,8 +9,8 @@
 
 | 属性 | 值 |
 |------|-----|
-| 版本 | v2.0 |
-| 更新日期 | 2026-09-25 |
+| 版本 | v3.1 |
+| 更新日期 | 2026-10-01 |
 | 适用范围 | 项目愿景、方法论、治理规则、落地路线 |
 | 相关文档 | [DECISIONS.md](../../DECISIONS.md)、[PROGRESS.md](../../PROGRESS.md)、[../development/SKILLS-MAINTENANCE.md](../development/SKILLS-MAINTENANCE.md) |
 
@@ -85,13 +85,15 @@ my-pi 当前安全网 = `npm run golden`（12 步：隔离/注册面/死导出/�
 
 | 层 | 指标 | pi-tools 对应工具 | my-pi 现状 |
 |---|---|---|---|
-| 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有**：`custom/features/context/usage-stats.ts` 持久化工具 token/缓存读写（`usage.jsonl`），`/context usage` 产出命中率；`scripts/check-injection-surface.sh` 注入面前缀指纹守门 |
+| 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有（口径已升级）**：成本/缓存度量以**每轮用量** `portable/memory/context/.usage-diag.jsonl` 为准（`usage.jsonl` 是工具级台账、没有缓存字段，**不要用它算命中率**），前缀断裂归因用 `portable/memory/logs/prefix-fingerprints.jsonl`（system/tools/head/thinking 档位变更）；`scripts/daily-health.mjs` 产出**加权命中率 / 未命中每轮 / 输出占比 / 前缀前端变更次数**（阈值 `PI_HEALTH_HIT_FLOOR`=0.97、`PI_HEALTH_UNCACHED_CEIL`=3000），`scripts/check-injection-surface.sh` 守注入面前缀指纹，`scripts/test-usage-metrics.mjs` 守度量口径本身 |
 | 干预 | abort 快照留存率 / corrective 关联率 | pi-intervention → `memory/interventions.jsonl` | **已有**：`custom/features/intervention/` 落盘 `portable/memory/interventions.jsonl`，`/intervention stats` 产出关联率/近 7 天 |
-| 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **已有**：autopilot telemetry（按模型/任务成功率 + 预算）`/auto stats` |
-| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh` 12 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端）+ 死导出与补丁行为守门 + `.githooks/`；622 单测用例 |
+| 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **已有**：autopilot telemetry（按模型/任务成功率 + 预算）`/auto stats`；任务执行情况另有 `/daily`（每日任务视图：今日完成/待跑/失败、上次结果、启停） |
+| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh` 13 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量）+ 死导出与补丁行为守门 + `.githooks/`；**696 单测用例 / 60 文件**（`--smoke` 追加无头冒烟） |
+| 上游 | 变更代价（补丁失配 / API 面 / churn / 破坏性默认值） | — | **已有**：`scripts/check-upstream.sh` 只读体检（各包 churn、新增包、changelog 新增版本段与破坏性关键词、逐个补丁的目标文件是否被上游改过、adapters 依赖的 API 面逐符号核对），结论=已最新/可同步/需先改补丁；流程与"不想要的变更"四档手段见 `docs/operations/UPSTREAM-UPDATE.md` |
 | 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 / 垃圾与聚合 | memory-lifecycle.mjs（只读报告） | **已有**：`memory/store/storage.ts` 治理字段就绪；`memory/mine/lifecycle.ts` + `/memory lifecycle` 出六类候选，`scripts/memory-lifecycle.mjs --json` 供 headless 定时任务消费 |
 
-结论：度量层已基本建成（P1/P2/P3 达成）；仅 P4 升格通道待推进。落地顺序见 §6。
+结论：度量层已建成（P1/P2/P3 达成，且缓存口径已从"工具级台账"升级为"每轮用量 + 前缀断裂归因"）；
+上游变更面从"事后读 changelog"升级为**同步前确定性读数**；仅 P4 升格通道待推进。落地顺序见 §6。
 
 ## 五、记忆生命周期治理规则 v1
 
@@ -136,3 +138,4 @@ my-pi 当前安全网 = `npm run golden`（12 步：隔离/注册面/死导出/�
 - 2026-08-26 v1：初稿。用户口述愿景整理 + 四大基建计划（P1 干预捕获 / P2 任务遥测 / P3 golden tasks / P4 记忆生命周期）。
 - 2026-09-20 v2：自 pi-tools 迁移并按 my-pi 现状重写。保留 §1–§3、§5 的愿景与方法论（仅把落点映射到 my-pi 的目录与硬约束）；§4 度量表由"pi-tools 全绿"改写为 my-pi 真实差距（度量层整体缺失）；§5 明确标注为目标设计；新增 §6 落地路线（P0 已完成 → P4），替代原 pi-tools `SELF-OPTIMIZING-ROADMAP.md`。
 - 2026-09-25 v3：按实现现状回填 §4/§5/§6：度量层 P1–P3 全部达成（golden 11 步 + 死导出/补丁行为守门 + `.githooks/`，514 用例）；§5 增补垃圾嫌疑/聚合候选规则并标注已落地（含 headless 入口 `scripts/memory-lifecycle.mjs`）；P4 升格通道为唯一未完成阶段。
+- 2026-10-01 v3.1：§4 现状列再回填——缓存口径由"工具级台账 `usage.jsonl`"更正为"每轮用量 `.usage-diag.jsonl` + 前缀断裂归因 `prefix-fingerprints.jsonl`，指标含加权命中率/未命中每轮/输出占比/前缀前端变更次数"；回归 golden 12 步 → **13 步、622 → 696 用例**；新增「上游」行（`check-upstream.sh` 把"升级代价"变成同步前的确定性读数）；任务行补 `/daily`。§1–§3、§5 的愿景与方法论未改动。

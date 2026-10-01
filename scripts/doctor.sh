@@ -70,11 +70,27 @@ if [ -d "$VENDOR_PI/.git" ]; then
   else
     bad "LAST_SYNC_POINT 缺失或格式无效"
   fi
-  # 离线兜底：上游改写历史/删库时，只有 bundle 能恢复 vendor（仓库本身不存 bundle）
-  if ls "$ROOT"/vendor/*.bundle >/dev/null 2>&1; then
-    ok "vendor 离线归档存在（$(ls -1 "$ROOT"/vendor/*.bundle | wc -l | tr -d ' ') 个）"
-  else
+  # 离线兜底：上游改写历史/删库时，只有 bundle 能恢复 vendor（仓库本身不存 bundle）。
+  # 判据不能只是"归档存在"：实测出现过"归档存在但不含当前 PINNED_COMMIT"（v0.87.0 时代的
+  # 旧归档）一路绿灯，而 restore 后 checkout 必然失败——那是假安全，比没有归档更危险。
+  _pin="$(head -1 "$ROOT/vendor/PINNED_COMMIT" 2>/dev/null | tr -d '[:space:]')"
+  _bundles=(); for _b in "$ROOT"/vendor/*.bundle; do [ -e "$_b" ] && _bundles+=("$_b"); done
+  if [ "${#_bundles[@]}" -eq 0 ]; then
     warn "无 vendor 离线归档（上游改写历史将无法引导；bash scripts/vendor-bundle.sh create 后另存仓库外）"
+  else
+    _matched=0
+    if [ -n "$_pin" ]; then
+      for _b in "${_bundles[@]}"; do
+        if git bundle list-heads "$_b" 2>/dev/null | awk '{print $1}' | grep -qxF "$_pin"; then
+          _matched=$((_matched + 1))
+        fi
+      done
+    fi
+    if [ "$_matched" -gt 0 ]; then
+      ok "vendor 离线归档可用（${#_bundles[@]} 个，其中 $_matched 个含 PINNED ${_pin:0:9}）"
+    else
+      warn "离线归档存在（${#_bundles[@]} 个）但都不含当前 PINNED_COMMIT（${_pin:0:9}）——restore 后会 checkout 失败；运行 bash scripts/vendor-bundle.sh create"
+    fi
   fi
   if [ "$FIX" = "1" ]; then
     NEED=0; for p in "$ROOT"/patches/*.patch; do

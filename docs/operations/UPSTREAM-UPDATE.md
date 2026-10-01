@@ -114,6 +114,20 @@ bash scripts/golden-tasks.sh        # 全量行为门（--fast 只跑结构守�
 `check-injection-surface.sh` 会报红——那不是 bug，是提示你确认前缀指纹的变化是否符合预期
 （确认后用 `--update` 刷新基线）。
 
+`doctor.sh` 的离线归档判据已加强：不再只看"归档存在"，而是要求**至少一个归档含当前
+`PINNED_COMMIT`**（用 `git bundle list-heads` 比对）。只报存在会给出假安全——实测同时存在
+v0.87.0 与 v0.99.1 两个归档，只有后者能用于引导。
+
+---
+
+## 已知待办（触发条件式，不是"有空再做"）
+
+| 触发条件 | 动作 | 依据 |
+|---|---|---|
+| **要给 my-pi 接 MCP** | **先升到上游 v0.99.2** | 我们固定的 v0.99.1+19 里 `codemode` / `tool_search` 的 description 会随 MCP 服务器的工具集变化（含 deferred 工具、工具计数、服务器指令），**服务器一变就整段前缀失效**；v0.99.2 明确修掉这一点，改成 `mcp_servers` 系统提示段 + **append-only**（与我们在 `AGENTS.md` 立的规矩同源）。体检实测：v0.99.2 距当前基线 40 提交 / 217 文件，9 个补丁里只有 `002` 的 `config.ts` 需要跟着改，属低风险 |
+| 要用 `Sign in with ChatGPT`（`/login openai`） | 提交前清掉 `portable/agent/settings.json` 里的 `deviceId` | 该键是安装级 UUID，只在首次登录时创建，而 settings.json 是**入库**文件（见 `AGENTS.md`「运行时状态不入库」） |
+| 上游出现"默认开启"的新能力（如配了 MCP 就自动激活 codemode） | 按下面「不想要的变更」四档处理，并在 `DECISIONS.md` 留记录 | 默认值变化不会让 `git apply` 或 `tsc` 报错，只有人看得见 |
+
 ---
 
 ## 不想要的变更怎么处理
