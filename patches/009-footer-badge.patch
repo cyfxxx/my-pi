@@ -1,0 +1,65 @@
+diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
+index 1e80f1980..219e23255 100644
+--- a/packages/coding-agent/src/modes/interactive/components/footer.ts
++++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
+@@ -44,6 +44,16 @@ export function formatCwdForFooter(cwd: string, home: string | undefined): strin
+ 	return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
+ }
+ 
++/**
++ * Patch (009-footer-badge): 扩展状态 key 以该前缀注册时，剥离前缀后渲染到第一行
++ * （pwd + git branch 行）尾部并高亮，用于计划模式这类常驻模式标识；其余 key 仍落到第三行状态行。
++ *
++ * 为什么不放第三行：模式标识与「当前目录/分支」同属会话级状态，应像 pwd 一样常驻可见；
++ * 第三行是扩展临时状态的堆放处（按 key 排序、可被挤占）。key 用前缀而非白名单，
++ * 是为了让后续新增模式（如 roleplay）零改动复用。
++ */
++export const BADGE_STATUS_PREFIX = "badge:";
++
+ // Patch (008-footer-cache-var-cleanup): 007 弃用 latestCacheHitRate 后，补齐 SessionStats
+ // 接口字段、stats 对象属性与 render 解构三处引用的删除（否则 tsc TS18004）。
+ interface SessionStats {
+@@ -170,6 +180,16 @@ export class FooterComponent implements Component {
+ 			pwd = `${pwd} • ${sessionName}`;
+ 		}
+ 
++		// Patch (009-footer-badge): 收集 badge: 前缀的扩展状态，稍后追加到第一行尾部。
++		// 空串视为清除（与 setStatus(key, undefined) 效果一致），统一过滤。
++		const extensionStatuses = this.footerData.getExtensionStatuses();
++		const pwdBadges = Array.from(extensionStatuses.entries())
++			.filter(([key]) => key.startsWith(BADGE_STATUS_PREFIX))
++			.map(([key, text]) => [key, sanitizeStatusText(text)] as const)
++			.filter(([, text]) => text.length > 0)
++			.sort(([a], [b]) => a.localeCompare(b))
++			.map(([, text]) => `[${text}]`);
++
+ 		// Build stats line
+ 		// Patch (004-footer-tweaks): 前 3 字段改为 Σ总输入(prompt 总量=命中+未命中) / ↑累计未命中 / ↓累计输出；R/W 并入 Σ。
+ 		// Patch (007-footer-reorder): 顺序定为 Σ总输入 → ↓输出 → CH会话累计 → ¥费用 → 上下文 → ⇅速度；
+@@ -316,15 +336,23 @@ export class FooterComponent implements Component {
+ 		const remainder = statsLine.slice(statsLeft.length); // padding + rightSide
+ 		const dimRemainder = theme.fg("dim", remainder);
+ 
+-		const pwdLine = truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "..."));
++		// Patch (009-footer-badge): badge 段必须放在 dim(pwd) 之后并单独着色——
++		// 反过来把 badge 拼进 pwd 再整体 dim，会把高亮连同 badge 一起吃掉。
++		const pwdLine = truncateToWidth(
++			pwdBadges.length > 0
++				? `${theme.fg("dim", pwd)} ${theme.fg("warning", pwdBadges.join(" "))}`
++				: theme.fg("dim", pwd),
++			width,
++			theme.fg("dim", "..."),
++		);
+ 		const lines = [pwdLine, dimStatsLeft + dimRemainder];
+ 
+ 		// Add extension statuses on a single line, sorted by key alphabetically.
+ 		// Patch (005-footer-speed-and-scrollback): "tps" 已并入 stats 行，这里排除；
+ 		// 其余状态行统一 dim，与 footer 其余内容保持一致。
+-		const extensionStatuses = this.footerData.getExtensionStatuses();
++		// Patch (009-footer-badge): badge: 前缀已并入第一行，第三行排除以免重复显示。
+ 		const otherStatuses = Array.from(extensionStatuses.entries())
+-			.filter(([key]) => key !== "tps")
++			.filter(([key]) => key !== "tps" && !key.startsWith(BADGE_STATUS_PREFIX))
+ 			.sort(([a], [b]) => a.localeCompare(b))
+ 			.map(([, text]) => sanitizeStatusText(text));
+ 		if (otherStatuses.length > 0) {

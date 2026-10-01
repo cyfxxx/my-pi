@@ -47,6 +47,11 @@ export interface ToolExecuteContext {
   editor?: (title: string, prefill?: string) => Promise<string | undefined>;
   /** 本轮工具调用的中止信号（ctx_exec 等长任务用；pi 未提供时为 undefined） */
   signal?: AbortSignal;
+  /**
+   * 写 footer 状态（key 以 `badge:` 前缀时进第一行 pwd 旁，否则进第三行状态行；
+   * text 传 undefined 清除）。工具侧唯一能改 footer 的通道，非交互时为 undefined。
+   */
+  setStatus?: (key: string, text: string | undefined) => void;
 }
 
 /**
@@ -111,6 +116,7 @@ function buildExecuteContext(piCtx: unknown, signal?: AbortSignal): ToolExecuteC
       notify?: (message: string, level?: string) => void;
       select?: (title: string, options: string[]) => Promise<string | undefined>;
       editor?: (title: string, prefill?: string) => Promise<string | undefined>;
+      setStatus?: (key: string, text: string | undefined) => void;
     };
   };
   const model =
@@ -127,6 +133,7 @@ function buildExecuteContext(piCtx: unknown, signal?: AbortSignal): ToolExecuteC
     select: typeof c.ui?.select === 'function' ? (t, o) => c.ui!.select!(t, o) : undefined,
     editor: typeof c.ui?.editor === 'function' ? (t, p) => c.ui!.editor!(t, p) : undefined,
     signal,
+    setStatus: typeof c.ui?.setStatus === 'function' ? (k, t) => c.ui!.setStatus!(k, t) : undefined,
     cwd: typeof c.cwd === 'string' ? c.cwd : undefined,
   };
 }

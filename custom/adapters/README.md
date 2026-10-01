@@ -16,7 +16,10 @@
 
 - `HookEvent` 从 Pi 类型派生而非手写清单：无效事件名（如历史上误用的 `before_tool_call`）会在 `tsc` 阶段报错。
 - 工具参数用简化的 `ToolParameter` 描述，由 `tool-adapter` 编译成合法 TypeBox schema。
-- `ToolExecuteContext` 是 `ExtensionContext` 的稳定子集（`hasUI` / `confirm` / `notify` / `shutdown` 等），供 `index.ts` 使用。
+- `ToolExecuteContext` 是 `ExtensionContext` 的稳定子集（`hasUI` / `confirm` / `notify` / `shutdown` / `setStatus` 等），供 `index.ts` 使用。
+  `setStatus` 是工具侧唯一能改 footer 的通道（钩子/命令侧本来就有 `ctx.ui`）：key 以 `badge:` 前缀时渲染到
+  footer **第一行**（pwd/branch 旁），否则落到第三行状态行；传 `undefined` 清除。当前消费方是
+  `plan-mode` 的计划模式常驻标识。
 - `logic.ts` 及 feature 内部模块**不得** import 本层；跨层只用顶层 `import type`（编译期擦除）。
 
 ## 校验

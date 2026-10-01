@@ -14,7 +14,8 @@ patches/
 ├── 005-footer-speed-and-scrollback.patch  # 速度并入 footer stats 行 + regular 模式保留 scrollback
 ├── 006-footer-cost-and-cache-window.patch  # 汇率可配置 + CH 右值改最近 20 轮滑动窗口
 ├── 007-footer-reorder.patch   # stats 行重排 + 去掉 ↑未命中 + CH 收敛为会话累计单值
-└── 008-footer-cache-var-cleanup.patch  # 清理 007 遗留的 latestCacheHitRate 引用（修复 tsc 编译）
+├── 008-footer-cache-var-cleanup.patch  # 清理 007 遗留的 latestCacheHitRate 引用（修复 tsc 编译）
+└── 009-footer-badge.patch     # footer 第一行 badge：`badge:` 前缀状态渲染到 pwd/branch 旁
 ```
 
 ## 补丁命名规范
@@ -35,6 +36,7 @@ patches/
 | `006-footer-cost-and-cache-window.patch` | ① 成本换算汇率 `CNY_PER_USD` 由硬编码 6.77 改为可配置（`PI_CNY_PER_USD`，默认 7.05）；② CH 右值由“会话累计命中率”改为“最近 20 轮滑动窗口命中率”——累计值被早期未命中轮次稀释（重启/压缩后首轮全量重发）长期停在 95% 附近，滑动窗口随上下文规模贴近真实健康度（正常 99%+） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `007-footer-reorder.patch` | footer stats 行顺序定为 `Σ总输入 → ↓输出 → CH会话累计 → ¥费用 → 上下文 → ⇅速度`（速度移末位并自带 dim，抵消上下文色码 reset）；移除与 Σ 重复的 `↑` 未命中；CH 由「最近一轮/20 轮窗口」双值收敛为单一会话累计命中率 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `008-footer-cache-var-cleanup.patch` | 007 删除了 `latestCacheHitRate` 的声明与赋值，但漏删 `SessionStats` 接口字段、stats 对象属性与 render 解构三处引用，导致 `tsc` 报 TS18004；本补丁补齐删除 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
+| `009-footer-badge.patch` | **footer 第一行的常驻模式标识**：扩展状态 key 以 `badge:` 前缀注册时，剥离前缀后用 `warning` 色渲染在 `~/my-pi (main)` 之后（其余 key 仍走第三行状态行）。动机：计划模式是强只读约束，此前进入后仅一次性 `notify`（提示一滚走就无从判断），`/plan status` 又要主动查询；模式标识与「当前目录/分支」同属会话级状态，应常驻在 pwd 行。用前缀而非白名单，后续模式（roleplay 等）可零改动复用。当前消费方：`custom/features/plan-mode`（`badge:plan`） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 
 ## 验证补丁
 
@@ -45,22 +47,28 @@ bash scripts/check-features.sh          # 补丁可应用或已应用（含顺�
 bash scripts/golden-tasks.sh --fast     # 同上 + 补丁行为标记守门
 ```
 
-> 不要用 `git apply --check --reverse` 逐个判定：004/005/006/007 都改 `footer.ts`，顺序叠加后
+> 不要用 `git apply --check --reverse` 逐个判定：004–009 都改 `footer.ts`，顺序叠加后
 > 单个补丁的 reverse-check 会假失败。判定以**提交历史**为准（`scripts/lib-vendor.sh` 的
 > `vendor_patch_applied`，匹配 `local: NNN-*` 本地提交）；行为是否还在由
-> `scripts/check-patches-behavior.mjs` 断言关键符号/自标记。
+> `scripts/check-patches-behavior.mjs` 断言关键符号/自标记——因此**每个补丁都必须在改动处写
+> `Patch (NNN-name):` 自标记注释并说明理由**，没有标记的补丁在行为守门里等于没有防线。
 
 ## 使用方法
 
 补丁由 `scripts/sync-upstream.sh` 在同步上游后自动应用，或在引导时由 `scripts/build.sh` 应用：
 
 ```bash
+bash scripts/check-upstream.sh    # 先体检：目标基线会不会让补丁失配（只读）
 bash scripts/sync-upstream.sh
 ```
+
+上游同步前先体检、同步后如何验证、以及「上游出现了不想要的变更怎么办」，
+见 [../docs/operations/UPSTREAM-UPDATE.md](../docs/operations/UPSTREAM-UPDATE.md)。
 
 ## 最佳实践
 
 1. **最小化修改**：只修改必要的代码
 2. **清晰描述**：每个补丁都有清晰的作用说明
-3. **及时更新**：上游同步后及时更新补丁
-4. **定期清理**：删除不再需要的补丁
+3. **写自标记注释**：`Patch (NNN-name):` + 问题与取舍（行为守门的唯一锚点）
+4. **及时更新**：上游同步后及时更新补丁
+5. **定期清理**：删除不再需要的补丁（清理前先查 `DECISIONS.md` 里它为什么存在）

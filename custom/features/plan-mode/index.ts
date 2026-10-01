@@ -76,6 +76,25 @@ const PLAN_USAGE = [
 
 export function register(pi: ExtensionAPI): void {
   let planModeEnabled = false;
+  // 计划模式常驻标识（footer 第一行，见 patches/009-footer-badge.patch）：
+  // 状态 key 用 `badge:` 前缀注册，footer 剥离前缀后高亮渲染在 `~/my-pi (main)` 旁边。
+  // 只读是强约束，靠 /plan status 或一次 notify 都不够——提示会滚走，标识必须常驻。
+  const PLAN_BADGE_KEY = 'badge:plan';
+  const PLAN_BADGE_TEXT = '⏸ 计划模式';
+  let badgeUI: { setStatus(key: string, text: string | undefined): void } | null = null;
+  const syncPlanBadge = (): void => {
+    try {
+      badgeUI?.setStatus(PLAN_BADGE_KEY, planModeEnabled ? PLAN_BADGE_TEXT : undefined);
+    } catch {
+      /* 非交互环境（RPC/headless）无 setStatus */
+    }
+  };
+  // 捕获 UI 上下文：同一会话内 ui 对象稳定，抓到一次即可。session_start 已足够，
+  // 命令/快捷键/工具里再抓是为了不依赖 hook 触发顺序（吞掉重复赋值无副作用）。
+  const captureUI = (ui: unknown): void => {
+    const candidate = ui as { setStatus?: (key: string, text: string | undefined) => void } | undefined;
+    if (typeof candidate?.setStatus === 'function') badgeUI = candidate as typeof badgeUI;
+  };
   const overlay = new TodoOverlay();
   // 计划落盘：任务状态变化时同步 plan-<ts>/plan.md（供重启后磁盘恢复）；
   // 空状态（clear）时删除当前计划文件，避免重启后已清空的计划被 restoreStateFromPlans 复活。
@@ -101,6 +120,7 @@ export function register(pi: ExtensionAPI): void {
   const applyPlanMode = (enabled: boolean): void => {
     planModeEnabled = enabled;
     appendEntry(pi, 'plan-mode', { enabled, timestamp: Date.now() });
+    syncPlanBadge();
   };
 
   // ── ask_user（向用户提问取回选择）──
@@ -137,6 +157,7 @@ export function register(pi: ExtensionAPI): void {
     parameters: {},
     execute: async (_params, ctx) => {
       if (planModeEnabled) return '已在计划模式（只读）。';
+      captureUI({ setStatus: ctx?.setStatus });
       applyPlanMode(true);
       ctx?.notify?.('规划模式已启用（模型主动）。');
       return '已进入计划模式（只读）。可用 read/grep 与 bash 只读单命令（ls、cat、grep、git status 等，不支持管道与 && 拼接）探索，可调用 plan_exit 退出（需用户确认）。';
@@ -157,6 +178,7 @@ export function register(pi: ExtensionAPI): void {
         ctx?.notify?.('已取消退出计划模式，保持只读。');
         return '用户取消了退出请求，继续保持计划模式（只读）。等待用户输入。';
       }
+      captureUI({ setStatus: ctx?.setStatus });
       applyPlanMode(false);
       ctx?.notify?.('规划模式已禁用（用户确认）。完整权限已恢复。');
       return '用户已确认退出计划模式，恢复完整权限。';
@@ -219,6 +241,8 @@ export function register(pi: ExtensionAPI): void {
       } catch {
         /* 非交互环境 */
       }
+      captureUI(ctx.ui);
+      syncPlanBadge();
 
       if (sub === 'help' || sub === '') {
         ctx.ui.notify(PLAN_USAGE, 'info');
@@ -260,9 +284,8 @@ export function register(pi: ExtensionAPI): void {
           ctx.ui.notify('没有可恢复的计划任务。请先 /plan enter 创建计划。', 'info');
           return;
         }
-        planModeEnabled = false;
+        applyPlanMode(false);
         overlay.update();
-        appendEntry(pi, 'plan-mode', { enabled: false, timestamp: Date.now() });
         sendMessage(
           pi,
           {
@@ -312,6 +335,7 @@ export function register(pi: ExtensionAPI): void {
   registerShortcut(pi, Key.ctrlAlt('p'), {
     description: '切换计划模式 (Ctrl+Alt+P)',
     handler: async (ctx) => {
+      captureUI(ctx.ui);
       applyPlanMode(!planModeEnabled);
       if (ctx.hasUI) {
         ctx.ui.notify(planModeEnabled ? '计划模式已启用。编辑工具已禁用。' : '计划模式已禁用。完整访问已恢复。', 'info');
@@ -348,6 +372,8 @@ export function register(pi: ExtensionAPI): void {
       } catch {
         /* 非交互环境 */
       }
+      captureUI(ctx.ui);
+      syncPlanBadge();
       if (ctx.hasUI) ctx.ui.notify('计划模式已就绪（/plan help）', 'info');
     },
   });
