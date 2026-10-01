@@ -1185,3 +1185,91 @@ SIGKILL 服务器后，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到
 - `docs/FAQ.md` 的浏览器条目补上"同端口重启免重授权"与指向该小节的交叉引用。
 - 其余操作点（启动命令、隧道、令牌流程、参数表、首屏 20 秒、单会话、多标签镜像、
   每环境独立密钥、xterm 5.5.0 约束）复核后确认**原本已有记录**，不再重复。
+
+## 计划模式标识 + 每日任务命令 + 上游更新体检（第 62 批，2026-10-01）
+
+用户一次提了四件事：计划模式没有界面标识、需要每日任务的查看/启停命令、上次跳版（v0.87.0 →
+v0.99.1）都改了什么、以后更新前如何先看变化以及遇到不想要的变更怎么办。
+
+### 计划模式常驻标识（vendor 补丁 009）
+
+- 现状：footer 第一行是硬编码的 `pwd (branch) • sessionName`，扩展的 `setStatus` 只能落到第三行；
+  进入计划模式只发一次 `notify`（滚走即无痕迹）。
+- 补丁 009 做成**通用前缀约定**：状态 key 以 `badge:` 开头 → 剥离前缀后用 `warning` 色渲染到第一行
+  （`~/my-pi (main) [⏸ 计划模式]`），其余 key 行为不变（`tps` 仍进第二行、其余仍进第三行）。
+- `plan-mode` 侧把标识同步挂到**唯一状态出口** `applyPlanMode()`，并把 `/plan resume` 里那处直接赋值
+  收口过去；UI 上下文在 `session_start` 捕获、命令/快捷键/工具里兜底再抓一次。工具侧此前拿不到
+  `setStatus`，顺带在 `tool-adapter` 的 `ToolExecuteContext` 上补了这个字段（钩子/命令侧本来就有 `ctx.ui`）。
+- 新增 `patches/009-footer-badge.patch`（由 vendor 本地提交 `local: 009-footer-badge` 导出），
+  更新 `patches/README.md`；重建 vendor dist 后生效。
+
+### 每日任务命令 `/daily`
+
+- 「每日任务」= `tasks.json` 里 `tags` 含 `daily` 的任务；当前 5 个（`golden-fast` 07:30、
+  `daily-health` 07:50、`knowledge-subscribe` 08:20、`daily-review` 09:05、`tool-stats-daily` 23:30）。
+- 新增 `custom/features/autopilot/daily.ts`（纯逻辑：筛选/概览/详情/cron 时刻解析/时长与相对时间）
+  与 `/daily <list|show|on|off|help>`，默认输出概览（今日完成·待跑·失败 + 逐条一行 + 失败提示）。
+- 关键口径：无 `daily` 标签时降级显示全部并说明（不静默丢任务）；今日进度按 `lastRun` 本地日期；
+  cron 只在 `M H * * *` 时显示 `HH:MM`，复杂表达式原样显示；`on` 不重算 `nextRun`（错过的触发点下一轮补跑）。
+- `__tests__/daily.test.ts` 18 例；`gen-registrations.mjs --update` 刷新注册面（命令 11 → 12）。
+
+### 上游 v0.87.0 → d2931ad3 变更报告
+
+- 子代理产出 `docs/operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md`（126 行）：130 提交 / 744 文件 /
+  `+90664-24881`；churn 前五 `durable` 41516、`coding-agent` 36108、`chord` 15372、`ai` 10422、`mcp` 4623（新包）。
+- 关键结论：上游**没有 0.88–0.98 发布**（只有 0.87.1 / 0.99.0 / 0.99.1，基点还比 v0.99.1 多 19 个提交）；
+  最需要注意的是 codemode+MCP 新包与自动激活、默认主题改 `system`、TS7/ES2024 工具链、ai 图片模型 API 删除、
+  `--no-extensions` 语义变化；**本区间未新增遥测**。
+
+### 更新前体检 `check-upstream.sh` + 补丁策略文档
+
+- 新增 `scripts/check-upstream.sh`（只读）：目标版本/区间提交数/各包 churn/新增包、changelog 新增版本段
+  与破坏性关键词、**逐个补丁的目标文件是否被上游改过**、adapters 依赖的 API 面（入口文件 + 逐符号核对）；
+  结论=已最新/可同步/需先改补丁；`PI_CHECK_NO_FETCH=1` 离线、`PI_CHECK_STRICT=1` 风险时 `exit 2`。
+- 新增 `docs/operations/UPSTREAM-UPDATE.md`：四步流程（体检 → 读懂 → 决策 → 同步 → 验证）、
+  `sync-upstream.sh` 六步在做什么与失败后的状态、以及**「不想要的变更」四档手段**
+  （关配置 → 改默认值 → 删入口 → 跳过整版）与硬约束（不手改 vendor、不手写 LAST_SYNC_POINT、
+  每条不接受的上游变更在 `DECISIONS.md` 留记录）、新增补丁的标准流程与自标记注释约定。
+- 实测：脚本首次真跑就发现上游已到 `v0.99.2`（+40 提交 / 217 文件），**9 个本地补丁只有 `002` 的
+  `config.ts` 被上游动过**，adapters 导入符号一个没少 → 结论"需先改补丁（1 个）"，属低风险升级。
+
+### 跳版后暴露的两个本地隐患（顺手修掉）
+
+体检脚本的价值立刻体现了一次——顺着"上游删了什么"去查本地依赖，发现两处**只在换机/重新引导后才爆**
+的隐患（本机因为 `npm ci` 没被触发，残留还在，所以表面上一切正常）：
+
+1. **`run-ts.sh` 借的是 `vendor/pi` 的 tsx，而上游 v0.99.0 已删除该依赖**。本地
+   `vendor/pi/node_modules/tsx@4.23.15` 只是升级前的残留（`vendor/pi/package-lock.json` 里已无任何
+   tsx 条目），fresh `npm ci` 后消失 → autopilot 的 `daily-review`、`knowledge-subscribe`（都靠
+   `bash scripts/run-ts.sh scripts/memory-store.mjs` 写记忆）会在换机后**静默失效**。
+   修法：`custom/package.json` 声明 `"tsx": "4.23.15"`（`npm install` → 根 `node_modules/.bin/tsx`），
+   `run-ts.sh` 改为「根 → vendor 残留（告警）→ npx（告警）」三级回退。`package-lock.json` 增 tsx +
+   esbuild 及 26 个平台可选包。
+2. **vendor 离线归档停留在旧 pin**：`vendor/pi-d201760ffee1.bundle` 是 v0.87.0 时代建的（PINNED
+   还是 `d201760f…`），用它 `restore` 后 `checkout d2931ad3…` 必然失败——但 `doctor` 只检查"归档存在"，
+   会给出虚假的安全感。已重新 `vendor-bundle.sh create` 生成 `vendor/pi-d2931ad3d5bf.bundle`（69M，不入库）。
+
+两处的共同教训：**上游删依赖 / 换 pin 时，本地"看起来还能用"不等于还能用**——`check-upstream.sh`
+报的是"补丁与 API 面"，这类"借来的依赖"要靠人顺藤摸瓜，已写进 `UPSTREAM-UPDATE.md` 的常见坑。
+
+### 验证与文档
+
+- `npx tsc --noEmit -p custom/` 通过；新增单测 `autopilot/__tests__/daily.test.ts`（18 例，视图口径）
+  与 `plan-mode/__tests__/badge.test.ts`（6 例：session_start/工具/快捷键/`/plan enter·exit`/`/plan resume`
+  五条状态变更路径都同步标识，非交互环境不抛错）；vitest 全绿。
+- **footer 渲染实测**：直接构造 `FooterComponent`（初始化 theme）渲染三行并断言——
+  无 badge 时第一行 `~/my-pi (main)`；设 `badge:plan` 后为 `~/my-pi (main) [⏸ 计划模式]` 且**行数不变**；
+  同时设 `tps` 与其它状态时，`tps` 仍进第二行 stats、其它状态仍进第三行、第一行不重复出现；
+  传 `undefined` 与空串都清除。这是补丁 009 的端到端证据（不是只断言源码里有标记）。
+- `doctor.sh --no-net`：24 正常 / 0 警告 / 0 异常（`补丁齐备（9）`、`dist 与源码同步（stamp b2347bec2）`）；
+  `check-isolation`、`check-features`、`check-dead-exports`、`check-doc-links`（109 md）、
+  `check-injection-surface`（AGENTS.md 变更后已 `--update`，新指纹 `143bf914…`）、`golden-tasks.sh` 全通过。
+- 顺带修掉一个长期假告警：`patch-playwright-core.mjs` 的 `TARGET_FILES` 里还留着 1.53.x 的两个路径
+  （`lib/server/utils/hostPlatform.js`、`lib/server/registry/index.js`），1.63.0 已把它们并入
+  `lib/coreBundle.js`，于是每次构建都打印"缺失目标，需人工核对"——把这两项删掉（合并目标本来就在表内），
+  现在输出 `应用 0 / 跳过 4 / 缺失 0`。这是 v0.99.1 跳版之外的**既有**遗留（playwright-core 由
+  `custom/package.json` 锁定，与 vendor 无关），但它正好是"构建输出里不该有噪音"的例子。
+- 文档：`patches/README.md`（009 行 + 自标记要求）、`scripts/README.md`、`STRUCTURE.md`（脚本 35 → 36）、
+  `docs/README.md`（新增两篇运维文档）、`custom/features/plan-mode/README.md`（标识机制与原因）、
+  `custom/features/autopilot/README.md`（`/daily` 全表 + 口径）、`custom/adapters/README.md`（`setStatus`）、
+  `portable/agent/AGENTS.md`（脚本数 + 同步前体检 + 补丁优先策略 + 深度文档入口）。

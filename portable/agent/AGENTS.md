@@ -15,7 +15,7 @@ custom/                    # 自定义层（adapters/core/features + web-termina
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
 deploy/                    # 可选系统级部署产物（systemd 等）
-scripts/                   # 35 个运维脚本
+scripts/                   # 36 个运维脚本
 patches/                   # 上游补丁
 ```
 
@@ -127,9 +127,13 @@ bash scripts/sync-upstream.sh      # 上游同步（vendor/pi 为独立 git clon
 `vendor/pi/` 不随主仓库分发（已 gitignore）。fresh checkout 后由 `scripts/build.sh` 自动 clone 上游并 checkout `vendor/PINNED_COMMIT`、应用 `patches/`。
 
 ```bash
+bash scripts/check-upstream.sh             # 同步前体检（只读）：补丁失配风险 / API 面 / changelog 破坏性关键词
 bash scripts/sync-upstream.sh              # 同步到最新上游
 bash scripts/sync-upstream.sh <commit-sha> # 同步到指定 commit
 ```
+
+上游出现不想要的变更时**不回退基线，而是加补丁**（关配置 → 改默认值 → 删入口 → 最后才跳过整版）；
+流程与四档手段见 [../../docs/operations/UPSTREAM-UPDATE.md](../../docs/operations/UPSTREAM-UPDATE.md)。
 
 ## 深度文档
 
@@ -139,6 +143,7 @@ bash scripts/sync-upstream.sh <commit-sha> # 同步到指定 commit
 | 目录结构说明 | `STRUCTURE.md` |
 | 架构进度 | `PROGRESS.md` |
 | 架构决策 | `DECISIONS.md` |
+| 上游更新流程（体检/补丁策略） | `docs/operations/UPSTREAM-UPDATE.md` |
 | 项目总览 | `README.md` |
 | 外部技能包 | `packs/README.md` |
 | Pi 官方文档 | https://pi.dev/docs/latest |

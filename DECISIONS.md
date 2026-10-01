@@ -739,3 +739,75 @@ xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效�
 `xterm-scroll-area`（`scripts/test-web-terminal.mjs` 不覆盖滚动，故写进 README 提醒）。
 **验证**：真实应用（第二实例）触摸下滑后首行 350 → 348 再滑回；`tsc` 通过；
 `scripts/test-web-terminal.mjs` 22 项通过。
+
+---
+
+### [2026-10-01] footer 第一行的常驻模式标识：`badge:` 前缀（vendor 补丁 009）
+**背景**：进入计划模式后，edit/write/非只读 bash 全部被拦截，但 TUI 底部**没有任何标识**。用户只能靠记忆或主动跑 `/plan status` 判断自己在不在这个模式里——而"误以为有写权限"的代价是白跑一轮，反过来误以为只读会不敢动手。
+**现状约束**：footer 第一行是硬编码的 `pwd (branch) • sessionName`（`footer.ts` 的 render 里字符串拼接），扩展**没有任何入口**能写进去；扩展的 `ctx.ui.setStatus(key, text)` 全部落到第三行状态行（按 key 排序、可被其它状态挤占），只有 `tps` 被补丁 005 特判进了第二行 stats 行。
+**选项**：
+1. 用第三行状态行（纯 custom，零 vendor 改动）
+2. 新增 vendor 补丁，把特定 key 的状态渲染到第一行
+3. 扩展自建 `setFooter()` 自定义 footer 组件，完全接管三行
+**决策**：选项 2，且做成**通用前缀约定**（key 以 `badge:` 开头）而非计划模式白名单；消费方是 `plan-mode` 的 `badge:plan`。
+**理由**：
+- 选项 1 不满足需求（用户明确要求"第一行、`~/my-pi (main)` 旁边"），而且第三行本来就拥挤；
+- 选项 3 要复刻 usage 汇总、上下文百分比、着色、模型右对齐等全部逻辑，之后每次上游改 footer 都会形成**无补丁可依的分叉**，维护成本远高于一个 30 行的补丁；
+- 前缀约定让后续模式（roleplay 等）零改动复用，且不改变其它 key 的现有行为（`tps` 特判、其余走第三行）；
+- `applyPlanMode()` 已是计划模式状态的**唯一变更出口**，标识同步挂在这里就不会出现"改了一处漏一处"（`/plan enter|exit`、`Ctrl+Alt+P`、模型 `plan_enter/plan_exit`、`/plan resume` 全覆盖）；`/plan resume` 里那处直接赋值 `planModeEnabled = false` 也一并收口。
+**代价与约束**：需要重建 vendor dist 才生效；补丁与 004–009 同改 `footer.ts`，上游动这个文件时维护成本叠加（`check-upstream.sh` 会先报出来）。badge 段必须放在 `theme.fg("dim", pwd)` **之后**单独着色——反过来拼进 pwd 再整体 dim，高亮会被一起吃掉（补丁注释里写了）。
+**验证**：`npx tsc --noEmit -p custom/` 通过；`check-patches-behavior.mjs` 靠 `Patch (009-footer-badge)` 自标记断言行为存在；`scripts/golden-tasks.sh` 全绿。
+
+---
+
+### [2026-10-01] 每日任务用独立 `/daily` 命令，而不是给 `/schedule` 加子命令
+**背景**：用户要"查看每日任务的情况：有哪些、执行情况、关闭/开启"。现有 `/schedule list` 只输出一行原始信息（`● 名 [cron:…] next=… runs=… last=success`），没有今日进度、没有失败数、没有一键全开关；用户也不知道"每日任务"就是 `tags` 含 `daily` 的调度任务。
+**选项**：
+1. 什么都不加，只补文档讲清 `/schedule list` 的用法
+2. 给 `/schedule` 加 `daily`/`overview` 子命令
+3. 新增独立 `/daily` 命令
+**决策**：选项 3。
+**理由**：
+- 选项 1 不解决"执行情况"——`fmtTask` 里没有 `failCount`/上次执行时间/今日完成数，补文档变不出来；
+- 选项 2 会让 `/schedule` 的子命令从 10 个涨到 12 个，而两者的读者意图不同：`/schedule` 是**管理**（增删改查 cron），`/daily` 是**巡检**（今天跑到哪了、有没有失败）——分开后各自的 help 都能一眼看完；
+- 渲染逻辑独立成 `custom/features/autopilot/daily.ts`（纯函数、零 Pi 依赖），命令层只做筛选与派发，符合本仓库"逻辑层零 Pi 依赖"的分层。
+**口径约定**（写进 README，因为这几点错了就会误导排查方向）：
+- 无任何 `daily` 标签时**降级显示全部调度任务**并在标题里说明，避免用户自建的 cron 任务"凭空消失"；
+- 今日完成/失败按 `lastRun` 的**本地日期**判定（cron 的自然日语义），昨天的成功不计入今天；
+- cron 只在 `M H * * *` 时显示 `HH:MM`，含步进/区间/星期限定则原样显示表达式（`cronClock` 返回 null，不硬猜）；
+- `on` 只改 `enabled`、**不重算 `nextRun`**：已错过的触发点会在下一轮立即补跑（与 `/schedule enable` 一致）。
+**验证**：`__tests__/daily.test.ts` 17 例（筛选/降级、cron 边界、今日口径、失败提示、详情渲染）；
+`gen-registrations.mjs --update` 刷新注册面基线（命令 11 → 12）。
+
+---
+
+### [2026-10-01] 上游更新前必须体检；不想要的变更**不回退基线，而是加补丁**
+**背景**：2026-09-30 把 vendored pi 从 v0.87.0 一次跳到 v0.99.1（130 提交 / 744 文件 / +90664-24881），**同步后**才发现默认主题改了 `system`、工具链换成 TS7 + ES2024、多了 `mcp`/`codemode` 两个包、`--no-extensions` 语义变成"连内置扩展一起禁用"。这些变化 `git apply` 不报错、`tsc` 也不报错，只有人事后看 changelog 才知道。用户随即提出两个问题：以后更新前怎么先看变化？上游出现不需要/不喜欢的变更怎么办？
+**选项**：
+1. 维持现状（同步后靠人读 changelog）
+2. 同步前跑一次只读体检，给出"可同步 / 需先改补丁"的结论
+3. 只写文档流程，每次手工敲 `git diff` / `git log`
+**决策**：选项 2 —— 新增 `scripts/check-upstream.sh`（只读），并把决策与补丁策略写成 `docs/operations/UPSTREAM-UPDATE.md`。
+**理由**：
+- 体检能自动化的部分恰好是**最费人力的部分**：各包 churn 排行、新增包、逐个补丁的"目标文件是否被上游改过"、adapters 依赖的 API 面是否变动。这些用 30 行 `git diff --name-only` 就能算出来，但要人肉做一遍得十几分钟且容易漏；
+- 结论必须可执行（`已最新` / `可同步` / `需先改补丁`），而不是又输出一堆 diff 让人自己判断；`PI_CHECK_STRICT=1` 时风险即 `exit 2`，将来可以直接挂进钩子；
+- 补丁风险用**提交历史**判定（`vendor_patch_applied` 语义）而非 `git apply --reverse --check`：004–009 全改 `footer.ts`，顺序叠加后单片反查会假失败——这是仓库里已经踩过的坑。
+**"不想要的变更"的四档手段**（写进文档，按代价递增）：① 用配置/环境变量关掉 → ② 补丁改默认值 → ③ 补丁删入口/整段 revert → ④ `sync-upstream.sh <commit>` 跳过整版。硬约束：不手改 vendor 工作树（会被同步冲掉）、不手写 `LAST_SYNC_POINT`/`PINNED_COMMIT`（会导致引导基线与补丁不同源）、每条不接受的上游变更都要在本文件留一条记录（否则半年后没人知道那个补丁为什么存在）。
+**顺带的实测收获**：脚本首次真跑就发现上游已到 `v0.99.2`（+40 提交 / 217 文件），且**本地 9 个补丁的目标文件全部未被上游改动**（只有 `002` 的 `config.ts` 变了），API 符号一个没少——即"补丁风险 1 个"，是一次低风险升级。这正说明体检的价值：不必读 40 条 changelog 就知道成本落在哪。
+**验证**：离线路径（`PI_CHECK_NO_FETCH=1` + 指定旧 tag，验证反向告警与失配检测）、在线路径（fetch 到 v0.99.2）均实跑；逐符号 API 核对修掉了两个假阳性（`as` 别名取错侧）。
+
+---
+
+### [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖
+**背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走 tsx；headless 的 `memory-store.mjs`/`knowledge-ingest.mjs`/`memory-lifecycle.mjs` 全走这里）。上游 v0.99.0 改用 Node 内置类型剥离，**删除了 `tsx` 依赖**；查证本地 `vendor/pi/package-lock.json` 已无任何 `tsx` 条目、`vendor/pi/package.json` 也不再声明它——本地那份 `4.23.15` 纯粹是升级前的残留。由于 `build.sh` 只在 `deps_ok` 判定需要时才跑 `npm ci`，残留会一直在，**故障只在换机 / 重新引导 / `npm ci` 之后才暴露**，表现为 autopilot 的 `daily-review`、`knowledge-subscribe` 静默失败。
+**选项**：
+1. 维持现状（继续祈祷 vendor 的 node_modules 不被动）
+2. 把 `tsx` 加进 my-pi 自己的依赖（`custom/package.json`），从根 `node_modules` 取，vendor 那份仅作兜底
+3. 放弃 tsx，改写 `custom/` 的导入为带扩展名的 ESM，用 Node 内置类型剥离
+**决策**：选项 2。
+**理由**：
+- 选项 1 是隐性依赖：我们借的是**上游的 devDependency**，而上游没有任何义务替我们保留它——本次就是活例；
+- 选项 3 看似更干净，但要改动整个 `custom/` 的导入风格（几百处 `from './x'`），且 pi 自身用 jiti 加载扩展、不受 Node 剥离规则约束，改了只有坏处；
+- 选项 2 把工具链归属说清楚：my-pi 运行自己的 TS 逻辑，就自己声明运行器；`custom/package.json` 是唯一工作区依赖出口，`npm install` 会提升到根 `node_modules/.bin/tsx`。
+**代价与约束**：`package-lock.json` 增加 tsx + esbuild 及其 26 个平台可选包（约 480 行）；`run-ts.sh` 保留"根 → vendor 残留 → npx"三级回退，但后两级都会打印显式告警，避免再次出现"看起来能用"。
+**验证**：`bash scripts/run-ts.sh scripts/memory-lifecycle.mjs --limit 1` 正常输出（走根 tsx）；`doctor.sh --no-net` 依赖检查通过。
