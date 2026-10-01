@@ -1,9 +1,26 @@
 {
   "default": "full",
   "modes": {
+    "lean": {
+      "description": "精简工具面 - 成本敏感的交互会话（去掉 browser/voice/link/autopilot）",
+      "features": [
+        "web-search",
+        "context",
+        "memory",
+        "mode",
+        "plan-mode",
+        "intervention",
+        "subagent",
+        "tmux"
+      ],
+      "thinking": "low"
+    },
     "roleplay": {
       "description": "角色扮演 - 日常交流（web-search + 隔离记忆）",
-      "features": ["web-search", "memory"],
+      "features": [
+        "web-search",
+        "memory"
+      ],
       "thinking": "low",
       "appendPrompt": "modes/roleplay.md",
       "memoryNamespace": "roleplay"

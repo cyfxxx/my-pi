@@ -11,6 +11,13 @@
 | `full` | 代码锁定 | 全部 12 个 | 开发项目 |
 | `minimal` | 代码锁定 | 无（仅内置工具 + `/mode`） | 测试/修复 |
 | `roleplay` | `modes.json` | `web-search`、`memory`（隔离命名空间 `roleplay`） | 日常交流角色扮演 |
+| `lean` | `modes.json` | `web-search`、`context`、`memory`、`plan-mode`、`intervention`、`subagent`、`tmux` | 成本敏感会话：去掉 `browser`/`voice`/`link`/`autopilot` 四组工具 |
+
+`lean` 的依据（2026-10-01 实测，守门 `context/__tests__/tools-payload.test.ts`）：本仓库 12 个功能注册
+**62 个工具、合计 28.5 KB**（请求里 `toolsBytes` 62.4 KB，其余约 33 KB 是 pi 内置工具）——
+其中 `autopilot` 6.4 KB、`browser` 6.3 KB、`voice` 1.0 KB、`link` 0.8 KB。模式白名单在**启动期**过滤功能，
+未注册即 0 字节，且整个会话内工具数组不变（缓存安全；见 `DECISIONS.md` 的"不做热重载"与
+"不要会话中途改工具集"）。
 
 `full`/`minimal` 由 `FIXED_MODES`（`logic.ts`）定义，`modes.json` 无法覆盖；文件只存自定义模式。
 
