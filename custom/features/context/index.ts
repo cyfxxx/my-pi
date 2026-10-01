@@ -78,6 +78,7 @@ import {
   KEEP_THINKING_TOKENS,
   PER_TURN_ERASE,
   DEDUP_SUMMARIES,
+  BASH_TIMEOUT_CEIL_S,
   TOOL_LAYERING,
   readEnvRatio,
   resolveContext,
@@ -461,9 +462,21 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'tool_call',
     handler: async (event) => {
-      const toolEvent = event as { toolName?: string };
+      const toolEvent = event as { toolName?: string; input?: Record<string, unknown> };
       if (toolEvent.toolName) {
         toolState.toolCallStarts.set(toolEvent.toolName, Date.now());
+      }
+      // ── bash 前台默认上限（硬约束，2026-10-01）──
+      // 按工具拆解 1101 个可归属步：工具执行占墙钟 63.6%，其中 `bash` 一家占工具时间 63%
+      // ——p50 440ms、p90 36.4s、**p99 164s**（pi 的 bash 默认无超时）。对照之下前缀重放只占
+      // 请求处理时间的 0.5%（拟合 0.0085ms/未命中 token）→ 顿挫感来自前台长命令，不是缓存。
+      // "长任务后台化"写在 AGENTS.md 里是软提示、显然没被稳定遵守，故按 VISION §3.2（硬优先）
+      // 落到代码：模型未显式给 `timeout` 时注入上限，超时即中断并在结果里给出改法；
+      // 显式写了 timeout 的调用**原样尊重**（那是有意为之的放宽）。
+      if (toolEvent.toolName === 'bash' && toolEvent.input && typeof toolEvent.input === 'object') {
+        const given = toolEvent.input.timeout;
+        const explicit = typeof given === 'number' && Number.isFinite(given) && given > 0;
+        if (!explicit) toolEvent.input.timeout = BASH_TIMEOUT_CEIL_S;
       }
     },
   });

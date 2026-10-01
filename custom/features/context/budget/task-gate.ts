@@ -102,6 +102,20 @@ export const PER_TURN_ERASE = process.env.PI_CONTEXT_ERASE === 'on';
  */
 export const DEDUP_SUMMARIES = process.env.PI_CONTEXT_DEDUP_SUMMARIES === 'on';
 
+/**
+ * `bash` 前台执行的默认上限（秒；`PI_BASH_TIMEOUT_CEIL` 可调，<=0 关闭）。
+ *
+ * 依据（2026-10-01 实测，1101 个可归属步）：工具执行占步墙钟 **63.6%**，其中 `bash` 占工具时间
+ * **63%**（p50 440ms / p90 36.4s / p99 **164s**；pi 的 bash 默认**无超时**）。而前缀重放只占
+ * 请求处理时间的 0.5%（拟合 0.0085ms/未命中 token）——所以"顿挫感"的元凶是前台长命令。
+ * AGENTS.md 里"长任务后台化"是软提示、实测没被稳定遵守，故按硬优先落到代码：
+ * 模型未显式给 `timeout` 时注入 240s，超时中断并提示改用 tmux_run/后台或显式放宽。
+ */
+export const BASH_TIMEOUT_CEIL_S = (() => {
+  const v = Number(process.env.PI_BASH_TIMEOUT_CEIL ?? 240);
+  return Number.isFinite(v) && v > 0 ? v : 0; // <=0 / 非法 → 0 = 不注入（关闭该硬约束）
+})();
+
 /** 读取 0-1 比例环境变量 */
 export function readEnvRatio(name: string): number | undefined {
   const raw = process.env[name];

@@ -71,6 +71,7 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存�
 - **不要在会话中途改工具集**：pi 0.99 起 `/reload` 会**启用**新加入 `defaultTools` 的工具（移除的不会自动关，会话里手动关掉的也不会被它打开），而**任何工具数组变化都会让整段前缀按全价重算**。模式/工具面的变更走 `/mode` 的自动重启（或下次启动），不要在会话里热改 `defaultTools`。
 - **运行时状态不入库**：每台机器的选择/状态不要写进入库文件——已踩过两次：`modes.json` 的 `current`（被 git 操作静默回退，见 `custom/features/mode/README.md`）与上游新增的 `deviceId`（global setting，会落在**入库**的 `portable/agent/settings.json`，仅在首次 `Sign in with ChatGPT` 时创建）。不用该登录则零影响；用了就在提交前清掉 `deviceId` 键（下次登录会重建）。
 - **后台任务（禁止阻塞前台）**：长任务用 `tmux_run` 启动，**启动后立即结束回合**，不同轮内不等待；同轮内禁止 `tmux_wait`，确需等待只用 `pattern=` 匹配且 `timeout≤60s`。会话结束后由 `features/tmux/watcher.ts` 自动注入通知并触发新回合（不必等用户下一条消息）。子代理（`subagent`）是同步阻塞的，只适合必须立即拿到结果的短任务。
+  前台 `bash` 有 **240s 默认上限**（`PI_BASH_TIMEOUT_CEIL` 可调）：实测按工具拆解，工具执行占步墙钟 63.6%、其中 `bash` 占工具时间 63%（p90 36.4s / p99 164s），而前缀重放只占 0.5%——顿挫感来自前台长命令。命令需要更久就**改用后台**（`tmux_run`）并在后续轮取结果，不要用 `timeout` 参数硬撑（除非确实要同步等待且能说明理由）。
 - **git 提交**：暂存显式路径，只提交本次会话更改的文件；不提交 `auth.json` 等敏感配置。
 
 ## 验证与命令
