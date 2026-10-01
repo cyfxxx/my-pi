@@ -15,7 +15,7 @@ custom/                    # 自定义层（adapters/core/features + web-termina
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
 deploy/                    # 可选系统级部署产物（systemd 等）
-scripts/                   # 36 个运维脚本
+scripts/                   # 37 个运维脚本
 patches/                   # 上游补丁
 ```
 

@@ -1186,6 +1186,53 @@ SIGKILL 服务器后，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到
 - 其余操作点（启动命令、隧道、令牌流程、参数表、首屏 20 秒、单会话、多标签镜像、
   每环境独立密钥、xterm 5.5.0 约束）复核后确认**原本已有记录**，不再重复。
 
+## 模式切换修复：current 分离 + 自动重启（第 63 批，2026-10-01）
+
+起因：用户报告"用 `/mode` 切到角色扮演，**重启后没生效**"，并提出"切换后应该自动重启"与
+"模式切换必须重启吗，能不能热重载"。
+
+### 诊断（先证伪机制，再定位数据）
+
+- supervisor 侧用临时 agent 目录实测 `apply_mode`：`--append-system-prompt …/modes/roleplay.md`
+  与 `PI_MEMORY_NAMESPACE=roleplay` 都正确产出 → **解析机制没问题**。
+- 根因在数据落点：`current` 写在**入库**的 `portable/agent/modes.json`（`.gitignore` 特意放行该文件），
+  切模式只是把入库文件改脏，**任何 git 操作都会静默把它退回 `full`**。旁证：该文件现在是 `full`
+  且工作区干净；`portable/memory/` 下从来没有 `roleplay/` 命名空间目录（roleplay 从未真正激活）。
+- 附带发现：模式应用逻辑只写在 `pi-supervisor.sh` 里，**`dev.sh` 静默不注入人设**（入口漂移）。
+
+### 修复
+
+- **config/state 分离**：`modes.json` 只留 `default` + 模式定义（入库）；`current` 落
+  `portable/agent/modes-state.json`（gitignored）。切模式不再让工作区变脏，git 操作也不可能回退它。
+  旧格式（`modes.json.current`）仍被识别，保证迁移平滑。
+- **`/mode <name>` 自动重启**：需要重启时写 `modes-state.json` 并提交 admin restart（带
+  `--session` 续接当前会话）后 `ctx.shutdown()`，不再提示用户手动 `/exit` 重启；只改思考档位仍即时生效。
+  响应进行中（`ctx.isIdle()` 为 false）则拒绝切换且**什么都不落盘**——否则会留下"配置已改、进程没重启"
+  的半切换状态（pi 自己的 `/reload` 也有同样的保护）。
+- **启动一致性校验**：`session_start` 比对"磁盘持久化模式"与"本进程实际注册模式"，不一致就告警并给出
+  `/mode <磁盘模式>` 修复命令——直接覆盖本次故障症状（`PI_AGENT_MODE_SOURCE=env` 时跳过，避免误报）。
+- **入口一致化**：新增 `scripts/lib-mode.sh`，supervisor 与 `dev.sh` 共用模式解析，dev 也能注入人设。
+- **为热重载留路口**：`PI_AGENT_MODE_SOURCE` 区分"外部注入"与"bootstrap 回写"的 `PI_AGENT_MODE`——
+  此前回写值会让 `/reload` 永远读到旧模式（这正是"热重载切模式不成立"的隐性原因）。
+  但默认仍走重启，理由见下与 `custom/features/mode/README.md`。
+
+### 关于热重载的结论（写进 mode README）
+
+查实 `/reload` 会 `clearExtensionCache()` 重跑扩展工厂，所以**功能白名单可热切**；但 ① 人设是
+CLI 参数，扩展 API 只有只读的 `getSystemPrompt()`，热切需改用 `context_with_system` 自行拼 system prompt；
+② 记忆命名空间热切会造成同一会话跨命名空间，破坏记忆治理与执行-知识分离；
+③ **热重载在缓存上没有收益**——模式切换必然改工具数组，重启与 reload 的前缀代价相同。
+故维持"重启是模式的正确语义"，热重载仅在将来确有需要时再做。
+
+### 验证
+
+- 新增 `custom/features/mode/__tests__/mode-switch.test.ts`（**27 例**）：状态分离（含"切模式不得
+  改动 modes.json"的回归断言）、旧格式迁移、无效/损坏状态回落、来源区分、自动重启接线、
+  **响应进行中拒绝切换且不落盘**、一致性告警三态（不一致/一致/env 强制）。
+- `scripts/test-supervisor.sh` 44 → **54 项**：新增 `apply_mode` 的 bash 侧契约（状态文件优先、
+  旧格式兼容、人设缺文件不注入、命名空间仍注入、外部 env 覆盖优先）。
+- `npx tsc --noEmit -p custom/` 通过；全量 golden 通过；`modes-state.json` 确认被 gitignore 覆盖。
+
 ## 计划模式标识 + 每日任务命令 + 上游更新体检（第 62 批，2026-10-01）
 
 用户一次提了四件事：计划模式没有界面标识、需要每日任务的查看/启停命令、上次跳版（v0.87.0 →

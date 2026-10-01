@@ -811,3 +811,22 @@ xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效�
 - 选项 2 把工具链归属说清楚：my-pi 运行自己的 TS 逻辑，就自己声明运行器；`custom/package.json` 是唯一工作区依赖出口，`npm install` 会提升到根 `node_modules/.bin/tsx`。
 **代价与约束**：`package-lock.json` 增加 tsx + esbuild 及其 26 个平台可选包（约 480 行）；`run-ts.sh` 保留"根 → vendor 残留 → npx"三级回退，但后两级都会打印显式告警，避免再次出现"看起来能用"。
 **验证**：`bash scripts/run-ts.sh scripts/memory-lifecycle.mjs --limit 1` 正常输出（走根 tsx）；`doctor.sh --no-net` 依赖检查通过。
+
+---
+
+### [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启
+**背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）用临时 agent 目录实测正确，`bootstrap.ts` 也按同一文件过滤功能。真正的问题在数据落点——`current`（当前模式）被写在**入库**的 `portable/agent/modes.json` 里（`.gitignore` 用 `!portable/agent/modes.json` 特意放行），于是切模式只是把入库文件改脏，**任何 git 操作（checkout/stash/restore/pull，含另一台设备的版本）都会把它静默退回 `full`**。旁证两条：该文件现在是 `full` 且工作区干净；`portable/memory/` 下从来没有过 `roleplay/` 命名空间目录。顺带发现第二处缺陷：模式应用逻辑只写在 `pi-supervisor.sh` 里，`scripts/dev.sh` 直接 exec pi，**静默不注入人设**。
+**选项**：
+1. 维持现状（继续把运行时选择放进库文件）
+2. `current` 移到 gitignored 的 `modes-state.json`，并对 `/mode` 切换加自动重启 + 启动一致性校验
+3. 改做热重载（`/reload`）切模式，不重启进程
+**决策**：选项 2；热重载明确不做默认路径，只留路口。
+**理由**：
+- 选项 1 的问题不是洁癖：**每次切模式都会让工作区变脏**，而这在一个"频繁 commit/push、还有多设备"的仓库里必然被某次 git 操作回退；同一类错误上一轮已经出现过一次（上游新增的 `deviceId` 会写进入库的 `settings.json`）。原则统一为：**运行时/每环境状态不入库**。
+- 选项 3 的可行性我查实了：`/reload` 会走 `session.reload()` → `resourceLoader.reload()` → `clearExtensionCache()`（`loader.ts:131-141`），扩展工厂确实会重跑，**功能白名单这一层可热切**。但另外三件不行或不该：① 人设是 CLI 启动参数 `--append-system-prompt`，扩展 API 只有只读的 `getSystemPrompt()`；热切必须改用 `context_with_system` 自行拼 system prompt；② 记忆命名空间热切会让同一会话前半段写 full、后半段写 roleplay，而历史里已注入的记忆块还是旧命名空间的，破坏记忆治理（VISION §5）与执行-知识分离（§3.4）；③ **热重载在缓存上没有收益**——模式切换必然改变工具数组，无论重启还是 reload，下一轮整段前缀都按全价重算。省下的只是"进程/pty/scrollback 重建"的体验，却要额外处理半切换状态与 `session_start(reason: reload)` 下各钩子的幂等性。
+- 而重启的成本极低：复用**既有**的 admin restart 通道（`writeRestartRequest('restart', { targetSession })` + `ctx.shutdown()`），supervisor 用 `--session` 精确续接，这条路已有 44 项测试兜底。
+**代价与约束**：
+- config/state 分离带来的迁移：`modes.json` 里遗留的 `current` 仍被识别（`normalizeModesFile` 处理），新写入一律进 `modes-state.json`；已把入库文件的 `current` 字段删除。
+- 顺带修好了"热重载切模式此前不成立"的隐性原因：`bootstrap` 会把解析结果回写 `PI_AGENT_MODE`，而 `resolveEffectiveMode()` 又优先读它，于是 `/reload` 重跑时永远读到上一次的旧值。现在由 `PI_AGENT_MODE_SOURCE`（`env`/`file`）区分"外部注入"与"自己回写"，只有前者才优先。
+- 模式应用逻辑抽到 `scripts/lib-mode.sh`，`pi-supervisor.sh` 与 `dev.sh` 共用——入口漂移（dev 无人设）一并修掉。
+**验证**：新增 26 例 vitest（含"切模式**不得**改动 modes.json"的回归断言、旧格式迁移、来源区分、自动重启接线、一致性告警）；`test-supervisor.sh` 44 → **54 项**（新增 apply_mode 的 bash 侧契约：状态文件优先、旧格式兼容、人设缺文件不注入、外部 env 覆盖优先）；`tsc` 与全量 golden 通过。runtime 实测 `lib-mode.sh`：无状态 → `full`；写 `{"current":"roleplay"}` → 模式/命名空间/人设绝对路径三者齐备。
