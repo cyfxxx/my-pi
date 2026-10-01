@@ -11,7 +11,7 @@
 | system 追加段 | `custom/features/context/budget/system-prompt.ts` → `HARD_RULES` + `EFFICIENCY_ADVICE` | `SYSTEM_INJECTION_MAX_BYTES` = 4096 | **767 B** |
 | system 原生追加 | `portable/agent/APPEND_SYSTEM.md` | `SYSTEM_APPEND_MAX_BYTES` = 2048 | **789 B** |
 | 工作区指令（尾部 append-only 消息） | `portable/agent/AGENTS.md` | `WORKSPACE_INSTRUCTIONS_MAX_BYTES` = 65536 | **11829 B**（本批降权前 12346 B，−517 B） |
-| 稳定前缀指纹 | 上述三个文件 + `system-prompt.ts` | `scripts/check-injection-surface.sh` 基线 | `33212e7b…` |
+| 稳定前缀指纹 | 上述三个文件 + `system-prompt.ts` | `scripts/check-injection-surface.sh` 基线 | `a09e666c…` |
 
 守门：`custom/features/context/__tests__/injection-stability.test.ts`（10 例：装配契约 / 逐字节确定 / 易变内容拒绝 / 三项预算）。
 超预算时的顺序是**先降权删除、再谈硬化**，不得直接抬高上限。
@@ -29,18 +29,28 @@
 
 **预备样本**（本轮之前已硬化、但当时未同步降权，随本批一并降权）：`bash` 前台 240s 上限（P3-6）、AGENTS.md 移出 system 前缀（P1-1）、headless 调度网关（P3-5）、工具面中途变更默认关闭（P1-3/P2-2）。
 
+## 已完成：第二批（2026-10-01，同日续做）
+
+本批由第一批的"待评"项倒逼出来：要硬化"bash 优先合并碎调用"，先查度量落点，结果查出一个真实缺陷。
+
+| # | 问题 | 硬化落点 | 发现 | 证据 |
+|---|---|---|---|---|
+| 7 | 死导出守门把**测试引用**算作接线 | `scripts/check-dead-exports.mjs` 新增"仅测试引用"规则（零生产引用即失败，棘轮白名单 C 段）；golden 第 3 步 | **32 个导出生产零接线**，其中 10 个是工具事件/用量子系统（`recordToolCallEvent`、`recordToolCall`、`recordToolEnable`、`loadToolCallRecords`、`recomputeToolUsage`…），即"工具调用分布"度量长期为空的根因；旧规则因单测引用而放行 | 负数测试：临时"仅测试引用"导出立即报错并 exit 1；存量 32 个棘轮登记（`dead-exports-allowlist.txt` C 段） |
+| 8 | 注入面纪律只在 CI 检查 | `auditSystemInjection` 在扩展注册时跑一次（超预算/易变内容即 `console.warn`），使三个预算常量进入**生产路径** | 会话中改注入文本的人不会先跑 golden，静默失效；现在启动即可见 | `injection-stability.test.ts` 14 例（新增 4 例：当前内容零告警 / 超预算告警 / 易变内容告警 / 缺文件不报错） |
+
 ## 待评（明确未硬化，附原因与前置条件）
 
 | 软引导 | 状态 | 原因 / 前置条件 |
 |---|---|---|
-| APPEND_SYSTEM.md「bash 优先合并碎调用」 | 未硬化 | **缺度量落点**：每回合工具名分布没落盘（用量记录只有 `runToolCount`）。先在 `.usage-diag.jsonl` 加 per-turn 工具直方图，才谈约束（否则无法证明约束有效） |
+| APPEND_SYSTEM.md「bash 优先合并碎调用」 | 未硬化（原料已具备） | 更正第一批的判断：**每次工具调用其实已落盘**——`portable/memory/context/usage.jsonl` 每行含 `ts`/`tool`/`ok`/`durationMs`（1784 行），子系统的 `recordToolCallEvent` 才是没接线的那条路。现在只差"按回合配对"：用 `.usage-diag.jsonl` 的 usage 记录作回合边界，统计每回合 bash 调用数与单命令占比，再定阈值 |
 | APPEND_SYSTEM.md「我提出的问题必须先回答再执行」 | 保持软（有意） | 用户对话纪律，硬化等于用代码替用户决定何时执行；与 P3-1 结论一致 |
 | AGENTS.md「不要在会话中途改工具集」 | 部分硬化 | 已硬化的是**默认行为**（工具分层默认关、模式切换走重启）；剩余"模型主动 `enable_tool`"属模型行为，正确硬化形态是**启动期按模式收窄工具面**（P2-1 记录的方向，未做） |
 | APPEND_SYSTEM.md「禁止 emoji / 简短精炼」 | 暂缓 | 硬化需输出侧校验器（成本高、误报多）；收益低于成本 |
 | §5「升格候选（recurrence≥5）」 | 通道就绪、尚无转正 | `/memory lifecycle` 已产出候选，但"候选 → 规则"这一步仍是人工判断；下一批候选来源 |
 | AGENTS.md「回答先于编辑」 | 保持软（有意） | 同"先回答再执行" |
+| **B-3**：32 个"仅测试引用"导出 | 已由守门棘轮锁住（禁止新增），存量待清 | 下一步：确认 `tool-events`/`tool-use-*` 确无消费方后**整族删除**（10 个），其余按"接线或删除"逐条处理；清单见 `scripts/dead-exports-allowlist.txt` C 段 |
 
 ## 下一批复核
 
 - 每次日报（`node scripts/daily-health.mjs --print`）顺带看四项注入字节数；接近上限即启动降权评估。
-- 优先候选：① `.usage-diag.jsonl` 增补 per-turn 工具直方图（解锁"碎调用"硬化）；② 启动期按模式收窄工具面（解锁"工具数组中途变更"硬化，并直接减小 tools 段 62 KB 的前缀开销）。
+- 优先候选：① **回合内 bash 调用分布**（`usage.jsonl` × `.usage-diag.jsonl` 回合边界；解锁"碎调用"硬化，同时给 P3-2 延迟分解补上"每回合工具数"维度）；② 启动期按模式收窄工具面（解锁"工具数组中途变更"硬化，并直接减小 tools 段 62 KB 的前缀开销）；③ B-3 存量清理（先确认消费方，再整族删除）。

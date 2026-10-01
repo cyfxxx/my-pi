@@ -1615,5 +1615,35 @@ VISION §6 的 P4 是唯一未完成的路线阶段：按 §3.1 把"反复有效
 
 - `injection-stability.test.ts` 10 例；tmux 单测 29 例（新增 5 例边界）；`check-conventions.sh` 负数测试
   （临时 `: any` 文件、`"current"`/`"deviceId"` 注入即失败；`packs/`、`tool-count-localhost.json` 不误伤）。
-- `golden-tasks.sh --fast` 14 步全绿；`check-injection-surface.sh --update` → 新指纹 `33212e7b…`。
+- `golden-tasks.sh --fast` 14 步全绿；`check-injection-surface.sh --update` → 新指纹 `a09e666c…`。
 - 文档：VISION（§4 结论 / §6 P4 / §9 v4）、`docs/design/UPGRADE-LEDGER.md`、`docs/README.md`、DECISIONS、AGENTS.md。
+
+## P4 升格通道第二批（2026-10-01，同日续做）
+
+第二批由第一批的"待评"项倒逼：要硬化 AGENTS.md 的「bash 优先合并碎调用」，先查度量落点，
+结果查出一个被守门放行的真实缺陷。
+
+### 死导出守门：测试引用不算接线
+
+`recordToolCallEvent` / `recordToolCall` 等工具事件落盘函数**只在单测里被调用**，生产路径从未接线，
+于是"工具调用分布"这条度量落点长期为空；而旧守门 `check-dead-exports.mjs` 统计的是"任何引用"，
+单测引用让它顺利通过。现在新增规则：**零生产引用（但存在测试引用）同样报错**，实测扫出
+**32 个存量**（工具事件/用量子系统 10 个、预算与暖前缀 10 个、Best-of-N 3 个、其他 9 个），
+作为棘轮登记在 `dead-exports-allowlist.txt` C 段，**新增**即失败（负数测试验证：临时"仅测试引用"导出 exit 1）。
+
+### 注入面运行期体检
+
+新增 `auditSystemInjection`，在 `context` 扩展注册时跑一次：超预算或出现日期/百分比等易变内容即
+`console.warn`。动机是测试守门只在提交时跑，而注入文本常在会话中被改——现在启动即可见，
+三个预算常量也因此进入生产路径（不再只是"测试专用常量"）。
+
+### 度量落点更正
+
+`portable/memory/context/usage.jsonl` 每行本就是一次工具调用（`ts`/`tool`/`ok`/`durationMs`，1784 行），
+"工具调用分布"**不缺原料**，缺的是"按回合配对"。因此"碎调用"硬化的前置条件从"新增埋点"
+改为"用 `.usage-diag.jsonl` 的 usage 记录作回合边界做统计"，列入台账下一批优先候选。
+
+### 验证
+
+`injection-stability.test.ts` 14 例（新增 4 例运行期体检）；`check-dead-exports` 负数测试通过；
+文档：`docs/design/UPGRADE-LEDGER.md`（第二批小节 + 待评行更正 + B-3 条目 + 下一批复核）。
