@@ -66,11 +66,11 @@
       "name": "golden-fast",
       "type": "cron",
       "schedule": "30 7 * * *",
-      "prompt": "执行防退化基准（确定性零 LLM，勿做其他事）：运行 bash scripts/golden-tasks.sh。全部通过则输出一行『golden-fast 全绿』即结束，不写文件不提交。任一失败：将失败项与输出尾部 10 行写入 portable/memory/daily-results/{{date}}-golden-<本机hostname>.md；该文件为纯本地运行时数据，不 git add/commit/push。",
+      "prompt": "执行防退化基准（确定性零 LLM，勿做其他事）：运行 bash scripts/golden-tasks.sh —— 这是**全量**门（含 tsc/vitest/浏览器终端，约 5 分钟），单次 bash 调用请给 timeout 600，超时不要把同一个门重跑一遍。全部通过则输出一行『golden-fast 全绿』即结束，不写文件不提交。任一失败：将失败项与输出尾部 10 行写入 portable/memory/daily-results/{{date}}-golden-<本机hostname>.md；该文件为纯本地运行时数据，不 git add/commit/push。",
       "useSubagent": true,
       "notifyMain": true,
       "waitForUserOnLocal": true,
-      "maxRunTime": 300,
+      "maxRunTime": 900,
       "retries": 1,
       "tags": [
         "daily",
