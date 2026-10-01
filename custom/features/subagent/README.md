@@ -2,6 +2,21 @@
 
 把任务委派给专门 agent（可并行/串行链），隔离上下文、复用角色定义。
 
+## 上下文模式：spawn / fork
+
+`subagent` 的 `context` 参数决定子代理的起点（默认 `spawn`）：
+
+| 模式 | 子进程参数 | 含义 | 何时用 |
+|------|-----------|------|--------|
+| `spawn` | `--no-session` | 空上下文，只有 system + 工具声明 + 任务 | 默认；任务自包含、不需要父会话 |
+| `fork` | `--fork <父会话文件>` | 继承父会话历史（pi 新建 fork 会话） | 需要父上下文的**短任务**，且**紧接**父会话请求时 |
+
+fork 的成本逻辑：父会话刚发过请求时，那段前缀在 provider 侧是**暖的**，子代理首请求按 cacheRead
+计价（约为全价的 1/50）——所以"既拿到上下文又便宜"；反之若缓存已冷，就要为整段历史付全价。
+因此它是**显式 opt-in**，不是默认。拿不到 `ctx.sessionFile`（headless/无会话）时静默退回 spawn。
+
+对齐 DSH 的 fork/spawn 之分（见 `docs/development/DSH-RUNTIME-AUDIT.md`）。
+
 ## 注册面
 
 - 工具：`subagent`

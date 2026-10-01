@@ -57,4 +57,10 @@ export interface SubagentToolParams {
   cwd?: string;
   /** 单次调用默认模型；tasks/chain 项的 model 优先级更高 */
   model?: string;
+  /**
+   * 会话上下文模式（默认 `spawn`）：
+   *   `spawn` = `--no-session`，子代理只有 system+工具+任务（最便宜的一次请求）；
+   *   `fork`  = `--fork <父会话>`，继承父会话历史——紧接父会话请求时前缀是暖的，按 cacheRead 计价。
+   */
+  context?: 'spawn' | 'fork';
 }

@@ -64,6 +64,37 @@ function getPiInvocation(args: string[]): { command: string; args: string[] } {
   return { command: 'pi', args };
 }
 
+/**
+ * 组装子代理命令行（纯函数，便于单测）。
+ *
+ * 两种会话模式（`context` 参数）：
+ *   - **spawn（默认）**：`--no-session` —— 空上下文，只带 system + 工具声明 + 任务。
+ *     最便宜的一次请求，但子代理看不到父会话。
+ *   - **fork**：`--fork <父会话文件>` —— 继承父会话历史（pi 会新建一个 fork 会话）。
+ *     父会话刚发过请求时，那段前缀在 provider 侧是**暖的**，子代理首请求按 cacheRead 计价（约为全价的 1/50），
+ *     于是"既拿到上下文又便宜"；反之若缓存已冷，则为整段历史付全价。
+ *     故它是**显式 opt-in**，适合"需要父上下文的短任务"且紧接着父会话请求时使用（对齐 DSH 的 fork/spawn 之分）。
+ *
+ * 注意：fork 时不能带 `--no-session`（fork 本身要创建会话）；`--no-extensions` 两者都保留。
+ */
+export function buildSubagentArgs(opts: {
+  task: string;
+  model?: string;
+  tools?: readonly string[] | null;
+  promptPath?: string | null;
+  forkSession?: string | null;
+}): string[] {
+  const fork = typeof opts.forkSession === 'string' && opts.forkSession.length > 0 ? opts.forkSession : null;
+  const args: string[] = ['--mode', 'json', '-p', '--no-extensions'];
+  if (fork) args.push('--fork', fork);
+  else args.push('--no-session');
+  if (opts.model) args.push('--model', opts.model);
+  if (opts.tools && opts.tools.length > 0) args.push('--tools', opts.tools.join(','));
+  if (opts.promptPath) args.push('--append-system-prompt', opts.promptPath);
+  args.push(`Task: ${opts.task}`);
+  return args;
+}
+
 export async function runSubprocessAgent(
   agent: AgentConfig,
   defaultCwd: string,
@@ -75,12 +106,10 @@ export async function runSubprocessAgent(
   makeDetails: (results: SingleResult[]) => SubagentDetails,
   currentModel?: { id?: string; provider?: string },
   overrideModel?: string,
+  forkSession?: string,
 ): Promise<SingleResult> {
-  const args: string[] = ['--mode', 'json', '-p', '--no-session', '--no-extensions'];
   const resolvedModel = resolveModelId(agent.model, overrideModel, currentModel);
-  if (resolvedModel) args.push('--model', resolvedModel);
   const effectiveTools = resolveAgentTools(agent);
-  if (effectiveTools && effectiveTools.length > 0) args.push('--tools', effectiveTools.join(','));
 
   let tmpPromptDir: string | null = null;
   let tmpPromptPath: string | null = null;
@@ -114,10 +143,15 @@ export async function runSubprocessAgent(
       const tmp = writePromptToTempFile(agent.name, fullPrompt);
       tmpPromptDir = tmp.dir;
       tmpPromptPath = tmp.filePath;
-      args.push('--append-system-prompt', tmpPromptPath);
     }
 
-    args.push(`Task: ${task}`);
+    const args = buildSubagentArgs({
+      task,
+      model: resolvedModel,
+      tools: effectiveTools,
+      promptPath: tmpPromptPath,
+      forkSession,
+    });
     let wasAborted = false;
 
     const exitCode = await new Promise<number>((resolve) => {
@@ -250,6 +284,7 @@ export async function runSingleAgent(
   makeDetails: (results: SingleResult[]) => SubagentDetails,
   currentModel?: { id?: string; provider?: string },
   overrideModel?: string,
+  forkSession?: string,
 ): Promise<SingleResult> {
   const agent = agents.find((a) => a.name === agentName);
   if (!agent) {
@@ -270,7 +305,8 @@ export async function runSingleAgent(
       makeDetails,
       currentModel,
       overrideModel,
+      forkSession,
     );
   }
-  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel);
+  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel, forkSession);
 }
