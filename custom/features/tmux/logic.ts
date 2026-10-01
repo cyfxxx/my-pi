@@ -11,6 +11,7 @@ export {
   defaultLogDir,
   registryPath,
   loadTmuxConfig,
+  clampWaitTimeout,
   normalizeSessionName,
   isPiSession,
   ensureLogDir,
@@ -18,7 +19,7 @@ export {
   rotateLogIfLarge,
   removeLog,
 } from './config';
-export type { TmuxOpts, TmuxConfig } from './config';
+export type { TmuxOpts, TmuxConfig, WaitTimeout } from './config';
 
 export {
   runTmux,

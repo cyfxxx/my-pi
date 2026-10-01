@@ -12,6 +12,7 @@ import {
   rotateLogIfLarge,
   logPathFor,
   loadRegistry,
+  clampWaitTimeout,
   registerSession,
   unregisterSession,
   shutdownCleanup,
@@ -106,5 +107,43 @@ describe('log + registry 文件语义', () => {
     expect(killed).toEqual(['pi-a']);
     expect(res.killed).toEqual(['pi-a']);
     expect(res.skippedOthers).toEqual(['pi-b']);
+  });
+});
+
+// ── P4 升格通道第一批：同轮内等待的硬上限（原软引导"确需等待 timeout≤60s"）──
+
+describe('clampWaitTimeout', () => {
+  it('未给 timeout → 默认值，且受上限截断', () => {
+    expect(clampWaitTimeout(undefined, 120, 60)).toEqual({
+      seconds: 60,
+      clamped: true,
+      ceiling: 60,
+      requested: 120,
+    });
+  });
+
+  it('显式正数原样尊重（不超过上限时）', () => {
+    expect(clampWaitTimeout(5, 120, 60)).toEqual({ seconds: 5, clamped: false, ceiling: 60, requested: 5 });
+    expect(clampWaitTimeout(60, 120, 60).clamped).toBe(false);
+  });
+
+  it('超过上限 → 截断并标记 clamped', () => {
+    const r = clampWaitTimeout(600, 120, 60);
+    expect(r.seconds).toBe(60);
+    expect(r.clamped).toBe(true);
+  });
+
+  it('非法/非正数回落到默认值', () => {
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const r = clampWaitTimeout(bad, 30, 60);
+      expect(r.requested).toBe(30);
+      expect(r.seconds).toBe(30);
+      expect(r.clamped).toBe(false);
+    }
+  });
+
+  it('上限 ≤0 表示停用上限', () => {
+    expect(clampWaitTimeout(600, 120, 0)).toEqual({ seconds: 600, clamped: false, ceiling: 0, requested: 600 });
+    expect(clampWaitTimeout(undefined, 120, -1).seconds).toBe(120);
   });
 });

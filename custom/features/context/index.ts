@@ -17,13 +17,12 @@ import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
 import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
-import { HARD_RULES } from './budget/hard-rules';
+import { buildSystemPrompt } from './budget/system-prompt';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
 import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
 import {
   createToolLifecycleState,
-  EFFICIENCY_ADVICE,
   LOW_PRESSURE_DELEGATION,
   FULL_DELEGATION_ADVICE,
   hasInProgressTask,
@@ -424,8 +423,9 @@ export function register(pi: ExtensionAPI): void {
       // system prompt 只追加**静态常量**，保持逐字节稳定（工具集变化本身无法避免）：
       // HARD_RULES = 不变量摘要（权威性留在 system 层），EFFICIENCY_ADVICE = 效率建议。
       // 体积大且频繁变更的 AGENTS.md 正文已移出 system（见下面的工作区指令注入）。
+      // 装配唯一入口 = buildSystemPrompt（P4 硬化：字节预算 + 易变内容守门）。
       return {
-        systemPrompt: `${e.systemPrompt}\n\n${HARD_RULES}\n\n${EFFICIENCY_ADVICE}`,
+        systemPrompt: buildSystemPrompt(e.systemPrompt),
         ...(message ? { message } : {}),
       };
     },

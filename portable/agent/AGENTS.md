@@ -15,7 +15,7 @@ custom/                    # 自定义层（adapters/core/features + web-termina
 packs/                     # 外部技能包（按需读取，不注入系统提示词）
 docs/                      # 项目文档
 deploy/                    # 可选系统级部署产物（systemd 等）
-scripts/                   # 37 个运维脚本
+scripts/                   # 运维脚本与守门脚本
 patches/                   # 上游补丁
 ```
 
@@ -64,15 +64,11 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存�
 
 ## 关键约定
 
-- **上游隔离**：`vendor/pi/` 不直接修改，改动通过 `patches/` 记录。
-- **接口隔离**：Pi API 只出现在 `custom/adapters/`。
-- **缓存友好**：system prompt 注入禁止时间戳/精确数值；压力提示按档位固定文案（<75% 不注入、≥75%/≥90% 用固定文本）；token 估算统一用 `features/context/budget/budget.ts` 的 `estimateTokens`。
-- **前缀缓存是第一成本杠杆**（DeepSeek 命中价仅为未命中价的 1/50）：**任何改写已发送历史的动作**（删注入、擦除旧消息、压缩）或**改变请求前部的动作**（切 thinking 档位、改工具数组、改 system prompt）都会让其后整段上下文按全价重算。新增功能若需插入历史信息，一律 **append-only（追加到尾部）**，不得移除旧项——实测记忆注入的"删旧插新"占全部未命中的 39%。成本自查：`node scripts/daily-health.mjs --print`（加权命中率 / 未命中每次 / 前缀前端变更次数 / **首段分叉 `messages@0-7`** / **冷启动次数**——后两项分别是「整段重放」与「自改/重启代价」的先行指标）。
+- **缓存友好**：system 注入禁止时间戳/精确数值（装配唯一入口 `features/context/budget/system-prompt.ts`，预算与易变内容有守门测试）；压力提示按档位固定文案（<75% 不注入、≥75%/≥90% 用固定文本）；token 估算统一用 `features/context/budget/budget.ts` 的 `estimateTokens`。
+- **前缀缓存是第一成本杠杆**（DeepSeek 命中价仅为未命中价的 1/50）：**任何改写已发送历史的动作**（删注入、擦除旧消息、压缩）或**改变请求前部的动作**（切 thinking 档位、改工具数组、改 system prompt）都会让其后整段上下文按全价重算。新增功能若需插入历史信息，一律 **append-only（追加到尾部）**，不得移除旧项。成本自查：`node scripts/daily-health.mjs --print`（加权命中率 / 未命中每次 / 前缀前端变更次数 / **首段分叉 `messages@0-7`** / **冷启动次数**——后两项分别是「整段重放」与「自改/重启代价」的先行指标）。
 - **不要在会话中途改工具集**：pi 0.99 起 `/reload` 会**启用**新加入 `defaultTools` 的工具（移除的不会自动关，会话里手动关掉的也不会被它打开），而**任何工具数组变化都会让整段前缀按全价重算**。模式/工具面的变更走 `/mode` 的自动重启（或下次启动），不要在会话里热改 `defaultTools`。
-- **运行时状态不入库**：每台机器的选择/状态不要写进入库文件——已踩过两次：`modes.json` 的 `current`（被 git 操作静默回退，见 `custom/features/mode/README.md`）与上游新增的 `deviceId`（global setting，会落在**入库**的 `portable/agent/settings.json`，仅在首次 `Sign in with ChatGPT` 时创建）。不用该登录则零影响；用了就在提交前清掉 `deviceId` 键（下次登录会重建）。
-- **后台任务（禁止阻塞前台）**：长任务用 `tmux_run` 启动，**启动后立即结束回合**，不同轮内不等待；同轮内禁止 `tmux_wait`，确需等待只用 `pattern=` 匹配且 `timeout≤60s`。会话结束后由 `features/tmux/watcher.ts` 自动注入通知并触发新回合（不必等用户下一条消息）。子代理（`subagent`）是同步阻塞的，只适合必须立即拿到结果的短任务。
-  前台 `bash` 有 **240s 默认上限**（`PI_BASH_TIMEOUT_CEIL` 可调）：实测按工具拆解，工具执行占步墙钟 63.6%、其中 `bash` 占工具时间 63%（p90 36.4s / p99 164s），而前缀重放只占 0.5%——顿挫感来自前台长命令。命令需要更久就**改用后台**（`tmux_run`）并在后续轮取结果，不要用 `timeout` 参数硬撑（除非确实要同步等待且能说明理由）。
-- **git 提交**：暂存显式路径，只提交本次会话更改的文件；不提交 `auth.json` 等敏感配置。
+- **运行时状态不入库**：每环境状态写进被 gitignore 的 `*-state.json`，不写进入库文件——踩过两次：`modes.json` 的 `current`、上游 `deviceId` 落在入库的 `settings.json`。守门：`scripts/check-conventions.sh`（背景见 `custom/features/mode/README.md`）。
+- **后台任务（禁止阻塞前台）**：长任务用 `tmux_run` 启动，**启动后立即结束回合**，不同轮内不等待，同轮内禁止 `tmux_wait`；会话结束由 `features/tmux/watcher.ts` 自动注入通知并触发新回合（不必等用户下一条消息）。前台 `bash` 有 **240s 默认上限**（`PI_BASH_TIMEOUT_CEIL`），`tmux_wait` 有 **60s 硬上限**（`PI_TMUX_WAIT_CEIL_SEC`），两者都是代码约束；命令需要更久就**改用后台**并在后续轮取结果。子代理（`subagent`）同步阻塞，只适合必须立即拿到结果的短任务。
 
 ## 验证与命令
 
@@ -80,6 +76,7 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存�
 npm run check                      # 隔离边界验证（scripts/check-isolation.sh）
 npx tsc --noEmit -p custom/        # 自定义层类型检查
 bash scripts/golden-tasks.sh       # 行为防退化基准（--fast 仅结构守门，跳过 tsc/vitest）
+bash scripts/check-conventions.sh  # 约定守门（状态不入库 / 敏感文件 / any / 动态 import）
 bash scripts/install-hooks.sh      # 启用 git 钩子（pre-commit 快检 / pre-push 全量；本地无 CI）
 bash scripts/dev.sh                # 开发模式（tsx 直接运行 TS）
 npm run web                        # 浏览器访问（pty 拉起原样 TUI；只绑 127.0.0.1，远程走 SSH 隧道）
@@ -94,7 +91,7 @@ bash scripts/sync-upstream.sh      # 上游同步（vendor/pi 为独立 git clon
 ## 开发规范
 
 - **对话风格**：回答简短精炼，不使用 emoji；只使用技术性语言，直接了当；用户提问时先回答再进行编辑。
-- **代码质量**：大范围更改前完整阅读文件；不使用 `any`，检查 `node_modules` 获取外部 API 类型；禁止内联导入，只使用顶层导入。
+- **代码质量**：大范围更改前完整阅读文件；不使用 `any`、只使用顶层导入（两者由 `scripts/check-conventions.sh` 守门），并检查 `node_modules` 获取外部 API 类型。
 - **Git 规范**：只提交本次会话更改的文件；暂存显式路径，永远不要 `git add -A`；提交消息格式 `{feat,fix,docs}: <消息>`。
 - **命令**：代码更改后运行 `npm run check`；除非用户要求，不运行 `npm run build` 或 `npm test`。
 

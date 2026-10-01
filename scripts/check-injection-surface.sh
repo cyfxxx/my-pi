@@ -18,6 +18,8 @@ FILES=(
   "portable/agent/APPEND_SYSTEM.md"
   "portable/agent/AGENTS.md"
   "custom/features/context/budget/hard-rules.ts"
+  # P4（2026-10-01）：system 追加段的装配点与效率建议常量也在此文件里，故一并入基线
+  "custom/features/context/budget/system-prompt.ts"
 )
 
 hash_file() {

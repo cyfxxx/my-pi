@@ -13,6 +13,7 @@ import { createCompletionWatcher, NOTIFY_CUSTOM_TYPE } from './watcher';
 import type { WatcherHandle } from './watcher';
 import {
   loadTmuxConfig,
+  clampWaitTimeout,
   normalizeSessionName,
   startSession,
   listSessions,
@@ -178,16 +179,28 @@ export function register(pi: ExtensionAPI): void {
     parameters: {
       name: { type: 'string', description: '会话名' },
       pattern: { type: 'string', description: '等待日志中出现的关键字（可选）', optional: true },
-      timeout: { type: 'number', description: `超时秒数（默认 ${cfg.defaultTimeoutSec}）`, optional: true },
+      timeout: {
+        type: 'number',
+        description:
+          cfg.waitCeilSec > 0
+            ? `超时秒数（默认 ${cfg.defaultTimeoutSec}；受硬上限 ${cfg.waitCeilSec}s 截断）`
+            : `超时秒数（默认 ${cfg.defaultTimeoutSec}）`,
+        optional: true,
+      },
       until_exit: { type: 'boolean', description: '等待会话结束（默认 false；true 时 pattern 忽略）', optional: true },
     },
     execute: async (args) => {
       try {
         const name = normalizeSessionName(args.name as string, cfg.prefix);
-        const timeoutSec = (args.timeout as number) ?? cfg.defaultTimeoutSec;
-        const res = await waitSession(cfg, name, args.pattern as string | undefined, timeoutSec * 1000, Boolean(args.until_exit));
+        // 硬上限（P4）：同轮内阻塞等待被限制在 cfg.waitCeilSec（默认 60s，PI_TMUX_WAIT_CEIL_SEC 可调）。
+        // 软引导"确需等待 timeout≤60s"此前只写在 AGENTS.md，实测未被稳定遵守。
+        const wt = clampWaitTimeout(args.timeout as number | undefined, cfg.defaultTimeoutSec, cfg.waitCeilSec);
+        const res = await waitSession(cfg, name, args.pattern as string | undefined, wt.seconds * 1000, Boolean(args.until_exit));
         const head = res.outcome === 'exited' ? '会话已结束' : res.outcome === 'pattern' ? '匹配到关键字' : '等待超时';
-        return `${head}。\n\n${res.lastOutput.slice(-4000) || '(无输出)'}`;
+        const note = wt.clamped
+          ? `\n\n[已按 ${wt.ceiling}s 硬上限截断（请求 ${wt.requested}s）。长任务请 tmux_run 后结束回合，会话结束会由 watcher 自动通知。]`
+          : '';
+        return `${head}。${note}\n\n${res.lastOutput.slice(-4000) || '(无输出)'}`;
       } catch (e) {
         return fail(e);
       }

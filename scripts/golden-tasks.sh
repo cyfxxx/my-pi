@@ -99,8 +99,12 @@ step "13. 用量度量口径（成本告警的有效性）"
 # 也没告警）。这里用合成数据驱动真实 daily-health，锁定命中率来源与前端变更告警。
 if node scripts/test-usage-metrics.mjs >/tmp/golden-usage.log 2>&1; then pass "$(tail -1 /tmp/golden-usage.log)"; else fail "用量度量守门（见 /tmp/golden-usage.log）"; tail -15 /tmp/golden-usage.log; fi
 
+step "14. 约定守门（状态不入库 / 敏感文件 / 代码规范）"
+# P4 升格通道第一批：把 AGENTS.md 里的三条软约定硬化（此前靠人自觉）。
+if bash scripts/check-conventions.sh >/tmp/golden-conventions.log 2>&1; then pass "$(tail -1 /tmp/golden-conventions.log)"; else fail "约定守门（见 /tmp/golden-conventions.log）"; cat /tmp/golden-conventions.log; fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "14. 无头会话冒烟"
+  step "15. 无头会话冒烟"
   # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
   # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，

@@ -89,14 +89,13 @@ export function createToolLifecycleState(): ToolLifecycleState {
   };
 }
 
-// ── 效率建议 ──
-
-export const EFFICIENCY_ADVICE = '效率建议：使用更具体的工具调用可以提高响应速度。';
-export const LOW_PRESSURE_DELEGATION = '低压力委派：将简单任务委派给子代理可以提高效率。';
-export const FULL_DELEGATION_ADVICE = '完全委派建议：对于重复性任务，考虑使用自动化脚本。';
+// ── 效率建议 / system 注入装配 ──
+// P4（2026-10-01）：这三个常量与 system prompt 装配统一归位到 `budget/system-prompt.ts`
+// （注入面唯一装配点，带字节预算与易变内容守门），这里仅重导出以保持既有导入路径。
 
 // ── 迁移自 pi-tools 的 token 预算模块（纯逻辑） ──
 export * from './budget/budget';
+export * from './budget/system-prompt';
 export * from './budget/output-archive';
 export * from './budget/tool-groups';
 export * from './budget/compression';
