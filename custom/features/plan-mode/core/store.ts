@@ -11,14 +11,8 @@ let _state: TaskState = { tasks: [...EMPTY_STATE.tasks], nextId: EMPTY_STATE.nex
 export function getTodos(): readonly Task[] {
   return _state.tasks;
 }
-export function getNextId(): number {
-  return _state.nextId;
-}
 export function getState(): TaskState {
   return _state;
-}
-export function replaceState(next: TaskState): void {
-  _state = next;
 }
 export function commitState(next: TaskState): void {
   _state = next;

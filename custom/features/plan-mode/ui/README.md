@@ -6,7 +6,7 @@
 
 | 文件 | 职责 | 主要导出 |
 |------|------|----------|
-| `view.ts` | 纯逻辑视图/序列化：状态标签与标记、行格式化、plan 文件序列化 | `STATUS_LABEL`、`formatStatusLabel`、`statusMarker`、`formatCommandTaskLine`、`formatPlanMessageLine`、`formatListLine`、`formatGetLines`、`renderPlanFile`、`parsePlanFile` |
+| `view.ts` | 纯逻辑视图/序列化：状态标签与标记、行格式化、plan 文件序列化 | `STATUS_LABEL`、`formatStatusLabel`、`statusMarker`、`formatCommandTaskLine`、`formatListLine`、`formatGetLines`、`renderPlanFile`、`parsePlanFile` |
 | `overlay.ts` | `TodoOverlay`：经 `ctx.ui.setWidget` 注册 aboveEditor 任务面板 | `TodoOverlay` |
 
 ## 约定

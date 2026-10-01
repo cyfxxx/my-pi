@@ -9,7 +9,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { writeJSONSync } from '../../../core/atomic-write';
 import { readJSONOr } from '../../../core/fs-json';
-import { resultsFilePath, schedulerDir } from './storage';
+import { resultsFilePath } from './storage';
+import { schedulerDir } from './paths';
 
 export interface ResultEntry {
   ts: number;

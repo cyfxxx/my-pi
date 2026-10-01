@@ -9,7 +9,7 @@
 
 import { join } from 'node:path';
 import { getMemoryDir } from '../../../core/config';
-import { appendJSONL, readJSONL } from '../../../core/fs-json';
+import { appendJSONL } from '../../../core/fs-json';
 
 export interface TaskRecord {
   type: 'task';
@@ -43,8 +43,3 @@ export function recordTaskRecord(e: Omit<TaskRecord, 'type' | 'ts'>): void {
   }
 }
 
-export function loadTaskRecords(): TaskRecord[] {
-  return readJSONL<TaskRecord>(taskRecordFile(), (r): r is TaskRecord => {
-    return typeof r === 'object' && r !== null && (r as { type?: unknown }).type === 'task';
-  });
-}

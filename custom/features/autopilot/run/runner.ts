@@ -6,7 +6,6 @@
  */
 
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderPrompt } from '../store/storage';
@@ -194,6 +193,3 @@ function pruneRunLogs(taskId: string, keep: number): void {
 }
 
 /** 任务运行临时目录（隔离，含 pid） */
-export function taskTmpDir(): string {
-  return path.join(os.tmpdir(), `my-pi-autopilot-${process.pid}`);
-}

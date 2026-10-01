@@ -96,11 +96,3 @@ export function purgeExpiredNotes(): number {
   return removed;
 }
 
-export function clearCompactionFlag(): void {
-  updateNotes((notes) => {
-    if (notes['_ctx.just_compacted']) {
-      delete notes['_ctx.just_compacted'];
-      delete notes['_ctx.compacted_at'];
-    }
-  });
-}

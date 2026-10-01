@@ -1,15 +1,14 @@
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { writeJSONSync } from '../../../core/atomic-write';
 import { appendJSONLRotating } from '../../../core/fs-json';
 import type { Task, TaskStore, SchedulerSettings, ExecHistoryEntry } from '../types';
 import { STORE_VERSION, DEFAULT_MAX_RUN_TIME, HISTORY_LIMIT } from '../types';
-import { schedulerDir, tasksPath, resultsFilePath, deviceTag } from './paths';
+import { tasksPath, resultsFilePath, deviceTag } from './paths';
 import { withStoreLock } from './locks';
 import { computeNextRun, addMs, isoNow, retryDelayMs } from './schedule';
 
 export {
-  schedulerDir,
   tasksPath,
   lockPath,
   logDir,
@@ -299,10 +298,3 @@ export function renderPrompt(prompt: string): string {
   return out;
 }
 
-export function listSchedulerFiles(): string[] {
-  try {
-    return readdirSync(schedulerDir());
-  } catch {
-    return [];
-  }
-}

@@ -51,7 +51,7 @@ fork 的成本逻辑：父会话刚发过请求时，那段前缀在 provider �
 ## 并发与安全
 
 - 并发上限按环境区分（Termux 更低）：`MAX_PARALLEL_TASKS`/`MAX_CONCURRENCY`/`TERMUX_*`，由 `getMaxParallelTasks`/`getMaxConcurrency` 解析。
-- 只读工具白名单 `READONLY_ALLOWED_TOOLS` 与风险分级 `classifyTaskRisk`/`riskToolRestrictions`。
+- 只读工具白名单 `READONLY_ALLOWED_TOOLS` 与风险分级 `classifyTaskRisk`。
 - 子代理输出有上限（`PER_TASK_OUTPUT_CAP`/`PREVIOUS_OUTPUT_CAP_BYTES`）并做头尾截断。
 
 ## 相关

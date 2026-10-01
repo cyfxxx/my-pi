@@ -15,7 +15,7 @@
 | `config.ts` | 端点/超时解析、settings.json 读取、`HTTP_TIMEOUT_MS` |
 | `search.ts` | `searchWeb`（SearXNG）、`formatResponse`、`sanitizeMaxResults`、`truncate` |
 | `fetch.ts` | `fetchUrl`（抓取 + 正文截断）、`searchDirect`（Bing 直连降级）、实体/跳转解码 |
-| `concurrency.ts` | `createConcurrencyLimiter`、`batchFetch` |
+| `concurrency.ts` | `createConcurrencyLimiter`（并发限制原语，供批量抓取场景；当前搜索/抓取路径未接线） |
 | `types.ts` | 类型定义 |
 
 ## 配置（环境变量 > settings.json > 默认）

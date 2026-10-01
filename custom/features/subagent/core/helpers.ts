@@ -174,11 +174,6 @@ export function classifyTaskRisk(task: string): RiskLevel {
   return '1σ';
 }
 
-export function riskToolRestrictions(level: RiskLevel): string[] | null {
-  if (level === '3σ') return ['read', 'grep', 'find', 'ls'];
-  return null;
-}
-
 export async function mapWithConcurrencyLimit<TIn, TOut>(
   items: TIn[],
   concurrency: number,

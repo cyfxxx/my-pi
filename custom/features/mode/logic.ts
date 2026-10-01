@@ -239,12 +239,6 @@ export function isFeatureEnabled(featureName: string, config: ModeConfig): boole
 }
 
 /** 人设追加文件的绝对路径（无配置或文件不存在时返回 null） */
-export function resolveAppendPromptPath(config: ModeConfig): string | null {
-  if (!config.appendPrompt) return null;
-  const p = join(getAgentDir(), config.appendPrompt);
-  return existsSync(p) ? p : null;
-}
-
 function featuresEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   const sa = [...a].sort();

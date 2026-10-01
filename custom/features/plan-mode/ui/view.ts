@@ -27,13 +27,6 @@ export function formatCommandTaskLine(t: Task, glyph: string): string {
   return `  ${glyph} #${t.id} ${t.subject}${form}`;
 }
 
-export function formatPlanMessageLine(t: Task, maxSubject = 40): string {
-  const check = statusMarker(t.status);
-  const subject = t.subject.length > maxSubject ? `${t.subject.slice(0, maxSubject - 1)}…` : t.subject;
-  const form = t.status === 'in_progress' && t.activeForm ? ` (${t.activeForm})` : '';
-  return `${t.id}. ${check} ${subject}${form}`;
-}
-
 export function formatListLine(t: Task): string {
   const form = t.status === 'in_progress' && t.activeForm ? ` (${t.activeForm})` : '';
   const failed = t.failures && t.failures.length > 0 ? ` [!${t.failures.length}次失败]` : '';

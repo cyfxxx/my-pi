@@ -46,10 +46,6 @@ export function detectEnvironment(): RuntimeEnv {
   return cached;
 }
 
-export function resetEnvironmentCache(): void {
-  cached = null;
-}
-
 /** 条目是否对当前环境可见：无 environments 视为 all；含 all 永远可见；否则须含当前环境 */
 export function isEnvVisible(environments: string[] | undefined, current: RuntimeEnv): boolean {
   if (!environments || environments.length === 0) return true;

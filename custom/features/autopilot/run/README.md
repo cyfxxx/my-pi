@@ -6,7 +6,7 @@
 
 | 文件 | 职责 | 主要导出 |
 |------|------|----------|
-| `runner.ts` | 子进程运行单个任务、构造 pi 参数、提取输出 | `runTaskOnce`、`buildRunArgs`、`extractRunOutput`、`taskTmpDir` |
+| `runner.ts` | 子进程运行单个任务、构造 pi 参数、提取输出 | `runTaskOnce`、`buildRunArgs`、`extractRunOutput` |
 | `watchdog.ts` | 忙闲标记、活动时间、挂起判定与触发恢复 | `setTurnBusy`/`isTurnBusy`、`setBackgroundBusy`/`isBackgroundBusy`、`touchActivity`、`isHanging`、`triggerHangRecovery` |
 | `verifier.ts` | Best-of-N 评分与选择（纯逻辑，外部编排未迁移） | `parseJudgeScores`、`selectBest`、`shouldVerify`、`bestOfN`、`recordVerification` |
 | `verifier-logger.ts` | 验证记录与聚合落盘 | `logVerification`、`readVerifications`、`summarize` |

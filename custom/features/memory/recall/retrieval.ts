@@ -209,18 +209,6 @@ export function searchEntriesWithScores(
   return final.map((x) => ({ entry: x.e, score: x.score }));
 }
 
-export function searchEntries(
-  entries: MemoryEntry[],
-  query?: string,
-  category?: MemoryCategory,
-  tags?: string[],
-  limit = 5,
-  env?: RuntimeEnv | 'all',
-  asOf?: string,
-): MemoryEntry[] {
-  return searchEntriesWithScores(entries, query, category, tags, limit, env, asOf).map((x) => x.entry);
-}
-
 export interface SearchTraceInput {
   caller: 'memory_search';
   query?: string;

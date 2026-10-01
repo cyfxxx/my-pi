@@ -16,6 +16,7 @@ getUrgencyHint budget 公共查询 API（同上；若要启用"紧急提示"应�
 setTotalBudget budget 公共配置 API（当前只用 setContextWindow）
 recordCacheUsage budget 公共记账 API（缓存用量由 footer/usage-diag 直接统计）
 MIN_TAIL_LENGTH 暖前缀重放受上游事件限制暂为死代码（补丁点见 CONTEXT-MANAGEMENT-COMPARISON 第四节）
+createConcurrencyLimiter 并发限制原语（批量抓取/多引擎场景用）：当前搜索与抓取路径未接线，保留纯逻辑
 compactJson JSON 结构性压缩（超预算时按结构收缩而非硬切）：R4 截断目前统一走 head+tail，接入需先定"哪些工具输出按 JSON 压缩"并补测试
 jsonBytes 同上（JSON 字节数工具函数）
 shrinkHalf 同上（结构收缩算子）
@@ -37,21 +38,3 @@ resetWhisperHealthCache 测试专用重置钩子（whisper 健康探测缓存）
 #
 # ── C. 待清理存量（逐条"接线或删除"，处理完即从清单移除；下列历史条目暂缺理由，
 #      清理时补齐或直接删除该行） ──
-taskTmpDir
-consumeRestartLog
-isTurnBusy
-isBackgroundBusy
-lastActivityTs
-listSchedulerFiles
-loadTaskRecords
-resetEnvironmentCache
-searchEntries
-clearCompactionFlag
-resolveAppendPromptPath
-getNextId
-replaceState
-formatPlanMessageLine
-formatAgentList
-riskToolRestrictions
-voiceGuideError
-batchFetch

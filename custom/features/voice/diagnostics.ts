@@ -19,10 +19,6 @@ export function platformInstallGuide(cfg: VoiceConfig): string {
   return '1) 录音：apt-get install pulseaudio-utils（parec）或 alsa-utils（arecord）\n2) TTS：apt-get install espeak-ng（+ pulseaudio-utils）\n3) 转写：bash custom/features/voice/scripts/pi-whisper.sh start';
 }
 
-export function voiceGuideError(cfg: VoiceConfig, detail: string): string {
-  return `语音功能不可用：${detail}\n修复指引：\n${platformInstallGuide(cfg)}`;
-}
-
 export async function doctor(cfg: VoiceConfig): Promise<string[]> {
   const kind = resolvePlatform(cfg);
   const spec = recorderSpec(cfg);

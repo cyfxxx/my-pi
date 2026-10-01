@@ -20,24 +20,13 @@ export function setTurnBusy(busy: boolean): void {
   busyTurn = busy;
   busySince = busy ? Date.now() : 0;
 }
-export function isTurnBusy(): boolean {
-  return busyTurn;
-}
-
 /** 后台任务（autopilot setInterval 子进程）运行标记：期间不判定挂死。 */
 export function setBackgroundBusy(busy: boolean): void {
   backgroundBusy = busy;
 }
-export function isBackgroundBusy(): boolean {
-  return backgroundBusy;
-}
 export function touchActivity(): void {
   lastActivity = Date.now();
 }
-export function lastActivityTs(): number {
-  return lastActivity;
-}
-
 function latestSessionFile(): string | null {
   const own = process.env.PI_SESSION_FILE;
   if (own) {

@@ -24,7 +24,7 @@
 | `tool-groups.ts` / `tool-layering.ts` | 工具分层与休眠组 | `SLEEPING_GROUPS`、`buildSleepingSummary`、`applyToolLayering`、`enableGroup` |
 | `tool-health.ts` | 错误输出精简与失败熔断提示 | `dehydrateErrorOutput`、`updateFailStreak`、`FAIL_STREAK_LIMIT` |
 | `warm-prefix.ts` | 压缩摘要的暖前缀重放（**当前未生效**） | `needsWarmPrefix`、`isSummarizationMessage`、`buildReplayedPayload`、`buildWarmPrefixData` |
-| `task-record.ts` / `token-speed.ts` | 任务记录与出字速度统计 | `recordTaskRecord`/`loadTaskRecords`、`createSpeedTracker`/`formatSpeed` |
+| `task-record.ts` / `token-speed.ts` | 任务记录与出字速度统计 | `recordTaskRecord`、`createSpeedTracker`/`formatSpeedCompact` |
 
 ## 关键常量与环境变量
 
