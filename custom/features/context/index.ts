@@ -15,8 +15,10 @@ import { registerCommand, sendMessage, getAllToolNames, getActiveTools, getThink
 import { registerTool } from '../../adapters/tool-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
-import { getMemoryDir } from '../../core/config';
+import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
+import { HARD_RULES } from './budget/hard-rules';
+import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
 import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
 import {
@@ -418,11 +420,40 @@ export function register(pi: ExtensionAPI): void {
         lastVolatileContext = volatileText;
         message = { customType: VOLATILE_ADVICE_TAG, content: volatileText, display: false };
       }
-      // system prompt 只追加静态常量，保持逐字节稳定（工具集变化本身无法避免）
+      // system prompt 只追加**静态常量**，保持逐字节稳定（工具集变化本身无法避免）：
+      // HARD_RULES = 不变量摘要（权威性留在 system 层），EFFICIENCY_ADVICE = 效率建议。
+      // 体积大且频繁变更的 AGENTS.md 正文已移出 system（见下面的工作区指令注入）。
       return {
-        systemPrompt: `${e.systemPrompt}\n\n${EFFICIENCY_ADVICE}`,
+        systemPrompt: `${e.systemPrompt}\n\n${HARD_RULES}\n\n${EFFICIENCY_ADVICE}`,
         ...(message ? { message } : {}),
       };
+    },
+  });
+
+  // ── 工作区指令（AGENTS.md/CLAUDE.md）改为尾部 append-only 注入 ──
+  // 背景：pi 原生把工作区指令放 system prompt 的 project_context 段（前缀最前处），而这份文件
+  // 正是 my-pi 自己频繁编辑的 → 每改一次整段前缀作废。故 pi 侧用 --no-context-files 关掉原生注入
+  // （scripts/pi-supervisor.sh / dev.sh），改由这里复刻同一套发现规则注入为消息。
+  // 只在**内容变化时追加一份完整替换**（旧版本留在历史里，模型按"以最新一块为准"理解）——
+  // 于是"改自己的工作区文档"的代价从"整段重放"变成"尾部追加"。
+  let lastWorkspaceHash: string | null = null;
+  registerHook(pi, {
+    event: 'before_agent_start',
+    handler: async () => {
+      try {
+        const wi = collectWorkspaceInstructions({ cwd: process.cwd(), agentDir: getAgentDir() });
+        if (!wi.text || wi.hash === lastWorkspaceHash) return;
+        lastWorkspaceHash = wi.hash;
+        return {
+          message: {
+            customType: 'my-pi-workspace-instructions',
+            content: wi.text,
+            display: false,
+          },
+        };
+      } catch {
+        /* 读不到工作区指令不阻塞本轮 */
+      }
     },
   });
 

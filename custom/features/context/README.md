@@ -23,6 +23,8 @@
 |------|------|
 | `index.ts` | 注册工具/命令/钩子；编排各预算模块 |
 | `logic.ts` | 纯逻辑 barrel + 注入文本常量（`extractUserRequest`/`hasInProgressTask`/`EFFICIENCY_ADVICE`） |
+
+> 工作区指令（AGENTS.md）的注入位置（2026-10-01）：**不在 system prompt**，而是由 `budget/workspace-instructions.ts` 渲染成尾部 append-only 消息（`my-pi-workspace-instructions`）。system 层只保留 `budget/hard-rules.ts` 的静态常量与 pi 原生的 `APPEND_SYSTEM.md`。原因与验证见 `DECISIONS.md` 的 [2026-10-01] 条目。 |
 | `usage-stats.ts` | 工具调用用量/缓存命中 JSONL 记账与汇总 |
 | `budget/` | 预算子包，见 [budget/README.md](budget/README.md) |
 

@@ -27,6 +27,12 @@ export default defineConfig({
     name: 'my-pi-custom',
     maxWorkers: 4,
     sequence: { groupOrder: 1 },
+    // 默认超时 5s 太紧：`custom/features/*/index.ts` 会被 `adapters/tool-adapter` 静态拉入
+    // `typebox`（实测单独 import 就要 ~3.5s，用于在注册期把简化的参数声明编译成 TypeBox schema），
+    // 于是"import 一个 feature + 注册"这类测试整体约 5–6s，贴着默认线跑——多一个测试文件提高并发
+    // 就会假红（2026-10-01 实测：enable-tool / search-tool 两个用例在新增一个测试文件后超时）。
+    // 这些测试做的是真实模块加载，不是慢逻辑，故把默认超时提到与其真实成本匹配。
+    testTimeout: 20_000,
     include: ['custom/**/__tests__/**/*.test.ts'],
     exclude: ['node_modules/**', 'vendor/**', 'custom/dist/**'],
   },

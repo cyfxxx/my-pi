@@ -2,6 +2,27 @@
 
 > 系统化的故障诊断流程，帮助快速定位和解决 my-pi 运行中的问题。
 
+## 0. 提交被拦：`check-isolation` 误报 "vendor/pi 有未提交的修改"
+
+**症状**：`git commit` 时 pre-commit 报 `❌ vendor/pi/ 有未提交的修改`，紧跟着
+`fatal: unable to read <sha>`；但手动跑 `bash scripts/check-isolation.sh` 又是全绿。
+
+**原因**：不是 vendor 脏，而是**部分提交**（`git commit -- <pathspec>` / `git commit <file>`）——
+git 会为这次提交创建**临时索引**，并把 `GIT_INDEX_FILE` 传给钩子。钩子里的
+`git -C vendor/pi diff --quiet` 于是**拿主仓库的索引去比对 vendor 仓库**，索引里的对象在 vendor 仓库
+不存在 → `unable to read` → diff 退出码非 0 → 被判定成"工作树脏"。
+
+**决定性验证**：
+
+```bash
+GIT_INDEX_FILE=$PWD/.git/index git -C vendor/pi diff --quiet   # → fatal: unable to read <sha>，rc=128
+```
+
+**已修**：`scripts/check-isolation.sh` 顶部 `unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE
+GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES`——守门只应依赖自己的参数，不应继承调用方的 git 环境。
+
+**临时绕过**（若在旧版本上遇到）：改用普通提交（只提交已暂存内容），或 `git commit --no-verify`（不推荐）。
+
 ## 元信息
 
 | 属性 | 值 |

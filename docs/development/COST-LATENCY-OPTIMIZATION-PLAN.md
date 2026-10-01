@@ -34,7 +34,7 @@
 | **P0-1** | 未命中归因缺口：`head` 指纹只覆盖**前 6 条消息**，`total` 兜底仅在 `changed` 为空时触发（763 条里命中 0 次） | `prefix-fingerprint.ts:23`、`:100`；60 条大未命中里 **37 条（=全部未命中 50%）无法归因** | 闭着眼睛优化 | 零（只加度量） |
 | **P0-2** | 没有"冷启动/断裂成本"的日常记账 | `daily-health.mjs` 只有命中率/未命中/前端变更计数，无"每会话冷启动未命中" | 自改成本不可见 | 零 |
 | **P0-3** | 旧对比文档三处结论已失效 | ①"my-pi 256K 压缩会触发"——实际阈值 = 窗口−reserveTokens ≈ **967K**，实测 max 341K **从未触发**（`compaction/compaction.ts` 的 `shouldCompact`）；②"O1/O2 擦除每次请求都跑"——实际 `PER_TURN_ERASE` **默认关**（`budget/task-gate.ts:92`）；③"DSH 从不压缩"——实测 6 次，且由 provider 400 `CONTEXT_WINDOW_EXCEEDED` 触发 | 后来人会继续踩坑 | 零 |
-| **P1-1** | **`AGENTS.md` 进 system 前缀**（`project_context` 段，1.7–2.1K token；文件当前 11.8K 字符，且由我们自己频繁编辑）；DSH 把它作为 `<system-reminder>` user 消息**追加到历史尾部**、变更时追加完整替换 | pi 分段实测；DSH `dsh-agent-instructions`（审计 §11）；会话中途 `system` 指纹变更 9 次 | **改自己的工作区文档 = 整段前缀作废**，这是最贵的一类断裂 | 中（改变注入位置，可能影响行为，需 A/B） |
+| ~~**P1-1**~~ ✅ | **`AGENTS.md` 进 system 前缀**（`project_context` 段）→ **已改为：system 只留 `HARD_RULES` 常量，正文走尾部 append-only 消息**（`--no-context-files` + `workspace-instructions.ts`） | 见 DECISIONS [2026-10-01]；A/B 判据全部通过（跨进程 `system` 指纹不变、会话内改文档只产生尾部追加、`project_context` 消失） | 原本是最贵的一类断裂 | 已修 |
 | ~~**P1-2**~~ ✅ | 唯一**默认开启**的删历史动作：`≥2 条 compactionSummary` 时删除旧摘要 → **已改为默认关闭**（`PI_CONTEXT_DEDUP_SUMMARIES=on` 才启用） | `context/index.ts:463`、`budget/task-gate.ts` 的 `DEDUP_SUMMARIES` + 3 例门控测试 | 低频但代价 100%（其后全量重放） | 已修 |
 | **P1-3** | 会话中途断裂：**旧口径报 20 次（`tools` 8 / `system+head` 9 / `head` 1 / 混合 2）里有 19 次是误报**——`head` 只看前 6 条消息，分不清「改写」与「在头窗内追加」（实测：新会话第 2 次请求 msgs 3→5 即被记为 `['head','messages']`，而 segments 未分叉）。**按新口径重算 763 条：真实断裂 14 次 = `system` 9 + `tools` 5** | `prefix-fingerprints.jsonl` + `daily-health`（前端变更数 7 → 4，只剩 system） | 大头缩小到 9 次 system 重渲染（→ P1-1）+ 5 次工具面变化 | 低–中 |
 | **P1-4** | 启动 13 + 重启 9 次冷前缀（每次 8.7–23.2K）无预算、无提示 | 同上 | 自改闭环的固有代价 | 低 |
@@ -61,7 +61,7 @@
 
 | 项 | 改法 | 判据 |
 |---|---|---|
-| P1-1 | **AGENTS.md 迁出 system**：用 pi 的 `--no-context-files` 关掉原生注入，由 my-pi 自己以**append-only user 消息**注入（首条注入 + 内容变更时追加完整替换，旧版本保留），对齐 DSH | A/B：新建会话首请求未命中 **<3K**；改一次 AGENTS.md 后下一请求未命中 **<1K**；行为不退化（golden + 人工抽查一轮真实任务） |
+| ~~P1-1~~ ✅ | （已完成）system 只保留 `HARD_RULES`/`APPEND_SYSTEM.md`；`AGENTS.md` 正文由 `workspace-instructions.ts` 以尾部消息注入，64KB 预算 + UTF-8 安全截断 | 实测：改文档后 `system` 指纹不变、只产生尾部追加；`project_context` 从分段消失；11 例单测 |
 | ~~P1-2~~ ✅ | （已完成）去重改为默认关闭，仅 `PI_CONTEXT_DEDUP_SUMMARIES=on` 启用 | 门控 3 例测试通过；该路径默认不再产生断裂 |
 | P1-3 | ① 口径修正已完成（追加不再误报）；② 剩余真实断裂 = `system` 9（→ P1-1，以及不要中途改工作区文档）+ `tools` 5（默认关闭分层后不应再出现，加一道「中途改工具面」的守门告警） | 真实断裂从 14 → ≤5（7 天窗口对比）；不再出现 `tools` 类断裂 |
 | P1-4 | 冷启动记账化：`daily-health` 与 `/daily` 报"今日自改引起的冷启动次数与 token"；在 `AGENTS.md` 里写明"每次改 AGENTS.md/工具面 = 一次冷启动" | 数字可见 |
@@ -81,6 +81,7 @@
 | P3-1 | 自主度专项：先做**归因**（统计每个用户轮在什么条件下停下：是否 plan/todo 未完成就交回、是否被"简短回答"规则诱导），再决定是否加"未完成不收尾"的硬门 | 每轮步数中位数提升；干预率不升 |
 | P3-2 | 步延迟拆解：把 37s p90 拆成"前缀重放 prefill" vs "工具耗时" vs "生成"，再决定是否给 `bash` 加默认超时或提示 | 拆解报告 + 优化后 p90 下降 |
 | P3-3 | 子代理 fork 模式（继承历史、复用前缀）——上游已有 `fork` 能力则接线 | 子代理首请求未命中显著下降 |
+| P3-5 | **headless `-p` 带扩展产出回复后不退出**（实测 >240s 挂住；golden 冒烟的注释里已记为已知现象）。最可能是我们扩展里的 `setInterval`（autopilot tick、tmux watcher）未 `unref()`，使事件循环不空。定位后加 `unref()`；若成立，autopilot 任务用 `--no-extensions` 的变通或有放宽空间 | 带扩展的 `-p` 能在产出回复后正常退出（golden 冒烟断言 rc=0） |
 
 ### Phase 4 — 防退化收尾
 

@@ -1,8 +1,12 @@
 #!/bin/bash
 # check-injection-surface.sh — 系统提示词注入面基线守门（VISION P2）
 #
-# 对 pi 注入 system prompt 的前缀输入（portable/agent/APPEND_SYSTEM.md + AGENTS.md）
-# 取指纹并与基线比对，捕获"无意改动注入面导致缓存前缀断裂/行为漂移"。
+# 对**注入面源文件**取指纹并与基线比对，捕获"无意改动注入面导致缓存前缀断裂/行为漂移"。
+# 构成（2026-10-01 P1-1 后）：
+#   - APPEND_SYSTEM.md：pi 原生注入 system prompt（输出要求/重要事项）
+#   - AGENTS.md：不再进 system 前缀，改由 custom/features/context 以尾部 append-only 消息注入
+#   - hard-rules.ts：system 层的**静态**硬规则常量（不变量摘要）
+# 三者任一变动都会影响"模型看到的指令"，故一并守门。
 # 用法：
 #   bash scripts/check-injection-surface.sh            # 比对（失配 exit 1）
 #   bash scripts/check-injection-surface.sh --update   # 写入/更新基线（需人工确认）
@@ -13,6 +17,7 @@ BASELINE="$ROOT/portable/agent/injection-baseline.json"
 FILES=(
   "portable/agent/APPEND_SYSTEM.md"
   "portable/agent/AGENTS.md"
+  "custom/features/context/budget/hard-rules.ts"
 )
 
 hash_file() {

@@ -17,6 +17,8 @@
 | `compression.ts` | 压缩前快照（`checkpoints/compact/`，旧版根目录兼容清理）与 JSON 缩减 | `snapshotBeforeCompact`、`pruneSnapshots`、`shrinkHalf`、`compactJson`、`snapshotDir`、`legacySnapshotDir` |
 | `task-gate.ts` | 阈值/门限解析（含 env 覆盖）与后台任务判定 | `ABSOLUTE_TOKENS`/`RESTART_TOKENS`/`COMPACT_COOLDOWN_MS`/`IDLE_MS`/`TASK_GATE`、`resolveContext`、`hasBackgroundTask` |
 | `auto-compact.ts` | 压缩判定与阈值计算 | `computeCompactThreshold`、`makeCompactDecider`、`makeAutoContinueGate` |
+| `workspace-instructions.ts` | 工作区指令（AGENTS.md/CLAUDE.md）收集与渲染：复刻 pi 的发现规则（agentDir 优先 → cwd 向上、宽泛→具体、按路径去重）+ 64KB 体积预算 + UTF-8 安全截断。产出待注入的尾部消息文本与 hash | `collectWorkspaceInstructions`、`collectContextFiles`、`renderWorkspaceInstructions`、`truncateUtf8Safe`、`WORKSPACE_INSTRUCTIONS_MAX_BYTES` |
+| `hard-rules.ts` | system 层保留的**静态不变量摘要**（常量）：上游隔离/接口隔离/缓存纪律/状态不入库/后台任务。改动它等于所有会话前缀失效一次 | `HARD_RULES` |
 | `prefix-fingerprint.ts` | 逐请求前缀指纹（system/tools/消息头/**全消息序列分段**/总量哈希） | `fingerprintRequest`、`formatFingerprint`、`systemTextOf`、`messageSegments`、`firstDivergentSegment`、`FINGERPRINT_HEAD_MESSAGES`、`FINGERPRINT_SEGMENT_MESSAGES` |
 | `thinking-level.ts` | 思考档位自动升降 | `tickThinkingLevel`、`proposeThinkingLevel`、`inferTaskType` |
 | `tool-groups.ts` / `tool-layering.ts` | 工具分层与休眠组 | `SLEEPING_GROUPS`、`buildSleepingSummary`、`applyToolLayering`、`enableGroup` |

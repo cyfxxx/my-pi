@@ -1,6 +1,31 @@
 # 架构决策记录
 
 ## 格式
+### [2026-10-01] 工作区指令移出 system 前缀（P1-1）：正文走尾部注入，不变量留在 system
+**背景**：缓存差距的定量归因指向**静态前缀的可变性**：763 条指纹里 9 次 `system` 断裂全部是 system 消息被重渲染，而 system 正文里最大的一块正是 `AGENTS.md`（`project_context` 段，1.7–2.1K token；文件 11.8KB 且由 my-pi 自己频繁编辑）。每改一次自己的工作区文档 → 整段前缀作废（近 24h 冷启动 5 次、119,867 token 全价，平均 23,973/次）。对照 DSH：工作区指令以 `<system-reminder>` 包成 **user 消息追加进历史**，append-only，内容变更时追加完整替换（`DSH-RUNTIME-AUDIT.md` §11）。
+**选项**：
+1. 维持现状（AGENTS.md 留在 system 的 project_context 段）
+2. 整体搬到尾部消息（简单，但把**权威性**一起搬走——system > user 的层阶是有意义的）
+3. **拆开**：不变量摘要（短、静态）留在 system；体积大、频繁变更的正文走尾部 append-only
+**决策**：选项 3。pi 侧加 `--no-context-files` 关掉原生注入；my-pi 在 `context` 功能里复刻同一套发现规则（agentDir 优先 → cwd 向上，宽泛→具体，按路径去重）并注入为 `my-pi-workspace-instructions` 消息；system 层只保留 `HARD_RULES` 常量（上游隔离/接口隔离/缓存纪律/状态不入库/后台任务 五条不变量）与原有的 `APPEND_SYSTEM.md`。
+**理由**：
+- 选项 1 是那个 9 次断裂的直接来源，且 my-pi 的自我编辑是常态而非例外；
+- 选项 2 会让"提交只暂存显式路径""不改写已发送历史"这类硬约束降级为 user 消息——而 VISION §3.2 要求硬约束不依赖模型自觉；
+- 选项 3 让**变更代价与权威性解耦**：越常变的内容越靠尾部，越不可动摇的内容越靠 system。这与"append-only + 硬优先"两条既有纪律同源。
+**代价与约束**：
+- **非 full 模式（roleplay/minimal）不再注入 AGENTS.md**（`context` 不在其功能白名单里）。这是有意的：AGENTS.md 是开发环境说明，与角色扮演人设本就冲突；需要时应显式把 `context` 加进模式白名单。
+- 注入按**每次 run** 检查一次（`before_agent_start` 的粒度），run 中途改文件不会当轮刷新；新进程首 run 会再注入一份（内容相同则重复一份，代价是尾部追加 ≈ cacheRead 价，不是断裂）。若将来觉得吵，可改为"从历史里找最后一份并比对 hash"。
+- `HARD_RULES` 是常量：**改它 = 所有会话前缀失效一次**（预期内，但要克制）；已纳入 `check-injection-surface.sh` 的指纹。
+**验证**（临时工作区 A/B，未触碰真实文档）：
+- 跨两次进程：把工作区 `AGENTS.md` 从 VERSION-ONE 改成 VERSION-TWO，两边的 `system` 指纹**完全相同**（`23e6fc3fa017`）；
+- 会话内端到端：让模型在自己会话里把该文件改成 VERSION-THREE，指纹为 `changed=['head','messages']`（尾部追加）而**不含 `system`**；
+- 会话 `system` 分段里 **`project_context` 已消失**（`preamble/tools/rules/docs/addendum/skills/cwd`）；
+- `custom_message` 里出现 `my-pi-workspace-instructions`（7973 字符，含 VERSION-ONE）。
+**留待观察**：真实使用中"指令从 system 降到消息层"是否影响遵守度。若观察到退化，退路是把最关键的两三条再抄进 `HARD_RULES`（system 层），而不是整体搬回去。
+
+---
+
+
 ### [日期] [决策标题]
 **背景**：
 **选项**：

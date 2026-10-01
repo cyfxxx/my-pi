@@ -1186,6 +1186,46 @@ SIGKILL 服务器后，`script` → `pi-supervisor.sh` → `pi` 被 reparent 到
 - 其余操作点（启动命令、隧道、令牌流程、参数表、首屏 20 秒、单会话、多标签镜像、
   每环境独立密钥、xterm 5.5.0 约束）复核后确认**原本已有记录**，不再重复。
 
+## 成本与效率优化 Phase 1 主体：工作区指令移出 system 前缀（第 67 批，2026-10-01）
+
+P1-1 完成。用户已授权"自行决策与执行"，故按 VISION 的目标（缓存/成本不劣化、硬优先、防退化）自行决策实施。
+
+### 设计：把"变更代价"与"权威性"解耦
+
+- **system 层**保留：`APPEND_SYSTEM.md`（pi 原生）+ 新增 `HARD_RULES` 常量（五条不变量摘要：
+  上游隔离 / 接口隔离 / 缓存纪律 / 状态不入库 / 后台任务）。短、静态、逐字节稳定 → 权威性不降。
+- **尾部消息层**：`AGENTS.md` 等全部工作区指令改由 `custom/features/context/budget/workspace-instructions.ts`
+  收集（复刻 pi 的发现规则：agentDir 优先 → cwd 向上，宽泛→具体，按路径去重）并渲染为
+  `my-pi-workspace-instructions` 消息注入；**只在内容变化时追加完整替换**。
+- pi 侧 `--no-context-files`（supervisor 两处 + dev.sh 三处）关掉原生 project_context 注入。
+- 新增 DSH 式**体积预算**（64KB，超出从最宽泛的开始丢、单份超限则 UTF-8 安全截断并显式说明）。
+
+### 验证（临时工作区 A/B，不触碰真实文档）
+
+| 判据 | 结果 |
+|---|---|
+| 改工作区文档后 `system` 指纹是否变 | **不变**（VERSION-ONE → VERSION-TWO，两次进程同为 `23e6fc3fa017`） |
+| 会话内改文档的指纹标记 | `changed=['head','messages']`（尾部追加），**不含 `system`** |
+| system 分段是否还有 `project_context` | **已消失**（preamble/tools/rules/docs/addendum/skills/cwd） |
+| 指令是否真的注入 | `custom_message: my-pi-workspace-instructions`（7973 字符，含被改前的内容） |
+| 发现规则/预算/截断 | 新增单测 11 例（顺序、override 优先、去重、确定性 hash、丢宽泛、UTF-8 安全截断） |
+
+### 顺带（两处既有隐患）
+
+- `check-injection-surface.sh` 的指纹源加入 `hard-rules.ts`（system 层新增内容必须被守门覆盖），基线已刷新。
+- **vitest 默认 5s 超时太紧**：本轮新增一个测试文件（提高并发）后 `enable-tool` / `search-tool` 两个用例
+  超时假红。查根因是 `adapters/tool-adapter` 静态拉入 `typebox`——**单独 import 实测 ~3.5s**
+  （用于注册期把简化参数声明编译成 TypeBox schema），于是"import 一个 feature + 注册"整体约 5–6s，
+  一直贴着默认线跑。已在 `vitest.config.ts` 把 `testTimeout` 提到 20s 并写明原因（这些用例做的是真实
+  模块加载，不是慢逻辑）。
+- **headless `-p` 挂起**：真实启动路径验收时复现"产出回复后进程不退出"（golden 冒烟注释里已记为已知）。
+  已作为 P3-5 记入方案（怀疑是我们扩展的 `setInterval` 未 `unref()`）。
+- **`check-isolation` 会被"部分提交"误伤**：本轮两次提交被 pre-commit 拦下、报 `vendor/pi 有未提交的修改`
+  + `fatal: unable to read <sha>`，而手动跑门是全绿。根因是 `git commit -- <pathspec>` 用**临时索引**
+  并把 `GIT_INDEX_FILE` 传给钩子，钩子里 `git -C vendor/pi diff` 便拿主仓库索引比对 vendor 仓库。
+  已用 `GIT_INDEX_FILE=$PWD/.git/index git -C vendor/pi diff --quiet` 决定性复现（同一 sha、rc=128）；
+  修法是在 `check-isolation.sh` 顶部 unset 这些 git 环境变量，并写进 `docs/TROUBLESHOOTING.md` 第 0 节。
+
 ## 成本与效率优化 Phase 1（部分）：删历史默认关 + 断裂口径修正（第 66 批，2026-10-01）
 
 ### P1-2 旧压缩摘要去重改为默认关闭

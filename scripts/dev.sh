@@ -31,12 +31,12 @@ fi
 # fresh `npm ci` 后会消失（见 docs/operations/UPSTREAM-UPDATE.md 常见坑）。
 TSX="$ROOT/node_modules/.bin/tsx"
 if [ -x "$TSX" ]; then
-    exec "$TSX" "$CLI_SRC" --extension "$ROOT/custom/bootstrap.ts" ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "$@"
+    exec "$TSX" "$CLI_SRC" --extension "$ROOT/custom/bootstrap.ts" --no-context-files ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "$@"
 fi
 # 兜底：vendor 残留（旧布局）→ npx（需网络）
 if [ -x "$ROOT/vendor/pi/node_modules/.bin/tsx" ]; then
     echo "⚠ 未找到根 node_modules/.bin/tsx，回退 vendor 残留副本（运行 npm install 修正）" >&2
-    exec "$ROOT/vendor/pi/node_modules/.bin/tsx" "$CLI_SRC" --extension "$ROOT/custom/bootstrap.ts" ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "$@"
+    exec "$ROOT/vendor/pi/node_modules/.bin/tsx" "$CLI_SRC" --extension "$ROOT/custom/bootstrap.ts" --no-context-files ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "$@"
 fi
 echo "⚠ 未找到 tsx（先运行 npm install），回退 npx tsx（需网络）" >&2
-exec npx --yes tsx "$CLI_SRC" --extension "$ROOT/custom/bootstrap.ts" ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "$@"
+exec npx --yes tsx "$CLI_SRC" --extension "$ROOT/custom/bootstrap.ts" --no-context-files ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "$@"

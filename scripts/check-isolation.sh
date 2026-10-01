@@ -2,6 +2,12 @@
 # 隔离边界验证脚本
 set -e
 
+# 清掉调用方注入的 git 环境：`git commit <pathspec>`（部分提交）会用**临时索引**并把
+# GIT_INDEX_FILE 传给钩子，于是本脚本里的 `git -C vendor/pi diff` 会拿 my-pi 的索引去比对
+# vendor 仓库 → `fatal: unable to read <sha>` → 误判 "vendor/pi 有未提交的修改"，
+# 提交被 pre-commit 拦下（2026-10-01 实测两次复现）。守门只应依赖自己的参数。
+unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || true
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ERRORS=0
 

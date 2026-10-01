@@ -203,7 +203,10 @@ if [ "${MY_PI_SUPERVISOR_LIB:-0}" = "1" ]; then
 fi
 
 # ── 主循环 ──
-ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" "$@")
+# --no-context-files：关掉 pi 原生的 AGENTS.md/CLAUDE.md 注入（它进 system prompt 的
+# project_context 段 = 前缀最前处，而这份文件由 my-pi 自己频繁编辑 → 每改一次整段前缀作废）。
+# 改由 custom/features/context 以尾部 append-only 消息注入，见 budget/workspace-instructions.ts。
+ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" --no-context-files "$@")
 
 # 脚本自重载：保存原始参数与当前脚本哈希，供主循环检测变更后 exec 自身。
 USER_ARGS=("$@")
@@ -362,7 +365,7 @@ while true; do
     reset_crash_count
     RECOVERY_ROUNDS=0
     CONSECUTIVE_FAIL=0
-    ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" "$@" --continue)
+    ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" --no-context-files "$@" --continue)
     sleep 1
     continue
   fi
