@@ -93,7 +93,7 @@ my-pi 当前安全网 = `npm run golden`（12 步：隔离/注册面/死导出/�
 | 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 / 垃圾与聚合 | memory-lifecycle.mjs（只读报告） | **已有**：`memory/store/storage.ts` 治理字段就绪；`memory/mine/lifecycle.ts` + `/memory lifecycle` 出六类候选，`scripts/memory-lifecycle.mjs --json` 供 headless 定时任务消费 |
 
 结论：度量层已建成（P1/P2/P3 达成，且缓存口径已从"工具级台账"升级为"每轮用量 + 前缀断裂归因"）；
-上游变更面从"事后读 changelog"升级为**同步前确定性读数**；仅 P4 升格通道待推进。落地顺序见 §6。
+上游变更面从"事后读 changelog"升级为**同步前确定性读数**；P4 升格通道**第一批已执行**（6 条软引导硬化 + 降权，注入预算有硬上限守门），剩余候选与前置条件见 [UPGRADE-LEDGER.md](UPGRADE-LEDGER.md)。落地顺序见 §6。
 
 ## 五、记忆生命周期治理规则 v1
 
@@ -117,7 +117,9 @@ my-pi 当前安全网 = `npm run golden`（12 步：隔离/注册面/死导出/�
 - **P1 度量基建（已完成，2026-09-21）**：干预捕获落盘（`interventions.jsonl` + `/intervention stats`）→ 任务遥测（autopilot telemetry + `/auto stats`）→ 缓存/用量统计（`usage-stats.ts` + `/context usage`）。判据达成：可产出干预率、token 成本、缓存命中率三项数字。
 - **P2 防退化（已完成，2026-09-21）**：`scripts/golden-tasks.sh`（隔离/注册面/类型/单测/补丁/注入面，`--smoke` 无头冒烟）+ `scripts/check-injection-surface.sh`（system prompt 前缀指纹基线）。判据达成：结构性改动可被 `npm run golden` 拦截。
 - **P3 记忆生命周期（已完成，2026-09-21；2026-09-25 补齐）**：治理字段在 `memory/store/types.ts` 就绪（recurrence/confidence/accessedAt/source/links/supersededBy）；只读生命周期报告 `memory/mine/lifecycle.ts` + `/memory lifecycle`（§5 淘汰/升格/冲突/垃圾/聚合五类候选 + 规模陈旧度）；headless 入口 `scripts/memory-lifecycle.mjs`（定时任务无扩展命令可用）；教训闭环 `memory/mine/lesson-miner.ts` + `/memory mine [--ingest]`（从干预纠正意图挖掘并入记忆库，自动去重）。
-- **P4 升格通道执行**：按 §3.1 把反复有效的软引导硬化，并同步降权原软引导。判据：软层条目不无限增长（注入预算受控）。
+- **P4 升格通道执行（第一批已完成，2026-10-01）**：按 §3.1 把反复有效的软引导硬化，并同步降权原软引导。判据：软层条目不无限增长（注入预算受控）。
+  本批 6 条：system 注入的稳定性与预算（装配唯一入口 + 8 类易变模式 + 三个字节上限常量）、运行时状态/敏感文件不入库、生产代码规范（`any` 与动态 import）、`tmux_wait` 同轮等待 60s 硬上限；降权动作 = 删除重复条目（git 提交/上游隔离/接口隔离）+ 压缩已被代码覆盖的描述，AGENTS.md 12346 → **11829 B**。
+  台账（含已完成证据与"待评/不硬化原因"）：[UPGRADE-LEDGER.md](UPGRADE-LEDGER.md)。落地位置：`custom/features/context/budget/system-prompt.ts`、`scripts/check-conventions.sh`（golden 第 14 步）。
 
 ## 七、未来展望（受限于算力与技术，暂缓）
 
@@ -139,3 +141,4 @@ my-pi 当前安全网 = `npm run golden`（12 步：隔离/注册面/死导出/�
 - 2026-09-20 v2：自 pi-tools 迁移并按 my-pi 现状重写。保留 §1–§3、§5 的愿景与方法论（仅把落点映射到 my-pi 的目录与硬约束）；§4 度量表由"pi-tools 全绿"改写为 my-pi 真实差距（度量层整体缺失）；§5 明确标注为目标设计；新增 §6 落地路线（P0 已完成 → P4），替代原 pi-tools `SELF-OPTIMIZING-ROADMAP.md`。
 - 2026-09-25 v3：按实现现状回填 §4/§5/§6：度量层 P1–P3 全部达成（golden 11 步 + 死导出/补丁行为守门 + `.githooks/`，514 用例）；§5 增补垃圾嫌疑/聚合候选规则并标注已落地（含 headless 入口 `scripts/memory-lifecycle.mjs`）；P4 升格通道为唯一未完成阶段。
 - 2026-10-01 v3.1：§4 现状列再回填——缓存口径由"工具级台账 `usage.jsonl`"更正为"每轮用量 `.usage-diag.jsonl` + 前缀断裂归因 `prefix-fingerprints.jsonl`，指标含加权命中率/未命中每轮/输出占比/前缀前端变更次数"；回归 golden 12 步 → **13 步、622 → 696 用例**；新增「上游」行（`check-upstream.sh` 把"升级代价"变成同步前的确定性读数）；任务行补 `/daily`。§1–§3、§5 的愿景与方法论未改动。
+- 2026-10-01 v4：**P4 升格通道第一批执行完毕**——6 条软引导硬化（system 注入装配唯一入口 + 预算/易变内容守门、状态与敏感文件入库守门、生产代码规范守门、`tmux_wait` 60s 硬上限）并按 §3.1 同步降权原软引导；新增台账 [UPGRADE-LEDGER.md](UPGRADE-LEDGER.md)（已完成/待评各有证据与原因，判据=注入预算受控）；回归 golden **14 步**。§1–§3 的愿景与方法论未改动，§5 未改动。

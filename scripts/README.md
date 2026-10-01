@@ -26,9 +26,10 @@
 | `check-patches-behavior.mjs` | 补丁行为存在性守门（断言关键符号/自标记仍在 vendor 源码，防上游同步语义漂移） |
 | `check-upstream.sh` | **上游同步前体检（只读）**：目标版本/区间提交数/各包 churn/新增包、changelog 新增版本段与破坏性关键词、每个 `patches/*.patch` 的目标文件是否被上游改过、`custom/adapters` 依赖的 API 面是否变动；结论=已最新/可同步/需先改补丁（`PI_CHECK_NO_FETCH=1` 离线，`PI_CHECK_STRICT=1` 风险时 exit 2）。流程见 [../docs/operations/UPSTREAM-UPDATE.md](../docs/operations/UPSTREAM-UPDATE.md) |
 | `check-injection-surface.sh` | system prompt 注入面前缀指纹基线守门（`--update` 更新基线） |
+| `check-conventions.sh` | 约定守门（P4 升格通道）：A 运行时状态不入库（`settings.json` 的 `deviceId`、`modes.json` 的 `current`）／B 敏感文件与运行时数据不入库（已跟踪 + **暂存区**，含 `*-state.json`、会话、扩展安装位、私钥、`.env`）／C 生产代码禁 `any` 与动态 `import(`（测试与 `node_modules` 排除）；三条原为 AGENTS.md 软约定 |
 | `check-doc-links.mjs` | 文档内部相对链接一致性 |
 | `check-seeds-headless.mjs` | 定时任务提示词 headless 可用性守门（不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令） |
-| `golden-tasks.sh` | 行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
+| `golden-tasks.sh` | 行为防退化基准（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
 | `test-web-terminal.mjs` | 浏览器终端进程级守门（鉴权/cookie 属性/Host 栅栏/穿越防护/WS 双向数据/resize/restart/孤儿会话回收，36 项，零 LLM）；缺 `script`/`stty` 时显式 SKIP |
 | `test-usage-metrics.mjs` | 成本度量口径守门（**29 项**，零 LLM）：合成数据驱动 `daily-health.mjs`，锁定命中率取自**每轮用量**而非工具级台账、前缀前端变更（system/tools/level）与**首段分叉（`messages@0-7`＝整段重放）**会触发告警、中后段分叉单独计数不误报、**旧记录仅 head 不计入**（与头窗内追加无法区分，实测误报率 19/42）、**冷启动次数与未命中量**（与每轮用量配对）、**工具声明体积**超阈值告警、缺数据时记 n/a 而非瞎算 |
 | `patch-playwright-core.mjs` | Termux 下把 playwright-core 的 linux 分支扩展至 android（幂等） |

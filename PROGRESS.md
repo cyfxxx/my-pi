@@ -1583,3 +1583,37 @@ v0.99.1）都改了什么、以后更新前如何先看变化以及遇到不想�
   `docs/README.md`（新增两篇运维文档）、`custom/features/plan-mode/README.md`（标识机制与原因）、
   `custom/features/autopilot/README.md`（`/daily` 全表 + 口径）、`custom/adapters/README.md`（`setStatus`）、
   `portable/agent/AGENTS.md`（脚本数 + 同步前体检 + 补丁优先策略 + 深度文档入口）。
+
+## P4 升格通道第一批（2026-10-01）
+
+VISION §6 的 P4 是唯一未完成的路线阶段：按 §3.1 把"反复有效但只写在提示词里"的软引导硬化，
+并同步降权原软引导（判据：软层条目不无限增长、注入预算受控）。本批处理 6 条，全部有证据与降权动作。
+
+### 硬化（软 → 硬）
+
+- **system 注入装配唯一入口**：新增 `custom/features/context/budget/system-prompt.ts`
+  （`buildSystemPrompt` / `appendedSystemParts` / `findVolatileInjection` + 三个字节预算常量），
+  `index.ts` 不再手写模板串；8 类易变内容（日期/时钟/百分比/绝对路径/字节数/sha/版本号）由
+  `context/__tests__/injection-stability.test.ts` 拒绝。**理由**：前缀一变其后整段按全价重算
+  （命中价 1/50，单次实测 170K–316K），而这条纪律此前只写在 AGENTS.md 里。
+- **约定守门** `scripts/check-conventions.sh`，接入 `golden-tasks.sh` 第 14 步（`--fast` 也跑）：
+  A 运行时状态不入库（`settings.json` 禁 `deviceId`、`modes.json` 禁 `current`）；
+  B 敏感文件/运行时数据不入库（已跟踪 + **暂存区**，含 `*-state.json`、会话、扩展安装位、私钥、`.env`）；
+  C 生产代码规范（禁 `any`、禁动态 `import(`；测试与 `node_modules` 排除）。三条原为 AGENTS.md 软约定，现状 0 违规。
+- **`tmux_wait` 同轮等待硬上限**：新增纯函数 `clampWaitTimeout`（显式值原样尊重、随后按上限截断，
+  非法值回落默认值，`PI_TMUX_WAIT_CEIL_SEC` ≤0 停用），默认 60s；截断时在结果里给出改法。
+  与 `bash` 的 240s 上限同一约定（P3-6），补上"前台同步等待"的第二条通路。
+
+### 降权（§3.1 要求的对价）
+
+删除 AGENTS.md 的「git 提交」「上游隔离」「接口隔离」三条重复条目（分别与开发规范、架构原则、HARD_RULES 重复，
+且前两条已由守门覆盖），并把「运行时状态不入库」「缓存友好」「代码质量」「后台任务」压成规则 + 守门指针；
+**12346 → 11829 B（−517 B）**。注入预算基线：system 追加 **767 B** / 上限 4096，APPEND_SYSTEM **789 B** / 上限 2048，
+工作区指令 11829 B / 上限 65536。台账（含"待评/不硬化"及其原因）：`docs/design/UPGRADE-LEDGER.md`。
+
+### 验证
+
+- `injection-stability.test.ts` 10 例；tmux 单测 29 例（新增 5 例边界）；`check-conventions.sh` 负数测试
+  （临时 `: any` 文件、`"current"`/`"deviceId"` 注入即失败；`packs/`、`tool-count-localhost.json` 不误伤）。
+- `golden-tasks.sh --fast` 14 步全绿；`check-injection-surface.sh --update` → 新指纹 `33212e7b…`。
+- 文档：VISION（§4 结论 / §6 P4 / §9 v4）、`docs/design/UPGRADE-LEDGER.md`、`docs/README.md`、DECISIONS、AGENTS.md。
