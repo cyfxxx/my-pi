@@ -52,7 +52,7 @@
 
 | 13 | C 段 18 条历史"零引用"条目 | **删除 17 / 修正 1 条陈旧条目 / 1 条转为"能力保留"** | 删前先用守门口径复核真实引用数（关键：allowlist 只表示"登记过"，不代表现在仍死）：`consumeRestartLog` 实为**活代码**（`session_start` 消费 + 6 处测试引用）→ 条目陈旧，直接删条目不动代码；其余 17 个零引用（`taskTmpDir`/`isTurnBusy`/`isBackgroundBusy`/`lastActivityTs`/`listSchedulerFiles`/`loadTaskRecords`/`resetEnvironmentCache`/`searchEntries`/`clearCompactionFlag`/`resolveAppendPromptPath`/`getNextId`/`replaceState`/`formatPlanMessageLine`/`formatAgentList`/`riskToolRestrictions`/`voiceGuideError`/`batchFetch`）逐个确认"功能是否在别处活着"后删除；`createConcurrencyLimiter` 因 `batchFetch` 被删而变成仅测试引用，但它是有文档的**并发原语**（批量抓取场景），转 A 段登记 | 同步更新 6 个 feature README 的函数清单（避免文档指向已删符号）；**C 段清空** |
 
-| 14 | `tools` 段是前缀最大构件（payload 62.4 KB ≈15.6K token）但无守门、无按模式收窄 | **先测量 → 加守门 → 加可选 `lean` 模式**（不改默认） | 测量：本仓库 62 个工具 = **28.5 KB**（autopilot 6.4 / browser 6.3 / memory 5.5 / tmux 2.8 / plan-mode 2.5 / subagent 1.5 / web-search 1.1 / voice 1.0 / link 0.8 / context 0.7），其余 ~33 KB 是 pi 内置工具；参数 schema 占单工具体积 ~80%。不改默认的三条理由（能力缺失是常态、会话中途改工具数组最贵、描述裁剪收益已被 P2-1 否掉）见 `DECISIONS.md` | 新增守门 `context/__tests__/tools-payload.test.ts`（总量 32 KB / 单项 2 KB / 数量 66 三个上限 + 打印构成 + 模式收窄断言）；`lean` 模式去掉四组共 14.5 KB |
+| 14 | `tools` 段是前缀最大构件（payload 62.4 KB ≈15.6K token）但无守门、无按模式收窄 | **先测量 → 加守门 → 加可选 `lean` 模式**（不改默认） | 测量：本仓库 62 个工具 = **28.5 KB**（autopilot 6.4 / browser 6.3 / memory 5.5 / tmux 2.8 / plan-mode 2.5 / subagent 1.5 / web-search 1.1 / voice 1.0 / link 0.8 / context 0.7），其余 ~33 KB 是 pi 内置工具；参数 schema 占单工具体积 ~80%。不改默认的三条理由（能力缺失是常态、会话中途改工具数组最贵、描述裁剪收益已被 P2-1 否掉）见 `DECISIONS.md` | 新增守门 `context/__tests__/tools-payload.test.ts`（总量 32 KB / 单项 2 KB / 数量 66 三个上限 + 打印构成 + 模式收窄断言）；`lean` 模式端到端实测 `toolsBytes` **63 268 → 38 430 B（−39%）** |
 
 顺带修掉一个计时缺陷：`toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具，
 一步内同名工具多次调用会互相覆盖（时长失真）。改用 `toolCallId`（`tool_call`/`tool_result`
@@ -70,6 +70,23 @@
   写前快照：`portable/memory/checkpoints/entries-20261001T191520Z.json`（68 518 B，写入后 active 60 → 58）。
 - **下次触发条件**：同一教训被重复入库累计 5 次即出现在报告里；`daily-review` 定时任务每日跑该报告并把候选数量写进结论（该任务被明确禁止执行写操作，升格/淘汰/合并/聚合都需要用户确认）。
 - **不做的**：不降低阈值（§5 的 recurrence≥5 属愿景/方法论层，改动需用户确认）、不凭"感觉重要"手工升格（会破坏"反复有效"的证据链）。
+
+## 效果复核（逐日实测，2026-10-01 取数）
+
+数据源：`portable/memory/context/.usage-diag.jsonl`（每轮用量）+ `portable/memory/logs/prefix-fingerprints.jsonl`（逐请求前缀指纹）。
+
+| 日期 | 轮数 | 加权命中 | 未命中/轮 均值 | p50 | p90 | max | 输出占比 | 前端变更 | 首段分叉 | 冷启动 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 09-25 | 165 | 97.21% | 7 270 | 353 | 1 385 | 316 053 | 0.3% | 0 | 0 | 4 |
+| **09-26** | 106 | **80.66%** | **31 833** | 1 002 | **191 396** | 253 095 | 0.9% | 5 | 0 | 3 |
+| 09-27 | 317 | 96.40% | 3 816 | 357 | 2 311 | 142 150 | 0.9% | 5 | 0 | 6 |
+| 09-28 | 72 | 98.74% | 903 | 370 | 1 840 | 8 742 | 1.2% | 0 | 0 | 1 |
+| 09-30 | 259 | 98.27% | 1 976 | 270 | 1 684 | 122 038 | 0.6% | 4 | 0 | 4 |
+| 10-01 | 8 | 37.41% | 14 809 | 23 093 | 23 712 | 23 960 | 0.8% | 0 | 0 | 5 |
+
+- **结论（正向但需诚实标注口径）**：09-26 的整段重放事故（p90 191K、均值 31.8K）在修复后消失，09-27 起稳定在 **96.4%–98.7%**，未命中/轮 **p50 270–370**；**全天首段分叉 = 0**（分段口径上线后从未出现整段重放）。
+- **10-01 的 8 条不可用**：全部来自开发/探针会话（5 次冷启动、样本 8 轮），命中率与均值都不代表真实使用；观察项应以 09-27..30 为基线。
+- **体积口径已上线**：真实无头请求的指纹显示 `toolsBytes=63 268`、`systemBytes=7 323`（此前该字段虽已实现但尚未被真实请求触发过，核对过时间线：源码改动 12:11 UTC 落盘，最后一条旧记录 12:02 UTC，故非"死指标"）。`lean` 模式同一请求实测 `toolsBytes=38 430`（−39%）。
 
 ## 待评（明确未硬化，附原因与前置条件）
 

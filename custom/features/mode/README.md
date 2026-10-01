@@ -15,7 +15,7 @@
 
 `lean` 的依据（2026-10-01 实测，守门 `context/__tests__/tools-payload.test.ts`）：本仓库 12 个功能注册
 **62 个工具、合计 28.5 KB**（请求里 `toolsBytes` 62.4 KB，其余约 33 KB 是 pi 内置工具）——
-其中 `autopilot` 6.4 KB、`browser` 6.3 KB、`voice` 1.0 KB、`link` 0.8 KB。模式白名单在**启动期**过滤功能，
+其中 `autopilot` 6.4 KB、`browser` 6.3 KB、`voice` 1.0 KB、`link` 0.8 KB。**端到端实测**（真实无头请求）：`toolsBytes` 63 268 → **38 430 B（−39%）**。模式白名单在**启动期**过滤功能，
 未注册即 0 字节，且整个会话内工具数组不变（缓存安全；见 `DECISIONS.md` 的"不做热重载"与
 "不要会话中途改工具集"）。
 

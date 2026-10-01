@@ -22,7 +22,7 @@
 **理由**：
 - 选项 1 会把"缺少工具"变成常态：用户随时可能需要 browser/voice/autopilot，而**会话中途改工具数组会让整段前缀失效**（本项目已实测代价 150K–320K token/次），所以"少了再开"在本项目里是最贵的做法；
 - 选项 2 的收益已被上一轮评估过（P2-1：剩余廉价裁剪 ≈5% ≈800 token/epoch），且要牺牲参数说明的清晰度或破坏 TypeBox 原生 schema，性价比不成立；
-- 选项 3 零风险且**可用**：模式白名单在启动期过滤功能注册，未注册即 0 字节，且整个会话内工具数组不变（缓存安全）。`lean` 保留 web-search/context/memory/plan-mode/intervention/subagent/tmux，去掉四组共 **14.5 KB**（约减半；整段 payload 62.4 → ~48 KB）。
+- 选项 3 零风险且**可用**：模式白名单在启动期过滤功能注册，未注册即 0 字节，且整个会话内工具数组不变（缓存安全）。`lean` 保留 web-search/context/memory/plan-mode/intervention/subagent/tmux，去掉四组；**端到端实测**（真实无头请求写入的前缀指纹）：`toolsBytes` **63 268 → 38 430 B（−39%，≈−6.2K token/epoch）**，`systemBytes` 不变（7 323）。组件级估算（四组 14.5 KB）低于端到端差值，说明按功能过滤还会连带去掉若干条件注册的工具——以端到端数字为准。
 **代价与约束**：`lean` 会话内没有 scheduled task（autopilot 未注册）、没有浏览器与语音工具；切回需 `/mode full`（自动重启，见模式条目）。守门只在"无声膨胀"上设限（总量 32 KB / 单项 2 KB / 数量 66），要放宽必须改常量并在 DECISIONS 说明理由。
 **验证**：`tools-payload.test.ts` 2 例（构成打印、预算断言、模式收窄断言）；`doctor`/`golden` 全绿。
 
