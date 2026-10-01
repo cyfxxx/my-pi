@@ -6,7 +6,7 @@
 
 | 属性 | 值 |
 |------|-----|
-| 更新日期 | 2026-09-29 |
+| 更新日期 | 2026-10-01 |
 | 适用范围 | my-pi 项目文档索引 |
 | 相关文档 | [README.md](../README.md)、[STRUCTURE.md](../STRUCTURE.md)、[DECISIONS.md](../DECISIONS.md) |
 
@@ -45,6 +45,8 @@
 | [operations/ENVIRONMENTS.md](operations/ENVIRONMENTS.md) | 多环境（Termux/WSL2/Linux/macOS）识别、配置分层与数据隔离 |
 | [operations/TERMUX-DEV-NOTES.md](operations/TERMUX-DEV-NOTES.md) | Termux/Android（PRoot）实测经验：录音链路、系统特性、终端输入、sshd、本地转写 |
 | [operations/alacritty-tmux-setup.md](operations/alacritty-tmux-setup.md) | WSL2 + Alacritty + tmux 部署问题与修复汇总 |
+| [operations/UPSTREAM-UPDATE.md](operations/UPSTREAM-UPDATE.md) | **更新 vendored pi 的完整流程**：同步前体检（`check-upstream.sh` 六段报告怎么读）→ 决策 → 同步 → 验证；以及「上游出现不想要的变更怎么办」的四档手段与补丁维护约定 |
+| [operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md](operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md) | 上游 v0.87.0 → d2931ad3 跳版实测报告（130 提交 / 744 文件）：逐条变更、破坏性项、需评估项与遥测结论 |
 
 ### 设计与目标
 

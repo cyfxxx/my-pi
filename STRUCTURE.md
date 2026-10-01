@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 35 个运维脚本（含共享库 lib-vendor.sh）
+├── scripts/             # 36 个运维脚本（含共享库 lib-vendor.sh）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -93,11 +93,11 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `006-footer-cost-and-cache-window.patch`：成本汇率与缓存命中率窗口调整（20 轮）
 
 ### `scripts/`
-共 35 个运维脚本（含 1 个共享库 `lib-vendor.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 36 个运维脚本（含 1 个共享库 `lib-vendor.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
-- `dev.sh`：开发模式运行（优先 vendor 内置 tsx）
+- `dev.sh`：开发模式运行（tsx 直接跑 vendor 源码，不构建；tsx 来自根 `node_modules`）
 - `sync-upstream.sh`：上游同步 + 自动修复（merge → 幂等补丁 → 重建 dist → 刷新自愈缓存 → 类型检查；`PI_SYNC_DRY_RUN=1` 只读预演）
 - `lib-vendor.sh`：被 build/sync/doctor source 的共享逻辑（补丁幂等应用、依赖一致性判断）
 - `check-isolation.sh`：验证隔离边界
@@ -105,8 +105,9 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `gen-registrations.mjs`：从代码生成/校验注册面基线（`registration-baseline.json`；`--update` 刷新）——替代原先手写清单，防漂移
 - `check-dead-exports.mjs`：死导出守门（抓"写了没接线"，如曾经的 `pruneThinkingBudget`），白名单见 `dead-exports-allowlist.txt`
 - `check-patches-behavior.mjs`：补丁"行为存在性"守门（断言补丁关键符号/自标记仍在 vendor 源码，防上游同步语义漂移）
+- `check-upstream.sh`：上游同步前体检（只读）——目标版本/区间提交数/各包 churn/新增包、changelog 新增版本段与破坏性关键词、每个补丁的目标文件是否被上游改过、adapters 依赖的 API 面是否变动；结论=已最新/可同步/需先改补丁（`PI_CHECK_NO_FETCH=1` 离线）；同步流程与「不想要的变更怎么办」见 [docs/operations/UPSTREAM-UPDATE.md](docs/operations/UPSTREAM-UPDATE.md)
 - `check-seeds-headless.mjs`：定时任务提示词的 headless 可用性守门（提示词里不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令，如 `memory_store`、`/memory`）
-- `run-ts.sh`：以 vendor tsx 运行「需要加载 my-pi TypeScript 逻辑」的脚本（`custom/` 用无扩展名导入，Node 类型剥离解析不了，必须走 tsx）——headless 里写记忆/入库的唯一入口
+- `run-ts.sh`：以 tsx 运行「需要加载 my-pi TypeScript 逻辑」的脚本（`custom/` 用无扩展名导入，Node 类型剥离解析不了，必须走 tsx）——headless 里写记忆/入库的唯一入口。tsx 由 `custom/package.json` 声明（上游 v0.99.0 起 vendor/pi 已不再自带 tsx）
 - `memory-store.mjs`：记忆入库（零 LLM，直接调 memory 逻辑层 `storeEntry`，内置标题去重）；`--json`/`--file`/stdin，`--dry-run`
 - `reseed-seeds.mjs`：把 `scheduled-seeds.json` 的种子定义显式应用到已存在的同名任务（种子对账是「只补缺失不覆盖」，改提示词后需本脚本；保留 id/enabled/lastRun/runCount/history，默认预演，`--apply` 先备份）
 - `install-hooks.sh`：启用 `.githooks/`（pre-commit 跑 `golden --fast`，pre-push 跑全量；本地无 CI，钩子是唯一自动防线）

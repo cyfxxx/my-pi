@@ -7,11 +7,11 @@
 | 脚本 | 用途 |
 |------|------|
 | `build.sh` | 一键重建/引导：Node 检查 → 根依赖 `npm ci`（不改 lock）→ vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）→ 可选 fd-rg shim / 自愈缓存 |
-| `dev.sh` | 开发模式运行源码（优先 vendor 内置 tsx） |
-| `sync-upstream.sh` | 上游同步 + 自动修复：临时 worktree 确定性重建补丁栈 → 重建 dist → 刷自愈缓存 → 类型检查（`PI_SYNC_DRY_RUN=1` 只读预演） |
+| `dev.sh` | 开发模式运行源码（tsx 直接跑 vendor 的 `cli.ts`，不构建；tsx 来自根 `node_modules`） |
+| `sync-upstream.sh` | 上游同步 + 自动修复：临时 worktree 确定性重建补丁栈 → 重建 dist → 刷自愈缓存 → 类型检查（`PI_SYNC_DRY_RUN=1` 只读预演）。**同步前先跑 `check-upstream.sh`** |
 | `lib-vendor.sh` | 被 build/sync/doctor source 的共享逻辑（补丁幂等应用、依赖一致性、vendor exclude） |
 | `pi-source-build.sh` | 构建 vendor/pi 并把 dist 缓存为「好 pi」（崩溃自愈用）；`--no-build` 仅缓存现有 dist |
-| `run-ts.sh` | 以 vendor tsx 运行「需加载 my-pi TypeScript 逻辑」的脚本（`custom/` 用无扩展名导入，Node 裸跑解析不了）；headless 写记忆/入库的统一入口 |
+| `run-ts.sh` | 以 tsx 运行「需加载 my-pi TypeScript 逻辑」的脚本（`custom/` 用无扩展名导入，Node 裸跑解析不了）；headless 写记忆/入库的统一入口。tsx 由 `custom/package.json` 声明（根 `node_modules/.bin/tsx`）——**不要再用 `vendor/pi` 那份**：上游 v0.99.0 起已删除该依赖，本地副本是升级残留，fresh `npm ci` 后消失 |
 
 ## 体检与守门
 
@@ -23,6 +23,7 @@
 | `gen-registrations.mjs` | 从代码生成/校验注册面基线 `registration-baseline.json`（`--update` 刷新）；替代手写清单防漂移 |
 | `check-dead-exports.mjs` | 死导出守门（抓"写了没接线"；白名单 `dead-exports-allowlist.txt`） |
 | `check-patches-behavior.mjs` | 补丁行为存在性守门（断言关键符号/自标记仍在 vendor 源码，防上游同步语义漂移） |
+| `check-upstream.sh` | **上游同步前体检（只读）**：目标版本/区间提交数/各包 churn/新增包、changelog 新增版本段与破坏性关键词、每个 `patches/*.patch` 的目标文件是否被上游改过、`custom/adapters` 依赖的 API 面是否变动；结论=已最新/可同步/需先改补丁（`PI_CHECK_NO_FETCH=1` 离线，`PI_CHECK_STRICT=1` 风险时 exit 2）。流程见 [../docs/operations/UPSTREAM-UPDATE.md](../docs/operations/UPSTREAM-UPDATE.md) |
 | `check-injection-surface.sh` | system prompt 注入面前缀指纹基线守门（`--update` 更新基线） |
 | `check-doc-links.mjs` | 文档内部相对链接一致性 |
 | `check-seeds-headless.mjs` | 定时任务提示词 headless 可用性守门（不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令） |
