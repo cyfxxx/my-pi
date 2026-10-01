@@ -1739,3 +1739,20 @@ APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"
 - 同步更新 6 个 feature README 的函数清单（web-search / context-budget / plan-mode-ui / subagent /
   subagent-core / autopilot-run），避免文档指向已删符号。
 - 结果：白名单 **C 段清空**，A 段 17 条 + B 段 4 条每条都有理由；死导出守门（含"仅测试引用"规则）绿。
+
+## P4 台账候选：工具面前缀收窄（2026-10-01）
+
+先测量再决策（新增守门 `custom/features/context/__tests__/tools-payload.test.ts`，注册全部 12 个
+功能后逐工具序列化 schema）：
+
+- **本仓库 62 个工具 = 28.5 KB**：`autopilot` 6.4 / `browser` 6.3 / `memory` 5.5 / `tmux` 2.8 /
+  `plan-mode` 2.5 / `subagent` 1.5 / `web-search` 1.1 / `voice` 1.0 / `link` 0.8 / `context` 0.7 KB；
+  请求里 `toolsBytes` = 62.4 KB，其余约 **33 KB 是 pi 内置工具**（不在本仓库控制内）；
+  单工具最大 `schedule_task` 1.7 KB，参数 schema 占单工具体积约 80%。
+- **守门**：总量 ≤32 KB、单项 ≤2 KB、数量 ≤66（超出时打印占比最高的工具）；另断言"模式白名单确有收窄效果"。
+- **交付**：新增可选 `lean` 模式（`web-search`/`context`/`memory`/`plan-mode`/`intervention`/`subagent`/`tmux`），
+  去掉 `browser`/`voice`/`link`/`autopilot` 四组共 **14.5 KB**（本仓库工具面减半，整段 payload 62.4 → ~48 KB）。
+  依据与"为什么不改默认"记入 `DECISIONS.md`：能力缺失会成为常态、会话中途改工具数组是最贵的做法
+  （实测 150K–320K token/次）、描述裁剪收益已被 P2-1 否掉。
+- 模式白名单在**启动期**过滤功能注册（未注册即 0 字节，会话内工具数组不变 = 缓存安全）；
+  `custom/features/mode/README.md` 的模式表补上 `lean` 与实测依据。

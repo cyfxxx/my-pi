@@ -52,6 +52,8 @@
 
 | 13 | C 段 18 条历史"零引用"条目 | **删除 17 / 修正 1 条陈旧条目 / 1 条转为"能力保留"** | 删前先用守门口径复核真实引用数（关键：allowlist 只表示"登记过"，不代表现在仍死）：`consumeRestartLog` 实为**活代码**（`session_start` 消费 + 6 处测试引用）→ 条目陈旧，直接删条目不动代码；其余 17 个零引用（`taskTmpDir`/`isTurnBusy`/`isBackgroundBusy`/`lastActivityTs`/`listSchedulerFiles`/`loadTaskRecords`/`resetEnvironmentCache`/`searchEntries`/`clearCompactionFlag`/`resolveAppendPromptPath`/`getNextId`/`replaceState`/`formatPlanMessageLine`/`formatAgentList`/`riskToolRestrictions`/`voiceGuideError`/`batchFetch`）逐个确认"功能是否在别处活着"后删除；`createConcurrencyLimiter` 因 `batchFetch` 被删而变成仅测试引用，但它是有文档的**并发原语**（批量抓取场景），转 A 段登记 | 同步更新 6 个 feature README 的函数清单（避免文档指向已删符号）；**C 段清空** |
 
+| 14 | `tools` 段是前缀最大构件（payload 62.4 KB ≈15.6K token）但无守门、无按模式收窄 | **先测量 → 加守门 → 加可选 `lean` 模式**（不改默认） | 测量：本仓库 62 个工具 = **28.5 KB**（autopilot 6.4 / browser 6.3 / memory 5.5 / tmux 2.8 / plan-mode 2.5 / subagent 1.5 / web-search 1.1 / voice 1.0 / link 0.8 / context 0.7），其余 ~33 KB 是 pi 内置工具；参数 schema 占单工具体积 ~80%。不改默认的三条理由（能力缺失是常态、会话中途改工具数组最贵、描述裁剪收益已被 P2-1 否掉）见 `DECISIONS.md` | 新增守门 `context/__tests__/tools-payload.test.ts`（总量 32 KB / 单项 2 KB / 数量 66 三个上限 + 打印构成 + 模式收窄断言）；`lean` 模式去掉四组共 14.5 KB |
+
 顺带修掉一个计时缺陷：`toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具，
 一步内同名工具多次调用会互相覆盖（时长失真）。改用 `toolCallId`（`tool_call`/`tool_result`
 事件都带该字段），并补了回归测试。
@@ -70,4 +72,4 @@
 ## 下一批复核
 
 - 每次日报（`node scripts/daily-health.mjs --print`）顺带看四项注入字节数；接近上限即启动降权评估。
-- 优先候选：① 启动期按模式收窄工具面（解锁"工具数组中途变更"硬化，并直接减小 tools 段 62 KB 的前缀开销）；③ B-3 存量清理（先确认消费方，再整族删除）。
+- 优先候选：① ③ B-3 存量清理（先确认消费方，再整族删除）。
