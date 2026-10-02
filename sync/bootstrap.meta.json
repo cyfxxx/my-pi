@@ -1,0 +1,12 @@
+{
+  "tool": "bootstrap-key.sh v1",
+  "mode": "passphrase",
+  "created_at": "2026-10-02T04:30:37Z",
+  "bundle": "bootstrap.age",
+  "bundle_sha256": "58a59e3dfbfed2e1197f141d8114bf010457e47b5abd09e52003af16c182212f",
+  "bundle_bytes": 1100,
+  "members": ["age.key", "bootstrap/README.txt"],
+  "age_recipient_fingerprint": "age1dufp9jk382skzfmvgj6smat36dhf9awlydmh2kehuygrd6xr8d2sedgau2",
+  "contains_ssh_key": false,
+  "note": "只装 age 私钥（解密材料）。SSH 私钥请在新设备重新生成并在 GitHub 网页添加公钥。"
+}

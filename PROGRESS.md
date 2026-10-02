@@ -1893,3 +1893,16 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 现状：本机仅剩 `~/.config/my-pi/age.key`（600）+ 用户自持备份；`bootstrap-key.sh` 的明文副本告警已消失。
 - 备注：FUSE/共享存储上 `rm` 不等于安全擦除；若认为该文件曾暴露有意义，唯一彻底做法是**轮换 age 密钥**
   （`sync-memory.sh init` 需先移走旧私钥 + `push` 重加密 + `bootstrap-key.sh pack` 刷新引导包）——属用户决定。
+
+### 引导包已生成并校验（方案 A，2026-10-02）
+
+用户在本机执行 `bash scripts/bootstrap-key.sh pack`（口令模式）与 `verify`；我接手做无需口令的结构性校验：
+
+- `sync/bootstrap.age`：1100 字节，头部 `age-encryption.org/v1 -> scrypt`（口令模式），
+  sha256 `58a59e3dfbfed2e1…`；元信息 `sync/bootstrap.meta.json` 的 sha256/字节数与实际文件**一致**。
+- **公开仓库红线**（新加的守门）：密文内不含 `AGE-SECRET-KEY-1`、不含 `PRIVATE KEY/BEGIN OPENSSH`、
+  不含成员名与 `ustar`（tar 头未泄漏）→ 明文零泄漏。
+- 元信息声明成员白名单 `["age.key","bootstrap/README.txt"]`、`contains_ssh_key: false`；
+  `age_recipient_fingerprint` 与 `sync/age.pub` **一致**（`age1dufp9jk…`）→ 该引导包解出的私钥能解当前 `memory.tar.age`。
+- 守门：`check-conventions`（引导包分支）与 `scripts/test-bootstrap.sh`（15 项）全通过。
+- 待办（用户侧）：口令存密码管理器 + 纸质；有空在**干净环境**演练一次 `clone → unpack → verify → pull`。

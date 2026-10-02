@@ -49,6 +49,11 @@ bash scripts/sync-memory.sh pull
 
 ## 引导包（方案 A）：新设备如何拿到 age 私钥
 
+**当前状态**：`sync/bootstrap.age`（2026-10-02 生成，1100 字节，sha256 `58a59e3d…`；成员
+`age.key` + `bootstrap/README.txt`；口令模式 `scrypt`；指纹与 `sync/age.pub` 一致 → 可解当前 `memory.tar.age`）。
+新设备取包后可用 `sha256sum sync/bootstrap.age` 与上面对齐，再 `verify`。
+
+
 **只装解密材料**：`sync/bootstrap.age` = `age.key` + 一页说明，用 `age -p`（口令）加密；
 元信息 `sync/bootstrap.meta.json`（明文、不含秘密：成员清单 / sha256 / 指纹 / 生成时间）。
 
