@@ -38,6 +38,7 @@
 | [development/DSH-CONTEXT-AUDIT.md](development/DSH-CONTEXT-AUDIT.md) | DeepSeek Harness 上下文管理逐条证据（外部参照，含 `file:line`） |
 | [development/DSH-RUNTIME-AUDIT.md](development/DSH-RUNTIME-AUDIT.md) | DSH 运行时实现审计（系统提示词 21 段、agent 循环步结构、并行/独占策略、重试、收尾纪律），每条带 `file:line` 与真实会话实测 |
 | [development/PI-RUNTIME-AUDIT.md](development/PI-RUNTIME-AUDIT.md) | pi + my-pi 自定义层运行时审计（system 分段与稳定性、循环与钩子时序、自定义层每请求副作用、实测分布），含对旧文档的矛盾更正 |
+| [development/TOOL-EXTERNALIZATION-ANALYSIS.md](development/TOOL-EXTERNALIZATION-ANALYSIS.md) | **工具外置可行性分析**：把"不直接影响项目本身"的工具（浏览器/语音等）包装成脚本+技能按需加载——判据、实测成本账、逐候选结论、为何本轮不迁移、将来要做的落地路径与触发条件 |
 | [development/COST-LATENCY-OPTIMIZATION-PLAN.md](development/COST-LATENCY-OPTIMIZATION-PLAN.md) | **成本与效率优化方案**：问题清单（含证据/影响/风险）、四个阶段、每项实测判据、验证方法论 |
 | [development/CHECK-REPORT.md](development/CHECK-REPORT.md) | 历史功能/脚本检查报告（迁移波次补漏记录，供追溯） |
 

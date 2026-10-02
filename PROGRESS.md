@@ -1796,3 +1796,19 @@ APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"
 - 体积口径实测上线：真实无头请求 `toolsBytes=63 268`、`systemBytes=7 323`；同一请求在 `lean` 模式下
   `toolsBytes=38 430`（**−39%，≈−6.2K token/epoch**）。核对时间线确认 `toolsBytes` 此前"0 条记录"
   是"实现刚落地、尚无真实请求"，不是死指标。
+
+## 稳定优先决策 + 工具外置分析（2026-10-01）
+
+- 用户指示"以稳定运行为主，由你决定" → 默认面**冻结**，并明确"不做清单"（记录在 DECISIONS）：
+  输出侧校验器不做、VISION §5 阈值不动、Best-of-N 与记忆合并不接线（保留 A 段能力登记）、
+  `lean` 保持可选（默认仍 `full`）、工具外置本轮不迁移。
+- 新增 [docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md](docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md)：
+  回答"不直接影响项目本身的工具（如浏览器）能否包装成外部程序、以 skill 按需加载、用脚本/终端操作"。
+  结论：**机制可行、账算得通，但本轮不迁移**。关键事实与判据：
+  - 工具面构成：本仓库 62 工具 = 28.5 KB（browser 18 个 = 6.3 KB、voice 3 个 = 1.0 KB、link 2 个 = 0.8 KB），
+    真实使用率 browser 1.6% / voice 0.3% / link 0.2%（1784 次调用）；
+  - pi 技能成本实测：4 个技能 ≈1.8 KB system 前缀（每个 ≈450 B），加载走内置 `read`/`bash`，**不占 tools 段**；
+  - 交换比：browser 外置净省 ≈5.9 KB（≈1.5K token/epoch），但 CLI 每次新进程 → 要么每次冷启浏览器、
+    要么自建 CDP daemon；voice 天然无状态（重活在常驻 whisper-server）但只省 ≈0.55 KB；
+    link（出站+发送守卫）、autopilot（改调度器/重启）、ctx_/memory/tmux（改运行时状态）不满足判据。
+  - 现成的低成本替代是 `lean` 模式（实测 −39% 工具面、零新代码路径）。
