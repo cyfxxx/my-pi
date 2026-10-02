@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 40 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh）
+├── scripts/             # 42 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -95,7 +95,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `006-footer-cost-and-cache-window.patch`：成本汇率与缓存命中率窗口调整（20 轮）
 
 ### `scripts/`
-共 40 个运维脚本（`.sh`/`.mjs`/`.py`，含 2 个共享库 `lib-vendor.sh`、`lib-mode.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 42 个运维脚本（`.sh`/`.mjs`/`.py`，含 2 个共享库 `lib-vendor.sh`、`lib-mode.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
@@ -135,6 +135,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `tool-stats-sync.mjs`：工具使用统计汇总（`usage.jsonl` → 跨设备计数）
 - `task-summarizer.mjs`：任务记录批量总结（游标聚合 → digest，`--spawn` 可选入库）
 - `sync-memory.sh`：记忆/会话的 age 加密同步（`init/push/pull/verify/status`；`verify` 校验可解密性、公钥一致性、清单一致与 JSON 有效）
+- `bootstrap-key.sh` / `test-bootstrap.sh`：私钥引导包（方案 A：只装 age 私钥、口令加密、成员白名单、指纹核对）与守门；见 [docs/operations/KEY-BOOTSTRAP-ANALYSIS.md](docs/operations/KEY-BOOTSTRAP-ANALYSIS.md)
 
 ## 数据流向
 

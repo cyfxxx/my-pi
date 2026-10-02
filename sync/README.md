@@ -46,3 +46,34 @@ bash scripts/sync-memory.sh pull
 ## 相关
 
 - 私钥如何在新设备上重建（引导包是否可行、哪些该放哪些不该放）：[docs/operations/KEY-BOOTSTRAP-ANALYSIS.md](../docs/operations/KEY-BOOTSTRAP-ANALYSIS.md)
+
+## 引导包（方案 A）：新设备如何拿到 age 私钥
+
+**只装解密材料**：`sync/bootstrap.age` = `age.key` + 一页说明，用 `age -p`（口令）加密；
+元信息 `sync/bootstrap.meta.json`（明文、不含秘密：成员清单 / sha256 / 指纹 / 生成时间）。
+
+```bash
+# 有私钥的设备（如 PC worker）：
+bash scripts/bootstrap-key.sh pack          # 口令输两遍 → sync/bootstrap.age + .meta.json
+git add sync/bootstrap.age sync/bootstrap.meta.json && git commit -m 'chore(sync): 更新私钥引导包'
+
+# 新设备（先 clone，再解包）：
+ssh-keygen -t ed25519 -C "new-device"       # 生成新 key，用网页 + 2FA 添加公钥（不要搬运旧私钥）
+bash scripts/bootstrap-key.sh unpack --yes  # 输口令 → ~/.config/my-pi/age.key（600，旧文件留 .bak）
+bash scripts/bootstrap-key.sh verify        # 成员白名单 + 指纹是否与 sync/age.pub 一致
+bash scripts/sync-memory.sh verify && bash scripts/sync-memory.sh pull
+```
+
+规则（重要）：
+
+1. **口令**：≥6 词 diceware（≈77 bit）或密码管理器生成的 20+ 随机字符；**不复用**其它口令。
+   忘记口令 = 记忆不可解（与"丢私钥"等价，只是载体从设备变成口令）→ 口令存密码管理器 + 纸质备份。
+2. **不放 SSH 私钥**（也不放 `auth.json`/`deviceId`）：引导包成员被脚本限定为白名单两项，
+   夹带其它文件（例如 `id_ed25519`）时 `verify`/`unpack` 会直接拒绝。
+3. **轮换流程**：`age-keygen -o newkey` → `bash scripts/sync-memory.sh init`（会重写 `sync/age.pub`；私钥已存在时不覆盖，
+   需先移走旧文件）→ `push` 重加密 bundle → `bootstrap-key.sh pack --force` 刷新引导包 → **在新设备演练一次恢复** → 销毁旧私钥。
+4. **演练**：引导包必须在干净环境里真跑过一次 `unpack → verify → pull`，否则等于没有备份。
+5. **明文私钥不要留在共享存储**：`pack`/`verify`/`unpack` 都会扫描常见位置并告警（Android 共享存储属组
+   `aid_everybody`，且 FUSE 会忽略部分权限位）。
+
+分析与取舍（为何 SSH 私钥不搬运、三方案对比、风险清单）：[docs/operations/KEY-BOOTSTRAP-ANALYSIS.md](../docs/operations/KEY-BOOTSTRAP-ANALYSIS.md)。

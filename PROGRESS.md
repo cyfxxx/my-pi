@@ -1864,3 +1864,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 公开仓库里放账号级写权限 + 新设备其实生成新 key 再用网页添加公钥即可）。给出 A/B/C 三方案、
 方案 A 的落地设计（`age -p` 口令包、口令强度与落盘纪律、守门两条、轮换流程、干净环境演练）与风险清单。
 待用户选 A/B/C 后再写 `bootstrap-key.sh` + 守门 + 测试 + `sync/README.md` 补章。
+
+## 私钥引导包落地（方案 A，2026-10-02）
+
+用户选 A：引导包只放 age 私钥（口令加密），SSH 私钥不搬运。
+
+- **`scripts/bootstrap-key.sh`**：`pack`（`age -p` 口令加密 → `sync/bootstrap.age` + 明文元信息
+  `sync/bootstrap.meta.json`：成员/ sha256 / 指纹 / 时间）/ `verify`（白名单成员 + 与 `sync/age.pub` 指纹核对，
+  不安装）/ `unpack [--yes]`（安装到私钥路径、`600`、覆盖留 `.bak`）。
+  硬约束：成员白名单只有 `age.key` + 一页说明；**拒绝仓库内私钥**；**拒绝夹带** `id_ed25519` 等文件；
+  自动扫描并告警共享存储里的明文私钥副本（实测已告警出 `/storage/emulated/0/我的文件/my-pi-age.key`）。
+- **`scripts/test-bootstrap.sh`**（13 项，全程临时密钥，含口令模式走 `script` 伪终端）接入 golden **第 16 步**；
+  `check-conventions.sh` 增加"有引导包就必须有元信息"。
+- `sync/README.md` 增加「引导包」章节：pack/unpack/verify 流程、口令强度（≥6 词 diceware 或 20+ 随机字符）、
+  轮换流程、干净环境演练、共享存储告警；分析文档标注"已决 A 并落地"。
+- 文档计数同步：步骤 **16**、脚本 **42**（README/STRUCTURE/scripts/README/VISION/TROUBLESHOOTING）。
+- 待用户决定（未动）：共享存储那份明文私钥是否清理。

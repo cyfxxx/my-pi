@@ -29,7 +29,9 @@
 | `check-conventions.sh` | 约定守门（P4 升格通道）：A 运行时状态不入库（`settings.json` 的 `deviceId`、`modes.json` 的 `current`）／B 敏感文件与运行时数据不入库（已跟踪 + **暂存区**，含 `*-state.json`、会话、扩展安装位、私钥、`.env`）／C 生产代码禁 `any` 与动态 `import(`（测试与 `node_modules` 排除）；三条原为 AGENTS.md 软约定 |
 | `check-doc-links.mjs` | 文档内部相对链接一致性 |
 | `check-seeds-headless.mjs` | 定时任务提示词 headless 可用性守门（不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令） |
-| `golden-tasks.sh` | 行为防退化基准 **15 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
+| `golden-tasks.sh` | 行为防退化基准 **16 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
+| `bootstrap-key.sh` | **age 私钥引导包**（方案 A）：`pack`（`age -p` 口令加密 → `sync/bootstrap.age` + 明文元信息 `.meta.json`）/ `verify`（成员白名单 + 指纹核对，不安装）/ `unpack [--yes]`（安装到私钥路径，600，覆盖留 `.bak`）；只装解密材料，**不装 SSH 私钥**。见 [docs/operations/KEY-BOOTSTRAP-ANALYSIS.md](../docs/operations/KEY-BOOTSTRAP-ANALYSIS.md) |
+| `test-bootstrap.sh` | 引导包守门（13 项，临时密钥）：拒绝仓库内私钥、成员白名单、指纹不一致拒绝、口令模式 pack/unpack、覆盖保护、拒绝夹带 `id_ed25519` 的引导包；接入 golden 第 16 步 |
 | `books.py` | **书籍知识库框架**（探针/索引/按需提页/报告/自检）：目录优先建索引（PDF outline / EPUB nav）、按需页提取（文字层优先 → tesseract 兜底）、缓存复用、每次运行留 run log；两端通用（手机 `role=phone` / PC `role=worker`）。用法见 [packs/books/SKILL.md](../packs/books/SKILL.md)，方案见 [docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md](../docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md) |
 | `test-books.mjs` | 书籍框架自检（合成 PDF 跑通 probe/index/read/report/记录，15 项，零网络零 LLM），接入 golden 第 15 步 |
 | `test-web-terminal.mjs` | 浏览器终端进程级守门（鉴权/cookie 属性/Host 栅栏/穿越防护/WS 双向数据/resize/restart/孤儿会话回收，36 项，零 LLM）；缺 `script`/`stty` 时显式 SKIP |

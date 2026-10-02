@@ -57,6 +57,15 @@ else
   ok "敏感文件与运行时数据未入库（$(printf '%s\n' "$candidates" | grep -c . ) 个文件已检查）"
 fi
 
+# ── B2. 引导包配套元信息（防"无人记得怎么解、内容不明"）──
+if [ -f sync/bootstrap.age ] && [ ! -f sync/bootstrap.meta.json ]; then
+  bad "sync/bootstrap.age 存在但缺 sync/bootstrap.meta.json（成员清单/指纹/生成时间；见 docs/operations/KEY-BOOTSTRAP-ANALYSIS.md）"
+elif [ -f sync/bootstrap.age ]; then
+  ok "引导包有配套元信息 sync/bootstrap.meta.json"
+else
+  note "尚未生成引导包（sync/bootstrap.age 不存在；需要时 bash scripts/bootstrap-key.sh pack）"
+fi
+
 # ── C. 生产代码规范 ──
 # 只看生产代码：测试与 node_modules 不在此列（测试里允许 `as any` 造桩）。
 ANY_HITS="$(grep -rnE '(:[[:space:]]*any\b|<any>|as[[:space:]]+any\b)' custom \

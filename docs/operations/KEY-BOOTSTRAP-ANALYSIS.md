@@ -78,5 +78,14 @@ bootstrap-key.sh verify  # 解出后核对 age.pub 指纹一致（复用 pub_mat
 - 备选 C 更保守（密码管理器/Syncthing/私密仓库 Release），代价是多一个渠道要维护。
 - B（含 SSH 私钥）只在"确实无法在新设备登录 GitHub 网页"时才考虑，且必须配仓库外的独立引导凭据。
 
-**现在需要你定**：选 A / B / C；选定后我再写 `bootstrap-key.sh` + 守门 + 测试 + `sync/README.md` 补章
-（本轮按你"暂时不操作"的要求只做分析，未改代码）。
+**已决（2026-10-02）：选方案 A，并已落地。**
+
+- `scripts/bootstrap-key.sh`：`pack`（`age -p` 口令加密 → `sync/bootstrap.age` + 明文 `bootstrap.meta.json`）/
+  `verify`（白名单成员 + 指纹核对，不安装）/ `unpack [--yes]`（装到私钥路径、600、覆盖留 `.bak`）。
+  硬约束：成员白名单只有 `age.key` + 一页说明；**拒绝**仓库内私钥；**拒绝**夹带 `id_ed25519` 等文件；
+  自动扫描并告警共享存储里的明文私钥副本。
+- `scripts/test-bootstrap.sh`（13 项，全程临时密钥）接入 golden **第 16 步**；`check-conventions.sh` 增加
+  "有 `sync/bootstrap.age` 就必须有 `sync/bootstrap.meta.json`"。
+- `sync/README.md` 增加「引导包」章节（pack/unpack/verify、口令强度、轮换流程、干净环境演练、共享存储告警）。
+- **待你决定（未动）**：共享存储里那份明文私钥 `/storage/emulated/0/我的文件/my-pi-age.key` 是否清理
+  （脚本已能持续告警；删除/移动属你的备份决定）。
