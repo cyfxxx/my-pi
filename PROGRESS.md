@@ -1880,3 +1880,16 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   轮换流程、干净环境演练、共享存储告警；分析文档标注"已决 A 并落地"。
 - 文档计数同步：步骤 **16**、脚本 **42**（README/STRUCTURE/scripts/README/VISION/TROUBLESHOOTING）。
 - 待用户决定（未动）：共享存储那份明文私钥是否清理。
+
+### 安全卫生：清理共享存储里的明文私钥副本（2026-10-02）
+
+- 用户问："`我的文件` 里保存的是不是最新的私钥，如果是、已备份可清理。"
+- 核查：`/storage/emulated/0/我的文件/my-pi-age.key` 与 `~/.config/my-pi/age.key` **sha256 完全相同**
+  （`e6d6301abfaf2021…`），指纹均为 `age1dufp9jk…`，且与仓库 `sync/age.pub` 一致 → 是当前私钥的冗余明文副本；
+  权限 `-rw-rw----`、属组 `aid_everybody`（共享存储，同组 App 可能可读）。
+- 依赖检查：仓库内无脚本引用该路径（仅 `bootstrap-key.sh` 的告警扫描会提到它）；`pi-backup/` 两个归档为 08-11，
+  早于 09-23 生成的密钥，不含该私钥。
+- 动作：删除前 `sync-memory.sh verify` 通过 → `rm` 该副本 → 删除后再次 `verify` 通过；canonical 指纹未变。
+- 现状：本机仅剩 `~/.config/my-pi/age.key`（600）+ 用户自持备份；`bootstrap-key.sh` 的明文副本告警已消失。
+- 备注：FUSE/共享存储上 `rm` 不等于安全擦除；若认为该文件曾暴露有意义，唯一彻底做法是**轮换 age 密钥**
+  （`sync-memory.sh init` 需先移走旧私钥 + `push` 重加密 + `bootstrap-key.sh pack` 刷新引导包）——属用户决定。
