@@ -42,3 +42,7 @@ bash scripts/sync-memory.sh pull
 - 会话目录按 cwd 转义命名（`portable/agent/sessions/<转义 cwd>/`），跨设备路径不同会错位；
   建议保持相同项目路径或使用 `--session-dir`。
 - 与 roleplay 模式配合：其隔离记忆在 `portable/memory/roleplay/`，可在清单中单独选择是否同步。
+
+## 相关
+
+- 私钥如何在新设备上重建（引导包是否可行、哪些该放哪些不该放）：[docs/operations/KEY-BOOTSTRAP-ANALYSIS.md](../docs/operations/KEY-BOOTSTRAP-ANALYSIS.md)

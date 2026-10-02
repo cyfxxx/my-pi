@@ -1849,3 +1849,18 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - read：文字层 3 页 1 662 字符 / **547 ms**，二次命中缓存 **11 ms**；扫描页 OCR **1 952 字符 / 72.3 s**，质量门通过。
 - 文档：方案新增 §9 落地状态与两端分工；README/STRUCTURE/TROUBLESHOOTING/VISION 步骤数 14 → **15**；
   `scripts/README.md`、`STRUCTURE.md`（脚本 37 → **40**）、`packs/INDEX.md`、`packs/README.md` 同步。
+
+## 私钥引导包分析（2026-10-02）
+
+用户问：把私钥压缩加密后同步到 GitHub，新设备重建就免手工搬运私钥——可行吗？
+产出 [docs/operations/KEY-BOOTSTRAP-ANALYSIS.md](docs/operations/KEY-BOOTSTRAP-ANALYSIS.md)（本轮只分析，未改代码）。
+
+实测事实：仓库**公开**（HTTP 200）；`sync/memory.tar.age`(203 KB)+`age.pub`+`manifest.txt` 已入库（只放密文）；
+`age` 私钥在仓库外 `~/.config/my-pi/age.key`(600)，但**共享存储里有一份 `-rw-rw----` 的明文副本**
+（`/storage/emulated/0/我的文件/my-pi-age.key`，属组 aid_everybody）；`manifest.txt` 明文列出最近 5 条会话 ID；
+`init` 幂等不覆盖；脚本已有 `pub_matches_key` 校验与 `verify --no-key`。
+
+结论：**可行**，但按钥匙分开——`age` 私钥可放（口令加密引导包），**SSH 私钥不建议搬运**（循环依赖 +
+公开仓库里放账号级写权限 + 新设备其实生成新 key 再用网页添加公钥即可）。给出 A/B/C 三方案、
+方案 A 的落地设计（`age -p` 口令包、口令强度与落盘纪律、守门两条、轮换流程、干净环境演练）与风险清单。
+待用户选 A/B/C 后再写 `bootstrap-key.sh` + 守门 + 测试 + `sync/README.md` 补章。
