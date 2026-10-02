@@ -93,6 +93,7 @@ packs/
 | `cangjie-skill/` | 长内容蒸馏元技能（外部收纳 kangarooking/cangjie-skill @5f03a4c，MIT）：RIA-TV++ 七阶段管线把书/长视频转写/播客蒸馏成原子化可执行 skills——Adler 整书分析→5 提取器并行→三重验证（通过率 25-50%）→RIA++ 六维构造→Zettelkasten 关联→压力测试（诱饵题+混淆题）→交付；原文不动，pi 适配与验收规范见包内 README |
 | `pdf-toolkit/` | PDF 处理：通用能力 CLI `bin/pdf_core`（提取/合并/拆分/旋转/加密/水印/渲染/报告）+ 表单填写与扫描件 OCR 子技能；去水印/签名/压缩/Stirling/MinerU 等繁重能力记录在 references/specialized-tools.md。整合 anthropics/pdf skill 技术栈 |
 | `media-toolkit/` | 图片/视频/游戏美术处理：通用 CLI `bin/media_core`（图片：转换/压缩/水印/批量；视频：转码/剪辑/拼接/抽帧/音频/GIF/字幕；游戏：精灵表拆分/图集打包/资产优化）+ 三个子技能（image-basics/video-basics/game-art）；TexturePacker/GIMP/whisper 等繁重能力记录在 references/specialized-tools.md。全部本地执行（ImageMagick+ffmpeg+Pillow） |
+| `books/` | 书籍知识库框架（`scripts/books.py`：探针/索引/按需提页/缓存/记录，两端通用）+ 使用说明 `SKILL.md`；方案与实测见 [docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md](../docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md)。之所以放 packs 而非 agentDir/skills：零系统提示词成本（低频按需能力） |
 | `knowledge-fetch/` | 零 LLM 知识订阅搭建（渠道调研/抓取脚本/去重过滤容错/定时任务接入）。已验证实例：`scripts/knowledge-fetch.py` v2 + `scripts/knowledge-ingest.mjs`（零 LLM 入库），接入定时任务 `knowledge-subscribe`/`daily-review`。来源：drafts/knowledge-fetch-setup（2026-08-27 升格） |
 | `skill-integration/` | 外部技能包引入与整合统一流程：选包/许可核对/安全审查/验收冒烟/通用-专用-繁重三层归置/整合纪律 |
 

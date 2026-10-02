@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 37 个运维脚本（含共享库 lib-vendor.sh、lib-mode.sh）
+├── scripts/             # 40 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -95,7 +95,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `006-footer-cost-and-cache-window.patch`：成本汇率与缓存命中率窗口调整（20 轮）
 
 ### `scripts/`
-共 37 个运维脚本（含 2 个共享库 `lib-vendor.sh`、`lib-mode.sh`；另有 5 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明、`knowledge-fetch.py`）：
+共 40 个运维脚本（`.sh`/`.mjs`/`.py`，含 2 个共享库 `lib-vendor.sh`、`lib-mode.sh`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
@@ -121,7 +121,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `web-terminal.sh`：浏览器终端启动器（在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务；只绑回环），见 [custom/web-terminal/README.md](custom/web-terminal/README.md)
 - `test-web-terminal.mjs`：web-terminal 的进程级守门（鉴权/栅栏/穿越/WS 双向/resize/孤儿会话回收），零 LLM 消耗；缺 `script`/`stty` 时显式 SKIP
 - `test-usage-metrics.mjs`：成本度量口径守门（35 项；合成数据驱动 `daily-health.mjs`，锁定命中率取自每轮用量而非工具级台账、前缀前端变更/首段分叉/冷启动/工具声明体积/**回合内 bash 调用分布**会告警），零 LLM 消耗
-- `golden-tasks.sh`：行为防退化基准 14 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟）
+- `golden-tasks.sh`：行为防退化基准 15 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟）
 - `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
 - `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg shim）
 - `searxng-config.sh`：生成 SearXNG `settings.yml`（禁用不可达引擎、bing 指向 cn.bing.com；`--force/--probe`）
@@ -130,6 +130,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `daily-health.mjs`：每日健康检查（加权命中率/未命中每次/输出占比/前缀前端变更次数/首段分叉/冷启动/工具声明体积/**每步 bash 调用分位与单命令占比**/记忆库/种子失配/守门脏改；读每轮用量 `.usage-diag.jsonl` 与 `prefix-fingerprints.jsonl`）
 - `memory-lifecycle.mjs`：记忆生命周期只读报告（零 LLM，调 `analyzeLifecycle` 出淘汰/升格/冲突/垃圾/聚合五类候选；`--json`/`--limit`；供 `daily-review` 定时任务消费，headless 下无 `/memory lifecycle` 命令）
 - `knowledge-fetch.py`：知识源抓取（落 `portable/memory/knowledge/`）
+- `books.py` / `test-books.mjs`：书籍知识库框架（探针/索引/按需提页/报告/自检）与守门；两端通用（手机 phone / PC worker），见 [packs/books/SKILL.md](packs/books/SKILL.md)
 - `knowledge-ingest.mjs`：知识订阅入库（零 LLM，`storeEntry` 内置去重）
 - `tool-stats-sync.mjs`：工具使用统计汇总（`usage.jsonl` → 跨设备计数）
 - `task-summarizer.mjs`：任务记录批量总结（游标聚合 → digest，`--spawn` 可选入库）

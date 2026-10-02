@@ -1829,3 +1829,23 @@ L1 卡片进 memory 召回（500 token 预算内）、章节表只在磁盘 → 
 （**不加工具**）→ 批量走 headless 定时任务与 tmux、缓存走 age 加密同步。分期 P0（只读体检）/P1（索引层）/
 P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需用户确认 5 项（书库根路径、PC worker、云端视觉预算、
 古籍清单与质量标准、备份位置），不影响 P0。
+
+## 书籍知识库框架落地（P0–P2 骨架，2026-10-02）
+
+用户确认"数据大部分在另一台设备（3070 Ti + 32 GB），当前以**构建框架 / 验证可行性 / 做好记录**为主"
+→ 直接落可运行骨架，而不是继续写方案。
+
+- **`scripts/books.py`**（除 PyMuPDF 零依赖）：`probe` 只读体检 → 建议策略；`index` 目录优先建章节表（零 OCR）；
+  `read` 按需提页（文字层优先 → tesseract 兜底、缓存优先、质量门）；`report` 汇总；`selftest` 合成 PDF 自检。
+- **记录**：`_probe.jsonl` / `index/<book_id>.jsonl` / `cache/<book_id>/{文本,meta.jsonl}` /
+  `logs/run-YYYYMMDD.jsonl`（命令/角色/设备/计数/耗时）；`book_id = 标题slug + 内容指纹8位` → 两端同 id、缓存可同步。
+- **接入**：`packs/books/SKILL.md`（packs = 零系统提示词成本）+ `config.example.json`；不新增工具。
+- **守门**：`scripts/test-books.mjs` → golden **第 15 步**（15 项断言；缺 tesseract 时显式跳过）。
+
+真实数据验证（本机 = phone 端）：
+- 40 本 / 1.54 GB，probe **4.0 s**；策略：text_direct 4、text_direct_needs_toc 2、
+  outline_index_then_ondemand_ocr 19、epub_direct 4、needs_toc_ocr 11。
+- index：**27 本 / 5 486 章**（PDF outline + EPUB spine），13 本标记需目录页 OCR；顺带修了 outline 标题里的 NUL 字符。
+- read：文字层 3 页 1 662 字符 / **547 ms**，二次命中缓存 **11 ms**；扫描页 OCR **1 952 字符 / 72.3 s**，质量门通过。
+- 文档：方案新增 §9 落地状态与两端分工；README/STRUCTURE/TROUBLESHOOTING/VISION 步骤数 14 → **15**；
+  `scripts/README.md`、`STRUCTURE.md`（脚本 37 → **40**）、`packs/INDEX.md`、`packs/README.md` 同步。

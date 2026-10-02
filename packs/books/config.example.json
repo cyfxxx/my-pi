@@ -1,0 +1,15 @@
+{
+  "role": "phone",
+  "library_roots": ["/storage/emulated/0/我的文件/书籍"],
+  "text_layer_sample_pages": 6,
+  "text_layer_min_chars": 200,
+  "toc_page_range": [1, 20],
+  "page_budget": 8,
+  "dpi": 200,
+  "ocr_engine": "tesseract",
+  "ocr_langs": "chi_sim+eng",
+  "ocr_psm": "6",
+  "quality_min_chars": 120,
+  "quality_min_cjk_ratio": 0.25,
+  "privacy_cloud_vision": false
+}

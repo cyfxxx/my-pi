@@ -2,6 +2,21 @@
 
 ## 格式
 
+### [2026-10-02] 书籍知识库框架落地（P0–P2 骨架），PC 为 worker
+**背景**：用户明确"当前设备只有一小部分数据，大部分在另一台设备（**3070 Ti + 32 GB**），当前以**构建框架、验证可行性、做好记录**为主"。
+**决策**：按 [BOOK-KNOWLEDGE-BASE-PLAN](docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md) 落地可运行骨架，并把两端角色写死进配置：
+- **`scripts/books.py`**（零第三方依赖除 PyMuPDF）：`probe`（只读体检 → 建议策略）、`index`（PDF outline / EPUB nav → 章节表，零 OCR）、`read`（按需页：文字层优先 → tesseract 兜底，缓存优先，质量门）、`report`（汇总）、`selftest`（合成 PDF 全链路自检）。
+- **记录优先**：`_probe.jsonl`（每本书一行）、`index/<book_id>.jsonl`（章节表，不进上下文）、`cache/<book_id>/…`（文本 + `meta.jsonl`：method/quality/sha256/pages）、`logs/run-YYYYMMDD.jsonl`（命令/角色/设备/计数/耗时）。全部在 `portable/memory/knowledge/books/`（运行时、不入库）。
+- **跨设备一致**：`book_id = 标题 slug + 内容指纹 8 位`（size + 首尾各 1 MB 的 sha1）→ 同一本书两端 id 相同，缓存可经 `sync-memory.sh` 加密同步，不复制原书。
+- **守门**：`scripts/test-books.mjs` 接入 golden **第 15 步**（合成 PDF 含内嵌目录 + 纯图像页，15 项断言，缺 tesseract 时显式跳过）。
+- **接入方式**：`packs/books/SKILL.md`（放 packs = **零系统提示词成本**）+ 脚本，**不新增工具**（沿用工具外置判据）。
+**实测（本机 = phone 端）**：40 本 / 1.54 GB；probe **4.0 s**；index **27 本 / 5 486 章**、13 本需目录页 OCR；文字层 3 页 1 662 字符 **547 ms**、二次读取命中缓存 **11 ms**；扫描页 OCR **1 952 字符 / 72.3 s**（质量门通过）。
+**理由**：用户要的是"框架 + 可行性 + 记录"而非一次性全量处理；先把手机会话链路（检索→定位→提页→缓存→引用）跑通并有守门，重活（批量 OCR / GPU / 多模态）留给 PC，避免在 6 核/1.4 GB 可用内存的手机上做数量级不成立的事。
+**代价与约束**：向量检索暂不做（先用 BM25/jaccard + 章节表）；手机端不做批量 OCR；古籍/竖排/繁体标 `needs_vision` 交 PC；PC 端需 `pymupdf`（同一套脚本）。
+**验证**：`node scripts/test-books.mjs` 15 项；真实书库 probe/index/read 全链路通过并留记录；`golden`（15 步）全绿。
+
+---
+
 ### [2026-10-01] 书籍知识库：复用 memory + 脚本 + 技能，不引入新栈
 **背景**：用户给出书籍知识库构想与一份通用方案（三层 L1/L2/L3、SQLite+向量库、LangChain、GPU 全量 OCR）。要求"根据当前项目情况优化方案"。实测本机：6 核 / 可用内存 ~1.4 GB / 可用磁盘 51 GB；可达书库 40 本 1.54 GB（36 PDF + 4 EPUB，**仅 7 本有可用文字层、23 本有内嵌 outline**）；`tesseract 5.3.4`（只有 chi_sim/eng，**无 chi_tra**）实测 **31–69 秒/页**（原方案假设 GPU 2–5 页/秒）；Python 侧有 pymupdf/pdfplumber/pypdf/PIL，无 numpy/ebooklib/cv2。
 **决策**：保留通用方案的"轻量索引 → 按需深读 → 缓存复用"内核，落点改为本仓库既有组件：

@@ -130,3 +130,30 @@ L3 沉淀层（跨书复用）         记忆条目（category=reference/fact）
 5. **备份位置**（L2 缓存是长期资产：走现有 age 加密同步，还是另指定目录）。
 
 > 上述 5 项不影响 P0（只读体检）；P1 起需要第 1 项，OCR 分流需要第 2、3 项。
+
+## 9. 框架落地状态（2026-10-02 实测）
+
+**已实现并可运行**（`scripts/books.py` + `scripts/test-books.mjs` + `packs/books/`）：
+
+| 能力 | 命令 | 实测结果（本机 = 手机端，`role=phone`） |
+|---|---|---|
+| 只读体检（P0） | `books.py probe --root <书库>` | 40 本 / 1.54 GB，**4.0 秒**完成；策略分布：`text_direct` 4、`text_direct_needs_toc` 2、`outline_index_then_ondemand_ocr` 19、`epub_direct` 4、`needs_toc_ocr` 11 |
+| 索引层（P1） | `books.py index` | **27 本 / 5 486 章**章节表（PDF outline + EPUB spine），**13 本**标记需目录页 OCR（`_needs_toc_ocr.jsonl`）；零 OCR、耗时 0.5–4 s |
+| 按需提取（P2） | `books.py read --book <id> --pages A-B` | 文字层书：3 页 1 662 字符 / **547 ms**，二次读取 **命中缓存 11 ms**；扫描书：1 页 OCR **1 952 字符 / 72.3 s**，质量门通过 |
+| 记录 | 自动 | `_probe.jsonl` / `index/*.jsonl` / `cache/*/meta.jsonl`（method/quality/sha256/pages）/ `logs/run-YYYYMMDD.jsonl`（命令/角色/设备/计数/耗时） |
+| 自检（守门） | `node scripts/test-books.mjs`（golden 第 15 步） | 15 项断言：合成 PDF（内嵌目录 + 纯图像页）跑通 probe/index/read/report/记录；缺 tesseract 时 OCR 项显式跳过 |
+| 跨设备一致 | `book_id = 标题slug + 内容指纹8位` | 同一文件在两端 id 相同 → L2 缓存可经 `sync-memory.sh` 加密同步，无需复制原书 |
+
+**两端分工已确定**（用户 2026-10-02 补充）：**PC = 3070 Ti + 32 GB 内存 = `role: worker`**（完整书库、
+批量目录页 OCR、GPU OCR/PaddleOCR、本地多模态兜底）；手机 = `role: phone`（索引 + 按需提页 + 与 Agent 交互）。
+配置模板 `packs/books/config.example.json`，实际配置 `portable/memory/books/config.json`（运行时）。
+
+**更新后的成本模型**：本机 CPU OCR 31–69 秒/页（**不要在手机端做任何批量 OCR**）；PC 端 3070 Ti 上
+PaddleOCR-GPU 预期 2–5 页/秒 → **批量目录页 OCR（13 本 × ≤20 页）在 PC 上约 1–2 分钟**；
+正文仍坚持"按需页 + 缓存"，不为"可能有用"预跑全量。
+
+**下一步（按需选择，都不影响现有行为）**：
+1. PC 端克隆仓库 + `pymupdf`，`role: worker`，跑 `probe/index` 覆盖完整 200 GB 书库（只回传 `index/`+`_probe.jsonl`，几 MB）。
+2. 为 13 本"需目录页 OCR"的书在 PC 上补目录页识别（本机也可，但慢）。
+3. 每本书生成 1 条 L1 卡片入库（`memory_store`，~200 字符/本），让 `/memory search` 能召回书；章节表继续只留磁盘。
+4. 用真实问题跑 10–20 次"检索 → 定位 → 提页 → 缓存"，记录命中率与耗时，再决定是否需要向量检索。
