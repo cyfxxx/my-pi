@@ -82,6 +82,21 @@ npx tsc --noEmit -p custom/
 # 4. 运行单元测试
 npx vitest run
 
+### 0.3 私钥引导包（`sync/bootstrap.age`）常见问题
+
+- **`unpack` 报"解密失败（口令错误？）"** → 口令不对（age 不提示剩余次数）。到密码管理器核对；注意是全角/半角与前后空格。
+- **报"指纹与 `sync/age.pub` 不一致"** → 引导包与仓库不是同一把 age 密钥（换钥后忘了刷新包）：
+  在**持有正确私钥**的设备上 `bash scripts/bootstrap-key.sh pack --force` 重新生成。
+- **报"引导包含非白名单成员"** → 包被替换或用了旧版脚本：**不要安装**，从可信提交重新取包，
+  并用 `git log -p sync/bootstrap.age` 确认来源。
+- **提交时 `check-conventions` 报"引导包内含明文私钥"** → 立即停止：重新 `pack`；
+  若明文已经推送过，则 `git filter-repo` 清史 + **轮换 age 密钥与 SSH key**（见下）。
+- **口令忘记** → 该引导包作废（记忆本身仍可用现有设备上的私钥解开）。
+  以现有设备 `portable/memory/entries.json` 为准重建：轮换预案见
+  [operations/KEY-BOOTSTRAP-ANALYSIS.md](operations/KEY-BOOTSTRAP-ANALYSIS.md) §八。
+- **演练目录里手滑 `sync-memory.sh push`** → 会用该目录的空/旧记忆覆盖 `sync/memory.tar.age`：
+  立即用备份的 `sync/` + 正确私钥重跑 `push`；演练完直接删掉整个临时目录。
+
 # 5. 行为防退化基准（16 步：含隔离/注册面/死导出/补丁行为/注入面/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包）
 npm run golden
 

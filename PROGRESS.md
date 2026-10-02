@@ -1906,3 +1906,17 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   `age_recipient_fingerprint` 与 `sync/age.pub` **一致**（`age1dufp9jk…`）→ 该引导包解出的私钥能解当前 `memory.tar.age`。
 - 守门：`check-conventions`（引导包分支）与 `scripts/test-bootstrap.sh`（15 项）全通过。
 - 待办（用户侧）：口令存密码管理器 + 纸质；有空在**干净环境**演练一次 `clone → unpack → verify → pull`。
+
+### 引导包：干净环境演练 + 轮换预案入档（2026-10-02）
+
+- **演练**（临时目录 `/tmp/my-pi-bootstrap-rehearsal`，模拟新设备，公开 HTTPS 克隆、无任何凭据）：
+  ① 克隆成功（HEAD `91f19d9`，24 MB）；② `sha256sum sync/bootstrap.age` 与元信息一致（`58a59e3d…`）；
+  ③ 无密钥也能做密文体检（`sync-memory.sh verify --no-key` → age v1 头部完整）；
+  ④ 口令模式全链路用**一次性密钥+一次性口令**跑通（1082 B 包 → `unpack` → `600` → 指纹一致）；
+  ⑤ 唯一需真实口令的一步（真实包 `unpack` + `verify`）留给用户，命令已写入文档；并明确警告
+  **演练目录里不得执行 `push`**（会用空记忆覆盖 `memory.tar.age`）。
+- **轮换预案**写入 `docs/operations/KEY-BOOTSTRAP-ANALYSIS.md` §八（10 步：离线备份 → 移走旧钥 → `init` 换钥刷公钥 →
+  `push` 重加密为切换点 → `verify` → `pack --force` 刷引导包 → 显式路径提交 → 干净环境演练 → 销毁旧材料 → 记录），
+  并注明"步骤 3→4 是半切换态""旧钥丢失则只能以现有 entries.json 重建""age 轮换与 SSH 轮换是两件事"。
+- `sync/README.md` 轮换/演练两处改为指向该章节；`docs/TROUBLESHOOTING.md` 新增 §0.3 引导包常见问题
+  （口令错/指纹不符/非白名单成员/明文红线/忘记口令/误 push）；`STRUCTURE.md` 步骤数由 15 修正为 16。

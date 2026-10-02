@@ -75,9 +75,12 @@ bash scripts/sync-memory.sh verify && bash scripts/sync-memory.sh pull
    忘记口令 = 记忆不可解（与"丢私钥"等价，只是载体从设备变成口令）→ 口令存密码管理器 + 纸质备份。
 2. **不放 SSH 私钥**（也不放 `auth.json`/`deviceId`）：引导包成员被脚本限定为白名单两项，
    夹带其它文件（例如 `id_ed25519`）时 `verify`/`unpack` 会直接拒绝。
-3. **轮换流程**：`age-keygen -o newkey` → `bash scripts/sync-memory.sh init`（会重写 `sync/age.pub`；私钥已存在时不覆盖，
-   需先移走旧文件）→ `push` 重加密 bundle → `bootstrap-key.sh pack --force` 刷新引导包 → **在新设备演练一次恢复** → 销毁旧私钥。
+3. **轮换**：完整步骤（含备份、过渡态、销毁与记录）见 [KEY-BOOTSTRAP-ANALYSIS.md §八 轮换预案](../docs/operations/KEY-BOOTSTRAP-ANALYSIS.md)。
+   要点：先离线备份 → 移走旧钥 → `sync-memory.sh init`（刷新 `age.pub`）→ `push` 重加密（**切换以这一步为准**）→
+   `verify` → `bootstrap-key.sh pack --force` → 提交 → 干净环境演练 → 销毁旧材料。
 4. **演练**：引导包必须在干净环境里真跑过一次 `unpack → verify → pull`，否则等于没有备份。
+   2026-10-02 已在 `/tmp/my-pi-bootstrap-rehearsal` 演练到"真实包解包"前一步（clone/哈希核对/无密钥体检/
+   一次性密钥的口令模式全链路均通过），结果见 [KEY-BOOTSTRAP-ANALYSIS.md §七](../docs/operations/KEY-BOOTSTRAP-ANALYSIS.md)。
 5. **明文私钥不要留在共享存储**：`pack`/`verify`/`unpack` 都会扫描常见位置并告警（Android 共享存储属组
    `aid_everybody`，且 FUSE 会忽略部分权限位）。
 

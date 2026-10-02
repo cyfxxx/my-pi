@@ -89,3 +89,74 @@ bootstrap-key.sh verify  # 解出后核对 age.pub 指纹一致（复用 pub_mat
 - `sync/README.md` 增加「引导包」章节（pack/unpack/verify、口令强度、轮换流程、干净环境演练、共享存储告警）。
 - **待你决定（未动）**：共享存储里那份明文私钥 `/storage/emulated/0/我的文件/my-pi-age.key` 是否清理
   （脚本已能持续告警；删除/移动属你的备份决定）。
+
+## 七、干净环境演练结果（2026-10-02，`/tmp/my-pi-bootstrap-rehearsal`）
+
+在**临时目录**模拟一台新设备（公开仓库无需任何凭据）：
+
+| 步骤 | 命令 | 结果 |
+|---|---|---|
+| 1 检出 | `git clone --depth 1 https://github.com/cyfxxx/my-pi.git` | ✅ 无凭据克隆成功，`HEAD = 91f19d9`（24 MB） |
+| 2 取到的包是否对 | `sha256sum sync/bootstrap.age` vs `sync/bootstrap.meta.json` | ✅ `58a59e3d…` 一致 |
+| 3 无密钥能做什么 | `bash scripts/sync-memory.sh verify --no-key` | ✅ age v1 头部完整（"私钥可用时重跑可校验可解密性"） |
+| 4 口令模式全链路 | 一次性密钥/口令跑 `bootstrap-key.sh pack` → `unpack`（同一条生产代码路径） | ✅ 1082 B 包 → 安装到 `~/.config/my-pi/age.key` 权限 `600` → 指纹与源一致 |
+| 5 真实包解包 | 需**你的口令**（我无法代输） | ⏳ 见下方命令 |
+
+**演练目录里唯一待做的一步**（真实引导包 + 你的口令）：
+
+```bash
+cd /tmp/my-pi-bootstrap-rehearsal/my-pi
+bash scripts/bootstrap-key.sh unpack --yes      # 输口令 → 写到该演练 HOME 下
+bash scripts/sync-memory.sh verify              # 应输出"可解密、清单一致、JSON 有效"
+```
+
+> ⚠️ **演练目录里绝不要执行 `sync-memory.sh push`**：那个 clone 的记忆是空的/过期的，
+> push 会用它重新加密并覆盖 `sync/memory.tar.age`。演练完直接 `rm -rf /tmp/my-pi-bootstrap-rehearsal`。
+
+## 八、轮换预案（已记录，尚未执行）
+
+**触发条件**：口令疑似泄露 / 明文私钥副本曾在不可信位置出现 / 想更换设备归属。
+
+**前置**：新口令已存密码管理器 + 纸质；选一个低风险时间窗；先把 `portable/memory/entries.json` 与整个 `sync/`
+拷到离线介质（这一步是"万一失败还能退回"的唯一保障）。
+
+```bash
+# 1) 备份（离线介质）
+cp -a portable/memory/entries.json /path/to/offline/backup/
+cp -a sync /path/to/offline/backup/sync-$(date +%F)
+
+# 2) 移走旧私钥（不删，留作过渡与回退）
+mv ~/.config/my-pi/age.key ~/.config/my-pi/age.key.old-$(date +%s)
+
+# 3) 生成新钥 + 刷新仓库公钥（此后旧 bundle 仍只有旧钥能解，这是预期的过渡态）
+bash scripts/sync-memory.sh init          # 新 age.key(600) + 写 sync/age.pub
+
+# 4) 用新钥重加密记忆/会话（覆盖 sync/memory.tar.age）——**切换完成以这一步为准**
+bash scripts/sync-memory.sh push
+
+# 5) 复核
+bash scripts/sync-memory.sh verify
+
+# 6) 刷新引导包（新口令，可与旧口令不同）
+bash scripts/bootstrap-key.sh pack --force
+
+# 7) 提交（显式路径；不要 git add -A）
+git add sync/age.pub sync/memory.tar.age sync/bootstrap.age sync/bootstrap.meta.json
+git commit -m 'chore(sync): 轮换 age 密钥并重加密记忆'
+git push
+
+# 8) 干净环境演练（同 §七）：clone → sha256 核对 → unpack → verify → pull → 与备份比对条目数
+
+# 9) 销毁旧材料
+rm -f ~/.config/my-pi/age.key.old-* /path/to/offline/backup/sync-*/memory.tar.age   # 旧密文按需保留
+# 若怀疑旧钥已泄露：同时吊销并更换 SSH key（网页删除旧公钥 + ssh-keygen 新的）
+
+# 10) 记录：在 PROGRESS 写一条（时间/原因/新指纹/演练结果）
+```
+
+**关键注意**：
+
+1. 步骤 3→4 之间处于"半切换"状态（仓库里还是旧钥加密的 bundle）：**必须走完 4** 才算轮换完成。
+2. 若旧钥已丢失且无备份 → 旧 bundle 不可解，只能以**当前设备上的 `entries.json`** 为准重新 push（等于以现状为新的起点）。
+3. **age 密钥轮换与 SSH 密钥轮换是两件事**：前者管加密数据，后者管仓库推送权限；怀疑泄露时通常两者都要做。
+4. `memory.tar.age` 是历史包袱最少的一环（只有一份密文），轮换代价主要在"找不到旧钥就丢历史"。
