@@ -1812,3 +1812,20 @@ APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"
     要么自建 CDP daemon；voice 天然无状态（重活在常驻 whisper-server）但只省 ≈0.55 KB；
     link（出站+发送守卫）、autopilot（改调度器/重启）、ctx_/memory/tmux（改运行时状态）不满足判据。
   - 现成的低成本替代是 `lean` 模式（实测 −39% 工具面、零新代码路径）。
+
+## 书籍知识库方案（按 my-pi 现状优化，2026-10-01）
+
+用户给出构想文档（`/storage/emulated/0/Documents/书籍知识库.md`：轻量索引 → 按需深读 → 缓存复用 +
+一份通用方案），要求结合当前项目优化。产出 [docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md](docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md)。
+
+关键实测（决定了方案必须与原通用方案分道扬镳）：
+- 本机 6 核 / 可用内存 ~1.4 GB / 可用磁盘 51 GB；**tesseract 5.3.4 只有 chi_sim/eng（无 chi_tra）**；
+  Python 有 pymupdf/pdfplumber/pypdf/PIL，无 numpy/ebooklib/cv2。
+- 可达书库 40 本 / 1.54 GB：**仅 7 本有可用文字层、29 本疑似需 OCR、23 本有内嵌 outline**。
+- **OCR 实测 31–69 秒/页**（原方案假设 GPU 2–5 页/秒）→ 全量 OCR 在数量级上不成立。
+
+方案要点：目录优先（23 本零 OCR 建索引）→ 每问最多 8 页按需提取 + 缓存优先 → 原文为准、摘要分离 →
+L1 卡片进 memory 召回（500 token 预算内）、章节表只在磁盘 → 接入用 `packs/books/SKILL.md` + 脚本
+（**不加工具**）→ 批量走 headless 定时任务与 tmux、缓存走 age 加密同步。分期 P0（只读体检）/P1（索引层）/
+P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需用户确认 5 项（书库根路径、PC worker、云端视觉预算、
+古籍清单与质量标准、备份位置），不影响 P0。

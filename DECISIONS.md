@@ -2,6 +2,20 @@
 
 ## 格式
 
+### [2026-10-01] 书籍知识库：复用 memory + 脚本 + 技能，不引入新栈
+**背景**：用户给出书籍知识库构想与一份通用方案（三层 L1/L2/L3、SQLite+向量库、LangChain、GPU 全量 OCR）。要求"根据当前项目情况优化方案"。实测本机：6 核 / 可用内存 ~1.4 GB / 可用磁盘 51 GB；可达书库 40 本 1.54 GB（36 PDF + 4 EPUB，**仅 7 本有可用文字层、23 本有内嵌 outline**）；`tesseract 5.3.4`（只有 chi_sim/eng，**无 chi_tra**）实测 **31–69 秒/页**（原方案假设 GPU 2–5 页/秒）；Python 侧有 pymupdf/pdfplumber/pypdf/PIL，无 numpy/ebooklib/cv2。
+**决策**：保留通用方案的"轻量索引 → 按需深读 → 缓存复用"内核，落点改为本仓库既有组件：
+- **L1** = 每本书 1 条记忆条目（进上下文，受 500 token 召回预算约束）+ 每本书 1 个 `knowledge/books/<id>/index.jsonl`（章节表，**不进上下文**）；
+- **L2** = `knowledge/books/<id>/p<start>-<end>.txt` + `meta.json`（method/confidence/sha256/页码），缓存优先、永不重复 OCR；
+- **L3** = 记忆条目（`reference`/`fact` + `source` 指回页码），复用既有去重/取代/recurrence 升格治理；
+- **接入** = `packs/books/SKILL.md` + 三个脚本，走内置 `bash`，**不新增工具**（工具占 tools 前缀；这批能力低频无状态，符合 `TOOL-EXTERNALIZATION-ANALYSIS.md` 的外置判据）；
+- **不引入**：向量库/新 DB/LangChain/本地大模型；**不做全量 OCR**（数量级不成立），OCR 只在"用户问题驱动的少数页"发生，并设质量门（cjk_ratio/长度）与 `needs_vision` 降级。
+**理由**：① 新栈会与现有 memory 治理重复（去重/生命周期/注入预算/同步都已有）；② 工具面已有守门与预算，新增 7 个工具与"稳定优先"相悖；③ 本机 CPU/内存/语言包现实决定"全量 OCR"与"本地多模态"不可行，唯一可扩展的路径是**目录优先 + 按需页 + 缓存资产化**。
+**代价与约束**：检索先用 BM25/jaccard（向量检索留待"检索质量被证伪"再评估）；古籍/竖排/繁体本机不承接（无 chi_tra），标 `needs_vision` 后走云端视觉或 PC worker；书库不在本机 → 路径可配置 + 缓存走 age 加密同步。
+**验证**：方案与实测数据见 [docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md](docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md)；P0（只读体检脚本）判据 = 40 本全部产出建议策略且与实测一致。
+
+---
+
 ### [2026-10-01] 稳定优先：冻结默认面，明确"不做清单"
 **背景**：前几轮把若干"待你决定"的事项挂在台账上（输出侧校验器、VISION §5 阈值、Best-of-N 与记忆合并接线、工具外置）。用户指示："以稳定运行为主，由你决定"。
 **决策**：默认面冻结，只做低风险、可回滚的事；下列明确不做（各自保留登记与触发条件）：
