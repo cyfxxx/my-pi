@@ -58,10 +58,23 @@ else
 fi
 
 # ── B2. 引导包配套元信息（防"无人记得怎么解、内容不明"）──
-if [ -f sync/bootstrap.age ] && [ ! -f sync/bootstrap.meta.json ]; then
-  bad "sync/bootstrap.age 存在但缺 sync/bootstrap.meta.json（成员清单/指纹/生成时间；见 docs/operations/KEY-BOOTSTRAP-ANALYSIS.md）"
-elif [ -f sync/bootstrap.age ]; then
-  ok "引导包有配套元信息 sync/bootstrap.meta.json"
+if [ -f sync/bootstrap.age ]; then
+  if [ ! -f sync/bootstrap.meta.json ]; then
+    bad "sync/bootstrap.age 存在但缺 sync/bootstrap.meta.json（成员清单/指纹/生成时间；见 docs/operations/KEY-BOOTSTRAP-ANALYSIS.md）"
+  else
+    ok "引导包有配套元信息 sync/bootstrap.meta.json"
+  fi
+  # 仓库是公开的：一旦引导包里混进明文私钥，等于把账号/记忆直接公开 → 两条硬检查
+  if head -c 200 sync/bootstrap.age | grep -q 'age-encryption.org/'; then
+    ok "引导包是 age 密文（头部正确）"
+  else
+    bad "sync/bootstrap.age 头部不是 age 密文（可能被替换或未加密）"
+  fi
+  if grep -qa 'AGE-SECRET-KEY-1' sync/bootstrap.age; then
+    bad "sync/bootstrap.age 内含明文私钥（AGE-SECRET-KEY-1）——公开仓库禁止；请重新 pack 并清理 git 历史"
+  else
+    ok "引导包内无明文私钥残留"
+  fi
 else
   note "尚未生成引导包（sync/bootstrap.age 不存在；需要时 bash scripts/bootstrap-key.sh pack）"
 fi

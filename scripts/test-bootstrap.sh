@@ -79,6 +79,13 @@ else
 fi
 
 echo ""
+echo "=== 4b. 公开仓库红线：引导包必须是密文且无明文私钥 ==="
+if [ -f "$TMP/bootstrap-pass.age" ]; then
+  check "引导包头部是 age 密文" "$(head -c 200 "$TMP/bootstrap-pass.age" | grep -q 'age-encryption.org/' && echo 1 || echo 0)"
+  check "引导包内无明文私钥残留（AGE-SECRET-KEY-1）" "$(grep -qa 'AGE-SECRET-KEY-1' "$TMP/bootstrap-pass.age" && echo 0 || echo 1)"
+fi
+
+echo ""
 echo "=== 5. 夹带非白名单成员 → 拒绝 ==="
 EVIL="$TMP/evil"; mkdir -p "$EVIL/bootstrap"
 cp "$KEYREAL" "$EVIL/age.key"; echo "hi" > "$EVIL/bootstrap/README.txt"; echo "PRIVATE" > "$EVIL/id_ed25519"
