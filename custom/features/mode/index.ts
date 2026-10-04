@@ -41,7 +41,7 @@ const MODE_HELP = `用法:
 模式:
   full      完整模式 - 全部功能（开发项目，固定）
   minimal   极简模式 - 仅内置工具（测试/修复，固定）
-  roleplay  角色扮演 - 仅 web-search + 隔离记忆（自定义）
+  roleplay  标枪（秘书舰·已誓约）- web-search + 隔离记忆（自定义人设）
 
 注意:
   功能 / 人设 / 记忆命名空间的变更需重启 pi 才能生效——用 /mode <name> 切换时会**自动重启**
