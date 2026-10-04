@@ -106,6 +106,37 @@ describe('tool-layering：PI_CONTEXT_TOOL_LAYERING=on 恢复休眠分层', () =>
 });
 
 /**
+ * 回归（2026-10-04）：基线必须是 **pi 自己的激活决定**，不是"全部已注册工具"。
+ * 旧实现拿 `getAllToolNames()` 当基线，把 pi 以 `defaultActive:false` 注册的
+ * `tool_search`/`codemode`（以及 POSIX 上没用的 `powershell`）一并激活了。
+ */
+describe('applyToolLayering 基线取自 pi', () => {
+  afterEach(() => {
+    delete process.env.PI_CONTEXT_TOOL_LAYERING;
+    vi.resetModules();
+  });
+
+  it('注册但 pi 未激活的工具不会被加回来（只减不加，且不触发 setActiveTools）', async () => {
+    process.env.PI_CONTEXT_TOOL_LAYERING = 'on';
+    vi.resetModules();
+    const mod = await import('../budget/tool-layering');
+    let active = ['read', 'bash'];
+    let calls = 0;
+    const pi = {
+      getAllToolNames: () => ['read', 'bash', 'tool_search', 'codemode', 'powershell'],
+      getActiveTools: () => [...active],
+      setActiveTools: (names: string[]) => {
+        calls++;
+        active = [...names];
+      },
+    } as unknown as PiApi;
+    mod.applyToolLayering(pi);
+    expect(active).toEqual(['read', 'bash']);
+    expect(calls).toBe(0);
+  });
+});
+
+/**
  * 回归（2026-09-29）：`applyToolLayering` 过去无条件调用 `setActiveTools`。
  * 工具数组在请求最前部，任何一次调用（即使集合没变）都会重写 system prompt 与整段
  * 消息前缀 → 整段缓存失效。这里锁定"集合相同则不调用"与"顺序无关比较"。

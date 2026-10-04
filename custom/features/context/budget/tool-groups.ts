@@ -17,8 +17,8 @@
  * 2. 工具列表变化 = 前缀缓存断裂；enable 是低频显式操作，禁止每轮动态启停。
  * 3. 启用状态是进程内存态，重启恢复默认分层。
  * 4. 名单维护：未列入任何组的未知工具（未来新扩展）默认保留核心，
- *    computeActiveTools 用全集减去休眠组，不依赖名单完整性。例外是 pi 刻意休眠的工具
- *    （`DEFERRED_TOOLS`）：my-pi 不替 pi 激活它们。
+ *    computeActiveTools 用全集减去休眠组，不依赖名单完整性。活动集的**基线**是 pi
+ *    自己的激活决定（见下方"设计说明"）——my-pi 只减不凭空加。
  *
  * 迁移说明：原项目部分常驻/分组工具所属功能尚未迁移到 my-pi（plan_enter/plan_exit、
  * ctx_exec/ctx_note/ctx_list/ctx_snap、admin_*、ask_user、thinking_level、verify_*、
@@ -174,55 +174,51 @@ export function buildSleepingSummary(presentTools?: ReadonlySet<string>): string
 }
 
 /**
- * pi 注册但**刻意不激活**的工具 → my-pi 也不许顺手激活（pi 的 `defaultActive: false`）。
+ * 设计说明：my-pi 不激活 pi 刻意休眠的工具。
  *
  * 起因（2026-10-04 实测）：`effectiveActiveTools(layered=false)` 原先返回"全部已注册工具"，
  * 把 pi 内置扩展里 `defaultActive: false` 的 `tool_search` / `codemode` 一并激活了——
  * 与上游语义（`docs/operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md`："默认注册但不激活"）
- * 不符，白付 schema 前缀成本。
+ * 不符，白付 schema 前缀成本（另有 POSIX 上无 `pwsh` 可用的 `powershell`）。
  *
- * `ToolInfo`（`pi.getAllTools()`）只透出 name/description/parameters/promptGuidelines/
- * exposure/namespace/annotations/sourceInfo，**不含 `defaultActive`**，无法从元数据判定，
- * 故在此显式列出；同步上游（`scripts/sync-upstream.sh`）后需复核这份名单。
- *
- * `powershell`：POSIX 上无 `pwsh`（本机 `command -v pwsh` 为空，历史调用 1 次即失败），
- * schema 纯属浪费；Windows 平台保留（pi 原生 `DEFAULT_TOOL_NAMES` 也不含它）。
+ * 解法不是维护一份"谁该休眠"的名单——`ToolInfo`（`pi.getAllTools()`）不透出 `defaultActive`，
+ * 名单还得随上游更新——而是**以 pi 自己的激活决定为基线**：`effectiveActiveTools` 只做减法
+ * （裁掉未启用的休眠组）与"把显式 enable 的组加回来"，从不凭空加工具。基线在
+ * `tool-layering.ts` 首次应用前从 `getActiveTools()` 抓一次。
  */
-export function deferredTools(platform: string = process.platform): string[] {
-  return ['codemode', 'tool_search', ...(platform === 'win32' ? [] : ['powershell'])];
-}
-
-/** 当前平台的"永不由 my-pi 主动激活"名单（见 `deferredTools`） */
-export const DEFERRED_TOOLS: readonly string[] = deferredTools();
 
 /**
- * 计算活动工具集：全部已注册工具减去"未启用的休眠组"工具。
+ * 计算活动工具集：给定工具集减去"未启用的休眠组"工具。
  * 未知工具（不在任何名单）自动保留 → 未来新扩展默认核心，无需维护名单。
  */
 export function computeActiveTools(
-  allToolNames: string[],
+  presentToolNames: readonly string[],
   enabledGroups: ReadonlySet<string>,
 ): string[] {
   const excluded = SLEEPING_GROUPS.filter((g) => !enabledGroups.has(g.name)).flatMap((g) => g.tools);
   const excludedSet = new Set(excluded);
-  return allToolNames.filter((n) => !excludedSet.has(n));
+  return presentToolNames.filter((n) => !excludedSet.has(n));
 }
 
 /**
  * 按开关取实际活动工具集（纯函数，供测试与 tool-layering 共用）。
- * `layered=false`（默认）→ 全部工具常驻：不做休眠裁剪，`enable_tool` 成为无操作。
- * 理由见 `task-gate.ts` 的 `TOOL_LAYERING`：休眠组 schema 常驻只花命中价，
- * 而中途 enable 会让整段前缀缓存失效，一次就比一整场会话的常驻成本贵。
  *
- * 两个档位都不激活 `DEFERRED_TOOLS`：常驻策略是"my-pi 要用的工具别休眠"，
- * 不是"替 pi 把它刻意关掉的工具打开"。
+ * `baseActiveToolNames` = **pi 自己激活的工具**（my-pi 抓到的基线），不是"全部已注册工具"：
+ * 本函数只可能**减少**（裁休眠组）或在 `layered=true` 时把显式 enable 的组**加回来**，
+ * 永不激活 pi 没激活的工具（`tool_search`/`codemode` 这类 `defaultActive: false` 的、
+ * 平台上不可用的 `powershell`、以及 `--tools` 白名单之外的工具都因此自然排除）。
+ *
+ * `layered=false`（默认）→ 原样返回基线 = 全部工具常驻（不做休眠裁剪，`enable_tool` 是空操作）。
+ * 理由见 `task-gate.ts` 的 `TOOL_LAYERING`：休眠组 schema 常驻只花命中价，而中途 enable 会让
+ * 整段前缀缓存失效，一次就比一整场会话的常驻成本贵。
  */
 export function effectiveActiveTools(
-  allToolNames: string[],
+  baseActiveToolNames: readonly string[],
   enabledGroups: ReadonlySet<string>,
   layered: boolean,
 ): string[] {
-  const base = layered ? computeActiveTools(allToolNames, enabledGroups) : [...allToolNames];
-  const deferred = new Set(DEFERRED_TOOLS);
-  return base.filter((n) => !deferred.has(n));
+  if (!layered) return [...baseActiveToolNames];
+  const enabled = SLEEPING_GROUPS.filter((g) => enabledGroups.has(g.name)).flatMap((g) => g.tools);
+  // 顺序：保持 pi 的基线顺序（前缀缓存对工具数组顺序敏感），启用组追加在末尾
+  return computeActiveTools([...baseActiveToolNames, ...enabled], enabledGroups);
 }

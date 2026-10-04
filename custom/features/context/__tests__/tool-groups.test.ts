@@ -3,7 +3,6 @@ import {
   CORE_TOOLS,
   SLEEPING_GROUPS,
   computeActiveTools,
-  deferredTools,
   effectiveActiveTools,
   buildSleepingSummary,
   validateGroups,
@@ -80,17 +79,27 @@ describe('tool-groups: 摘要缓存友好', () => {
   });
 });
 
-describe('tool-groups: effectiveActiveTools（按需加载开关）', () => {
+describe('tool-groups: effectiveActiveTools（pi 基线 + 按需加载开关）', () => {
   const all = [...CORE_TOOLS, ...SLEEPING_GROUPS.flatMap((g) => g.tools)];
   const none = new Set<string>();
 
-  it('layered=false（默认）→ 全部工具常驻，休眠组不裁剪', () => {
+  it('layered=false（默认）→ 原样返回 pi 的基线，休眠组不裁剪', () => {
     expect(effectiveActiveTools(all, none, false)).toEqual(all);
   });
 
-  it('layered=false 时即使注册了未迁移功能之外的未知工具也全部保留', () => {
-    const withUnknown = [...all, 'some_future_tool'];
-    expect(effectiveActiveTools(withUnknown, none, false)).toContain('some_future_tool');
+  it('永不激活 pi 没激活的工具（未知工具仍按"默认核心"保留）', () => {
+    // 模拟真实：基线是 pi 自己激活的集合，"已注册但不在基线里"= defaultActive:false 或平台不可用
+    const piBase = [...all, 'some_future_tool'];
+    const registered = [...piBase, 'tool_search', 'codemode', 'powershell'];
+    expect(registered.length).toBeGreaterThan(piBase.length);
+    for (const layered of [false, true]) {
+      const active = effectiveActiveTools(piBase, none, layered);
+      for (const name of ['tool_search', 'codemode', 'powershell']) expect(active).not.toContain(name);
+      expect(active).toContain('some_future_tool');
+      expect(active).toContain('read');
+      // 结果必须是基线的子集（只减不凭空加）
+      expect(active.every((n) => piBase.includes(n))).toBe(true);
+    }
   });
 
   it('layered=true（PI_CONTEXT_TOOL_LAYERING=on）→ 裁掉未启用休眠组', () => {
@@ -99,35 +108,21 @@ describe('tool-groups: effectiveActiveTools（按需加载开关）', () => {
     expect(on).toEqual(computeActiveTools(all, none));
   });
 
-  it('layered=true 且组已启用 → 该组工具恢复活动', () => {
+  it('layered=true 且组已启用 → 该组工具加到基线之后，基线顺序不变', () => {
     const g = SLEEPING_GROUPS[0];
-    const on = effectiveActiveTools(all, new Set([g.name]), true);
+    const base = [...CORE_TOOLS];
+    const on = effectiveActiveTools(base, new Set([g.name]), true);
     expect(on).toContain(g.tools[0]);
+    expect(on.slice(0, base.length)).toEqual(base);
   });
 });
 
-describe('tool-groups: pi 刻意休眠的工具（defaultActive:false）', () => {
-  const deferred = new Set(deferredTools('linux'));
-
-  it('两个档位都不激活 pi 刻意休眠的工具', () => {
-    const all = [...CORE_TOOLS, 'codemode', 'tool_search', 'powershell', 'some_future_tool'];
-    for (const layered of [false, true]) {
-      const active = effectiveActiveTools(all, new Set(), layered);
-      for (const name of deferred) expect(active).not.toContain(name);
-      // 未知工具仍按"默认核心"保留，收口不改变这条语义
-      expect(active).toContain('some_future_tool');
-      expect(active).toContain('read');
-    }
-  });
-
-  it('名单按平台区分：POSIX 排除 powershell，Windows 保留', () => {
-    expect(deferredTools('linux')).toEqual(['codemode', 'tool_search', 'powershell']);
-    expect(deferredTools('android')).toContain('powershell');
-    expect(deferredTools('win32')).toEqual(['codemode', 'tool_search']);
-  });
-
-  it('名单与休眠组无重叠（两套机制互不干扰）', () => {
+describe('tool-groups: 与 pi 刻意休眠的工具无交集声明', () => {
+  it('休眠组名单里没有 pi 内置扩展/平台工具（避免两套机制互相干扰）', () => {
     const sleeping = new Set(SLEEPING_GROUPS.flatMap((g) => g.tools));
-    for (const name of deferredTools('linux')) expect(sleeping.has(name)).toBe(false);
+    for (const name of ['codemode', 'tool_search', 'powershell']) {
+      expect(sleeping.has(name)).toBe(false);
+      expect(CORE_TOOLS).not.toContain(name);
+    }
   });
 });

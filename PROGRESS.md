@@ -1985,9 +1985,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   写盘后 `process.exit(0)` 的 TS 扩展，`--no-session --approve`）→ 不需要调用模型就能拿到真实活跃工具集。
   实测：full 活跃 **72**（含 `codemode`/`tool_search`/`powershell`），roleplay 活跃 **15**（只有 `read/bash/edit/write`
   + web-search 3 + memory 8）。探针用完即删，未写会话文件、未改 `modes-state.json`。
-- **收口**：`custom/features/context/budget/tool-groups.ts` 增加 `deferredTools(platform)`/`DEFERRED_TOOLS`，
-  `effectiveActiveTools` 两档都减去它——`codemode`/`tool_search` 是 pi 内置扩展的 `defaultActive: false`
-  （`ToolInfo` 不透出该字段，只能显式列名），POSIX 上另减无 `pwsh` 的 `powershell`。
+- **收口**：`effectiveActiveTools` 的第一个参数从"全部已注册工具"改为"**pi 自己激活的工具**"
+  （基线由 `tool-layering.ts` 在首次动手前从 `getActiveTools()` 抓一次），函数只做减法（裁未启用休眠组）
+  或在分层档把显式 enable 的组加回来——`codemode`/`tool_search`（pi 的 `defaultActive: false`）、
+  POSIX 上无 `pwsh` 的 `powershell`、`--tools` 白名单之外的工具因此自然不激活，无需维护名单。
+  默认档 `applyToolLayering` 直接返回：不再调用 `setActiveTools`，工具面完全由 pi 的启动档决定。
 - **roleplay 补工具**：`portable/agent/settings.json` 加 `"defaultTools": ["+grep","+find","+ls"]`（pi 原生增量修饰符，
   追加而非替换 `DEFAULT_TOOL_NAMES`）→ roleplay 18 个、full 69 个。人设工具条同步写明"先 `find`/`grep` 定位、
   再 `read` 细看，别整份大文件往上下文里搬"。

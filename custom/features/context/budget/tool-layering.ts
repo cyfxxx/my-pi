@@ -20,15 +20,27 @@ import { TOOL_LAYERING } from './task-gate';
 export const enabledGroups = new Set<string>();
 
 /**
- * 应用工具集：按需加载开启时裁掉未启用休眠组，默认（关闭）全部工具常驻。
+ * 活动工具集基线：**第一次动手之前** pi 自己激活的工具（`getActiveTools()`）。
  *
- * 只有当目标集合与当前活跃集合**不同**时才调用 `setActiveTools`：工具数组位于请求最前部，
+ * 这是"不激活 pi 刻意休眠的工具"的落点——my-pi 只在这个集合上做减法（裁未启用休眠组）
+ * 与"把显式 enable 的组加回来"，从不反过来拿"全部已注册工具"当基线（那会把
+ * `defaultActive: false` 的 `tool_search`/`codemode` 和 POSIX 上没用的 `powershell` 一起激活，
+ * 见 `tool-groups.ts` 的"设计说明"）。基线只在首次应用前抓一次：之后本模块自己改过活动集，
+ * 再抓就会把裁剪结果当成基线，越裁越窄或反复横跳。
+ */
+let baseActiveToolNames: string[] | null = null;
+
+/**
+ * 应用工具集：按需加载开启时裁掉未启用休眠组；默认（关闭）**完全不动** pi 的工具集。
+ *
+ * 只有目标集合与当前活跃集合**不同**时才调用 `setActiveTools`：工具数组位于请求最前部，
  * 一次变更会使 system prompt 与整段消息前缀全部失效（实测单次 140K–250K 全价重算，
  * 2026-09-26 四次 `enable_tool` 各触发一次）。空操作调用在这里是纯代价。
  */
 export function applyToolLayering(pi: PiApi): void {
-  const all = getAllToolNames(pi);
-  const target = effectiveActiveTools(all, enabledGroups, TOOL_LAYERING);
+  if (!TOOL_LAYERING) return; // 常驻 = 不动 pi 的选择（连一次空操作调用都省掉）
+  if (baseActiveToolNames === null) baseActiveToolNames = getActiveTools(pi);
+  const target = effectiveActiveTools(baseActiveToolNames, enabledGroups, true);
   if (sameToolSet(getActiveTools(pi), target)) return;
   setActiveTools(pi, target);
 }
@@ -91,7 +103,8 @@ export function buildToolsReport(pi: PiApi): string {
   if (!TOOL_LAYERING) {
     return [
       '## 工具状态：全部常驻（按需加载已关闭）',
-      `已注册工具全部活动: ${active.size} 个`,
+      `活跃 ${active.size} 个 / 已注册 ${present.size} 个` +
+        `（差值 = pi 刻意休眠或本平台不可用的工具，my-pi 不激活）`,
       `分组定义仍保留 ${groupsWithTools(present).length} 个（休眠名单不生效）；`,
       '恢复休眠分层：设 PI_CONTEXT_TOOL_LAYERING=on 后重启。',
     ].join('\n');

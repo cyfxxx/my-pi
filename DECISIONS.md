@@ -5,19 +5,20 @@
 ### [2026-10-04] 工具面收口：不激活 pi 刻意休眠的工具；角色扮演模式补上文件检索
 **背景**：回答"角色扮演模式启用了哪些工具"时用临时探针实测（挂 `custom/bootstrap.ts` 后 dump `pi.getActiveTools()`）：full 模式活跃 **72** 个，其中含 `codemode`、`tool_search`、`powershell`。前两个是 pi 内置扩展里以 `defaultActive: false` 注册的（上游语义："默认注册但不激活"，见 `docs/operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md`），第三个在本机不可用（`command -v pwsh` 为空，历史调用 1 次即失败）。根因：`effectiveActiveTools(layered=false)` 直接返回"全部已注册工具"，把 pi 的休眠决定一并推翻。另：roleplay 活跃 **15** 个，只有内置 `read/bash/edit/write`——没有 `grep/find/ls`（pi 原生 `DEFAULT_TOOL_NAMES` 只含这四个，`grep/find/ls` 是本仓库靠 context 的常驻放宽才补上的，而 roleplay 不加载 context）。
 **决策**：
-- **收口**：`tool-groups.ts` 新增 `deferredTools(platform)` / `DEFERRED_TOOLS`（`codemode`、`tool_search`，非 win32 另加 `powershell`），`effectiveActiveTools` 两个档位（常驻 / 分层）最后都减去它。未知工具"默认核心"的既有语义不变。
+- **收口（基线取自 pi，不维护名单）**：`effectiveActiveTools` 的第一个参数从"全部已注册工具"改成"**pi 自己激活的工具**"（`tool-layering.ts` 在首次动手前从 `getActiveTools()` 抓一次基线）；函数只做减法（裁掉未启用的休眠组）或在分层档把显式 `enable` 的组加回来，从不凭空加工具。于是 `defaultActive: false` 的 `tool_search`/`codemode`、POSIX 上无 `pwsh` 的 `powershell`、`--tools` 白名单之外的工具都自然不激活。未知工具"默认核心"的既有语义不变（它们本来就在 pi 的基线里）。
 - **roleplay 补文件检索**：`portable/agent/settings.json` 加 `"defaultTools": ["+grep", "+find", "+ls"]`——用 pi 原生的**增量**修饰符（`resolveDefaultTools`：只含 `+name` 时追加到 `DEFAULT_TOOL_NAMES`，而不是替换），使 `grep/find/ls` 成为所有模式的启动默认；roleplay 由 15 → 18 个工具（`read/bash/edit/write` + `grep/find/ls` + web-search 3 + memory 8）。
 - 明确**不加**：`context`（roleplay 有它就会连带注入上下文压力提示与委派建议、并注册 `thinking_level`），`plan-mode`（`plan_enter/plan_exit` 是编码工作流工具；`todo`/`ask_user` 对聊天型助手收益不足）、subagent / browser / voice / link / autopilot / tmux（日常交流与普通任务用不到；需要时用 `/mode` 切 full）。
 - 人设同步一句：`portable/agent/modes/roleplay.md` 的工具条补"找文件（`find` 按名字找、`grep` 搜内容）……先定位再 `read` 细看，不要整份大文件往上下文里搬"。
 **理由**：
 - 常驻策略的正确边界是"my-pi 要用的工具别休眠"，不是"替 pi 把它刻意关掉的工具打开"——后者既违背上游语义，也白付 schema 前缀成本（每个工具的 schema 都随每次请求发送）。
-- `ToolInfo`（`pi.getAllTools()`）**不透出 `defaultActive`**，无法从元数据判定谁该休眠，故用显式名单；同步上游后需复核（已在注释里写明）。
+- `ToolInfo`（`pi.getAllTools()`）**不透出 `defaultActive`**，所以"谁该休眠"不能靠 my-pi 猜名单（第一版实现就是一份显式 `DEFERRED_TOOLS`，得随上游同步复核）；正确的分工是把判断权交回 pi——my-pi 只在 pi 的基线上做减法。同理，context 在默认档不再调用 `setActiveTools`，工具面完全由 pi 的启动档决定。
 - 用 `settings.json` 而不是新增 per-mode 工具字段：pi 原生支持 `+name` 增量，零新代码路径；per-mode 方案还得在 mode 功能里加 `before_agent_start` 钩子改活跃集，与 context 的放宽逻辑存在竞争顺序，收益不抵风险。
 - roleplay 只补 `grep/find/ls`：这三种是"普通任务"的真实缺口（找文件、搜内容），且比 `bash find`/整份 `read` 更省上下文；其余能力用 `/mode full` 即可，符合"角色扮演模式收窄"的既定设计。
-**代价与约束**：full 模式活跃 72 → 69；`powershell` 在 POSIX 上不再可用（确需可在 Windows 上自动保留，或临时用 `setActiveTools`）；`grep/find/ls` 成为所有模式（含 `minimal`）的启动默认，工具面前缀相应变大（roleplay 侧约 +3 KB）；`deferredTools` 是硬编码名单，上游新增 `defaultActive: false` 的工具时需补。
-**验证**：`tool-groups.test.ts` 15 项（含"两个档位都不激活 deferred""名单按平台区分""未知工具仍保留""与休眠组无重叠"）；
+**代价与约束**：full 模式活跃 72 → 69；`powershell` 在 POSIX 上不再可用（需要时用 `setActiveTools` 临时开，或用 `--tools`/`defaultTools` 显式点名）；`grep/find/ls` 成为所有模式（含 `minimal`）的启动默认，工具面前缀相应变大（roleplay 侧约 +3 KB，活跃 schema 实测 11.2 KB）；默认档工具面完全等于 pi 的启动档，my-pi 想常驻某个 pi 默认不激活的工具时，唯一入口是 pi 原生的 `defaultTools`（本项目落在 `portable/agent/settings.json`）。
+**验证**：`tool-groups.test.ts` 13 项（"常驻档=原样返回基线""永不激活 pi 未激活的工具""分层档裁休眠组且顺序稳定"等）；
+`tool-layering.test.ts` 新增"基线取自 pi：注册但未激活的工具不会被加回来且不触发 `setActiveTools`"；
 新增 `custom/features/mode/__tests__/roleplay-surface.test.ts` 4 项（读入库的真实 `modes.json`/`settings.json`，把 roleplay 的
-功能白名单、人设/命名空间、`defaultTools` 增量列表钉成契约）；探针实测 roleplay 活跃 18 个 / full 69 个，`deferred` 三项均不在活跃集；`npx tsc --noEmit -p custom/`、`golden-tasks --fast`、全量 golden（pre-push）。
+功能白名单、人设/命名空间、`defaultTools` 增量列表钉成契约）；探针实测 roleplay 活跃 18 个 / full 69 个，三个 pi 休眠工具均不在活跃集；`npx tsc --noEmit -p custom/`、`golden-tasks --fast`、全量 golden（pre-push）。
 
 ---
 

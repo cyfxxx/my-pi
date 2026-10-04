@@ -17,10 +17,12 @@
 算，常驻 100 个请求共约 $0.006，一次中途 enable 就是 $0.0375。分组定义与 `/tools`、`enable_tool`
 仍保留以便回溯，`PI_CONTEXT_TOOL_LAYERING=on` 可恢复休眠分层。
 
-**例外（2026-10-04）**：常驻策略只管"my-pi 要用的工具别休眠"，**不替 pi 打开它刻意休眠的工具**。
-`effectiveActiveTools` 两个档位都会减去 `DEFERRED_TOOLS`（`tool_search`/`codemode` 以
-`defaultActive: false` 注册；POSIX 上另减无 `pwsh` 可用的 `powershell`）——此前 `layered=false`
-直接返回"全部已注册工具"，把这三个一并激活了（实测 full 模式活跃 72 个）。
+**基线是 pi 的激活决定（2026-10-04 修正）**：常驻策略只管"my-pi 要用的工具别休眠"，**不替 pi 打开
+它刻意休眠的工具**。`effectiveActiveTools` 的第一个参数是 `tool-layering.ts` 在首次动手前抓的
+`getActiveTools()` 基线，函数只做减法（裁未启用休眠组）或在分层档把显式 enable 的组加回来，因此
+`tool_search`/`codemode`（pi 以 `defaultActive: false` 注册）与 POSIX 上没有 `pwsh` 的 `powershell`
+自然不会被激活。此前 `layered=false` 直接返回"全部已注册工具"，把这三个一并激活了
+（实测 full 模式活跃 72 个 → 修正后 69 个）。
 
 ## 文件
 
