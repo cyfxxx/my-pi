@@ -1958,3 +1958,14 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 验证：dry-run 与实际写入（新增 3、更新 3）；`buildInjectionBlock` 实测 `entries=3 injected=3 tokens=153
   budget=500`（每轮注入、无截断、块内无时间戳）；`git status` 确认 `portable/memory/roleplay/` 未入库；
   默认命名空间 61 条、无「标枪」条目 → 命名空间隔离有效。
+
+### 守门稳定性：工具面体积守门的超时放宽（2026-10-04）
+
+- 现象：`pre-push` 全量 golden 在 vitest 步骤失败，唯一失败项是
+  `tools-payload.test.ts > 总量/单项/数量都在预算内（超出时打印占比最高的工具）`，报
+  `Test timed out in 20000ms`——而它打印的结果 `工具面: 62 个 / 28.5KB（上限 31KB）` **在预算内**。
+- 归因：该用例要 `import` + `register` 全部 12 个功能（含 browser/voice/autopilot 等重模块），
+  单跑实测 **14.2s**（距默认 20s 上限仅差 6s），与全量 vitest 的 66 个 worker 并发叠加后贴边超时。
+  属环境负载导致的假性失败，不是工具面回归（数字与之前一致）。
+- 处置：给该用例显式 `60_000` 超时（守卫的是体积预算，不是耗时），注释写明原因；同文件第二个用例
+  仅 1.3s，保持默认。单跑复验：`2 passed`。

@@ -130,7 +130,10 @@ describe('工具面体积守门', () => {
         SINGLE_TOOL_MAX_BYTES,
       );
     }
-  });
+    // 本用例要 import + register 全部 12 个功能（含 browser/voice/autopilot 等重模块）；
+    // 在手机端跑**全量** vitest（66 worker 并发）时实测贴到默认 20s 上限而假性超时（断言本身通过）。
+    // 显式放宽超时：守护的是体积预算，不是耗时。
+  }, 60_000);
 
   it('模式白名单确有收窄效果（未注册的功能 = 0 字节）', async () => {
     // modes.json 的 features 是启动期过滤：非 full 模式只注册白名单内的功能。
