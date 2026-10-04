@@ -3,6 +3,7 @@
   "defaultProvider": "freellmapi",
   "defaultModel": "auto",
   "defaultThinkingLevel": "high",
+  "defaultTools": ["+grep", "+find", "+ls"],
   "steeringMode": "all",
   "followUpMode": "all",
   "packages": [],

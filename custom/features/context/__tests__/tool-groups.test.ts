@@ -3,6 +3,7 @@ import {
   CORE_TOOLS,
   SLEEPING_GROUPS,
   computeActiveTools,
+  deferredTools,
   effectiveActiveTools,
   buildSleepingSummary,
   validateGroups,
@@ -102,5 +103,31 @@ describe('tool-groups: effectiveActiveTools（按需加载开关）', () => {
     const g = SLEEPING_GROUPS[0];
     const on = effectiveActiveTools(all, new Set([g.name]), true);
     expect(on).toContain(g.tools[0]);
+  });
+});
+
+describe('tool-groups: pi 刻意休眠的工具（defaultActive:false）', () => {
+  const deferred = new Set(deferredTools('linux'));
+
+  it('两个档位都不激活 pi 刻意休眠的工具', () => {
+    const all = [...CORE_TOOLS, 'codemode', 'tool_search', 'powershell', 'some_future_tool'];
+    for (const layered of [false, true]) {
+      const active = effectiveActiveTools(all, new Set(), layered);
+      for (const name of deferred) expect(active).not.toContain(name);
+      // 未知工具仍按"默认核心"保留，收口不改变这条语义
+      expect(active).toContain('some_future_tool');
+      expect(active).toContain('read');
+    }
+  });
+
+  it('名单按平台区分：POSIX 排除 powershell，Windows 保留', () => {
+    expect(deferredTools('linux')).toEqual(['codemode', 'tool_search', 'powershell']);
+    expect(deferredTools('android')).toContain('powershell');
+    expect(deferredTools('win32')).toEqual(['codemode', 'tool_search']);
+  });
+
+  it('名单与休眠组无重叠（两套机制互不干扰）', () => {
+    const sleeping = new Set(SLEEPING_GROUPS.flatMap((g) => g.tools));
+    for (const name of deferredTools('linux')) expect(sleeping.has(name)).toBe(false);
   });
 });

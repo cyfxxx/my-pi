@@ -1978,3 +1978,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **密文无需重打**：manifest 只决定打包哪些文件，被删的行本来就不存在，成员集合不变。清理后 `verify` 通过，
   只剩 2 条 roleplay `summaries.json`/`notes.json` 的预留提示（该命名空间尚未写这两类文件）。
 - 那条 09-22 会话仍可从 git 历史里的旧密文（`d22d5789f:sync/memory.tar.age`）用同一把私钥解出并回填。
+
+### 工具面收口 + 角色扮演补文件检索（2026-10-04）
+
+- **测量方法**：临时扩展探针（`--extension <bootstrap>` + 一个在 `before_agent_start` 里 `getAllTools()/getActiveTools()`
+  写盘后 `process.exit(0)` 的 TS 扩展，`--no-session --approve`）→ 不需要调用模型就能拿到真实活跃工具集。
+  实测：full 活跃 **72**（含 `codemode`/`tool_search`/`powershell`），roleplay 活跃 **15**（只有 `read/bash/edit/write`
+  + web-search 3 + memory 8）。探针用完即删，未写会话文件、未改 `modes-state.json`。
+- **收口**：`custom/features/context/budget/tool-groups.ts` 增加 `deferredTools(platform)`/`DEFERRED_TOOLS`，
+  `effectiveActiveTools` 两档都减去它——`codemode`/`tool_search` 是 pi 内置扩展的 `defaultActive: false`
+  （`ToolInfo` 不透出该字段，只能显式列名），POSIX 上另减无 `pwsh` 的 `powershell`。
+- **roleplay 补工具**：`portable/agent/settings.json` 加 `"defaultTools": ["+grep","+find","+ls"]`（pi 原生增量修饰符，
+  追加而非替换 `DEFAULT_TOOL_NAMES`）→ roleplay 18 个、full 69 个。人设工具条同步写明"先 `find`/`grep` 定位、
+  再 `read` 细看，别整份大文件往上下文里搬"。
+- 明确不加：`context`/`plan-mode`/subagent/browser/voice/link/autopilot/tmux（理由见 `DECISIONS.md` 同日条目）。
+- 验证：`tool-groups.test.ts`、`npx tsc --noEmit -p custom/`、`golden-tasks --fast`、全量 golden（pre-push）；
+  探针复测活跃集。
