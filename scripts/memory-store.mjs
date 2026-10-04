@@ -12,11 +12,15 @@
  *   node scripts/memory-store.mjs --file entries.json          # JSON 数组或 JSONL
  *   cat entries.jsonl | node scripts/memory-store.mjs          # 从 stdin
  *   以上均可加 --dry-run
+ *   显式人工写入加 --source manual（见下）
  *
  * 字段：category(solutions|fact|preference|habit|procedure|reference，默认 fact)、
  *       title(必填)、content(必填)、tags[]、confidence(0-1，默认 0.7)、environments[]
+ *       --source manual|extract|digest（默认 auto＝自动流程写入）
  *
- * 说明：需经 tsx 运行无扩展名导入：`bash scripts/run-ts.sh scripts/memory-store.mjs ...`（裸 node 会报 Cannot find module）。
+ * 说明：source 只影响记忆治理——`manual` 条目在 `decideMerge` 里受保护（矛盾候选置信度不足时不被取代），
+ *       自动流程（autopilot 任务提示词）走默认 `auto`，语义是"可被后续候选更新/取代"。
+ *       脚本路径需经 tsx 运行无扩展名导入：`bash scripts/run-ts.sh scripts/memory-store.mjs ...`（裸 node 会报 Cannot find module）。
  */
 import { readFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
@@ -25,16 +29,28 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CATEGORIES = new Set(['solutions', 'fact', 'preference', 'habit', 'procedure', 'reference']);
+const SOURCES = new Set(['manual', 'extract', 'digest']);
 
 const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry-run');
 const jsonIdx = argv.indexOf('--json');
 const fileIdx = argv.indexOf('--file');
+const sourceIdx = argv.indexOf('--source');
 
 function die(msg, code = 2) {
   console.error(`错误：${msg}`);
   process.exit(code);
 }
+
+/** 写入来源：默认 auto＝自动流程（可被后续候选取代）；显式人工写入用 manual（治理层保护） */
+function parseSource() {
+  if (sourceIdx < 0) return 'auto';
+  const v = argv[sourceIdx + 1];
+  if (!SOURCES.has(v)) die(`--source 取值须为 manual|extract|digest（收到：${v ?? '空'}）`);
+  return v;
+}
+
+const source = parseSource();
 
 let raw = '';
 if (jsonIdx >= 0 && argv[jsonIdx + 1]) {
@@ -114,7 +130,7 @@ for (const [i, e] of input.entries()) {
     content,
     tags,
     confidence,
-    source: 'auto',
+    source,
     recurrence: 1,
     createdAt: now,
     updatedAt: now,

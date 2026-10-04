@@ -54,7 +54,7 @@
 | `web-terminal.sh` | 浏览器终端启动器：在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务（只绑 127.0.0.1，远程走 SSH 隧道）；见 [custom/web-terminal/README.md](../custom/web-terminal/README.md) |
 | `pi-supervisor.sh` | 崩溃自愈外壳（分类/修复者 pi/健康检查/熔断）；`MY_PI_NO_SUPERVISOR=1` 直启 |
 | `test-supervisor.sh` | supervisor 纯函数行为测试（崩溃分类 / admin state 解析；库模式 source，无需网络/provider） |
-| `memory-store.mjs` | 记忆入库（零 LLM，直调 memory 逻辑层 `storeEntry`，内置标题去重）；`--json`/`--file`/stdin，`--dry-run` |
+| `memory-store.mjs` | 记忆入库（零 LLM，直调 memory 逻辑层 `storeEntry`，内置标题去重）；`--json`/`--file`/stdin，`--dry-run`，`--source manual`（人工写入，治理层受保护；默认 `auto`＝自动流程） |
 | `memory-lifecycle.mjs` | 记忆生命周期只读报告（零 LLM，调 `analyzeLifecycle`：淘汰/升格/冲突/垃圾/聚合候选）；`--json`/`--limit`；headless 下替代 `/memory lifecycle` |
 | `reseed-seeds.mjs` | 把 `scheduled-seeds.json` 的定义显式应用到已存在的同名任务（种子对账只补缺失不覆盖；改提示词后用它；保留 id/enabled/lastRun/runCount/history，默认预演，`--apply` 先备份） |
 | `daily-health.mjs` | 每日健康检查（**加权命中率/未命中每次/输出占比/前缀前端变更次数/首段分叉/中后段分叉/冷启动次数**/记忆库/种子失配/守门脏改；阈值 `PI_HEALTH_HIT_FLOOR`=0.97、`PI_HEALTH_UNCACHED_CEIL`=3000、`PI_HEALTH_COLDSTART_CEIL`=8。数据源是每轮用量 `.usage-diag.jsonl` 与 `prefix-fingerprints.jsonl`——**不要改用工具级台账 `usage.jsonl`**，它没有缓存字段，会让命中率恒为 n/a） |

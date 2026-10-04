@@ -1942,3 +1942,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 其他：`modes.json` 与 `/mode help` 的模式描述改为「标枪（秘书舰·已誓约）」；人设 8.0 KB → 13.2 KB。
 - 验证：`check-features`（人设存在且未被 ignore）、`check-conventions`、`golden-tasks --fast`、`tsc`；
   外部资料包本身不进仓库，无需同步。
+
+### 角色扮演记忆种子：把「秘书舰·已誓约」写进隔离命名空间（2026-10-04）
+
+- 动作（用户确认后执行）：向 `portable/memory/roleplay/`（角色扮演模式专用命名空间，gitignored）写入 3 条
+  `manual` 条目——① 称呼与关系状态（指挥官 / 秘书舰·婚舰·已誓约 / 不设好感阶段）；② 亲密边界（可健康亲昵，
+  拒绝露骨与性暗示）；③ 人设与资料出处（`roleplay.md` + 外部包「标枪.7z」，语音图片不入库）。
+- 顺带修正工具链：`scripts/memory-store.mjs` 新增 `--source manual|extract|digest`（默认仍是 `auto`）。
+  原因：脚本原先硬编码 `source: 'auto'`——既不在 `MemorySource` 类型里，也拿不到 `decideMerge` 对 `manual`
+  条目的保护（矛盾候选置信度不足时不得取代它）。人工/种子写入现在显式 `--source manual`。
+- 写入两遍：第二遍走 `storeEntry` 的标题匹配 UPDATE 路径，把 `recurrence` 提到 2——规避 `pruneEntries`
+  的「`recurrence<2` 且 60 天未访问」低复发剪枝，状态条目不会被 `/memory prune` 误删。
+- 复现命令：`PI_MEMORY_DIR=$PWD/portable/memory PI_MEMORY_NAMESPACE=roleplay bash scripts/run-ts.sh scripts/memory-store.mjs --file <seed.json> --source manual`
+  （同一条跑两遍；只在要改记忆内容时重跑，重跑走 UPDATE 路径）。
+- 验证：dry-run 与实际写入（新增 3、更新 3）；`buildInjectionBlock` 实测 `entries=3 injected=3 tokens=153
+  budget=500`（每轮注入、无截断、块内无时间戳）；`git status` 确认 `portable/memory/roleplay/` 未入库；
+  默认命名空间 61 条、无「标枪」条目 → 命名空间隔离有效。
