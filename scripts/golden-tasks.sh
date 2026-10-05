@@ -91,7 +91,7 @@ step "12. 浏览器终端（鉴权 + 传输）"
 # 安全边界（令牌换 cookie、Host/Origin 栅栏、穿越防护）与 pty 传输（双向数据、resize→SIGWINCH）
 # 都是单测覆盖不到的进程级行为。缺 script/stty 时该脚本显式 SKIP 并 exit 0。
 if [ "$FAST" = "1" ]; then
-  skip "web-terminal 守门（--fast 跳过，pre-push 全量跑）"
+  skip "web-terminal 守门（--fast 跳过；pre-push 对纯数据推送走 --fast，其余全量）"
 elif node scripts/test-web-terminal.mjs >/tmp/golden-webterm.log 2>&1; then pass "$(tail -1 /tmp/golden-webterm.log)"; else fail "web-terminal 守门（见 /tmp/golden-webterm.log）"; tail -15 /tmp/golden-webterm.log; fi
 
 step "13. 用量度量口径（成本告警的有效性）"
@@ -111,8 +111,12 @@ step "16. 私钥引导包（方案 A：口令加密 / 成员白名单 / 指纹�
 # 全程临时密钥：验证 pack/verify/unpack、拒绝仓库内私钥、拒绝夹带非白名单成员；缺 age 时脚本自跳过。
 if bash scripts/test-bootstrap.sh >/tmp/golden-bootstrap.log 2>&1; then pass "$(tail -1 /tmp/golden-bootstrap.log)"; else fail "引导包守门（见 /tmp/golden-bootstrap.log）"; tail -15 /tmp/golden-bootstrap.log; fi
 
+step "17. pre-push 门禁范围判定（纯数据降级不得误放代码）"
+# prepush-scope.sh 决定 pre-push 跑全量还是快检，判错会静默削弱推送防线 → 用临时仓库锁四类判定。
+if bash scripts/test-prepush-scope.sh >/tmp/golden-prepushscope.log 2>&1; then pass "$(tail -1 /tmp/golden-prepushscope.log)"; else fail "pre-push 范围判定（见 /tmp/golden-prepushscope.log）"; tail -15 /tmp/golden-prepushscope.log; fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "17. 无头会话冒烟"
+  step "18. 无头会话冒烟"
   # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
   # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，
