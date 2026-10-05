@@ -4,7 +4,7 @@
  * 读取顺序：环境变量 > portable/agent/pi-voice.json > 默认值。
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getAgentDir, getMemoryDir, getProjectRoot } from '../../core/config';
@@ -107,13 +107,31 @@ function envBool(value: string | undefined, fallback: boolean): boolean {
   return !['0', 'false', 'no', 'off'].includes(value.toLowerCase());
 }
 
+/**
+ * 配置损坏时先备份再继续。
+ *
+ * 此前 `loadConfig` 静默回退默认值、`persistConfig` 直接把损坏文件覆盖掉——用户手写的配置
+ * 会无声消失（且没有任何证据留下）。与 `memory/store/io.ts` 的 `backupCorruptFile` 同一处置：
+ * 备份到 `<path>.corrupt-<时间戳>` + 告警，然后按默认值继续。
+ */
+function backupCorruptConfig(path: string, err: unknown): void {
+  const detail = err instanceof Error ? err.message : String(err);
+  try {
+    const backup = `${path}.corrupt-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    renameSync(path, backup);
+    console.error(`[voice] 配置损坏（${path}）：${detail}；已备份到 ${backup}，本次按默认值继续，请人工检查恢复。`);
+  } catch (e) {
+    console.error(`[voice] 配置损坏（${path}）：${detail}；备份失败，原文件保持原位：`, (e as Error).message);
+  }
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, path: string = configPath()): VoiceConfig {
   let file: Partial<VoiceConfig> = {};
   if (existsSync(path)) {
     try {
       file = JSON.parse(readFileSync(path, 'utf-8')) as Partial<VoiceConfig>;
-    } catch {
-      /* 回退默认 */
+    } catch (err) {
+      backupCorruptConfig(path, err);
     }
   }
   const numeric = (v: string | undefined, fallback: number): number => {
@@ -191,8 +209,9 @@ export function persistConfig(partial: Partial<VoiceConfig>, env: NodeJS.Process
   if (existsSync(path)) {
     try {
       file = JSON.parse(readFileSync(path, 'utf-8')) as Partial<VoiceConfig>;
-    } catch {
-      /* 覆盖损坏文件 */
+    } catch (err) {
+      // 不静默"覆盖损坏文件"：先备份（否则用户配置无声丢失，事后无法追查）
+      backupCorruptConfig(path, err);
     }
   }
   const written: string[] = [];

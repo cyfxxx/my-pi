@@ -7,7 +7,7 @@ import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdirSync, readdirSync, rmSync, statSync, readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { getAgentDir } from '../../../core/config';
-import type { VoiceConfig } from '../config';
+import type { VoiceConfig, PlatformKind } from '../config';
 import { runCommand, nowStamp, type CommandResult } from '../types';
 
 export type ResolvedPlatform = 'termux' | 'linux' | 'windows';
@@ -28,6 +28,22 @@ function isTermux(): boolean {
 export function resolvePlatform(cfg: VoiceConfig): ResolvedPlatform {
   if (cfg.platform === 'auto') return isTermux() ? 'termux' : 'linux';
   return cfg.platform;
+}
+
+/**
+ * pkill -f 的残留匹配模式（导出便于单测）。
+ *
+ * termux 的录音器是固定二进制名，保持宽松匹配（命令行可能带完整路径）。
+ * 其余平台实际命令行形如 `<bin> … <tmpDir>/pi-voice-…` 或 `timeout <n> <bin> … <tmpDir>/…`：
+ * 锚定到行首 + 转义元字符，避免命中"命令行里恰好含该路径"的无关进程。
+ * bin/tmpDir 任一为空 → 返回 ''（宁可不清理，也不做无差别 pkill）。
+ */
+export function residuePatternFor(kind: PlatformKind, bin: string, tmpDir: string): string {
+  if (kind === 'termux') return 'termux-microphone-record';
+  if (!bin || !tmpDir) return '';
+  const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // linux 启动形如 `timeout <秒> <bin> … <tmpDir>/…`（见 startRecording）
+  return `^(timeout [0-9]+ )?${esc(bin)} .*${esc(tmpDir)}`;
 }
 
 export function recorderSpec(cfg: VoiceConfig): RecorderSpec {
@@ -130,9 +146,13 @@ export function startRecording(
 ): { child: ChildProcess; file: string } {
   const kind = resolvePlatform(cfg);
   const spec = recorderSpec(cfg);
-  const residuePattern = kind === 'termux' ? 'termux-microphone-record' : `${spec.bin} .*${cfg.tmpDir}`;
+  // 残留清理用 pkill -f（匹配整条命令行），因此模式必须是**锚定 + 转义**的字面量：
+  //   · 不转义时 tmpDir/bin 里的正则元字符（`.`、`+`、`(`…）会改变匹配面；
+  //   · 不锚定时可能命中命令行里恰好带这些字符串的**无关进程**（`bash -c ".../voice/tmp..."`）。
+  // 模式太弱（bin 或 tmpDir 为空）时宁可不清理，也不做无差别 pkill。
+  const residuePattern = residuePatternFor(kind, spec.bin, cfg.tmpDir);
   const allowClean = termuxSessionActive || ownerOrphaned() || (kind === 'linux' && opts.forceClean === true);
-  if (allowClean) {
+  if (allowClean && residuePattern) {
     try {
       execFileSync('pkill', ['-f', residuePattern]);
     } catch {

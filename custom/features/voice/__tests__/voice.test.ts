@@ -2,12 +2,12 @@
  * voice 纯逻辑回归测试
  * 覆盖 TTS 文本清洗/调度、配置解析、服务确保（注入 deps，无网络/录音）。
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanForSpeech, isSpeechWorthy, createTtsDispatcher, extractAssistantText, selectTtsEngine } from '../tts/tts';
-import { loadConfig, DEFAULTS, voiceScriptsDir } from '../config';
+import { loadConfig, persistConfig, DEFAULTS, voiceScriptsDir } from '../config';
 import { ensureWhisperService } from '../stt/transcription';
-import { recorderSpec, convertToWav, deleteAudioPair, fileExists, waitForFileStable, cleanupStaleAudio } from '../audio/recording';
-import { mkdtempSync, rmSync, writeFileSync, utimesSync, existsSync, statSync, constants } from 'node:fs';
+import { recorderSpec, residuePatternFor, convertToWav, deleteAudioPair, fileExists, waitForFileStable, cleanupStaleAudio } from '../audio/recording';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, utimesSync, existsSync, statSync, constants } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -249,5 +249,75 @@ describe('voice 服务脚本随仓库分发（回归：配置曾指向不存在�
     for (const f of ['whisper-server.py', 'pi-sherpa-server.py']) {
       expect(existsSync(join(dir, f)), `${f} 应存在`).toBe(true);
     }
+  });
+});
+
+describe('残留清理模式（pkill -f 不得误杀无关进程）', () => {
+  it('termux 用固定二进制名（命令行可能带完整路径，保持宽松）', () => {
+    expect(residuePatternFor('termux', 'termux-microphone-record', '/tmp/x')).toBe('termux-microphone-record');
+  });
+
+  it('linux/windows 锚定行首并转义元字符', () => {
+    const p = residuePatternFor('linux', 'arecord', '/tmp/my+pi.(v)/tmp');
+    expect(p.startsWith('^(timeout [0-9]+ )?arecord ')).toBe(true);
+    expect(p).toContain('/tmp/my\\+pi\\.\\(v\\)/tmp');
+    // 校准：模式确实只匹配真实录音命令行
+    const re = new RegExp(p);
+    expect(re.test('arecord -f S16_LE /tmp/my+pi.(v)/tmp/pi-voice-1.wav')).toBe(true);
+    expect(re.test('timeout 90 arecord -f S16_LE /tmp/my+pi.(v)/tmp/pi-voice-1.wav')).toBe(true);
+    expect(re.test('bash -c echo /tmp/my+pi.(v)/tmp')).toBe(false);
+    expect(re.test('arecord -f S16_LE /tmp/other/tmp/pi-voice-1.wav')).toBe(false);
+  });
+
+  it('bin/tmpDir 缺失时不做清理（宁可不清也不无差别 pkill）', () => {
+    expect(residuePatternFor('linux', '', '/tmp/x')).toBe('');
+    expect(residuePatternFor('linux', 'arecord', '')).toBe('');
+  });
+});
+
+describe('配置损坏：先备份再回退（不静默覆盖）', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'my-pi-voice-cfg-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('loadConfig 遇到损坏 JSON → 备份 + 告警 + 用默认值', () => {
+    const path = join(dir, 'pi-voice.json');
+    writeFileSync(path, '{ 这不是 JSON');
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const cfg = loadConfig({}, path);
+      expect(cfg.whisperEndpoint).toBe(DEFAULTS.whisperEndpoint);
+      expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('配置损坏');
+    } finally {
+      warn.mockRestore();
+    }
+    expect(existsSync(path)).toBe(false);
+    const backups = readdirSync(dir).filter((f) => f.startsWith('pi-voice.json.corrupt-'));
+    expect(backups.length).toBe(1);
+    expect(readFileSync(join(dir, backups[0]), 'utf-8')).toBe('{ 这不是 JSON');
+  });
+
+  it('persistConfig 不覆盖损坏文件：写入前先备份，新配置从默认基线上写', () => {
+    const path = join(dir, 'pi-voice.json');
+    writeFileSync(path, 'not json at all');
+    // persistConfig 走 configPath()（env PI_VOICE_CONFIG > agentDir），必须重定向到临时目录，
+    // 否则会把真实 portable/agent/pi-voice.json 写脏
+    const prevEnv = process.env.PI_VOICE_CONFIG;
+    process.env.PI_VOICE_CONFIG = path;
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const written = persistConfig({ language: 'zh' }, {});
+      expect(written).toEqual(['language']);
+    } finally {
+      warn.mockRestore();
+      if (prevEnv === undefined) delete process.env.PI_VOICE_CONFIG;
+      else process.env.PI_VOICE_CONFIG = prevEnv;
+    }
+    expect(JSON.parse(readFileSync(path, 'utf-8')).language).toBe('zh');
+    expect(readdirSync(dir).filter((f) => f.startsWith('pi-voice.json.corrupt-')).length).toBe(1);
   });
 });
