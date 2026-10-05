@@ -2028,3 +2028,28 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   `command-completions-wiring.test.ts` 7 项（命令层接线 + 未知名不误起子进程）、
   `command-run-manual.test.ts` 2 项（mock 执行器：后台派发/落账/释放锁/汇报，`vi.waitFor` 等后台结束）；
   全量 `golden` 16 步通过（72 文件 / 768 用例）。
+
+### 每日任务执行结果复盘与优化（2026-10-05）
+
+- **复盘对象**：用户手动跑完全部每日任务（`scheduler/telemetry.json` 当天 4 次 tool-stats-daily：1 次成功但 push 被拦、3 次 1200s 超时）
+  与一次全面检查技能（会话 `2026-10-05T11-38-04`，报告 A+B+C+D+E，结论 4 HIGH 均为设计权衡、0 条必修）。
+- **真实缺陷 1（工具侧）**：`lib-mode.sh` 只看 `PI_AGENT_MODE` 非空、不看 `PI_AGENT_MODE_SOURCE`，与 pi 侧
+  `resolveEffectiveMode` 不一致 —— 在 pi 进程内跑 bash（每日任务就是这种形态）会继承 bootstrap 回写的
+  `PI_AGENT_MODE`，于是 `test-supervisor.sh` 5 项红（状态文件 roleplay 解析成 full）→ golden 第 10 步红 →
+  pre-push 拦下统计提交。修：两侧同判据（source + 模式名必须已知），并在测试里隔离外部 env 泄漏；
+  回归用例增至 56 项（新增 source=file 回写、未知模式名两条）。
+- **真实缺陷 2（流程侧）**：纯统计提交要过 4~5 分钟全量 pre-push，叠加缺陷 1 的诊断/重推，把 1200s 任务预算烧穿，
+  还留下 staged 残留。修：`scripts/prepush-scope.sh` 按**改动范围**分级（白名单只有 `portable/memory/stats/`，
+  拿不准回退全量），钩子逐 ref 判定，`test-prepush-scope.sh` 7 项接入 golden 第 17 步；任务提示词（种子+本地同文）
+  改为三步 + "守门失败只报告、不要在本任务里改代码"。
+- **告警误报 3**：daily-health 同日 3 条 alert（命中 64.9%→67.4%，未命中/轮 12060）实测全部来自
+  12:51:42 的**手动压缩**（`compact-1791204702683`，reason=manual）——16 秒后 `messages@0-7` 首段分叉即整段重放。
+  修：压缩归因（10 分钟窗口）→ 新字段 `压缩重放=N` + 「已知」留痕，可归因时不告警、窗口外不豁免；
+  `test-usage-metrics.mjs` 35 → 46 项。
+- **顺带优化**：`decide()` 自动 failover 不再固定取 `fallbackModels[0]`，改用与手动路径同一打分
+  （`pickFailoverTarget`）；文档计数漂移修正（README 补丁 6→9、`custom/README` core 8→10、
+  `VISION.md` 安全网 12 步/622 用例→17 步/772 用例、`scripts/README` golden 16→17 步与隔离项 8→9）；
+  `pi-full-audit` 技能记录 4 条复盘（模块 C 缺 bash 侧守门、3 条计数类误报的取值口径）。
+- 处理超时残留：`git add` 过的 `portable/memory/stats/tool-count-localhost.json` 按每日任务约定单独提交。
+- 验证：`test-supervisor.sh` 56 项、`test-usage-metrics.mjs` 46 项、`test-prepush-scope.sh` 7 项、
+  `vitest` 72 文件 / 772 用例、`tsc`、全量 `golden` 17 步（注入面基线因 `AGENTS.md` 一行说明刷新一次）。

@@ -77,7 +77,7 @@ npm run check                      # 隔离边界验证（scripts/check-isolatio
 npx tsc --noEmit -p custom/        # 自定义层类型检查
 bash scripts/golden-tasks.sh       # 行为防退化基准（--fast 仅结构守门，跳过 tsc/vitest）
 bash scripts/check-conventions.sh  # 约定守门（状态不入库 / 敏感文件 / any / 动态 import）
-bash scripts/install-hooks.sh      # 启用 git 钩子（pre-commit 快检 / pre-push 全量；本地无 CI）
+bash scripts/install-hooks.sh      # 启用 git 钩子（pre-commit 快检；pre-push 默认全量，仅纯数据推送降级快检）
 bash scripts/dev.sh                # 开发模式（tsx 直接运行 TS）
 npm run web                        # 浏览器访问（pty 拉起原样 TUI；只绑 127.0.0.1，远程走 SSH 隧道）
 bash scripts/build.sh              # 构建 vendor/pi(coding-agent)；vendor 缺失时自动引导（custom/ 不编译）

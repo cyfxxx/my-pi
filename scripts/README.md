@@ -1,6 +1,6 @@
 # scripts — 运维脚本
 
-仓库内所有可执行运维脚本（**不得建子目录**，`check-isolation` 检查 8）。定位为「构建 / 守门 / 运维 / 自愈」四类。
+仓库内所有可执行运维脚本（**不得建子目录**，`check-isolation` 检查 9）。定位为「构建 / 守门 / 运维 / 自愈」四类。
 
 ## 构建与引导
 
@@ -29,15 +29,17 @@
 | `check-conventions.sh` | 约定守门（P4 升格通道）：A 运行时状态不入库（`settings.json` 的 `deviceId`、`modes.json` 的 `current`）／B 敏感文件与运行时数据不入库（已跟踪 + **暂存区**，含 `*-state.json`、会话、扩展安装位、私钥、`.env`）／C 生产代码禁 `any` 与动态 `import(`（测试与 `node_modules` 排除）；三条原为 AGENTS.md 软约定 |
 | `check-doc-links.mjs` | 文档内部相对链接一致性 |
 | `check-seeds-headless.mjs` | 定时任务提示词 headless 可用性守门（不得引用 `--no-extensions` 下不存在的扩展工具/斜杠命令） |
-| `golden-tasks.sh` | 行为防退化基准 **16 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟） |
+| `golden-tasks.sh` | 行为防退化基准 **17 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟＝第 18 步） |
 | `bootstrap-key.sh` | **age 私钥引导包**（方案 A）：`pack`（`age -p` 口令加密 → `sync/bootstrap.age` + 明文元信息 `.meta.json`）/ `verify`（成员白名单 + 指纹核对，不安装）/ `unpack [--yes]`（安装到私钥路径，600，覆盖留 `.bak`）；只装解密材料，**不装 SSH 私钥**。见 [docs/operations/KEY-BOOTSTRAP-ANALYSIS.md](../docs/operations/KEY-BOOTSTRAP-ANALYSIS.md) |
 | `test-bootstrap.sh` | 引导包守门（13 项，临时密钥）：拒绝仓库内私钥、成员白名单、指纹不一致拒绝、口令模式 pack/unpack、覆盖保护、拒绝夹带 `id_ed25519` 的引导包；接入 golden 第 16 步 |
 | `books.py` | **书籍知识库框架**（探针/索引/按需提页/报告/自检）：目录优先建索引（PDF outline / EPUB nav）、按需页提取（文字层优先 → tesseract 兜底）、缓存复用、每次运行留 run log；两端通用（手机 `role=phone` / PC `role=worker`）。用法见 [packs/books/SKILL.md](../packs/books/SKILL.md)，方案见 [docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md](../docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md) |
 | `test-books.mjs` | 书籍框架自检（合成 PDF 跑通 probe/index/read/report/记录，15 项，零网络零 LLM），接入 golden 第 15 步 |
 | `test-web-terminal.mjs` | 浏览器终端进程级守门（鉴权/cookie 属性/Host 栅栏/穿越防护/WS 双向数据/resize/restart/孤儿会话回收，36 项，零 LLM）；缺 `script`/`stty` 时显式 SKIP |
-| `test-usage-metrics.mjs` | 成本度量口径守门（**35 项**，零 LLM）：合成数据驱动 `daily-health.mjs`，锁定命中率取自**每轮用量**而非工具级台账、前缀前端变更（system/tools/level）与**首段分叉（`messages@0-7`＝整段重放）**会触发告警、中后段分叉单独计数不误报、**旧记录仅 head 不计入**（与头窗内追加无法区分，实测误报率 19/42）、**冷启动次数与未命中量**（与每轮用量配对）、**工具声明体积**超阈值告警、**回合内 bash 调用分布**（每步 p50/p90/max 与单命令占比，漂移即告警）、缺数据时记 n/a 而非瞎算 |
+| `test-usage-metrics.mjs` | 成本度量口径守门（**46 项**，零 LLM）：合成数据驱动 `daily-health.mjs`，锁定命中率取自**每轮用量**而非工具级台账、前缀前端变更（system/tools/level）与**首段分叉（`messages@0-7`＝整段重放）**会触发告警、中后段分叉单独计数不误报、**旧记录仅 head 不计入**（与头窗内追加无法区分，实测误报率 19/42）、**冷启动次数与未命中量**（与每轮用量配对）、**工具声明体积**超阈值告警、**回合内 bash 调用分布**（每步 p50/p90/max 与单命令占比，漂移即告警）、**压缩归因**（压缩窗口内的整段重放单独计数并进「已知」留痕，窗口外不豁免）、缺数据时记 n/a 而非瞎算 |
 | `patch-playwright-core.mjs` | Termux 下把 playwright-core 的 linux 分支扩展至 android（幂等） |
-| `install-hooks.sh` | 启用 `.githooks/`（pre-commit → `golden --fast`，pre-push → 全量）；本地无 CI，钩子是唯一自动防线。钩子会把完整输出 `tee` 到 `/tmp/my-pi-golden-{precommit,prepush}.log`——分步日志 `/tmp/golden-*.log` 会被下一次运行覆盖，偶发失败（实测发生过一次无法归因的拦截）需要留证据 |
+| `install-hooks.sh` | 启用 `.githooks/`（pre-commit → `golden --fast`；pre-push → 默认全量，仅当本次推送改动全部在 `prepush-scope.sh` 白名单内时降级 `--fast`）；本地无 CI，钩子是唯一自动防线。钩子会把完整输出 `tee` 到 `/tmp/my-pi-golden-{precommit,prepush}.log`——分步日志 `/tmp/golden-*.log` 会被下一次运行覆盖，偶发失败（实测发生过一次无法归因的拦截）需要留证据 |
+| `prepush-scope.sh` | pre-push 门禁范围判定（`<remote_oid> <local_oid>` → `full`/`fast`）：只有改动全部落在 `portable/memory/stats/` 才降级快检。远端对象不可得/全 0/空 diff 一律回退全量 |
+| `test-prepush-scope.sh` | 上者的守门（7 项，临时仓库造真实提交）：纯数据→fast、含代码→full、数据+代码混合→full、远端未知/新分支/空 diff/删 ref→full；接入 golden 第 17 步 |
 | `vendor-bundle.sh` | vendor/pi 离线归档（`create`/`restore`/`status`）；`status` 会标注每个归档**是否含当前 PINNED_COMMIT**（只报"存在"会假安全）；bundle 不入库 |
 
 ## 对外服务

@@ -82,13 +82,16 @@ my-pi/
 │   ├── test-web-terminal.mjs         # 浏览器终端守门（鉴权/栅栏/传输）
 │   └── run-ts.sh · memory-*.mjs …    # headless 入口等（完整清单见 scripts/README.md）
 │
-├── patches/                          # 上游补丁（6 个）
+├── patches/                          # 上游补丁（9 个，按序叠加）
 │   ├── 001-branding.patch            # 品牌化补丁
 │   ├── 002-local-pi-mods.patch       # 本地 pi 源码改动
 │   ├── 003-tab-completion-fix.patch  # Tab 命令参数补全
 │   ├── 004-footer-tweaks.patch       # TUI footer 调整
 │   ├── 005-footer-speed-and-scrollback.patch
-│   └── 006-footer-cost-and-cache-window.patch
+│   ├── 006-footer-cost-and-cache-window.patch
+│   ├── 007-footer-reorder.patch      # footer 精简（去掉逐轮缓存块）
+│   ├── 008-footer-cache-var-cleanup.patch  # 007 之后的类型残留清理
+│   └── 009-footer-badge.patch        # 扩展状态徽标渲染（常驻模式标识）
 │
 ├── my-pi.sh                          # 便携启动脚本
 ├── PROGRESS.md                       # 进度追踪
@@ -243,7 +246,7 @@ npm run golden -- --fast
 # TypeScript 类型检查
 npx tsc --noEmit -p custom/
 
-# 启用 git 钩子（pre-commit 快检 / pre-push 全量；本地无 CI）
+# 启用 git 钩子（pre-commit 快检；pre-push 默认全量，仅纯运行数据推送降级为快检；本地无 CI）
 bash scripts/install-hooks.sh
 ```
 

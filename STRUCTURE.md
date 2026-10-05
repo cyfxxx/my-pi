@@ -113,7 +113,8 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `run-ts.sh`：以 tsx 运行「需要加载 my-pi TypeScript 逻辑」的脚本（`custom/` 用无扩展名导入，Node 类型剥离解析不了，必须走 tsx）——headless 里写记忆/入库的唯一入口。tsx 由 `custom/package.json` 声明（上游 v0.99.0 起 vendor/pi 已不再自带 tsx）
 - `memory-store.mjs`：记忆入库（零 LLM，直接调 memory 逻辑层 `storeEntry`，内置标题去重）；`--json`/`--file`/stdin，`--dry-run`
 - `reseed-seeds.mjs`：把 `scheduled-seeds.json` 的种子定义显式应用到已存在的同名任务（种子对账是「只补缺失不覆盖」，改提示词后需本脚本；保留 id/enabled/lastRun/runCount/history，默认预演，`--apply` 先备份）
-- `install-hooks.sh`：启用 `.githooks/`（pre-commit 跑 `golden --fast`，pre-push 跑全量；本地无 CI，钩子是唯一自动防线）
+- `install-hooks.sh`：启用 `.githooks/`（pre-commit 跑 `golden --fast`；pre-push 默认全量，仅当本次推送改动全部落在 `prepush-scope.sh` 白名单的纯运行数据路径时降级为 `--fast`；本地无 CI，钩子是唯一自动防线）
+- `prepush-scope.sh` / `test-prepush-scope.sh`：pre-push 门禁范围判定与其守门（拿不准一律回退全量）
 - `vendor-bundle.sh`：vendor/pi 离线归档 `create|restore|status`（bundle 不入库，`doctor` 会提示缺失）
 - `check-injection-surface.sh`：system prompt 注入面前缀指纹基线守门（`--update` 更新基线）
 - `check-conventions.sh`：约定守门——运行时状态不入库（`settings.json` 的 `deviceId`、`modes.json` 的 `current`）/ 敏感文件与运行时数据不入库（含暂存区）/ 生产代码禁 `any` 与动态 `import(`

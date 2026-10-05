@@ -2,6 +2,29 @@
 
 ## 格式
 
+### [2026-10-05] 每日任务结果复盘：pre-push 门禁按改动范围分级；模式解析两侧同判据；压缩导致的前缀重放不算退化
+**背景**：用户手动跑完全部每日任务 + 一次全面检查技能后要求复盘并优化。执行结果里暴露三个实测缺陷：
+- **tool-stats-daily 当天 4 次运行 3 次 1200s 超时**（`scheduler/telemetry.json`）。根因链：纯统计提交也要过 4~5 分钟的全量 pre-push（tsc + 72 文件单测 + web-terminal）；而 pre-push 当时因下一条缺陷 5 项红，任务里又去改代码+反复重推，烧光预算，并在工作区留下 stranded 的 `git add`（staged `tool-count-localhost.json`）。
+- **golden 第 10 步 supervisor 5 项红**：`PI_AGENT_MODE_SOURCE` 语义在 bash 侧与 pi 侧不一致——`lib-mode.sh` 只看 `PI_AGENT_MODE` 非空。日常任务在 pi 进程内跑 bash 时，会继承 bootstrap 回写的 `PI_AGENT_MODE=<当前模式>`，于是状态文件里的 roleplay 被解析成 full。
+- **daily-health 同日 3 条 alert**（命中 64.9%→67.4%）：`messages@0-7` 首段分叉 = 12:51:42 手动压缩（`compact-1791204702683`，reason=manual）后 16 秒的整段重放。压缩改写前缀头部是压缩的固有代价，此前被报成"来源不明的缓存退化"。
+
+**决策**：
+- **pre-push 范围分级**：新增 `scripts/prepush-scope.sh`（`<remote_oid> <local_oid>` → `full`/`fast`）。白名单目前**只有** `portable/memory/stats/`；远端对象不可得/全 0/空 diff/混合改动一律回退全量。钩子读 pre-push 的 stdin，逐 ref 判定，全 fast 才降级 `golden --fast`。`scripts/test-prepush-scope.sh`（临时仓库造真实提交，7 项）接入 golden 第 17 步。
+- **模式解析两侧同判据**：bash 侧补齐 pi 侧的两条判据——`source` 区分"外部注入"与"bootstrap 回写"，且模式名必须已知（`modes.json ∪ {full,minimal}`）；同时 `test-supervisor.sh` 在 apply_mode 段先 unset 外部泄漏变量。回归用例 56 项（新增 source=file 回写、未知模式名两条）。
+- **daily-health 增加压缩归因**：读 `checkpoints/compact/*.json` 的 ts/reason（512B 预读 + 正则，失败回退整文件解析），10 分钟窗口内的首段分叉计入新字段 `压缩重放=N` 并写「已知」留痕，不进告警；仅当窗口内**所有**前缀分叉都能归因时，命中率/未命中阈值也不告警；窗口外照旧告警。`test-usage-metrics.mjs` 35 → 46 项（含窗口外不豁免的反例）。
+- **顺带修**：`decide()` 的三处自动 failover 从 `fallbackModels[0]` 改为与手动路径同一打分（新增 `pickFailoverTarget`），消除"自动/手动选型分叉"；文档计数漂移（README 补丁 6→9、`custom/README` core 8→10、`VISION.md` 安全网 12 步/622 用例→17 步/772 用例、`scripts/README` golden 16→17 步与隔离项 8→9）。
+- **tool-stats-daily 提示词**（种子与本地任务同文）：改成三步 + "纯统计推送的 pre-push 自动走快检，push 给 timeout 300" + "守门失败或超时只报告，不要在本任务里改仓库代码"。
+
+**理由**：
+- 门禁的强度应当与改动的**影响面**成比例：`portable/memory/stats/` 下的计数 JSON 不可能让测试变红，却要付全量门的固定成本；而每日任务正是在这个成本上反复超时。放宽面保持极窄（单一前缀），且任何不确定一律回退全量——降级的风险面由守门测试锁住。
+- bash 侧与 pi 侧读同一组文件却是两套判据，属于"同一契约两处实现"的典型漂移；无论生产路径当前是否触发，判据必须一致，否则排障成本会转嫁给下一个踩坑的人。
+- 告警的有效性取决于**误报率**：压缩是用户显式触发的省 token 动作，把它算成退化会让预算告警被忽略。归因而非静默豁免——「已知」行同样落盘，事后可查。
+- 自动化路径与手动路径的选型逻辑分叉，属于"两套实现必然漂移"的又一例；统一到 `selectFailover` 后，成功率低的备选不会被自动路径反复撞上。
+
+**代价与约束**：pre-push 对纯数据推送不再跑 tsc/vitest/web-terminal（结构守门仍全跑）；白名单放宽必须附证据。`decide()` 在真正要走 failover 时才读 settings/遥测（懒算，不增加失败路径的固定开销）。压缩归因窗口 10 分钟是实测值（真实压缩后 16 秒即出现分叉）留出的余量，超窗即不豁免。
+
+**验证**：`bash scripts/test-supervisor.sh` 56 项、`node scripts/test-usage-metrics.mjs` 46 项、`bash scripts/test-prepush-scope.sh` 7 项、`vitest` 72 文件/772 用例、`npx tsc --noEmit -p custom/`、全量 golden；`AGENTS.md` 一行命令说明改动使注入面基线刷新一次（`check-injection-surface.sh --update`，只影响尾部工作区指令消息）。
+
 ### [2026-10-05] 定时任务命令体验：手动执行走同一策略路径；补全项 value 必须是整段参数
 **背景**：用户反馈两点：(1) 每日任务只能等调度触发，想手动跑一次没有入口；(2) `/daily show|on|off` 与 `/schedule delete|enable|disable|edit|history` 的任务名要手输，不能像子命令那样下拉补全——任务名是 `task-<base36>`/`tool-stats-daily` 这类难记串。
 **决策**：

@@ -11,15 +11,17 @@ custom/
 │   ├── tool-adapter.ts     # 工具注册
 │   ├── ui-adapter.ts       # 命令/快捷键/渲染器
 │   └── session-adapter.ts  # 会话枚举
-├── core/               # 核心服务（纯逻辑，零 Pi 依赖）
+├── core/               # 核心服务（纯逻辑，零 Pi 依赖；10 个文件）
 │   ├── config.ts           # 路径解析
 │   ├── registry.ts         # 功能注册表
 │   ├── atomic-write.ts     # 原子写
 │   ├── fs-json.ts          # JSON/JSONL 读写基元
+│   ├── file-lock.ts        # 跨进程文件锁（RMW 串行化）
 │   ├── text.ts             # 文本/数值格式化
 │   ├── cli.ts              # 命令参数/补全解析
 │   ├── secrets.ts          # 脱敏
-│   └── net-guard.ts        # SSRF 防护
+│   ├── net-guard.ts        # SSRF 防护
+│   └── index.ts            # 统一导出
 ├── features/           # 12 个功能模块（详见 features/README.md）
 │   ├── web-search/         # 小功能：直接铺 logic.ts + index.ts
 │   └── memory/             # 大功能：按职责分组子包，logic.ts 仅作 barrel
