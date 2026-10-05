@@ -1,9 +1,13 @@
 {
-  "lastChangelogVersion": "0.87.0",
+  "lastChangelogVersion": "0.99.1",
   "defaultProvider": "freellmapi",
   "defaultModel": "auto",
   "defaultThinkingLevel": "high",
-  "defaultTools": ["+grep", "+find", "+ls"],
+  "defaultTools": [
+    "+grep",
+    "+find",
+    "+ls"
+  ],
   "steeringMode": "all",
   "followUpMode": "all",
   "packages": [],
