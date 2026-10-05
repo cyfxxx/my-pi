@@ -165,7 +165,7 @@ git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objec
 
 ## C. 确定性检查
 
-`review.sh` 自动化检查，覆盖 git 卫生、JSON 合法性、隔离边界、类型检查、可疑模式与密钥模式。
+`review.sh` 自动化检查 + **bash 侧结构守门**，覆盖 git 卫生、JSON 合法性、隔离边界、类型检查、可疑模式与密钥模式，以及单测/tsc 覆盖不到的 shell 门（supervisor 模式解析、种子提示词、约定、注入面）。
 
 ### 步骤
 
@@ -181,12 +181,19 @@ bash portable/agent/skills/pi-full-audit/review.sh
 
 # 全量：扫描项目根
 bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
+
+# 结构守门（秒级，含 supervisor/种子/约定/注入面/文档链接）——**必跑**
+bash scripts/golden-tasks.sh --fast
+
+# 基线测试（重定向落盘，保留收尾标记）
+npx vitest run > /tmp/my-pi-test.log 2>&1; echo EXIT=$? >> /tmp/my-pi-test.log
 ```
 
 - 保存完整输出到 /tmp 再分析（终端输出会截断）
 - **"失败"项先定性再报告**，见 [references/ERROR-CHECKLIST.md](references/ERROR-CHECKLIST.md)
 - 可疑模式逐条人工确认；密钥命中先 `git ls-files` + `git check-ignore -v` 判是否入库
 - 退出码恒为 0（只报告，不阻断）；判定以阶段汇总计数为准
+- **`golden --fast` 不是可选项**：`review.sh` + `tsc` + `vitest` 覆盖不到 bash 侧守门。2026-10-05 实测：报告结论"确定性检查全部通过"的同一时间窗内，`scripts/test-supervisor.sh` 5 项红（`bash scripts/test-supervisor.sh` 可复现），整份报告因此失真。全量 golden 的 tsc/vitest 与上面两步重复，不必再跑
 
 ### 检查项对照
 
@@ -198,6 +205,7 @@ bash portable/agent/skills/pi-full-audit/review.sh --all /root/my-pi
 | C | 隔离边界 `npm run check` | 违规=HIGH |
 | D | 类型检查 `npx tsc --noEmit -p custom/` | 类型错误=HIGH |
 | E | 可疑模式（debugger/TODO/eval/child_process/rm -rf 等） | 供人工判断，不直接定级 |
+| F | 结构守门 `bash scripts/golden-tasks.sh --fast`（隔离/注册面/死导出/补丁/注入面/文档链接/**supervisor 纯函数**/种子提示词/约定/书籍/引导包/pre-push 范围） | 失败=HIGH（其中 supervisor/种子/约定是 vitest 覆盖不到的 bash 门） |
 
 ---
 
@@ -261,3 +269,5 @@ subagent 功能（`custom/features/subagent/`）并行委派分组审查 + 复�
 ```
 
 文档类发现豁免子代理复核（核实只需一条 grep，主会话直接定论）。
+
+**但计数/版本类必须复算一次并写明口径**（子代理常在这里误报）：取值命令要明确扩展名集合、是否含共享库/非脚本文件、是否含测试。实测踩过两次——`ls scripts/*.sh scripts/*.mjs | wc -l`=40 被判成"文档 42 个脚本是漂移"（文档含 `.py`，实际就是 42），"`STRUCTURE.md` 写 v0.99.1 需核对"实测与 `vendor/PINNED_COMMIT` 一致。**"需核对"不是发现**：没有实测值的疑点不进报告。详见 [references/ERROR-CHECKLIST.md](references/ERROR-CHECKLIST.md)。
