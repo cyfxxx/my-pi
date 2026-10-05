@@ -172,6 +172,17 @@ describe('link.ts 纯函数', () => {
     expect(cmd).not.toContain('--no-extensions');
     expect(cmd).not.toContain('PI_LINK_LAST_SESSION');
   });
+
+  it('远端探针回声哨兵（没有可续会话时不再白等 3s 握手兜底）', () => {
+    // continue：既可能回声上次会话，也可能没有 → 哨兵保证两条路都能立刻结束握手
+    const cont = buildRemoteCommand({ host: 'h', user: 'u' }, {});
+    expect(cont).toContain('PI_LINK_PROBE_DONE');
+    expect(cont).toContain('PI_LINK_LAST_SESSION');
+    // fresh：契约仍然是不查询会话文件，但必须回声哨兵
+    const fresh = buildRemoteCommand({ host: 'h', user: 'u' }, { sessionPolicy: 'fresh' });
+    expect(fresh).toContain('PI_LINK_PROBE_DONE');
+    expect(fresh).not.toContain('PI_LINK_LAST_SESSION');
+  });
 });
 
 describe('withStateLock', () => {

@@ -32,13 +32,19 @@ export function buildRemoteCommand(d: DeviceConfig, opts: SendOptions): string {
   const args = parts.join(' ');
   const sdirAssign = sdir.startsWith('~') ? `$HOME${shellSingleQuote(sdir.slice(1))}` : shellSingleQuote(sdir);
   const policy = opts.sessionPolicy ?? d.sessionPolicy ?? 'continue';
+  // 握手哨兵：远端探针跑完必须显式回声一行，客户端据此立刻结束握手等待。
+  // 此前只有"有可续会话"才回声（PI_LINK_LAST_SESSION=<file>），没有可续会话时客户端只能
+  // 等满 3s 兜底定时器——每次调用白等 3s（sessionPolicy=fresh 时更是必然白等）。
+  // 哨兵与"上次会话"两件事分开：fresh 策略仍不查询会话文件（既有契约），只回声哨兵。
+  const PROBE_DONE = 'PI_LINK_PROBE_DONE';
   const resumeProbe =
     policy === 'fresh'
-      ? ''
+      ? `echo ${PROBE_DONE}; `
       : `SDIR=${sdirAssign}; ` +
         `F=$(ls -t "$SDIR"/*.jsonl 2>/dev/null | head -1); ` +
         `if [ -n "$F" ]; then SZ=$(stat -c%s "$F" 2>/dev/null || stat -f%z "$F" 2>/dev/null || echo 1048577); ` +
-        `if [ "$SZ" -lt 1048576 ]; then echo "PI_LINK_LAST_SESSION=$F"; fi; fi; `;
+        `if [ "$SZ" -lt 1048576 ]; then echo "PI_LINK_LAST_SESSION=$F"; fi; fi; ` +
+        `echo ${PROBE_DONE}; `;
   const launch =
     `JS=$(readlink -f "$(command -v pi-original 2>/dev/null || command -v pi 2>/dev/null || echo "$HOME/.local/share/pi-node/current/bin/pi-original")" 2>/dev/null); ` +
     `NODE_BIN="$(command -v node 2>/dev/null || echo "$HOME/.local/share/pi-node/current/bin/node")"; ` +

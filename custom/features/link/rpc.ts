@@ -192,7 +192,6 @@ export async function sendToDevice(
     });
     let switchResponded = false;
     let switchFailed = false;
-    switchTimer = setTimeout(() => switchResolve(), 20000);
 
     const rl = createInterface({ input: proc.stdout! });
     const settledP = new Promise<void>((resolve) => {
@@ -201,9 +200,14 @@ export async function sendToDevice(
         try {
           ev = JSON.parse(line) as RpcEvent;
         } catch {
-          const m = /^PI_LINK_LAST_SESSION=(.+)$/.exec(line.trim());
+          const t = line.trim();
+          const m = /^PI_LINK_LAST_SESSION=(.+)$/.exec(t);
           if (m) {
             lastSession = m[1];
+            clearTimeout(handshakeTimer);
+            handshakeResolve();
+          } else if (t === 'PI_LINK_PROBE_DONE') {
+            // 探针跑完（无论有没有可续会话）→ 立即发 prompt，不再白等 3s 兜底定时器
             clearTimeout(handshakeTimer);
             handshakeResolve();
           }
@@ -237,6 +241,10 @@ export async function sendToDevice(
     await handshakeP;
     if (opts.signal?.aborted) throw new Error('aborted by caller before handshake completed');
     if (lastSession) {
+      // 切换超时从**请求发出时**起算：此前定时器在 spawn 时（握手之前）就启动了，握手耗时
+      // 会吃掉切换预算，极端情况下 20s 到点时切换响应还没回来 → lastSession 被丢弃，
+      // 本该续接的会话变成新开会话。
+      switchTimer = setTimeout(() => switchResolve(), 20000);
       proc.stdin!.write(JSON.stringify({ type: 'switch_session', sessionPath: lastSession, id: 'pi-link-0' }) + '\n');
       await switchP;
       if (!switchResponded || switchFailed) lastSession = undefined;
@@ -383,10 +391,19 @@ async function attachToRemoteInner(device: DeviceConfig, text: string, tmuxSessi
   const busyMark = 'PI_LINK_INPUT_BUSY';
   const tryPaste = async (enter: boolean): Promise<'sent' | 'busy' | 'failed'> => {
     const tmp = `$HOME/.pi-link-msg.tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    // Android/Termux 上 tmux 常需绕过 LD_PRELOAD 并用绝对解释器启动。候选按"最可能可用"排序，
+    // 第一项与既有实现完全一致（aarch64 + /usr/bin/tmux），后面几项覆盖 armhf / Android linker /
+    // PATH 里的 tmux——只有第一项失败时才会被尝试，因此不会改变现有可用环境的路径。
     const tmuxProbe =
-      `TMUX_FB=0; tmux_cmd() { if [ "$TMUX_FB" = 1 ]; then LD_PRELOAD= /lib/ld-linux-aarch64.so.1 /usr/bin/tmux "\\$@"; else tmux "\\$@"; fi; }; ` +
+      `TMUX_FB=; TMUX_BIN=/usr/bin/tmux; ` +
+      `tmux_cmd() { if [ -n "$TMUX_FB" ]; then LD_PRELOAD= "$TMUX_FB" "$TMUX_BIN" "\\$@"; else tmux "\\$@"; fi; }; ` +
       `if ! tmux ls >/dev/null 2>&1; then ` +
-      `if LD_PRELOAD= /lib/ld-linux-aarch64.so.1 /usr/bin/tmux ls >/dev/null 2>&1; then TMUX_FB=1; else TMUX_FB=2; fi; fi; ` +
+      `[ -x "$TMUX_BIN" ] || TMUX_BIN=$(command -v tmux 2>/dev/null || echo /usr/bin/tmux); ` +
+      `for L in /lib/ld-linux-aarch64.so.1 /lib/ld-linux-armhf.so.3 /system/bin/linker64 /system/bin/linker; do ` +
+      `[ -x "$L" ] || continue; ` +
+      `if LD_PRELOAD= "$L" "$TMUX_BIN" ls >/dev/null 2>&1; then TMUX_FB="$L"; break; fi; ` +
+      `done; ` +
+      `[ -n "$TMUX_FB" ] || TMUX_FB=2; fi; ` +
       `[ "$TMUX_FB" != 2 ] || exit 4; `;
     const buf = 'pi-link-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
     const paste =
