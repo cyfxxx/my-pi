@@ -286,6 +286,70 @@ function runHealth({ mem, agent }, extraEnv = {}) {
   }
 }
 
+// ── 用例 2e：压缩导致的前缀重放应归因，不再误报为缓存退化（2026-10-05 实测）──
+// 实测：compact-1791204702683（12:51:42，reason=manual）后 16 秒出现
+// changed=[head,messages,messages@0-7]，当日 3 次日报全部 alert。压缩改写前缀头部是压缩的
+// 固有代价 —— 应计入"压缩重放"并留痕，而不是当成来源不明的整段重算。
+{
+  /** 把第 4 条用量做大，命中率压到 82%，未命中/轮抬到 16125 → 两条阈值都越线 */
+  const lowHit = (mem) => {
+    const now = Date.now();
+    const rows = [
+      { ts: now - 4000, input: 1000, cacheRead: 99000, cacheWrite: 0, output: 500 },
+      { ts: now - 3000, input: 2000, cacheRead: 98000, cacheWrite: 0, output: 600 },
+      { ts: now - 2000, input: 1500, cacheRead: 98500, cacheWrite: 0, output: 400 },
+      { ts: now - 500, input: 60000, cacheRead: 0, cacheWrite: 0, output: 400 },
+    ];
+    writeFileSync(join(mem, 'context', '.usage-diag.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  };
+
+  const unexplained = makeFixture({ frontChange: false, segChange: 'head' });
+  try {
+    lowHit(unexplained.mem);
+    const out = runHealth(unexplained);
+    check('（基线）低命中率触发告警', out.includes('加权命中率'), out.trim().split('\n')[0]);
+    check('（基线）首段分叉报整段重放', out.includes('等价整段重放'));
+    check('（基线）未命中/轮超限告警', out.includes('疑似整段重算'));
+    check('（基线）压缩重放为 0', out.includes('压缩重放=0'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(unexplained.root, { recursive: true, force: true });
+  }
+
+  const explained = makeFixture({ frontChange: false, segChange: 'head' });
+  try {
+    lowHit(explained.mem);
+    // 压缩检查点：紧接在第二条指纹（now-1000）之前，落在 10 分钟归因窗口内
+    const cdir = join(explained.mem, 'checkpoints', 'compact');
+    mkdirSync(cdir, { recursive: true });
+    writeFileSync(join(cdir, 'compact-1-x.json'), JSON.stringify({ ts: Date.now() - 1100, reason: 'manual', messages: [] }));
+    const out = runHealth(explained);
+    // 只看「原因」行：阈值仍会出现在「已知」留痕里，但不得构成告警理由
+    const reasonLine = (out.match(/└ 原因: .*/) || [''])[0];
+    check('压缩重放被单独计数', out.includes('压缩重放=1'), out.trim().split('\n')[0]);
+    check('压缩归因写入「已知」留痕', out.includes('已知:') && out.includes('压缩'), out.trim());
+    check('压缩吃掉的命中率不再告警', !reasonLine.includes('加权命中率'), reasonLine);
+    check('压缩吃掉的未命中不再告警', !reasonLine.includes('疑似整段重算'), reasonLine);
+    check('可归因的分叉不报整段重放', !reasonLine.includes('等价整段重放'), reasonLine);
+  } finally {
+    rmSync(explained.root, { recursive: true, force: true });
+  }
+
+  // 归因窗口（10 分钟）之外的旧压缩不得"原谅"当前分叉
+  const stale = makeFixture({ frontChange: false, segChange: 'head' });
+  try {
+    lowHit(stale.mem);
+    const cdir = join(stale.mem, 'checkpoints', 'compact');
+    mkdirSync(cdir, { recursive: true });
+    writeFileSync(join(cdir, 'compact-1-x.json'), JSON.stringify({ ts: Date.now() - 30 * 60 * 1000, reason: 'manual' }));
+    const out = runHealth(stale);
+    const reasonLine = (out.match(/└ 原因: .*/) || [''])[0];
+    check('窗口外的压缩不豁免分叉', reasonLine.includes('等价整段重放'), reasonLine);
+    check('窗口外的压缩不计入压缩重放', out.includes('压缩重放=0'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(stale.root, { recursive: true, force: true });
+  }
+}
+
 // ── 用例 3：只有工具级台账（旧数据源）→ 命中率记 n/a，绝不冒充命中率 ──
 {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-empty-'));
