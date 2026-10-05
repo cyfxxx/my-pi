@@ -523,6 +523,11 @@ export function register(pi: ExtensionAPI): void {
       if (toolEvent.toolName === 'bash' && toolEvent.input && typeof toolEvent.input === 'object') {
         const given = toolEvent.input.timeout;
         const explicit = typeof given === 'number' && Number.isFinite(given) && given > 0;
+        // 必须**原地**改 pi 传进来的同一个 args 对象：`BeforeToolCallResult` 只有
+        // block/reason/terminate，没有覆盖 args 的字段（vendor/pi/packages/agent/src/types.ts），
+        // 而 agent-loop 传的就是 `args: validatedArgs`、随后以同一个对象执行
+        // （vendor/pi/packages/agent/src/agent-loop.ts 的 prepareToolCall）。改成"复制再改"
+        // 会让这条硬约束静默失效（用例见 __tests__/bash-timeout.test.ts）。
         if (!explicit) toolEvent.input.timeout = BASH_TIMEOUT_CEIL_S;
       }
     },

@@ -24,8 +24,11 @@ export const SECRET_PATTERNS: Array<[RegExp, string]> = [
     '[REDACTED:private-key]',
   ],
   // 密码/令牌键值形态（保留原分隔符与空白，避免改写被持久化内容）
+  // 值长度下限 8：与主流口令策略（NIST SP 800-63B 最短 8）一致，同时避免把 `token: needed`
+  // 这类正常行文误判成密钥。代价是**短于 8 位的密钥不会脱敏**——这是刻意取舍而非遗漏；
+  // 真要收紧就改这里并同步 __tests__ 里的误报用例。
   [/\b(password|passwd|secret|api[_-]?key|token|access[_-]?key)(\s*[=:]\s*)['"]?[^\s'",;]{8,}/gi, '$1$2[REDACTED]'],
-  // JSON 序列化形态
+  // JSON 序列化形态（同上，8 位下限）
   [
     /("(?:password|passwd|secret|api[_-]?key|token|access[_-]?key)"\s*:\s*")(?!\[REDACTED)([^"]{8,})(")/gi,
     '$1[REDACTED]$3',
