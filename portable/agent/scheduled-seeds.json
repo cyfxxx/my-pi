@@ -6,7 +6,7 @@
       "name": "tool-stats-daily",
       "type": "cron",
       "schedule": "30 23 * * *",
-      "prompt": "执行工具统计每日聚合（当天数据已完整）：运行 node scripts/tool-stats-sync.mjs --daily，确认生成 portable/memory/stats/tool-count-<本机hostname>.json 后提交推送：git add 该文件并 commit（message: 'chore: tool stats {{date}}'）后 git push（推送前按仓库约定确认 remote 无 token）。若与远端冲突（其他设备也推送过计数），先 git pull --rebase 再推。",
+      "prompt": "执行工具统计每日聚合（当天数据已完整）：1) 运行 node scripts/tool-stats-sync.mjs --daily，确认生成 portable/memory/stats/tool-count-<本机hostname>.json；2) git add 该文件并 commit（message: 'chore: tool stats {{date}}'）；3) git push（推送前确认 remote 无 token；纯统计改动的 pre-push 会自动降级为快检，给这次 push timeout 300 足够）。若与远端冲突（其他设备也推送过计数），先 git pull --rebase 再推。守门失败或超时就报告失败项后立即结束，不要在本任务里改仓库代码（2026-10-05 因连续两次改代码+反复重推耗尽 1200s 预算）。",
       "useSubagent": true,
       "notifyMain": true,
       "waitForUserOnLocal": true,
