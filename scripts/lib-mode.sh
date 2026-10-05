@@ -16,6 +16,16 @@
 #
 # 语义与 custom/features/mode/logic.ts 的 resolveEffectiveMode 保持一致：
 # 外部注入的 PI_AGENT_MODE 优先（启动器/测试覆盖用），否则读运行时状态文件。
+#
+# 必须区分"外部注入"与"bootstrap 回写"：bootstrap 会把解析结果写回 PI_AGENT_MODE
+# 作为进程内标记。若不加区分，每次 mode_resolve 都会读到上一次的旧值，模式永远切不动
+# （正是 pi 侧 resolveEffectiveMode 注释里点名的坑）。来源由 bootstrap 写入
+# PI_AGENT_MODE_SOURCE；未设置时视为外部注入（兼容 launcher/测试直接注入）。
+#
+# 2026-10-05 修：此前只看 PI_AGENT_MODE 非空，与 pi 侧语义不一致——pi 进程内 bootstrap
+# 回写的 PI_AGENT_MODE=<旧模式> 会被 bash 侧当成外部注入，于是 supervisor 每次拉起都
+# 沿用上次的模式（实测表现：状态文件 roleplay 却按 full 启动，test-supervisor 5 项红）。
+# 现在两侧同判据：source 区分来源 + 模式名必须已知，详见下方 mode_resolve。
 
 # 解析模式配置。结果写入三个全局变量：
 #   MODE_NAME        生效模式名
@@ -29,16 +39,28 @@ mode_resolve() {
   # （历史上 set_model 缺 targetSession 时 PROVIDER/MODEL 串位就是这个坑）。
   out=$(node -e '
 const fs=require("fs");
-let mode=process.env.PI_AGENT_MODE||"";
-let ns="",ap="";
+// 与 pi 侧 resolveEffectiveMode 同一判据（两处必须一起改）：
+//  1) source 缺省或 "env" 才算外部注入；bootstrap 回写写的是 source="file"。
+//  2) 候选模式名必须**已知**——pi 侧注入时走 getModeConfig(env) 校验、状态文件走
+//     merged.modes[state.current] 校验，未知名一律忽略。这里用同一判据：modes.json 的
+//     modes ∪ 固定档（full/minimal，pi 侧 normalizeModesFile 会合并进来）。
+const FIXED=["full","minimal"];
+let ns="",ap="",mode="";
 try{
   const cfg=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
-  let cur="";
-  try{ cur=JSON.parse(fs.readFileSync(process.argv[2],"utf8")).current||""; }catch{}
-  if(!mode) mode=cur||cfg.current||cfg.default||"full";
+  const known=(n)=>Boolean(n)&&(FIXED.includes(n)||Boolean(cfg.modes&&cfg.modes[n]));
+  const src=process.env.PI_AGENT_MODE_SOURCE;
+  const envAllowed=src===undefined||src==="env";
+  const env=process.env.PI_AGENT_MODE;
+  if(envAllowed&&known(env)) mode=env;
+  if(!mode){
+    let cur="";
+    try{ cur=JSON.parse(fs.readFileSync(process.argv[2],"utf8")).current||""; }catch{}
+    mode=[cur,cfg.current,cfg.default,"full"].find(known)||"full";
+  }
   const m=(cfg.modes&&cfg.modes[mode])||null;
   if(m){ ns=m.memoryNamespace||""; ap=m.appendPrompt||""; }
-}catch(e){ if(!mode) mode="full"; }
+}catch(e){ mode="full"; }
 process.stdout.write([mode,ns,ap].join("\u001f"));
 ' "$agent_dir/modes.json" "$agent_dir/modes-state.json" 2>/dev/null)
   IFS=$'\x1f' read -r MODE_NAME MODE_NS MODE_APPEND_ABS <<<"$out"

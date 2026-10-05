@@ -185,6 +185,11 @@ check "重启动作已被消费（不留 action）" "none" \
 check "restartLog 保留（供新进程注入重启通知）" "端到端测试" \
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).restartLog?.reason))' "$LOOP/state.json" 2>/dev/null || echo missing)"
 
+# 隔离外部环境泄漏：本机 shell 可能残留 PI_AGENT_MODE/PI_AGENT_MODE_SOURCE
+# （来自某次 bootstrap 回写），不 unset 会让"无状态文件"等用例被 env 短路。
+unset PI_AGENT_MODE
+unset PI_AGENT_MODE_SOURCE
+
 echo "=== apply_mode（模式解析：入库配置 + 运行时状态）==="
 # 配置与状态分离：modes.json 只放 default + 模式定义（入库）；current 放 modes-state.json（gitignored）。
 # 这层契约必须由 bash 侧也锁住——模式解析在 lib-mode.sh，pi 侧在 mode/logic.ts，两边读同一组文件。
@@ -237,11 +242,35 @@ apply_mode
 check "人设文件缺失 → 不注入 --append-system-prompt" "" "${MODE_ARGS[*]:-}"
 check "人设文件缺失 → 命名空间仍注入" "roleplay" "$PI_MEMORY_NAMESPACE"
 
+# 外部注入必须同时给 PI_AGENT_MODE_SOURCE=env：lib-mode.sh 与 pi 侧
+# resolveEffectiveMode 共用同一判据，bootstrap 回写写的是 source="file"，
+# 只给 mode 不给 source 会被当成回写值，模式永远切不动。
 write_modes roleplay
 export PI_AGENT_MODE=minimal
+export PI_AGENT_MODE_SOURCE=env
 apply_mode
 unset PI_AGENT_MODE
+unset PI_AGENT_MODE_SOURCE
 check "外部注入 PI_AGENT_MODE 优先于状态文件" "minimal" "$MODE_NAME"
+
+# 回归（2026-10-05 真实事故）：pi 进程 bootstrap 回写 PI_AGENT_MODE=<旧模式> + SOURCE=file，
+# supervisor 若把它当外部注入，状态文件里的 roleplay 就永远切不动。
+write_modes roleplay
+export PI_AGENT_MODE=full
+export PI_AGENT_MODE_SOURCE=file
+apply_mode
+unset PI_AGENT_MODE
+unset PI_AGENT_MODE_SOURCE
+check "bootstrap 回写（source=file）→ 仍以状态文件为准" "roleplay" "$MODE_NAME"
+
+# 未知模式名的外部注入要忽略（pi 侧 getModeConfig 校验），不能凭空返回一个不存在的档位
+write_modes roleplay
+export PI_AGENT_MODE=does-not-exist
+export PI_AGENT_MODE_SOURCE=env
+apply_mode
+unset PI_AGENT_MODE
+unset PI_AGENT_MODE_SOURCE
+check "未知模式名的 env 注入 → 回落状态文件" "roleplay" "$MODE_NAME"
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then
