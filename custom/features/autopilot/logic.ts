@@ -13,3 +13,4 @@ export * from './run/watchdog';
 export * from './run/verifier-logger';
 export * from './run/verifier';
 export * from './daily';
+export * from './completions';

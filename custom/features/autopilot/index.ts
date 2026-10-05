@@ -7,7 +7,7 @@
  * 会话切换/重启：admin_* 工具写 portable/agent/autopilot/state.json，由 scripts/pi-supervisor.sh 消费后以 --session 重拉。
  */
 
-import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
@@ -61,6 +61,9 @@ import {
   formatDailyOverview,
   formatDailyLine,
   formatDailyDetail,
+  taskNameCompletions,
+  editFieldCompletions,
+  splitArgument,
 } from './logic';
 import type { TaskType, FallbackModel, Task } from './logic';
 import { runTaskOnce } from './run/runner';
@@ -274,6 +277,7 @@ export function register(pi: ExtensionAPI): void {
     getArgumentCompletions: (prefix) => {
       const subs = [
         { value: 'list', label: 'list', description: '列出所有任务' },
+        { value: 'run ', label: 'run', description: '立即执行（/schedule run <名>）' },
         { value: 'loop ', label: 'loop', description: '固定间隔任务（如 loop 5m <任务>）' },
         { value: 'remind ', label: 'remind', description: '一次性提醒（如 remind +30m <任务>）' },
         { value: 'cron ', label: 'cron', description: 'cron 任务（如 cron "0 9 * * 1-5" <任务>）' },
@@ -285,10 +289,21 @@ export function register(pi: ExtensionAPI): void {
         { value: 'history ', label: 'history', description: '查看执行历史' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
-      const first = (prefix.split(/\s+/)[0] ?? '');
+      const { sub, rest, hasTrailingSpace } = splitArgument(prefix);
       if (!prefix.includes(' ')) {
-        const f = filterCompletions(subs, first);
+        const f = filterCompletions(subs, sub);
         return f.length ? f : null;
+      }
+      // 第二段是任务名（列表来自 tasks.json）；`edit <名> ` 之后补字段
+      const tasks = listTasks();
+      if (sub === 'edit') {
+        const parts = rest.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) return editFieldCompletions(sub, parts[0], parts.slice(1).join(' '));
+        if (parts.length === 1 && hasTrailingSpace) return editFieldCompletions(sub, parts[0], '');
+        return taskNameCompletions(tasks, sub, rest);
+      }
+      if (['run', 'delete', 'enable', 'disable', 'history'].includes(sub)) {
+        return taskNameCompletions(tasks, sub, rest);
       }
       return null;
     },
@@ -297,6 +312,7 @@ export function register(pi: ExtensionAPI): void {
       const sub = subRaw || 'list';
       const help =
         '/schedule list                        列出任务\n' +
+        '/schedule run <名>                    立即执行一次（后台；忽略 enabled 与每日预算）\n' +
         '/schedule loop <间隔> <任务>          固定间隔（如 5m/1h）\n' +
         '/schedule remind <时间> <任务>        一次性（如 +30m 或 ISO）\n' +
         '/schedule cron <表达式> <任务>        POSIX cron（如 "0 9 * * 1-5"）\n' +
@@ -339,6 +355,20 @@ export function register(pi: ExtensionAPI): void {
               : '暂无历史',
             'info',
           );
+          return;
+        }
+        if (sub === 'run') {
+          const name = rest.join(' ');
+          if (!name) {
+            ctx.ui.notify('用法: /schedule run <名>', 'info');
+            return;
+          }
+          const targets = listTasks().filter((t) => t.name === name || t.id === name);
+          if (targets.length === 0) {
+            ctx.ui.notify(`未找到任务: ${name}`, 'warning');
+            return;
+          }
+          startManualRun(targets, ctx);
           return;
         }
         if (sub === 'delete' || sub === 'enable' || sub === 'disable') {
@@ -410,16 +440,23 @@ export function register(pi: ExtensionAPI): void {
     getArgumentCompletions: (prefix) => {
       const subs = [
         { value: 'list', label: 'list', description: '逐条列出每日任务' },
+        { value: 'run ', label: 'run', description: '立即执行（/daily run <名|all>）' },
         { value: 'show ', label: 'show', description: '任务详情与最近执行（/daily show <名>）' },
         { value: 'on ', label: 'on', description: '启用（/daily on <名|all>）' },
         { value: 'off ', label: 'off', description: '禁用（/daily off <名|all>）' },
         { value: 'help', label: 'help', description: '显示用法' },
       ];
-      const first = prefix.split(/\s+/)[0] ?? '';
+      const { sub, rest } = splitArgument(prefix);
       if (!prefix.includes(' ')) {
-        const f = filterCompletions(subs, first);
+        const f = filterCompletions(subs, sub);
         return f.length ? f : null;
       }
+      // 任务名补全：/daily 的目标集合 = daily 标签（无标签时降级为全部任务）
+      const tasks = selectDailyTasks(listTasks()).tasks;
+      if (sub === 'run' || sub === 'on' || sub === 'off') {
+        return taskNameCompletions(tasks, sub, rest, ['all']);
+      }
+      if (sub === 'show') return taskNameCompletions(tasks, sub, rest);
       return null;
     },
     handler: async (args, ctx) => {
@@ -429,6 +466,7 @@ export function register(pi: ExtensionAPI): void {
       const usage =
         '/daily                    每日任务概览（含今日进度）\n' +
         '/daily list               逐条列出（时间/上次结果/下次/成功失败）\n' +
+        '/daily run <名|all>       立即执行（后台；忽略 enabled 与每日预算）\n' +
         '/daily show <名>          详情：调度、统计、最近 5 次执行、提示词\n' +
         '/daily on|off <名|all>    启用/禁用（all = 全部每日任务）\n' +
         '/daily help               显示本帮助\n' +
@@ -440,6 +478,22 @@ export function register(pi: ExtensionAPI): void {
       }
 
       const sel = selectDailyTasks(listTasks());
+
+      if (sub === 'run') {
+        const name = rest.join(' ');
+        if (!name) {
+          ctx.ui.notify('用法: /daily run <名|all>', 'info');
+          return;
+        }
+        const targets =
+          name === 'all' ? sel.tasks : sel.tasks.filter((t) => t.name === name || t.id === name);
+        if (targets.length === 0) {
+          ctx.ui.notify(`未找到每日任务: ${name}`, 'warning');
+          return;
+        }
+        startManualRun(targets, ctx);
+        return;
+      }
 
       if (sub === 'list') {
         ctx.ui.notify(
@@ -518,6 +572,81 @@ export function register(pi: ExtensionAPI): void {
   // 此标志防多个 session_start 钩子/重入重复注入）
   let restartNoticeShown = false;
 
+  type NotifyLevel = 'info' | 'warning' | 'error';
+  type TaskOutcome = 'success' | 'failed' | 'skipped';
+
+  /**
+   * 执行单个任务并落账（遥测/历史/失败策略），供定时轮次与手动执行共用，避免两套逻辑漂移。
+   *
+   * `enforceBudget=false` 供手动执行显式跳过每日预算（用户主动触发）；无论是否跳过，
+   * 运行都会写入遥测，因此仍计入当日用量。`announce=false` 时由调用方自己汇报结果。
+   */
+  const runTaskWithPolicy = async (
+    task: Task,
+    ctx: ExtensionContext,
+    cfg: ReturnType<typeof readAutopilotConfig>,
+    notify: (text: string, level: NotifyLevel) => void,
+    opts: { enforceBudget?: boolean; announce?: boolean } = {},
+  ): Promise<TaskOutcome> => {
+    const { provider, model } = currentModel();
+    if (opts.enforceBudget !== false) {
+      const budget = checkBudget(cfg.budget, `${provider}/${model}`);
+      if (!budget.allowed) {
+        notify(`autopilot: 跳过 ${task.name}（${budget.reason}）`, 'info');
+        return 'skipped';
+      }
+    }
+    const r = await runTaskOnce(task, process.cwd());
+    await appendRun({
+      ts: new Date().toISOString(),
+      taskId: task.id,
+      taskName: task.name,
+      model,
+      provider,
+      result: r.result,
+      durationMs: r.durationMs,
+      outputLen: r.output.length,
+      estCost: estimateCost(provider, model, task.prompt.length, r.output.length),
+      errClass: r.result === 'failed' ? classifyError(r.stderr || r.output, r.exitCode) : null,
+    });
+    await updateTaskAfterRun(task.id, r.result, r.output, r.durationMs);
+    // 完成通知：任务显式开启 notifyOnCompletion 且配了 webhookUrl/PI_SCHEDULER_WEBHOOK 时发送
+    if (task.notifyOnCompletion) {
+      void sendWebhook(task, r.result, r.output);
+    }
+    if (r.result === 'failed') {
+      const errClass = classifyError(r.stderr || r.output, r.exitCode);
+      // updateTaskAfterRun 已把 failCount 落盘：用最新任务状态决策，避免读到自增前的计数（off-by-one）
+      const fresh = listTasks().find((t) => t.id === task.id) ?? task;
+      const decision = decide(fresh, errClass, cfg.policy, cfg.fallbackModels, {
+        stderr: r.stderr || r.output,
+        exitCode: r.exitCode,
+        promptLen: task.prompt.length,
+        outputLen: r.output.length,
+        durationMs: r.durationMs,
+      });
+      notify(`autopilot 任务 ${task.name} 失败：${decision.note}`, 'warning');
+      // 执行决策（此前只通知不执行，暂停/熔断/切换全部失效）
+      if (decision.type === 'suspend_task') {
+        await updateTask(task.id, { enabled: false });
+        notify(`autopilot: 任务 ${task.name} 已自动暂停（${decision.note}）`, 'warning');
+      } else if (decision.type === 'failover') {
+        let sessionFile: string | undefined;
+        try {
+          sessionFile = ctx.sessionManager.getSessionFile();
+        } catch {
+          /* stale ctx */
+        }
+        const text = executeFailover(decision.target, decision.note, false, sessionFile);
+        await updateTask(task.id, { failoverCount: (fresh.failoverCount ?? 0) + 1 });
+        notify(`autopilot: ${text}`, 'warning');
+      }
+      return 'failed';
+    }
+    if (opts.announce !== false) notify(`autopilot 任务 ${task.name} 完成`, 'info');
+    return 'success';
+  };
+
   const runDueTasks = async (ctx: ExtensionContext): Promise<void> => {
     if (running) return;
     const c = readAutopilotConfig();
@@ -528,7 +657,7 @@ export function register(pi: ExtensionAPI): void {
     if (!acquireSessionLock()) return;
     running = true;
     setBackgroundBusy(true);
-    const notify = (t: string, l: 'info' | 'warning' | 'error'): void => {
+    const notify = (t: string, l: NotifyLevel): void => {
       try {
         if (ctx.hasUI && ctx.ui?.notify) ctx.ui.notify(t, l);
       } catch {
@@ -539,66 +668,56 @@ export function register(pi: ExtensionAPI): void {
       // 拿到锁后重新读盘：持锁前的 due 快照可能已过期（另一实例刚完成同一任务并推进了 nextRun）
       const dueNow = listTasks().filter((t) => t.enabled && isDue(t));
       for (const task of dueNow) {
-        const { provider, model } = currentModel();
-        const budget = checkBudget(c.budget, `${provider}/${model}`);
-        if (!budget.allowed) {
-          notify(`autopilot: 跳过 ${task.name}（${budget.reason}）`, 'info');
-          continue;
-        }
-        const r = await runTaskOnce(task, process.cwd());
-        await appendRun({
-          ts: new Date().toISOString(),
-          taskId: task.id,
-          taskName: task.name,
-          model,
-          provider,
-          result: r.result,
-          durationMs: r.durationMs,
-          outputLen: r.output.length,
-          estCost: estimateCost(provider, model, task.prompt.length, r.output.length),
-          errClass: r.result === 'failed' ? classifyError(r.stderr || r.output, r.exitCode) : null,
-        });
-        await updateTaskAfterRun(task.id, r.result, r.output, r.durationMs);
-        // 完成通知：任务显式开启 notifyOnCompletion 且配了 webhookUrl/PI_SCHEDULER_WEBHOOK 时发送
-        if (task.notifyOnCompletion) {
-          void sendWebhook(task, r.result, r.output);
-        }
-        if (r.result === 'failed') {
-          const errClass = classifyError(r.stderr || r.output, r.exitCode);
-          // updateTaskAfterRun 已把 failCount 落盘：用最新任务状态决策，避免读到自增前的计数（off-by-one）
-          const fresh = listTasks().find((t) => t.id === task.id) ?? task;
-          const decision = decide(fresh, errClass, c.policy, c.fallbackModels, {
-            stderr: r.stderr || r.output,
-            exitCode: r.exitCode,
-            promptLen: task.prompt.length,
-            outputLen: r.output.length,
-            durationMs: r.durationMs,
-          });
-          notify(`autopilot 任务 ${task.name} 失败：${decision.note}`, 'warning');
-          // 执行决策（此前只通知不执行，暂停/熔断/切换全部失效）
-          if (decision.type === 'suspend_task') {
-            await updateTask(task.id, { enabled: false });
-            notify(`autopilot: 任务 ${task.name} 已自动暂停（${decision.note}）`, 'warning');
-          } else if (decision.type === 'failover') {
-            let sessionFile: string | undefined;
-            try {
-              sessionFile = ctx.sessionManager.getSessionFile();
-            } catch {
-              /* stale ctx */
-            }
-            const text = executeFailover(decision.target, decision.note, false, sessionFile);
-            await updateTask(task.id, { failoverCount: (fresh.failoverCount ?? 0) + 1 });
-            notify(`autopilot: ${text}`, 'warning');
-          }
-        } else {
-          notify(`autopilot 任务 ${task.name} 完成`, 'info');
-        }
+        await runTaskWithPolicy(task, ctx, c, notify);
       }
     } finally {
       running = false;
       releaseSessionLock();
       setBackgroundBusy(false);
     }
+  };
+
+  /**
+   * 手动执行（`/daily run`、`/schedule run`）：忽略调度时间与 enabled（显式动作），
+   * 但仍走同一套落账与失败策略。后台串行执行、不阻塞命令；持调度器锁避免与定时轮次并发。
+   */
+  const startManualRun = (targets: Task[], ctx: ExtensionCommandContext): void => {
+    if (targets.length === 0) return;
+    if (!acquireSessionLock()) {
+      ctx.ui.notify('已有任务正在执行（调度轮次或上一次手动执行），请稍后再试', 'warning');
+      return;
+    }
+    const cfg = readAutopilotConfig();
+    setBackgroundBusy(true);
+    const notify = (text: string, level: NotifyLevel): void => {
+      try {
+        if (ctx.hasUI && ctx.ui?.notify) ctx.ui.notify(text, level);
+      } catch {
+        /* stale ctx */
+      }
+    };
+    notify(`手动执行 ${targets.length} 个任务：${targets.map((t) => t.name).join('、')}（后台运行，完成后通知）`, 'info');
+    void (async () => {
+      const outcomes: string[] = [];
+      try {
+        for (const task of targets) {
+          const outcome = await runTaskWithPolicy(task, ctx, cfg, notify, { enforceBudget: false, announce: false });
+          if (outcome !== 'skipped') {
+            const fresh = listTasks().find((t) => t.id === task.id) ?? task;
+            const out = (fresh.lastOutput || '').replace(/\s+/g, ' ').trim();
+            const preview = out ? `\n${out.slice(0, 300)}${out.length > 300 ? '…' : ''}` : '';
+            notify(`${task.name} ${outcome === 'success' ? '成功' : '失败'}${preview}`, outcome === 'success' ? 'info' : 'warning');
+          }
+          outcomes.push(`${task.name}: ${outcome === 'success' ? '成功' : outcome === 'failed' ? '失败' : '跳过'}`);
+        }
+      } catch (e) {
+        notify(`手动执行异常：${(e as Error).message}`, 'error');
+      } finally {
+        releaseSessionLock();
+        setBackgroundBusy(false);
+        notify(`手动执行结束 —— ${outcomes.join('；')}`, 'info');
+      }
+    })();
   };
 
   let hangNotified = false;

@@ -5,7 +5,7 @@
 ## 注册面
 
 - 工具：`autopilot_status`、`autopilot_stats`、`autopilot_failover`、`autopilot_policy`、`schedule_task`、`verify_report`、`verify_config`、`verify_test`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model`（16 个，见 [tools/README.md](tools/README.md)）
-- 命令：`/auto <status|stats|metrics|policy|failover|pause|resume|help>`、`/schedule <list|loop|remind|cron|edit|delete|enable|disable|preview|history|help>`、`/daily <list|show|on|off|help>`（默认概览）
+- 命令：`/auto <status|stats|metrics|policy|failover|pause|resume|help>`、`/schedule <list|run|loop|remind|cron|edit|delete|enable|disable|preview|history|help>`、`/daily <list|run|show|on|off|help>`（默认概览）
 - 钩子：`session_start`、`session_shutdown`、`turn_start`、`turn_end`、`input`、`agent_settled`
 
 ## 文件
@@ -16,6 +16,7 @@
 | `logic.ts` | 纯逻辑 barrel |
 | `types.ts` | 类型与默认配置（`defaultAutopilotConfig`） |
 | `daily.ts` | `/daily` 的纯渲染逻辑（筛选/概览/详情，零 Pi 依赖），见下方「每日任务视图」 |
+| `completions.ts` | 命令参数补全纯逻辑（任务名前缀、`edit` 字段），单测见 `__tests__/completions.test.ts` |
 | `store/` | 任务存储/配置/策略/预算/遥测/会话/通知/种子，见 [store/README.md](store/README.md) |
 | `run/` | 执行/看门狗/验证器，见 [run/README.md](run/README.md) |
 | `tools/` | 工具组（策略/状态/配置/会话/模型、`schedule_task`、`verify_*`），见 [tools/README.md](tools/README.md) |
@@ -30,6 +31,7 @@
 |------|------|
 | `/daily` | 概览：任务数/启停 + 今日完成·待跑·失败 + 每条一行（时间/上次结果与耗时/下次/成败计数），末尾附「上次失败的任务」提示 |
 | `/daily list` | 只逐条列出，不折叠 |
+| `/daily run <名\|all>` | 立即执行（后台，完成后通知；忽略调度时间、`enabled` 与每日预算，仍记账） |
 | `/daily show <名>` | 详情：调度与下次（含相对时间）、统计（成功/连续失败/重试/超时/标签）、最近 5 次执行、提示词摘要 |
 | `/daily on\|off <名\|all>` | 启停（`all` = 全部每日任务） |
 | `/daily help` | 用法 |
@@ -41,6 +43,13 @@
   （`cronClock` 返回 null 而非硬猜）。
 - `on` 只改 `enabled`，**不重算 `nextRun`**：已错过的触发点会在下一个调度轮次立即补跑
   （与 `/schedule enable` 一致；重算会静默吞掉一次本应补上的执行）。
+- `run` 与调度轮次走**同一条**执行/落账/失败策略路径（`runTaskWithPolicy`），差别只有两点：
+  忽略调度时间与 `enabled`（显式动作）、跳过每日预算（仍写遥测，计入当日用量）。
+  它**不阻塞命令**：后台串行跑完后逐条通知结果与输出预览，结束时给一行汇总。
+  手动与定时共用调度锁（`acquireSessionLock`），同一时刻只有一个执行者，正在跑时再触发会提示稍后再试。
+- 任务名补全：`/daily show|on|off|run` 与 `/schedule delete|enable|disable|history|run` 在第二段
+  按 `tasks.json` 的任务名/ID 前缀补全（已禁用任务标注 `[已禁用]`），`/schedule edit` 在名字后再补字段。
+  补全项由纯逻辑 `completions.ts` 生成，单测见 `__tests__/completions.test.ts`。
 - 渲染是纯函数（`daily.ts`），单测见 `__tests__/daily.test.ts`；命令层只做筛选与派发。
 
 ## 数据与配置

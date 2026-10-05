@@ -2,6 +2,19 @@
 
 ## 格式
 
+### [2026-10-05] 定时任务命令体验：手动执行走同一策略路径；补全项 value 必须是整段参数
+**背景**：用户反馈两点：(1) 每日任务只能等调度触发，想手动跑一次没有入口；(2) `/daily show|on|off` 与 `/schedule delete|enable|disable|edit|history` 的任务名要手输，不能像子命令那样下拉补全——任务名是 `task-<base36>`/`tool-stats-daily` 这类难记串。
+**决策**：
+- **手动执行新增 `/daily run <名|all>` 与 `/schedule run <名>`，与调度轮次共用同一条路径**：把 `runDueTasks` 的每任务体抽成 `runTaskWithPolicy(task, ctx, cfg, notify, opts)`（预算检查→`runTaskOnce`→遥测→`updateTaskAfterRun`→webhook→失败决策），定时与手动只差两个开关：忽略调度时间与 `enabled`、跳过每日预算。手动执行后台串行、不阻塞命令，逐条通知结果与输出预览，共用 `acquireSessionLock` 保证同一时刻只有一个执行者。
+- **补全项 `value` 是整段参数文本**（`<子命令> <任务名>`），不是光任务名：pi-tui 的 `applyCompletion` 用 `argumentPrefix`（`/daily ` 之后的全部文本）整体替换（`vendor/pi/packages/tui/src/autocomplete.ts:414-429`），只给任务名会把已敲的子命令冲掉。纯逻辑落 `features/autopilot/completions.ts`。
+- **`/schedule edit` 区分"名后有无空格"**：`edit <名>` 补任务名，`edit <名> ` 补字段（schedule/type/enabled/prompt）。
+**理由**：
+- 手动执行若另写一套执行/落账/失败处理，必然与调度器漂移（失败自愈、熔断、webhook、超时日志都会漏）；抽公共函数是唯一能保证"手动跑出来的状态与定时一致"的做法。
+- 手动执行**后台**而非同步等待：任务 `maxRunTime` 默认 300s（`DEFAULT_MAX_RUN_TIME`），同步会冻住 TUI，也违背项目「长任务不阻塞前台」的既有约定。输出预览只取 `lastOutput` 前 300 字符并指向 `/daily show`，避免把整段输出塞进通知。
+- 手动执行**跳过每日预算**：预算（默认 50 次/日）是给无人值守的调度器兜底的，用户显式触发的动作不应被它挡住；但运行照常写遥测，因此仍计入当日用量，下一次调度检查会看到。
+**代价与约束**：`/daily run all` 会串行跑完所有每日任务（可能数十分钟、多次子进程），属显式操作；手动与定时互斥（锁），正在跑时再触发只提示稍后再试。
+**验证**：`completions.test.ts` 12 项（前缀过滤/整段 value/extras/edit 字段）、`command-completions-wiring.test.ts` 7 项（命令层接线、未知名派发前报错不误起子进程）、`command-run-manual.test.ts` 2 项（mock `runTaskOnce`：后台派发→落 tasks.json/telemetry.json→释放锁→汇报，`vi.waitFor` 等后台结束）；全量 `golden` 16 步通过（72 文件 / 768 用例）。
+
 ### [2026-10-05] 任务执行流畅度（减少中断、批量决策）与会话标题工具
 **背景**：用户提出两项行为改进：(1) 执行任务时减少中途询问——把能做的先做完，再一次性汇报执行情况与集中待决策项，但影响任务正常推进的重要决策仍要及时问；(2) 会话要有简短标题，在合适时机设置且不影响缓存命中。
 **决策**：

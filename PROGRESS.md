@@ -2008,3 +2008,23 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **缓存**：标题只落 `session_info` 元数据条目（append-only），不进 LLM 上下文 → 不改前缀、不影响命中率；`APPEND_SYSTEM.md` 变更使所有会话前缀失效一次（预期内，注入面基线已刷新）。
 - 基线：`node scripts/gen-registrations.mjs --update`（+`session_title`）、`bash scripts/check-injection-surface.sh --update`。
 - 验证：`session-title.test.ts` 6 项、`injection-stability.test.ts` 14 项、`tools-payload.test.ts`（63 工具 / 29.0KB 在预算内）、`tsc`、`check-features`、`check-conventions`、`check-dead-exports`、全量 `golden`。
+
+### /daily、/schedule 体验：手动执行 + 任务名自动补全（2026-10-05）
+
+- **手动执行**：新增 `/daily run <名|all>`、`/schedule run <名>`。把 `runDueTasks` 的每任务体抽成
+  `runTaskWithPolicy(task, ctx, cfg, notify, opts)`，定时轮次与手动执行共用同一条执行/落账/失败策略路径，
+  差异只有两处：忽略调度时间与 `enabled`（显式动作）、跳过每日预算（仍写遥测，计入当日用量）。
+  手动执行**后台串行**（不阻塞命令），逐条通知结果与输出预览、结束给一行汇总；与定时共用
+  `acquireSessionLock`，同一时刻只有一个执行者，忙时提示稍后再试。
+- **任务名补全**：`/daily show|on|off|run` 与 `/schedule run|delete|enable|disable|history` 的第二段按
+  `portable/memory/scheduler/tasks.json` 的任务名/ID 前缀补全（已禁用任务标 `[已禁用]`），
+  `/schedule edit <名> ` 之后再补字段（schedule/type/enabled/prompt）。此前只补子命令，任务名要手输
+  `task-<base36>` 这类串，易错。
+- 纯逻辑落在 `features/autopilot/completions.ts`（`taskNameCompletions`/`editFieldCompletions`/`splitArgument`）。
+  关键约定：补全项 `value` 必须是**整段参数文本**（`<子命令> <任务名>`）——pi-tui 用 argumentPrefix 整体替换，
+  只返回任务名会把子命令冲掉。
+- 注册面不变（只加子命令，未加工具/命令），`registration-baseline.json` 无需刷新。
+- 验证：新增 `completions.test.ts` 12 项（前缀过滤/整段 value/extras/edit 字段）、
+  `command-completions-wiring.test.ts` 7 项（命令层接线 + 未知名不误起子进程）、
+  `command-run-manual.test.ts` 2 项（mock 执行器：后台派发/落账/释放锁/汇报，`vi.waitFor` 等后台结束）；
+  全量 `golden` 16 步通过（72 文件 / 768 用例）。
