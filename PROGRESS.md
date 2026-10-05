@@ -1994,5 +1994,9 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   追加而非替换 `DEFAULT_TOOL_NAMES`）→ roleplay 18 个、full 69 个。人设工具条同步写明"先 `find`/`grep` 定位、
   再 `read` 细看，别整份大文件往上下文里搬"。
 - 明确不加：`context`/`plan-mode`/subagent/browser/voice/link/autopilot/tmux（理由见 `DECISIONS.md` 同日条目）。
+- **记录在案（不改代码）**：分层档（`PI_CONTEXT_TOOL_LAYERING=on`，默认关）以"首次抓到的 pi 基线"做减法，
+  pi 在会话中途激活的工具（MCP `exposure: deferred` → `tool_search`/`codemode`）可能被那次重算裁掉；
+  本项目基本不用 MCP 故不修，修法（改成"当前活跃 ∪ enable − 未启用休眠组"，幂等）记在
+  `custom/features/context/budget/README.md` 的「已知限制」。
 - 验证：`tool-groups.test.ts`、`npx tsc --noEmit -p custom/`、`golden-tasks --fast`、全量 golden（pre-push）；
   探针复测活跃集。

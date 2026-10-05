@@ -15,6 +15,7 @@
 - 用 `settings.json` 而不是新增 per-mode 工具字段：pi 原生支持 `+name` 增量，零新代码路径；per-mode 方案还得在 mode 功能里加 `before_agent_start` 钩子改活跃集，与 context 的放宽逻辑存在竞争顺序，收益不抵风险。
 - roleplay 只补 `grep/find/ls`：这三种是"普通任务"的真实缺口（找文件、搜内容），且比 `bash find`/整份 `read` 更省上下文；其余能力用 `/mode full` 即可，符合"角色扮演模式收窄"的既定设计。
 **代价与约束**：full 模式活跃 72 → 69；`powershell` 在 POSIX 上不再可用（需要时用 `setActiveTools` 临时开，或用 `--tools`/`defaultTools` 显式点名）；`grep/find/ls` 成为所有模式（含 `minimal`）的启动默认，工具面前缀相应变大（roleplay 侧约 +3 KB，活跃 schema 实测 11.2 KB）；默认档工具面完全等于 pi 的启动档，my-pi 想常驻某个 pi 默认不激活的工具时，唯一入口是 pi 原生的 `defaultTools`（本项目落在 `portable/agent/settings.json`）。
+**已知限制（记录在案，不修）**：分层档（`PI_CONTEXT_TOOL_LAYERING=on`，默认关）以"首次抓到的 pi 基线"做减法，若 pi 在会话中途激活了工具（MCP `exposure: deferred` 会自动激活 `tool_search`/`codemode`），而分层自愈又被触发，那次重算会把它裁掉。本项目基本不用 MCP、分层档也默认关闭，故不改；将来接 MCP 时把分层目标换成"当前活跃 ∪ enable − 未启用休眠组"即可（幂等）。详见 `custom/features/context/budget/README.md` 的「已知限制」。
 **验证**：`tool-groups.test.ts` 13 项（"常驻档=原样返回基线""永不激活 pi 未激活的工具""分层档裁休眠组且顺序稳定"等）；
 `tool-layering.test.ts` 新增"基线取自 pi：注册但未激活的工具不会被加回来且不触发 `setActiveTools`"；
 新增 `custom/features/mode/__tests__/roleplay-surface.test.ts` 4 项（读入库的真实 `modes.json`/`settings.json`，把 roleplay 的

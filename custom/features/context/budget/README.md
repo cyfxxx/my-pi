@@ -75,6 +75,21 @@
 **有意延后**——见 [MIGRATION-AUDIT.md](../../../../docs/development/MIGRATION-AUDIT.md) 的 G3
 与 DECISIONS 的上下文优化条目。
 
+## 已知限制：分层档会裁掉 pi 中途激活的工具（2026-10-04 记录，不改）
+
+`applyToolLayering`（仅在 `PI_CONTEXT_TOOL_LAYERING=on` 时动手）以"**首次动手前**抓到的 pi 基线"
+为基准做减法。若 pi 侧在**会话中途**激活了某个工具（典型：MCP 配成 `exposure: "deferred"` 时，
+MCP 扩展自己激活 `tool_search` / `codemode`），而分层自愈又被触发（有休眠组工具处于活跃 →
+`dormantToolsActive` 为真，例如 plan 模式退出），那一次 `applyToolLayering` 会拿**旧基线**重算，
+把这个中途激活的工具裁掉——延迟加载的 MCP 工具此后对模型不可见，直到重启或重新激活。
+
+- **为什么不修**：本项目基本不用 MCP（`portable/agent/mcp.json` 不存在），而分层档本身就是默认
+  关闭的考古开关；默认档 `applyToolLayering` 直接 `return`，完全不碰 pi 的工具集，不存在这个问题。
+- **将来真接 MCP 时的修法**（一处改动，且幂等）：把分层目标从"pi 基线 ∪ 显式 enable − 未启用休眠组"
+  改成"**当前活跃** ∪ 显式 enable − 未启用休眠组"——即把 `effectiveActiveTools` 的输入换成调用时的
+  `getActiveTools()`，同时删掉 `tool-layering.ts` 里的 `baseActiveToolNames` 模块状态。该式幂等
+  （`f(f(x)) = f(x)`），不会来回横跳，也仍然不会凭空激活 `defaultActive: false` 的工具。
+
 ## 相关
 
 - 上层：[../README.md](../README.md)
