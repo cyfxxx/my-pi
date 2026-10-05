@@ -2000,3 +2000,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   `custom/features/context/budget/README.md` 的「已知限制」。
 - 验证：`tool-groups.test.ts`、`npx tsc --noEmit -p custom/`、`golden-tasks --fast`、全量 golden（pre-push）；
   探针复测活跃集。
+
+### 任务执行流畅度 + 会话标题工具（2026-10-05）
+
+- **提示词（任务一）**：`portable/agent/APPEND_SYSTEM.md` 新增「任务执行」一节——一次交付（先把能做的、该做的做完，再一次性汇报 + 集中待决策项）、收尾集中列出选项与建议、汇报按「已完成 / 未完成及原因 / 待定决策」三段、方向性变更/破坏性操作/越权/与既有约定冲突先停下询问；「重要事项」里"不清楚就提问"改为"先自查（读代码/文档/实测），确需补充上下文才提问，其余并入收尾清单"。
+- **会话标题（任务二）**：新增模型工具 `session_title`（context 功能）——`tool-adapter` 把 `ExtensionAPI.setSessionName` 桥接为 `ToolExecuteContext.setSessionTitle`；新增纯逻辑 `budget/session-title.ts`（剥离 ANSI/控制字符、折叠空白、120B UTF-8 安全截断）；`APPEND_SYSTEM.md` 新增「会话标题」一节规定调用时机（理解任务后一次，主题明显变化才更新）。
+- **缓存**：标题只落 `session_info` 元数据条目（append-only），不进 LLM 上下文 → 不改前缀、不影响命中率；`APPEND_SYSTEM.md` 变更使所有会话前缀失效一次（预期内，注入面基线已刷新）。
+- 基线：`node scripts/gen-registrations.mjs --update`（+`session_title`）、`bash scripts/check-injection-surface.sh --update`。
+- 验证：`session-title.test.ts` 6 项、`injection-stability.test.ts` 14 项、`tools-payload.test.ts`（63 工具 / 29.0KB 在预算内）、`tsc`、`check-features`、`check-conventions`、`check-dead-exports`、全量 `golden`。

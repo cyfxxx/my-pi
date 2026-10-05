@@ -1,7 +1,7 @@
 {
-  "combined": "2ca792714f322122d9eb21786bd64611c959f6a268d7fc771bc3dcd91fd0a495",
+  "combined": "2617288a02b2e2b9e1b84c6deb9676ef327a752f14ed4cefd612827677190ab3",
   "files": {
-    "portable/agent/APPEND_SYSTEM.md": "1de6aeeb3cd49094537feca7dec8f447a61dcc4f48bd31dc45727433c900ad01",
+    "portable/agent/APPEND_SYSTEM.md": "58230e171fcb60ce8e7121c5ee92a20f9ac9ca30454f2c1e425658da39c9acda",
     "portable/agent/AGENTS.md": "708d7fcedda83b972da585fc348b192cc9c1ab1ea84e09c2f3ba9f2e2b626cd4",
     "custom/features/context/budget/hard-rules.ts": "82e4c7c2e0897e8cc70d787a2572043a940c152e243c27dd5f0098e1754ce522"
   }

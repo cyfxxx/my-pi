@@ -2,6 +2,19 @@
 
 ## 格式
 
+### [2026-10-05] 任务执行流畅度（减少中断、批量决策）与会话标题工具
+**背景**：用户提出两项行为改进：(1) 执行任务时减少中途询问——把能做的先做完，再一次性汇报执行情况与集中待决策项，但影响任务正常推进的重要决策仍要及时问；(2) 会话要有简短标题，在合适时机设置且不影响缓存命中。
+**决策**：
+- **任务执行规则进 system 层**：`portable/agent/APPEND_SYSTEM.md` 新增「任务执行」一节（一次交付、收尾集中列待决策项、汇报「已完成 / 未完成及原因 / 待定决策」三段、方向性变更/破坏性操作/越权/与既有约定冲突先停下询问）；并把「重要事项」里"不清楚就提问"改为"先自查（读代码/文档/实测），确需补充上下文才问，其余并入收尾清单"。
+- **会话标题做成模型可调用的 `session_title` 工具**（挂在 `custom/features/context/`）：`tool-adapter` 把 pi 的 `ExtensionAPI.setSessionName` 桥接为 `ToolExecuteContext.setSessionTitle`（features 仍零 Pi 依赖），落 `session_info` 元数据条目（append-only）；`APPEND_SYSTEM.md` 新增「会话标题」一节规定调用时机（理解任务后一次，主题明显变化才更新）。
+- **标题不进上下文**：标题只写会话文件，不注入 system prompt 或消息正文，故不改提示词前缀、不影响缓存命中；工具调用本身是 append-only 的正常历史追加。
+**理由**：
+- 两条都是"模型行为"约定，`APPEND_SYSTEM.md` 是 pi 原生注入 system 的位置，权威性高于尾部注入的工作区文档，且改动只让所有会话前缀失效一次（可预期）。
+- 标题若放 system prompt 或消息正文，会随主题变化反复改写前缀 → 每次全价重算；`session_info` 元数据是零缓存代价的位置。
+- 交给模型决定"何时设"比扩展层硬编码时机更贴合"合适的时机"；pi 没有模型侧入口，故补一个工具而不是让模型猜。
+**代价与约束**：`APPEND_SYSTEM.md` 737B → 1793B（预算 2048B；注入面基线已刷新，所有会话前缀失效一次）；工具面 +1（63 个 / 29.0KB，上限 32KB / 66 个）；`session_title` 只在启用 context 功能的模式可用（roleplay/minimal 不可用属预期，提示词已写成"若工具可用"）。
+**验证**：`session-title.test.ts` 6 项（多行折叠 / ANSI 与控制字符剥离 / 空串 / UTF-8 截断 / 字节边界 / 纯函数）；`injection-stability.test.ts` 14 项（APPEND_SYSTEM 预算与易变内容）；`tools-payload.test.ts`（63 个 / 29.0KB 在预算内）；`tsc`、`check-features`、`check-conventions`、`check-dead-exports`、`check-injection-surface`、全量 `golden`。
+
 ### [2026-10-04] 工具面收口：不激活 pi 刻意休眠的工具；角色扮演模式补上文件检索
 **背景**：回答"角色扮演模式启用了哪些工具"时用临时探针实测（挂 `custom/bootstrap.ts` 后 dump `pi.getActiveTools()`）：full 模式活跃 **72** 个，其中含 `codemode`、`tool_search`、`powershell`。前两个是 pi 内置扩展里以 `defaultActive: false` 注册的（上游语义："默认注册但不激活"，见 `docs/operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md`），第三个在本机不可用（`command -v pwsh` 为空，历史调用 1 次即失败）。根因：`effectiveActiveTools(layered=false)` 直接返回"全部已注册工具"，把 pi 的休眠决定一并推翻。另：roleplay 活跃 **15** 个，只有内置 `read/bash/edit/write`——没有 `grep/find/ls`（pi 原生 `DEFAULT_TOOL_NAMES` 只含这四个，`grep/find/ls` 是本仓库靠 context 的常驻放宽才补上的，而 roleplay 不加载 context）。
 **决策**：

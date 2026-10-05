@@ -28,7 +28,7 @@ const EXT_TOOLS = [
   'memory_store', 'memory_search', 'memory_stats', 'memory_forget',
   'ctx_exec', 'ctx_list', 'ctx_note', 'ctx_snap',
   'tmux_run', 'tmux_status', 'tmux_read', 'tmux_send', 'tmux_stop', 'tmux_wait',
-  'thinking_level', 'subagent', 'ask_user', 'plan_enter', 'plan_exit', 'todo',
+  'thinking_level', 'session_title', 'subagent', 'ask_user', 'plan_enter', 'plan_exit', 'todo',
   'link_send', 'link_status',
   'browser_navigate', 'browser_screenshot', 'browser_click', 'browser_type', 'browser_close',
   'voice_transcribe', 'voice_speak', 'voice_record',

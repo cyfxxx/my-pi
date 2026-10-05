@@ -52,6 +52,12 @@ export interface ToolExecuteContext {
    * text 传 undefined 清除）。工具侧唯一能改 footer 的通道，非交互时为 undefined。
    */
   setStatus?: (key: string, text: string | undefined) => void;
+  /**
+   * 设置当前会话标题（pi 的 `session_info` 元数据条目，append-only）。
+   * 只落会话文件、不进 LLM 上下文，因此不影响提示词前缀与缓存命中；
+   * 承载它的 ExtensionAPI 未提供该方法时为 undefined（features 自行降级）。
+   */
+  setSessionTitle?: (title: string) => void;
 }
 
 /**
@@ -157,7 +163,13 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
       piCtx?: unknown,
     ) => {
       // 不吞异常：Pi 会捕获抛出的错误并标记 isError，模型才能感知工具失败。
-      const result = await def.execute(params as Record<string, unknown>, buildExecuteContext(piCtx, _signal));
+      const ctx = buildExecuteContext(piCtx, _signal);
+      // 会话标题能力来自 ExtensionAPI（不是 ExtensionContext），在适配器内闭包桥接，
+      // features 因此无需接触 Pi 类型；pi 未提供时保持 undefined。
+      if (ctx && typeof pi.setSessionName === 'function') {
+        ctx.setSessionTitle = (title) => pi.setSessionName(title);
+      }
+      const result = await def.execute(params as Record<string, unknown>, ctx);
       return {
         content: [{ type: 'text', text: result }],
         details: undefined,

@@ -19,6 +19,7 @@ import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
 import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
 import { auditSystemInjection, buildSystemPrompt } from './budget/system-prompt';
+import { normalizeSessionTitle, MAX_SESSION_TITLE_BYTES } from './budget/session-title';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
 import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
@@ -277,6 +278,25 @@ export function register(pi: ExtensionAPI): void {
         (l) => setThinkingLevel(pi, l),
       );
       return r.message;
+    },
+  });
+
+  // 注册工具：session_title —— 模型在理解任务后给会话起一个简短标题。
+  // 只写 pi 的会话元数据（`session_info`，append-only），不进 LLM 上下文，
+  // 故不触碰提示词前缀、不影响缓存命中。规范化为空时不写入（避免清掉已有标题）。
+  registerTool(pi, {
+    name: 'session_title',
+    description:
+      '设置当前会话的简短标题（用于会话列表/页脚展示）。标题只写会话元数据且 append-only，不进入上下文、不影响前缀缓存。在理解任务后调用一次；仅当会话主题明显变化时更新，不要每轮重复设置。',
+    parameters: {
+      title: { type: 'string', description: '简短标题（建议 4–12 个汉字或几个词）' },
+    },
+    execute: async (args, ctx) => {
+      const title = normalizeSessionTitle(String(args.title ?? ''), MAX_SESSION_TITLE_BYTES);
+      if (!title) return '标题为空，未设置会话标题。';
+      if (!ctx?.setSessionTitle) return '当前环境不支持设置会话标题。';
+      ctx.setSessionTitle(title);
+      return `会话标题已设为「${title}」。`;
     },
   });
 
