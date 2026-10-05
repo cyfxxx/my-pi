@@ -3,8 +3,8 @@
  * 迁移自 pi-tools pi-memory/tests 的核心语义（storage 去重 / retrieval / merge / inject）。
  * 使用临时 PI_MEMORY_DIR，不触碰真实数据。
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -17,6 +17,11 @@ import {
   jaccardSimilarity,
 } from '../store/storage';
 import type { MemoryEntry } from '../store/types';
+import { saveEntries, entriesFile } from '../store/storage';
+import { memoryLockPath } from '../store/io';
+import { notesFile, updateNotes } from '../store/notes';
+import { summariesFile, appendSummary } from '../store/summaries';
+import { tryAcquireFileLock } from '../../../core/file-lock';
 import { searchEntriesWithScores, visibleAt, qualityScore } from '../recall/retrieval';
 import { detectContradiction, decideMerge } from '../store/merge';
 import { buildInjectionBlock, filterInjectedMessages, shouldInjectMemory, INJECT_TAG } from '../recall/inject';
@@ -378,5 +383,69 @@ describe('memory: 注入 append-only 不变量', () => {
     const entries: MemoryEntry[] = [entry({ title: 'T', content: '正文内容足够长以避免被截断为空' })];
     const { block } = buildInjectionBlock(entries, []);
     if (block) expect(block).toContain('以最新一块为准');
+  });
+});
+
+describe('跨进程 RMW 锁（M3 收口：原子写防不了丢更新）', () => {
+  it('正常写入不残留锁文件', () => {
+    saveEntries([entry({ title: 'A' })]);
+    expect(existsSync(memoryLockPath(entriesFile()))).toBe(false);
+    updateNotes((n) => {
+      n.k = 'v';
+    });
+    expect(existsSync(memoryLockPath(notesFile()))).toBe(false);
+    appendSummary({
+      id: 'sum1',
+      sessionId: 's1',
+      ts: new Date().toISOString(),
+      title: 't',
+      decisions: [],
+      facts: [],
+      prefs: [],
+      lessons: [],
+      fullText: 't',
+    });
+    expect(existsSync(memoryLockPath(summariesFile()))).toBe(false);
+  });
+
+  it('外部持锁时降级写入并告警，不卡死也不丢数据', () => {
+    process.env.PI_MEMORY_LOCK_TIMEOUT_MS = '50';
+    const lockPath = memoryLockPath(entriesFile());
+    const release = tryAcquireFileLock(lockPath);
+    expect(release).not.toBeNull();
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const saved = saveEntries([entry({ title: 'B' })]);
+      expect(saved.length).toBe(1);
+      // 降级路径仍然落盘（原子写保证完整性），只是放弃了串行化
+      const onDisk = JSON.parse(readFileSync(entriesFile(), 'utf-8')) as { entries: unknown[] };
+      expect(onDisk.entries.length).toBe(1);
+      expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('[file-lock]');
+    } finally {
+      warn.mockRestore();
+      release?.();
+      delete process.env.PI_MEMORY_LOCK_TIMEOUT_MS;
+    }
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it('锁被占用但未超时/未陈旧 → 等待期间不写入（真的串行化了）', () => {
+    process.env.PI_MEMORY_LOCK_TIMEOUT_MS = '120';
+    const lockPath = memoryLockPath(notesFile());
+    const release = tryAcquireFileLock(lockPath);
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const t0 = Date.now();
+      updateNotes((n) => {
+        n.k = 'v';
+      });
+      // 至少等过一轮重试才降级写出：证明不是"直接无视锁就写"
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(100);
+      expect(JSON.parse(readFileSync(notesFile(), 'utf-8')).k).toBe('v');
+    } finally {
+      warn.mockRestore();
+      release?.();
+      delete process.env.PI_MEMORY_LOCK_TIMEOUT_MS;
+    }
   });
 });

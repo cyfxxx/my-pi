@@ -17,7 +17,7 @@ import type {
 } from './types';
 import { writeJSONSync } from '../../../core/atomic-write';
 import { scrubSecrets } from '../../../core/secrets';
-import { dataDir, ensureDir, readStoreFile } from './io';
+import { dataDir, ensureDir, readStoreFile, withMemoryLock } from './io';
 import { loadSummaries } from './summaries';
 
 export { dataDir };
@@ -100,21 +100,25 @@ function migrateEntry(e: MemoryEntry): MemoryEntry {
 }
 
 export function saveEntries(entries: MemoryEntry[], opts: { excludeIds?: Set<string> } = {}): MemoryEntry[] {
-  let merged = entries;
-  try {
-    const onDisk = readEntriesRaw();
-    if (onDisk.length > 0) {
-      const byId = new Map(entries.map((e) => [e.id, e]));
-      for (const d of onDisk) {
-        if (d.id && !byId.has(d.id) && !d.deleted && !opts.excludeIds?.has(d.id)) byId.set(d.id, d);
+  // 读盘合并 + 落盘必须在同一把跨进程锁内：否则两个写者会各自基于自己的磁盘快照合并，
+  // 后写的那个把先写的条目丢掉（原子写防不了丢更新）。
+  return withMemoryLock(entriesFile(), () => {
+    let merged = entries;
+    try {
+      const onDisk = readEntriesRaw();
+      if (onDisk.length > 0) {
+        const byId = new Map(entries.map((e) => [e.id, e]));
+        for (const d of onDisk) {
+          if (d.id && !byId.has(d.id) && !d.deleted && !opts.excludeIds?.has(d.id)) byId.set(d.id, d);
+        }
+        merged = [...byId.values()];
       }
-      merged = [...byId.values()];
+    } catch {
+      /* 读失败用传入快照 */
     }
-  } catch {
-    /* 读失败用传入快照 */
-  }
-  writeJSONSync(entriesFile(), { version: STORE_VERSION, entries: merged.map(sanitizeEntry) } satisfies MemoryStore);
-  return merged;
+    writeJSONSync(entriesFile(), { version: STORE_VERSION, entries: merged.map(sanitizeEntry) } satisfies MemoryStore);
+    return merged;
+  });
 }
 
 function readEntriesRaw(): MemoryEntry[] {

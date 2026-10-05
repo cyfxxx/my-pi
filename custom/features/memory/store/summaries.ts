@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { writeJSONSync } from '../../../core/atomic-write';
 import { scrubSecrets } from '../../../core/secrets';
 import type { SummaryEntry, SummaryStore } from './types';
-import { dataDir, ensureDir, readStoreFile } from './io';
+import { dataDir, ensureDir, readStoreFile, withMemoryLock } from './io';
 
 export const SUMMARY_VERSION = 1;
 const MAX_SUMMARIES = 50;
@@ -47,27 +47,30 @@ export function saveSummaries(summaries: SummaryEntry[]): void {
 }
 
 export function appendSummary(summary: SummaryEntry): SummaryEntry[] {
-  const all = loadSummaries();
   const clean = sanitizeSummary(summary);
-  const existing = clean.sessionId ? all.findIndex((s) => s.sessionId === clean.sessionId) : -1;
-  if (existing >= 0) {
-    all[existing] = clean;
-  } else {
-    all.push(clean);
-  }
-  let trimmed = all.length > MAX_SUMMARIES ? all.slice(-MAX_SUMMARIES) : all;
-  try {
-    const fresh = readStoreFile<SummaryStore>(summariesFile(), 'summaries');
-    if (fresh && Array.isArray(fresh.summaries)) {
-      const seen = new Set(trimmed.map((s) => s.sessionId));
-      for (const d of fresh.summaries) {
-        if (d?.sessionId && !seen.has(d.sessionId)) trimmed.push(d);
-      }
+  // 读盘合并 + 落盘在同一把跨进程锁内（同 saveEntries：原子写防不了丢更新）
+  return withMemoryLock(summariesFile(), () => {
+    const all = loadSummaries();
+    const existing = clean.sessionId ? all.findIndex((s) => s.sessionId === clean.sessionId) : -1;
+    if (existing >= 0) {
+      all[existing] = clean;
+    } else {
+      all.push(clean);
     }
-  } catch {
-    /* 读失败用内存态 */
-  }
-  if (trimmed.length > MAX_SUMMARIES) trimmed = trimmed.slice(-MAX_SUMMARIES);
-  saveSummaries(trimmed);
-  return trimmed;
+    let trimmed = all.length > MAX_SUMMARIES ? all.slice(-MAX_SUMMARIES) : all;
+    try {
+      const fresh = readStoreFile<SummaryStore>(summariesFile(), 'summaries');
+      if (fresh && Array.isArray(fresh.summaries)) {
+        const seen = new Set(trimmed.map((s) => s.sessionId));
+        for (const d of fresh.summaries) {
+          if (d?.sessionId && !seen.has(d.sessionId)) trimmed.push(d);
+        }
+      }
+    } catch {
+      /* 读失败用内存态 */
+    }
+    if (trimmed.length > MAX_SUMMARIES) trimmed = trimmed.slice(-MAX_SUMMARIES);
+    saveSummaries(trimmed);
+    return trimmed;
+  });
 }

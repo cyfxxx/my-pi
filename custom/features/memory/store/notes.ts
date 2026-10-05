@@ -7,7 +7,7 @@
 import { join } from 'node:path';
 import { writeJSONSync } from '../../../core/atomic-write';
 import { scrubSecrets } from '../../../core/secrets';
-import { dataDir, ensureDir, readStoreFile } from './io';
+import { dataDir, ensureDir, readStoreFile, withMemoryLock } from './io';
 
 export function notesFile(): string {
   return join(dataDir(), 'notes.json');
@@ -36,23 +36,26 @@ function rawSaveNotes(notes: Record<string, string>): void {
  * `__ttl_*` 元数据键按普通键参与差分与合并（写入路径仍豁免脱敏），
  * 与数据键成对增删的现有约定不变。
  *
- * 残留窗口：重新读盘与 rename 之间仍有极短 TOCTOU 窗口（无跨进程锁），
- * 只保证不会覆盖窗口之前已落盘的更新。
+ * 并发：`重读盘 → 打补丁 → 原子写` 这一段在跨进程文件锁内（`withMemoryLock`），
+ * 因此 2026-10-05 之前注释里写的「重新读盘与 rename 之间的 TOCTOU 窗口」已关闭。
+ * 回调 `fn` 刻意在锁外执行：它只产出变更集，没必要把用户代码的耗时算进临界区。
  */
 export function updateNotes<T>(fn: (notes: Record<string, string>) => T): T {
   const working = rawLoadNotes();
   const before = { ...working };
   const result = fn(working);
 
-  // 保存前重新读盘：以回调变更集为补丁应用到盘上最新内容
-  const merged = rawLoadNotes();
-  for (const [k, v] of Object.entries(working)) {
-    if (before[k] !== v) merged[k] = v; // 新增或修改
-  }
-  for (const k of Object.keys(before)) {
-    if (!(k in working)) delete merged[k]; // after 缺失 = 删除
-  }
-  rawSaveNotes(merged);
+  withMemoryLock(notesFile(), () => {
+    // 保存前重新读盘：以回调变更集为补丁应用到盘上最新内容
+    const merged = rawLoadNotes();
+    for (const [k, v] of Object.entries(working)) {
+      if (before[k] !== v) merged[k] = v; // 新增或修改
+    }
+    for (const k of Object.keys(before)) {
+      if (!(k in working)) delete merged[k]; // after 缺失 = 删除
+    }
+    rawSaveNotes(merged);
+  });
   return result;
 }
 
