@@ -35,6 +35,10 @@ export interface ReadOutput {
   text: string;
   source: 'log' | 'capture';
   truncated: boolean;
+  /** 被行窗口丢掉的行数（0 = 返回的就是日志的全部行） */
+  omittedLines: number;
+  /** 返回文本是否被字符上限截过（保留末尾 maxChars） */
+  cutByChars: boolean;
 }
 
 export interface SendOpts {
@@ -170,19 +174,28 @@ export async function readOutput(opts: TmuxOpts, name: string, lines = 100, maxC
       }
     }
     if (logOk) {
-      const sliced = content.split('\n').slice(-lines).join('\n');
-      // 截断判定与截取都按字符（size 是字节，不能直接与 maxChars 比较）
-      const truncated = sliced.length > maxChars || content.length > sliced.length;
+      const all = content.split('\n');
+      const sliced = all.slice(-lines).join('\n');
+      // 截断判定与截取都按字符（size 是字节，不能直接与 maxChars 比较）。
+      // omittedLines/cutByChars 把"丢了多少行"与"是否又被字符窗口切"分开报：长跑日志恒为
+      // truncated=true（日志必然超过 lines 行），只说"已截断"无法区分这两种很不一样的代价。
+      const omittedLines = all.length > lines ? all.length - lines : 0;
+      const cutByChars = sliced.length > maxChars;
       return {
-        text: truncated ? sliced.slice(-maxChars) : sliced,
+        text: cutByChars ? sliced.slice(-maxChars) : sliced,
         source: 'log',
-        truncated,
+        truncated: omittedLines > 0 || cutByChars,
+        omittedLines,
+        cutByChars,
       };
     }
   }
   const r = await runTmux(opts, ['capture-pane', '-t', name, '-p', '-S', String(-lines)]);
-  const text = r.code === 0 ? r.stdout : '(日志文件不存在且 capture-pane 不可用)';
-  return { text, source: 'capture', truncated: text.length > maxChars };
+  const raw = r.code === 0 ? r.stdout : '(日志文件不存在且 capture-pane 不可用)';
+  // capture-pane 没有"行数截断"概念（-S 已按 lines 取屏），只可能超字符上限；超了就切，
+  // 否则整屏会直接冲进工具输出预算。
+  const cutByChars = raw.length > maxChars;
+  return { text: cutByChars ? raw.slice(-maxChars) : raw, source: 'capture', truncated: cutByChars, omittedLines: 0, cutByChars };
 }
 
 export async function sendKeys(opts: TmuxOpts, name: string, o: SendOpts): Promise<void> {

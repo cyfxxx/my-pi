@@ -120,7 +120,13 @@ export function register(pi: ExtensionAPI): void {
         const out = await readOutput(cfg, name, (args.lines as number) ?? cfg.defaultLines);
         // 用户已人工查看：该会话完成时不再重复通知
         watcher.ack(name);
-        return out.truncated ? `${out.text}\n\n[输出已截断]` : out.text || '(无输出)';
+        // 截断原因分开写：长跑日志必然超过 lines 行，"省略前 N 行"与"又被字符窗口切"是两回事，
+        // 只说"已截断"会让人以为工具坏了（此前长日志恒报一句无细节的 [输出已截断]）。
+        const why = [out.omittedLines > 0 ? `省略前 ${out.omittedLines} 行` : '', out.cutByChars ? '仅保留末尾字符窗口' : '']
+          .filter(Boolean)
+          .join('，');
+        const note = out.truncated ? `\n\n[输出已截断${why ? `：${why}` : ''}]` : '';
+        return out.text ? `${out.text}${note}` : '(无输出)';
       } catch (e) {
         return fail(e);
       }
