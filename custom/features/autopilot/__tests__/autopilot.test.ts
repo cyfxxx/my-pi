@@ -21,7 +21,7 @@ import {
   computeNextRun,
   previewCron,
 } from '../store/storage';
-import { decide, selectFailover, checkBudget, errClassOf, statsByModel } from '../store/ops';
+import { decide, selectFailover, pickFailoverTarget, checkBudget, errClassOf, statsByModel } from '../store/ops';
 import type { Task, FallbackModel } from '../types';
 
 let dir: string;
@@ -153,6 +153,18 @@ describe('failover / budget / 遥测', () => {
     ];
     const t = selectFailover(chain, 'cur', 'm');
     expect(t?.model).toBe('m2');
+  });
+
+  it('pickFailoverTarget 与手动 failover 同选型（自动路径不再固定取 chain[0]）', () => {
+    const chain: FallbackModel[] = [
+      { provider: 'other', model: 'z' },
+      { provider: 'cur', model: 'm2' },
+    ];
+    // 同 provider 打分更高 → 不能是 chain[0]
+    expect(pickFailoverTarget(chain, 'cur', 'm')?.model).toBe('m2');
+    // 备选全是当前模型时回落 chain[0]（旧行为，不把 failover 降级成 fail）
+    expect(pickFailoverTarget([{ provider: 'cur', model: 'm' }], 'cur', 'm')?.model).toBe('m');
+    expect(pickFailoverTarget([], 'cur', 'm')).toBeNull();
   });
 
   it('checkBudget 次数/模型白名单', () => {

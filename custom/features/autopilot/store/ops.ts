@@ -369,6 +369,25 @@ export function planFailover(chain: FallbackModel[], currentProvider: string, cu
   return { target, reason: `${currentProvider}/${currentModel} → ${target.provider}/${target.model}` };
 }
 
+/**
+ * 自动故障转移的选型：与 `/auto failover`（planFailover）共用 selectFailover 打分。
+ *
+ * 此前 `decide()` 三处直接取 `fallbackModels[0]`，而手动路径走打分（成功率 + 同 provider 优先），
+ * 于是"自动切换"和"手动切换"会选到不同模型——配了多个备选时，自动路径可能每次都撞到历史
+ * 成功率最低的那个。这里统一到一个入口。
+ *
+ * 全部备选都是当前模型时 selectFailover 返回 null：此时回落到 chain[0]（保持旧行为，
+ * 不因选型失败把一次可尝试的 failover 降级成 fail）。
+ */
+export function pickFailoverTarget(
+  chain: FallbackModel[],
+  currentProvider: string,
+  currentModelName: string,
+): FallbackModel | null {
+  if (!chain.length) return null;
+  return selectFailover(chain, currentProvider, currentModelName) ?? chain[0] ?? null;
+}
+
 export function executeFailover(
   target: FallbackModel,
   reason: string,
@@ -416,6 +435,11 @@ export function decide(
   const suspendAfter = policy.suspendAfter ?? 5;
   const maxFailovers = policy.maxFailovers ?? 1;
   const failoverBlocked = (task.failoverCount ?? 0) >= maxFailovers;
+  // 懒算：只有真要走 failover 分支时才读 settings/遥测（decide 在每次任务失败时都会被调用）
+  const failTarget = (): FallbackModel => {
+    const cur = currentModel();
+    return pickFailoverTarget(fallbackModels, cur.provider, cur.model) ?? fallbackModels[0]!;
+  };
   const circuitBreak: PolicyAction = {
     type: 'suspend_task',
     note: `failover 熔断：连续切换模型已达上限 ${maxFailovers}`,
@@ -430,7 +454,7 @@ export function decide(
     if (task.failCount < (task.retries || 0)) return { type: 'retry', note: `超时，按重试计划执行` };
     if (fallbackModels.length > 0) {
       if (failoverBlocked) return circuitBreak;
-      return { type: 'failover', target: fallbackModels[0], note: '超时且重试耗尽，切换模型尝试' };
+      return { type: 'failover', target: failTarget(), note: '超时且重试耗尽，切换模型尝试' };
     }
     return { type: 'fail', note: `超时（${Math.round(info.durationMs / 1000)}s）` };
   }
@@ -439,7 +463,7 @@ export function decide(
     if (task.failCount >= failoverAfter) {
       if (fallbackModels.length > 0) {
         if (failoverBlocked) return circuitBreak;
-        return { type: 'failover', target: fallbackModels[0], note: `连续 ${task.failCount} 次 provider 故障，切换模型` };
+        return { type: 'failover', target: failTarget(), note: `连续 ${task.failCount} 次 provider 故障，切换模型` };
       }
       return { type: 'fail', note: 'provider 故障且未配置 fallbackModels' };
     }
@@ -452,7 +476,7 @@ export function decide(
   }
   if (fallbackModels.length > 0 && task.failCount >= failoverAfter) {
     if (failoverBlocked) return circuitBreak;
-    return { type: 'failover', target: fallbackModels[0], note: `连续失败 ${task.failCount} 次，切换模型` };
+    return { type: 'failover', target: failTarget(), note: `连续失败 ${task.failCount} 次，切换模型` };
   }
   return { type: 'fail', note: `未知错误: ${info.stderr.slice(0, 200)}` };
 }
