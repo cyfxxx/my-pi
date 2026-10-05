@@ -2,6 +2,27 @@
 
 ## 格式
 
+### [2026-10-05] 全面检查 MEDIUM 收口：记忆 RMW 加跨进程锁；link/voice/subagent 边界加固；runner 与 secrets 经实测维持原样
+**背景**：上一轮修完 pre-push 门禁分级、模式解析判据、压缩归因、failover 选型后，把 `pi-full-audit` 报告里剩下的 MEDIUM/LOW 逐条核实。结论是**真问题就修，伪问题给证据不动代码**（审计报告本身不可全信：同批 6 处"文档计数漂移"里 3 处是误报）。
+
+**决策（按条目）**：
+- **记忆存储非原子 RMW → 加跨进程锁**（`memory/store/io.ts` 新增 `withMemoryLock`，`saveEntries`/`appendSummary`/`updateNotes` 的「读盘合并 + 原子写」整段进锁）。真实风险：写者不止一个——pi 会话内记忆工具、`scripts/memory-store.mjs`（headless 入库）、回顾/订阅类定时任务可能同时在跑；原子写只防半截文件，防不了「A 读 → B 读 → A 写 → B 写」丢更新。复用既有 `core/file-lock.ts`（tmux registry 已用同一实现），`PI_MEMORY_LOCK_TIMEOUT_MS/STALE_MS` 可覆盖；拿不到锁时告警降级（不死锁）。`updateNotes` 的回调刻意留在锁外（它只产出变更集），并同步删掉注释里"仍有 TOCTOU 窗口"的免责声明。
+- **link 握手哨兵**：远端探针此前只在「有可续会话」时回声 `PI_LINK_LAST_SESSION=<file>`，没有可续会话时客户端只能等满 3s 兜底定时器（`sessionPolicy=fresh` 必然白等）→ 探针追加固定哨兵 `PI_LINK_PROBE_DONE`，两条路都能立刻结束握手；fresh 契约（不查询会话文件）不变。
+- **link 切换超时起算点**：`switchTimer` 原来在 spawn 时就启动（握手之前），握手耗时会吃掉切换预算 → 改为**发出 switch 请求时**才起算，否则极端情况下 `lastSession` 被丢弃、本该续接的会话变成新开。
+- **link tmux 回退泛化**：`LD_PRELOAD= /lib/ld-linux-aarch64.so.1 /usr/bin/tmux` 写死单一解释器与路径 → 改为候选列表（aarch64 → armhf → Android linker64/linker + PATH 里的 tmux）。第一项与既有实现完全一致，只有它失败时才试后面的，不改变现有可用环境。
+- **voice 残留清理**：`pkill -f` 的模式原来直接拼接 `bin`+`tmpDir`，未转义也未锚定，可能命中"命令行里恰好含该路径"的无关进程 → 改为 `^(timeout [0-9]+ )?<escaped bin> .*<escaped tmpDir>`（真实命令行形如 `timeout 90 arecord … <tmpDir>/…`），且 `bin`/`tmpDir` 为空时**不清理**（宁可不清也不无差别 pkill）。
+- **voice 配置损坏**：`loadConfig` 静默回退默认、`persistConfig` 直接覆盖损坏文件 → 用户配置无声消失。改为与 `memory/store/io.ts:backupCorruptFile` 同一处置：备份到 `<path>.corrupt-<ts>` + 告警，再按默认值继续。
+- **subagent frontmatter**：简化解析器补两处——按 YAML 语义剥离行尾注释（引号内不剥，`readonly: true # 只读` 这类此前会让 `readonly` 失效、`tools: [a, b] # 注释` 解析成垃圾），块标量（`|`/`>`）不再静默当成字面量而是标为 `unsupported`；角色文件因缺字段/块标量被跳过时告警（此前静默消失，排障要翻源码）。
+- **context 原地突变 timeout → 维持原样 + 补注释**：`BeforeToolCallResult` 只有 `block/reason/terminate`，**没有覆盖 args 的字段**，而 agent-loop 传的就是 `validatedArgs` 并以同一对象执行——原地改是 pi 给的**唯一**通道（`__tests__/bash-timeout.test.ts` 6 项已锁）。注释里写明"不要改成复制再改"。
+- **runner「O(N²) 磁盘读」→ 不改**：实测数据量有界——`appendRun` 按 `TELEMETRY_LIMIT` 截断（telemetry.json 68 条/22KB），`updateTaskAfterRun` 走 `withStoreLock` 且每次运行只读改写一次 tasks.json（47KB/5 任务）。一次 `/daily run all` 的文件操作总量 <1MB。审计自己也标注"仅在大量到期任务时触发，可选优化"，按 VISION"先测量再动手"维持原样。
+- **secrets 短 token 窗口 → 不改，补文档**：键值形态的值长度下限 8 与 NIST SP 800-63B 的最短口令长度一致，且避免把 `token: needed` 误判成密钥；在代码里写明这是刻意取舍（短于 8 位的密钥不脱敏），不留"像是漏了"的歧义。
+
+**理由**：这批的共同点是"边界处的静默降级"——丢更新、白等、误杀、损坏被覆盖、角色文件消失、硬约束被误改。修法一律选**可验证的最小改动**：复用仓库已有的锁/备份/哨兵约定，不引入新依赖（保持 features 层零 Pi 依赖），并给每条加用例。判为不改的两条也给出量化依据而不是"看着没问题"。
+
+**代价与约束**：记忆写入多一次 `openSync(lockPath,'wx')` + 释放（毫秒级；拿不到锁退化为加锁前的行为）。link 探针多一次 `echo`（远端 shell 内置，无额外进程）。subagent 行尾注释按 YAML 语义剥离意味着 `description: 见 issue # 12` 会被截断为 `见 issue`（与真 YAML 一致；要保留请加引号）。voice/subagent 的新告警走 `console.error`，只在真损坏/真配置错误时出现。
+
+**验证**：`memory.test.ts` +3（锁不残留 / 外部持锁降级且告警 / 等待过重试才降级）、`link.test.ts` +1（哨兵契约，19 项）、`voice.test.ts` +5（模式锚定转义与空值守卫、损坏备份）、`subagent.test.ts` +3（注释剥离、块标量、坏文件告警，31 项）；`npx tsc --noEmit -p custom/`、`vitest` 72 文件/**784 用例**、全量 golden。
+
 ### [2026-10-05] 每日任务结果复盘：pre-push 门禁按改动范围分级；模式解析两侧同判据；压缩导致的前缀重放不算退化
 **背景**：用户手动跑完全部每日任务 + 一次全面检查技能后要求复盘并优化。执行结果里暴露三个实测缺陷：
 - **tool-stats-daily 当天 4 次运行 3 次 1200s 超时**（`scheduler/telemetry.json`）。根因链：纯统计提交也要过 4~5 分钟的全量 pre-push（tsc + 72 文件单测 + web-terminal）；而 pre-push 当时因下一条缺陷 5 项红，任务里又去改代码+反复重推，烧光预算，并在工作区留下 stranded 的 `git add`（staged `tool-count-localhost.json`）。

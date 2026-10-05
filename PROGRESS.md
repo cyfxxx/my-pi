@@ -2053,3 +2053,25 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 处理超时残留：`git add` 过的 `portable/memory/stats/tool-count-localhost.json` 按每日任务约定单独提交。
 - 验证：`test-supervisor.sh` 56 项、`test-usage-metrics.mjs` 46 项、`test-prepush-scope.sh` 7 项、
   `vitest` 72 文件 / 772 用例、`tsc`、全量 `golden` 17 步（注入面基线因 `AGENTS.md` 一行说明刷新一次）。
+
+### 全面检查 MEDIUM 项收口（2026-10-05，第二批）
+
+- **修（真问题）**：
+  - `memory/store`：`saveEntries`/`appendSummary`/`updateNotes` 的「读盘合并 + 原子写」进 `withMemoryLock`
+    （复用 `core/file-lock.ts`）——多写者（会话内工具 / `memory-store.mjs` / 定时任务）并发时不再丢更新；
+    `updateNotes` 回调留在锁外，注释里"仍有 TOCTOU 窗口"的免责声明删除。
+  - `link`：远端探针补固定哨兵 `PI_LINK_PROBE_DONE`（无可续会话时不再白等 3s 握手兜底）；
+    `switchTimer` 改为发出 switch 请求时才起算（避免握手吃掉切换预算导致该续接的会话变新开）；
+    Android/Termux 的 tmux 回退从单一 aarch64 路径改为候选列表（aarch64/armhf/Android linker + PATH tmux）。
+  - `voice`：`pkill -f` 模式改为锚定 + 转义（`^(timeout [0-9]+ )?<bin> .*<tmpDir>`），`bin`/`tmpDir` 为空则不清理；
+    配置损坏改为先备份 `<path>.corrupt-<ts>` 再回退（不再静默覆盖用户配置）。
+  - `subagent`：frontmatter 按 YAML 语义剥离行尾注释（引号内不剥）、块标量标为 unsupported；
+    角色文件被跳过时告警（此前静默消失）。
+- **不改（给证据）**：
+  - `context/index.ts` 原地突变 `timeout` —— `BeforeToolCallResult` 无 args 覆盖字段、agent-loop 传的就是
+    `validatedArgs`，原地改是 pi 的唯一通道；补注释 + 既有 6 项用例锁定。
+  - `runner` 的"O(N²) 磁盘读" —— 数据量有界（telemetry 按 `TELEMETRY_LIMIT` 截断、tasks.json 47KB/5 任务），
+    一次 `/daily run all` 文件操作 <1MB，按"先测量再动手"不动代码。
+  - `core/secrets.ts` 短 token 窗口 —— 值长度下限 8 与 NIST SP 800-63B 一致且避免误报，代码里写明是刻意取舍。
+- 验证：`vitest` 72 文件 / **784 用例**（新增 12 项：memory +3、link +1、voice +5、subagent +3）、
+  `npx tsc --noEmit -p custom/`、全量 `golden`。
