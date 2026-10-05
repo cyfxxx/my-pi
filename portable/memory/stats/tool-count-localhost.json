@@ -1,8 +1,8 @@
 {
   "device": "localhost",
-  "generatedAt": "2026-10-05T11:38:34.835Z",
+  "generatedAt": "2026-10-05T12:38:03.278Z",
   "windowDays": 30,
-  "totalCalls": 1784,
+  "totalCalls": 1795,
   "tools": {
     "read": {
       "calls": 234,
@@ -61,12 +61,12 @@
       "lastTs": 1790774365952
     },
     "bash": {
-      "calls": 1099,
+      "calls": 1110,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810163,
-      "lastTs": 1790829375701
+      "lastTs": 1791200469514
     },
     "memory_search": {
       "calls": 4,
