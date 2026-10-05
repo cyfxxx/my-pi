@@ -2,7 +2,7 @@
  * subagent 纯逻辑回归测试
  * 迁移自 pi-tools subagent/tests 的核心语义（frontmatter/agents/helpers/concurrency）。
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,6 +40,22 @@ describe('parseFrontmatter', () => {
     expect(frontmatter.tools).toEqual(['read', 'ls']);
   });
 
+  it('行尾注释按 YAML 语义剥离（引号内的 # 保留）', () => {
+    const { frontmatter } = parseFrontmatter(
+      '---\nname: x\ndescription: "见 issue # 12"\ntools: [read, ls] # 只读工具\nreadonly: true # 只读\n---\n',
+    );
+    expect(frontmatter.description).toBe('见 issue # 12');
+    expect(frontmatter.tools).toEqual(['read', 'ls']);
+    expect(frontmatter.readonly).toBe('true');
+  });
+
+  it('块标量（| / >）不支持 → 值置空并记入 unsupported（不静默当成字面量）', () => {
+    const { frontmatter, unsupported } = parseFrontmatter('---\nname: x\ndescription: >\n  多行\n  描述\n---\n正文');
+    expect(unsupported).toEqual(['description']);
+    expect(frontmatter.description).toBe('');
+    expect(frontmatter.name).toBe('x');
+  });
+
   it('无 frontmatter → 空对象 + 原文', () => {
     const { frontmatter, body } = parseFrontmatter('just text');
     expect(frontmatter).toEqual({});
@@ -56,6 +72,31 @@ describe('discoverAgents（读取 portable/agent/agents 内置角色）', () => 
     expect(scout.readonly).toBe(true);
     expect(scout.tools).toContain('read');
     expect(scout.source).toBe('user');
+  });
+
+  it('坏角色文件被跳过时告警（不再静默消失）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'my-pi-agents-'));
+    const agentsDir = join(dir, 'agents');
+    mkdirSync(agentsDir, { recursive: true });
+    writeFileSync(join(agentsDir, 'ok.md'), '---\nname: ok\ndescription: 正常\n---\n正文');
+    writeFileSync(join(agentsDir, 'no-desc.md'), '---\nname: broken\n---\n正文');
+    writeFileSync(join(agentsDir, 'block.md'), '---\nname: block\ndescription: >\n  折叠\n---\n正文');
+    const prev = process.env.PI_CODING_AGENT_DIR;
+    process.env.PI_CODING_AGENT_DIR = dir;
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { agents } = discoverAgents(process.cwd(), 'user');
+      expect(agents.map((a) => a.name)).toEqual(['ok']);
+      const logged = warn.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(logged).toContain('no-desc.md');
+      expect(logged).toContain('block.md');
+      expect(logged).toContain('块标量');
+    } finally {
+      warn.mockRestore();
+      if (prev === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = prev;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
