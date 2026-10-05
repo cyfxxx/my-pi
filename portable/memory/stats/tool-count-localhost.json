@@ -1,16 +1,16 @@
 {
   "device": "localhost",
-  "generatedAt": "2026-10-05T12:38:03.278Z",
+  "generatedAt": "2026-10-05T15:51:42.285Z",
   "windowDays": 30,
-  "totalCalls": 1795,
+  "totalCalls": 1834,
   "tools": {
     "read": {
-      "calls": 234,
+      "calls": 238,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068800068,
-      "lastTs": 1790772521920
+      "lastTs": 1791204610923
     },
     "find": {
       "calls": 1,
@@ -61,12 +61,12 @@
       "lastTs": 1790774365952
     },
     "bash": {
-      "calls": 1110,
+      "calls": 1129,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810163,
-      "lastTs": 1791200469514
+      "lastTs": 1791207392729
     },
     "memory_search": {
       "calls": 4,
@@ -117,12 +117,12 @@
       "lastTs": 1790511864905
     },
     "tmux_run": {
-      "calls": 15,
+      "calls": 19,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068832781,
-      "lastTs": 1790770527038
+      "lastTs": 1791203931133
     },
     "memory_forget": {
       "calls": 2,
@@ -133,12 +133,12 @@
       "lastTs": 1790510469738
     },
     "tmux_read": {
-      "calls": 8,
+      "calls": 12,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068838731,
-      "lastTs": 1790767810233
+      "lastTs": 1791203952585
     },
     "tmux_stop": {
       "calls": 4,
@@ -149,12 +149,12 @@
       "lastTs": 1790770386906
     },
     "subagent": {
-      "calls": 14,
+      "calls": 20,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068870686,
-      "lastTs": 1790770707004
+      "lastTs": 1791207377350
     },
     "enable_tool": {
       "calls": 8,
@@ -245,12 +245,12 @@
       "lastTs": 1790773487351
     },
     "ctx_note": {
-      "calls": 13,
+      "calls": 14,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790504206289,
-      "lastTs": 1790772970250
+      "lastTs": 1791203895522
     },
     "autopilot_policy": {
       "calls": 1,
@@ -563,6 +563,14 @@
       "cacheWrite": 0,
       "firstTs": 1790511869847,
       "lastTs": 1790511869847
+    },
+    "session_title": {
+      "calls": 1,
+      "input": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "firstTs": 1791203895511,
+      "lastTs": 1791203895511
     }
   }
 }
