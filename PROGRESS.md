@@ -2106,3 +2106,12 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **边界**：非默认模式下 `/new`、进程内 `/resume`、`-c`/`-r` 会多一次自动重启；会话文件移动/改名后回落 default；模式仍非热切换（人设是 CLI 参数）。
 - **重启成本实测**（2026-10-06，回答"方案 P 有什么代价"时补测；本机 `node -e 1` 仅 0.35s，慢的是 pi 自身启动 + 23MB dist）：`node cli.js --help` 无扩展 33.7s、带 bootstrap 扩展 43.7s、经 supervisor 43.9s、`PI_OFFLINE=1` 39.9s；同进程内重载扩展 9.4s（首次冷 jiti）/ **0.9s（warm）**。→ 一次重启 ≈40s、热重载 ≈1s，这是方案 P 真正的收益量级（前缀重放两边都省不掉）。
 - 验证：`test-supervisor.sh` 65 项、`mode-switch.test.ts` 28 项、`vitest` 72 文件 / **795 用例**、`tsc`、`check-conventions`/`check-dead-exports`/`check-features`/`check-doc-links`/`check-injection-surface`（基线已刷新）、`golden --fast` 17 步全绿、全量 golden。
+
+### 方案 P（模式"免重启"）评估（2026-10-06，**仅记录，不动代码**）
+
+- **结论：暂不实施**（含 P₀ / P₀+），保持 M（重启式切换 + 会话记录 + `session_start` 自愈）。用户决定"暂时先这样"，本次只落记录。
+- **三档**：P₀ 只打补丁（工厂期拿到会话 → 功能集按会话）——收益≈0 且造出"功能 roleplay + 人设 full"的新半切换，**明确不做**；P₀+ 补丁 + "人设/命名空间会过期才重启"（可作将来第一步）；P+ 补丁 + 人设与命名空间 TS 化 + `/mode` 走 `ctx.reload()`（收益完整）。
+- **对价**：一次重启 ≈40s vs 同进程热重载 ≈1s（数字与口径见上一条；前缀重放两档都省不掉）。
+- **主要代价**：补丁栈维护（`main.ts` churn 268/6774，锚点稳定但每次同步要重放）；`PI_SESSION_FILE` 的 env 静默失真面（同 2026-10-05 事故类型）；13 KB 人设搬进 `before_agent_start`（实测 **last-wins + 整段替换**、注册顺序变成语义、预算要新开档位）；丢掉"扩展挂了人设仍在"；命名空间需在**工厂期**设置（memory 的 `session_start` 早于 mode 且会写 notes）；bash 侧解析作废 + 约 1/4 supervisor 测试重写；热切换的工具集中途变化与新通知；真实链路验证需新基建。
+- **触发条件**：非默认模式下频繁 `/new`/`-c`/`-r` 被 ≈40s 重启打断；出现多会话频繁切模式的工作流；上游自带"扩展在工厂期拿到会话"的 API（那时无需补丁）。
+- 逐条记录与"若实施必须保留的不变量"（`modes-sessions.json` 键语义不变、不得停在 P₀、P₀+ 阶段 roleplay 仍走重启）见 `DECISIONS.md` 同日条目；feature 侧入口提示见 `custom/features/mode/README.md`。

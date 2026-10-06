@@ -2,6 +2,41 @@
 
 ## 格式
 
+### [2026-10-06] 模式"免重启"（方案 P）评估：**暂不实施**——记录三档划分、实测对价与触发条件
+
+**背景**：会话作用域化落地后，用户追问"方案 P 有什么代价"。P = 让扩展在**工厂期**就知道本次要加载哪个会话，从而把"模式 → 注册哪些功能"彻底按会话决定，`/new`、`/resume`、`/reload` 都不再需要重启。
+
+**决策：暂不实施 P（含其子档），保持当前 M（重启式切换 + `modes-sessions.json` 会话记录 + `session_start` 自愈）。** 只把评估、代价与触发条件记录在案。
+
+**三档划分**（关键：P 不是"加一行补丁就完了"——人设是 CLI 参数、命名空间是 bash 注入的 env）：
+
+| 档 | 内容 | 收益 | 结论 |
+|---|---|---|---|
+| P₀ | 只打补丁（工厂期拿到会话 → 功能集按会话） | ≈0 | **明确不做**：功能集按会话、人设/命名空间仍按进程 → 造出"功能已是 roleplay、人设还是 full"这类**新的半切换**，比 M 更糟 |
+| P₀+ | 补丁 + "人设/命名空间会过期才重启"（`PI_SESSION_MODE` ≠ 记录模式时才重启） | full/lean/minimal 之间切换、`-c`/`-r` 进无角色扮演会话免重启 | 将来若要动手，从这里起步 |
+| P+ | 补丁 + 人设/命名空间 TS 化 + `/mode` 走 `ctx.reload()` | 全部免重启 | 收益完整，代价最大 |
+
+**实测对价（2026-10-06，本机；`node -e 1` 仅 0.35s，慢的是 pi 自身启动 + 23MB dist）**：一次进程重启 **≈40s**（`node cli.js --help`：无扩展 33.7s、带 bootstrap 扩展 43.7s、经 supervisor 43.9s、`PI_OFFLINE=1` 39.9s）；同进程内重载扩展 9.4s（首次冷 jiti）/ **0.9s（warm）**；前缀重放**两档都省不掉**（仓库既有实测：变更 `selectedTools` ≈140k 全量重放/次、重启后第二回合 ≈80k）。→ P+ 买到的是"40s → 1s"与"`/new`、`-c`/`-r` 不再额外重启"，不是账单。
+
+**P+ 的代价（逐条）**：
+1. **补丁栈**：新增 `patches/010-*`、`check-patches-behavior.mjs` 条目、每次上游同步重放、`UPSTREAM-UPDATE.md` 记录。实测 `main.ts` churn 268/6774 提交（≈4%），上次同步 156 提交里只动 2 次且都不在 `createRuntime` 锚点 ±3 行 → **不算最脆**，但仍是长期维护面。
+2. **env 当接口的静默失真面**：`PI_SESSION_FILE` 是进程全局可变状态，会被 pi 内的 bash 工具与子代理继承——正是 2026-10-05 那次真实事故的类型（bash 侧读到 bootstrap 回写的 `PI_AGENT_MODE`）。要么加"谁写谁读、何时覆盖"的契约测试；更干净的形态（把 `sessionFile` 显式传进 `createAgentSessionServices`→`ResourceLoader`）要改 4 个文件 + 类型，补丁面大得多。
+3. **人设 TS 化（13 115 B，真正的大头）**：实测 `before_agent_start` 的 `systemPrompt` 是 **last-wins + 整段替换**（`forceSystemPrompt` 一旦设置就绕过 pi 自己的 sections），所以每个 handler 必须读 `event.systemPrompt` 再追加——**注册顺序变成语义**；而预算档位只有 `SYSTEM_INJECTION_MAX_BYTES`=4096 / `SYSTEM_APPEND_MAX_BYTES`=2048，13 KB 人设没有可用档位，要新开一类并写明理由（VISION §3.1 禁止直接抬上限），否则就是守门盲区。
+4. **失败隔离回退**：今天人设由 pi 原生 CLI 参数注入，**扩展崩了人设仍在**；搬到 TS 后这条不再成立。
+5. **命名空间**：`dataDir()` 惰性读 env（不必改 memory 代码），但 `FEATURES` 里 memory 在 mode 之前、且 memory 的 `session_start` 会写 notes（压缩后 30s 内写 `_ctx.just_compacted`）→ 靠 mode 的 `session_start` 改 env 会漏掉第一次写；正解是 bootstrap 在**工厂期**设好，即命名空间解析彻底离开 bash。
+6. **bash 侧作废 + 测试重写**：`lib-mode.sh` 的人设/命名空间职责与 65 项 supervisor 测试里约 1/4 要改；迁移期双写会把 13 KB 人设注入两次。
+7. **热切换的语义债**：工具数组在会话中途变化，与 `hard-rules.ts`"不在会话中途改工具集"直接冲突（要显式开例外）；今天重启会由 autopilot 注入"系统已重启…"通知让模型知道环境变了，热切换必须补一个等价通知，否则模型可能继续调用已消失的工具。
+8. **验证基建**：P 的核心行为（工厂期真能拿到会话）单测伪造不了，得把"真实 bootstrap 多轮工厂"固化成 golden 一步。
+
+**触发条件（满足任一再动手；先做 P₀+ 验证，再决定是否上 P+）**：
+- 实际被额外重启咬到：在非默认模式里频繁 `/new` 或 `-c`/`-r`（例如一周 ≥3 次明显打断），或每次切模式都觉得 ≈40s 不可接受；
+- 出现"会话间频繁切模式"的工作流（多会话并行、频繁 resume）；
+- 上游自行提供"扩展在工厂期拿到会话"的 API——那时不需要补丁，只剩人设 TS 化这一步。
+
+**若实施，必须保留的不变量**：`modes-sessions.json` 的键与语义不变（M 与 P 共用同一份真值，迁移零成本）；不得停留在 P₀；P₀+ 阶段 roleplay 场景必须继续走重启（不能出现人设与功能不一致）；`resolveEffectiveMode()` 的优先级链只允许"插入会话记录层"，不许改掉"外部硬覆盖 > 软来源 > default"。
+
+**测量口径（可重建）**：SDK 挂真实 `custom/bootstrap.ts` 跑多轮工厂（initial / reload / newSession / reload#2）统计注册工具数与 `PI_AGENT_MODE_SOURCE`；`MY_PI_CLI` 指向 stub CLI 跑真实 supervisor 看注入的 env/argv；真实 `-p` 无头运行里用 bash 工具回读 `$PI_MEMORY_NAMESPACE`；重启成本用 `date +%s%N` 包 `node cli.js --help`（无扩展 / 带扩展 / `PI_OFFLINE=1` 三种对照）。实验脚本是一次性的（未入库，重建约 30 行）。
+
 ### [2026-10-06] 模式改为**会话作用域**：`/mode` 只影响当前会话，新会话回 default；顺带修掉 bootstrap 的来源判据翻转
 
 **背景**：用户提问"模式切换能不能只在一个会话中生效——创建新会话或加载其他会话时，自动切换为默认模式或那个会话之前的模式"。旧设计里 `modes-state.json` 的 `current` 是**每台机器的全局选择**，所以新会话、别的会话、`-c`/`-r` 续接全都继承同一个值。

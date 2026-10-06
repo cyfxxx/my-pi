@@ -139,6 +139,25 @@ pi 的 `/reload` 会重跑扩展工厂：`session.reload()` → `resourceLoader.
 因此：**重启是模式的正确语义**（模式 = 启动档位，一次重启让功能/人设/命名空间同时且一致地生效）。
 `PI_AGENT_MODE_SOURCE` / `PI_SESSION_MODE` 已为将来真要做的热重载留好路口。
 
+### 要做到"免重启"（方案 P）：已评估，**暂不实施**（2026-10-06）
+
+P = 打补丁让扩展在**工厂期**就知道本次加载哪个会话，于是功能集天然按会话，`/new`、`/resume`、
+`/reload` 都不再需要重启。但**人设是 CLI 参数、命名空间是 bash 注入的 env**，所以：
+
+- **只打补丁（P₀）不能做**：会造成"功能已是 roleplay、人设还是 full"这类新半切换，比现在更糟；
+- **P₀+**（补丁 + "人设/命名空间会过期才重启"）：能让 full/lean/minimal 之间与 `-c`/`-r` 免重启，
+  是将来若要动手的第一步；
+- **P+**（补丁 + 人设与命名空间 TS 化 + `/mode` 走 `ctx.reload()`）：收益完整。
+
+**对价（本机实测）**：一次进程重启 ≈40s，同进程热重载 ≈1s；前缀重放两档都省不掉。
+**代价与触发条件**（补丁栈、env 静默失真面、13 KB 人设搬进 `before_agent_start` 的 last-wins +
+整段替换语义、预算要新开档位、丢掉"扩展挂了人设仍在"、命名空间需在工厂期设置、bash 侧解析作废、
+热切换的工具集中途变化与新通知、验证基建）逐条记在 [`DECISIONS.md` 的同名条目](../../../DECISIONS.md)。
+
+**将来动手的入口**：`resolveEffectiveMode()` 只插入"会话记录"这一层（`getSessionMode`/`setSessionMode`
+已就绪）；人设注入改走 `before_agent_start`（务必读 `event.systemPrompt` 再追加）；命名空间改由
+bootstrap 在工厂期设置。迁移零成本——`modes-sessions.json` 的键与语义不变。
+
 ## 相关
 
 - 启动装配：[../../../scripts/lib-mode.sh](../../../scripts/lib-mode.sh)、[../../../scripts/pi-supervisor.sh](../../../scripts/pi-supervisor.sh)、[../../bootstrap.ts](../../bootstrap.ts)
