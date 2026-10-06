@@ -2162,3 +2162,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **③ 无 autopilot 模式的兜底消费者**：roleplay/lean/minimal 不注册 autopilot，通用重启日志没人消费（崩溃恢复后无通知、不续跑、且静默）→ 由恒注册的 `mode` 兜底；文案/通道抽到 `core/restart-intent.ts` 的 `planRestartNotice`/`formatRestartLine` 共用。
 - **端到端**：真 pty 场景扩到 **22 项**——切模式零回合 + `intent=continue` 重启后**真的起回合**续跑（会话里出现 `my-pi-restart-resume`）。
 - 环境：按用户确认给 git 加了 SSH 保活（`core.sshCommand = ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6`），避免长门禁期间 push 连接被远端断开。
+
+### 场景自带假 provider：回合级断言变成计数级事实（2026-10-06）
+
+- 新增 `scripts/lib-fake-provider.mjs`（本地 OpenAI-compatible，零依赖，记录请求体）；场景把临时 `models.json` 指向它。
+- 真 pty 场景 22→**26 项**，新增：切模式 `completions=0`（连请求都没有）、续跑那次 `completions=1` 且**请求体**带 `系统已重启` + `不要凭空开工`、固定回复落进会话（回合真的跑完）、整场只有一个模型回合。
+- 收益：场景彻底不依赖网络/凭据/模型抖动；"有没有白跑一个回合"从间接证据变成可断言事实。
+- 未做：`intent=auto` 的盘面尾部路径端到端（现具备条件：假 provider 的 `hang` + 半途杀进程）；故障注入组。

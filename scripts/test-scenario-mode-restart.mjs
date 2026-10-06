@@ -22,7 +22,9 @@
  *     （2026-10-06 起通知走 deliverAs:'nextTurn' 的零成本通道：不触发回合、不写会话文件）；
  *   - `modes-sessions.json` 把该会话记成 roleplay；全程没有 lostRestart。
  *
- * 因为不再需要模型回合，本场景**不依赖 provider/网络**（确定性），只依赖 pty 与已构建的 dist。
+ * 场景自带**本地假 provider**（scripts/lib-fake-provider.mjs）：模型请求变成确定性事实——
+ * 切模式后 `completions.length === 0`（连请求都没有），续跑那次则能断言"请求体里确实带上了
+ * 续跑指令"，并让固定回复落进会话文件。因此**不依赖网络与真实 provider、也不依赖模型抖动**。
  *
  * 用法：
  *   node scripts/test-scenario-mode-restart.mjs                 # 约 3 分钟（两轮真实启动）
@@ -32,6 +34,7 @@
  * test-web-terminal.mjs 的处理一致。
  */
 import { spawn, spawnSync } from 'node:child_process';
+import { startFakeProvider } from './lib-fake-provider.mjs';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -75,12 +78,46 @@ const ROUNDS = join(AGENT, 'recovery', 'rounds.jsonl');
 mkdirSync(SESS_DIR, { recursive: true });
 mkdirSync(join(AGENT, 'modes'), { recursive: true });
 mkdirSync(MEM, { recursive: true });
-for (const f of ['settings.json', 'models.json', 'models-store.json', 'auth.json', 'keybindings.json', 'trust.json', 'modes.json', 'APPEND_SYSTEM.md', 'AGENTS.md']) {
+for (const f of ['settings.json', 'auth.json', 'keybindings.json', 'trust.json', 'modes.json', 'APPEND_SYSTEM.md', 'AGENTS.md']) {
   const src = join(ROOT, 'portable/agent', f);
   if (existsSync(src)) copyFileSync(src, join(AGENT, f));
 }
 const persona = join(ROOT, 'portable/agent/modes/roleplay.md');
 if (existsSync(persona)) copyFileSync(persona, join(AGENT, 'modes/roleplay.md'));
+// 假 provider：模型请求变成可断言的事实（切模式后应为 0 次；续跑那次应带上续跑指令）。
+// 配置只覆盖 defaultProvider/defaultModel，其余 settings 原样继承（行为差异最小）。
+const REPLY_TEXT = 'SCENARIO-REPLY-OK';
+const provider = await startFakeProvider({ replyText: REPLY_TEXT });
+const realModels = existsSync(join(ROOT, 'portable/agent/models.json'))
+  ? JSON.parse(readFileSync(join(ROOT, 'portable/agent/models.json'), 'utf8'))
+  : { providers: {} };
+writeFileSync(
+  join(AGENT, 'models.json'),
+  JSON.stringify({
+    providers: {
+      ...(realModels.providers ?? {}),
+      scenario: {
+        baseUrl: `http://127.0.0.1:${provider.port}/v1`,
+        api: 'openai-completions',
+        apiKey: 'scenario-not-needed',
+        models: [
+          {
+            id: 'scenario-model',
+            name: 'Scenario Model',
+            contextWindow: 131072,
+            maxTokens: 8192,
+            reasoning: false,
+            compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+          },
+        ],
+      },
+    },
+  }),
+);
+const settingsPath = join(AGENT, 'settings.json');
+const realSettings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
+writeFileSync(settingsPath, JSON.stringify({ ...realSettings, defaultProvider: 'scenario', defaultModel: 'scenario-model' }));
+
 // 预置一个最小会话头（pi 以 --session 载入它 = 续接）
 writeFileSync(SESS, JSON.stringify({ type: 'session', version: 3, id: '01a1ffff-0000-7000-9000-000000000001', timestamp: new Date().toISOString(), cwd: ROOT }) + '\n');
 
@@ -224,6 +261,7 @@ try {
   check('切模式不触发模型回合：也没有新增 user 消息', !rolesAfterSwitch.includes('user'), JSON.stringify(rolesAfterSwitch));
   check('零成本通道：模式通知不落盘（无 custom_message）', !rolesAfterSwitch.includes('custom_message'), JSON.stringify(rolesAfterSwitch));
   check('会话文件只含允许的条目类型', rolesAfterSwitch.every((r) => ['session', 'model_change', 'thinking_level_change'].includes(r)), JSON.stringify(rolesAfterSwitch));
+  check('切模式没有产生任何模型请求（假 provider 计数=0，零回合的强证据）', provider.completions.length === 0, `completions=${provider.completions.length}`);
 
   // ② 续跑通道（端到端）：写一条 intent=continue 的重启请求（语义等价于看门狗/自动 failover
   //    ——"工作在途被中断"），再 /quit 让 supervisor 重拉；新进程应当**真的起一个回合**接上。
@@ -250,7 +288,13 @@ try {
   check('intent=continue 的重启请求被真的执行（第二次重拉）', restartedAgain, JSON.stringify(rows()));
   const resumeInjected = await waitFor(() => sessionText().includes('my-pi-restart-resume'), { timeout: 180_000, label: '续跑回合注入', quiet: false });
   check('续跑通道：新进程真的起了回合（会话里出现 my-pi-restart-resume）', resumeInjected, sessionText().slice(-400));
-  check('续跑指令写明"没有下一步就停下、不要凭空开工"', sessionText().includes('不要凭空开工'));
+  const gotResumeRequest = await waitFor(() => provider.completions.length >= 1, { timeout: 60_000, label: '续跑回合的模型请求', quiet: false });
+  check('续跑那次真的调用了模型（假 provider 收到请求）', gotResumeRequest, `completions=${provider.completions.length}`);
+  const resumeBody = JSON.stringify(provider.completions.at(-1)?.body ?? {});
+  check('模型请求体里带着续跑指令（说明模型真的收到了"接着做/别凭空开工"）', resumeBody.includes('不要凭空开工') && resumeBody.includes('系统已重启'));
+  const gotReply = await waitFor(() => sessionText().includes(REPLY_TEXT), { timeout: 60_000, label: '假 provider 的回复落盘' });
+  check('假 provider 的固定回复落进会话（回合真的跑完了）', gotReply, sessionText().slice(-300));
+  check('整场只跑了这一个模型回合（切模式那次为 0）', provider.completions.length === 1, `completions=${provider.completions.length}`);
 
   // 收尾：round-3 可能正在流式回复；/quit → Ctrl+C → Ctrl+D → SIGTERM
   send('/quit\r');
@@ -292,6 +336,7 @@ try {
   } catch {
     /* 已退出 */
   }
+  await provider.close().catch(() => {});
   if (!process.env.PI_SCENARIO_KEEP) rmSync(T, { recursive: true, force: true });
   else console.log(`保留现场：${T}`);
 }
