@@ -2091,3 +2091,17 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 基础设施：重建 dist（stamp `086d6fc51`）、刷新自愈缓存（v1.0.4）、新建离线归档 `vendor/pi-28dcce2ba45c.bundle`（70M，含当前 PINNED）。
 - 文档：新增本次跳版报告；`docs/README.md` 索引、`UPSTREAM-UPDATE.md` 待办表（"接 MCP 前先升到 v0.99.2"标记已满足、新增 `env` 复用评估）、`PI-RUNTIME-AUDIT.md` 时点提示。
 - 验证：`tsc`、`vitest` 72 文件 / 784 用例、`golden --smoke` 全绿、`doctor.sh` 24 正常 / 1 警告 / 0 异常、`./my-pi.sh -p` 冒烟正常。
+
+### 模式会话作用域化（2026-10-06）
+
+- **需求**：用户提问"模式切换能不能只在一个会话中生效——创建新会话或加载其他会话时，自动切换为默认模式或那个会话之前的模式"。旧设计 `modes-state.json.current` 是每台机器的全局选择，新会话/别的会话都继承同一个值。
+- **交付**：
+  - `custom/features/mode/logic.ts`：新增会话记录表 `modes-sessions.json`（键=会话文件绝对路径 → `{mode, updatedAt}`，带孤儿记录裁剪）、`getSessionMode`/`setSessionMode`、`shouldRequestModeRestart`（120s 防环），以及 `resolveStartupMode()`——把"解析 + 进程内来源标记"收敛成单一入口；删除全局状态（`getCurrentMode`/`setCurrentMode`/`loadModeState`/`saveModeState`/`modeStatePath`）与 `ModesFile.current`。
+  - `custom/features/mode/index.ts`：`/mode` 只写当前会话的记录；`session_start` 按"本会话应有的模式"做一致性校验，不一致就带 `--session` 自愈重启（重启无效则改为告警）；`--no-session` 明确提示无法按会话记录。
+  - `custom/bootstrap.ts`：`envWasSet` 判据改为 `PI_AGENT_MODE_SOURCE`（**真 bug 修复**，见下）。
+  - `scripts/lib-mode.sh`：`mode_resolve <agentDir> [会话文件]`（会话记录 → `modes.json` 的 default）+ `mode_session_arg`（只认 `--session <绝对路径>`）；`pi-supervisor.sh`/`dev.sh` 导出 `PI_SESSION_MODE` 并按轮传参。
+- **实测证据（真实 bootstrap，同进程多轮工厂）**：新会话无记录 → full（63 个自定义工具）；写入会话记录 roleplay + 软来源 → 11 个工具、`ns=roleplay`；**第 3 轮仍是 roleplay**；记录改回 full → 回到 63 个工具。旧代码在第 3 轮漂回 full（来源判据翻转 bug：第二次工厂执行把 `PI_AGENT_MODE_SOURCE` 从 file 翻成 env，第三次起把首轮值当外部注入钉死；旧设计靠"每次 /mode 换进程"掩盖）。
+- **端到端（真实启动器 + stub CLI）**：`--session <roleplay 会话>` → `PI_SESSION_MODE=roleplay` + 人设参数 + `PI_MEMORY_NAMESPACE=roleplay`；无会话参数 → full、不注入人设；`--session abc123`（id 形态）→ 回落 default，交给 pi 侧自愈。
+- **端到端（真实无头运行）**：`./my-pi.sh -p` 新会话正常回复；对带 roleplay 记录的会话 `--session <file> -p`，模型用 bash 工具写出 `$PI_MEMORY_NAMESPACE` = `roleplay`（证明启动器按会话解析生效）。
+- **边界**：非默认模式下 `/new`、进程内 `/resume`、`-c`/`-r` 会多一次自动重启；会话文件移动/改名后回落 default；模式仍非热切换（人设是 CLI 参数）。
+- 验证：`test-supervisor.sh` 65 项、`mode-switch.test.ts` 28 项、`vitest` 72 文件 / **795 用例**、`tsc`、`check-conventions`/`check-dead-exports`/`check-features`/`check-doc-links`/`check-injection-surface`（基线已刷新）、`golden --fast` 17 步全绿、全量 golden。

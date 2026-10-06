@@ -2,6 +2,37 @@
 
 ## 格式
 
+### [2026-10-06] 模式改为**会话作用域**：`/mode` 只影响当前会话，新会话回 default；顺带修掉 bootstrap 的来源判据翻转
+
+**背景**：用户提问"模式切换能不能只在一个会话中生效——创建新会话或加载其他会话时，自动切换为默认模式或那个会话之前的模式"。旧设计里 `modes-state.json` 的 `current` 是**每台机器的全局选择**，所以新会话、别的会话、`-c`/`-r` 续接全都继承同一个值。
+
+**决策**：
+- **语义**：新会话（直接启动 / `/new`）用 `modes.json` 的 `default`；续接会话用它自己记录的模式（没有记录就是 default）；`/mode <name>` 只写**当前会话**的记录，然后走既有的 admin restart 通道（`--session` 精确续接）。
+- **存储**：`portable/agent/modes-sessions.json`（gitignored）：`{ "<会话文件绝对路径>": { mode, updatedAt } }`。
+  - 不用 `appendEntry`（pi 官方的扩展按会话持久化通道，`plan-mode` 在用）的原因：pi 的新会话文件**在首条 user/assistant 消息之前不落盘**（`SessionManager._persist` 的 `_hasConversation` 门控），而"刚开一个空会话就 `/mode` 然后自动重启"正是要覆盖的场景，那种情况下条目只在内存里、重启即丢。
+  - 键用**路径**而非 sessionId 的原因：空会话重启时 pi 会以同路径创建一个**新 id** 的会话（实测），只有路径稳定。
+- **两侧同一判据**：`PI_AGENT_MODE`(+`SOURCE=env`，外部硬覆盖) > `PI_SESSION_MODE`（bash 按会话解析出的**软**来源）> `modes.json` 的 `default`。bash 侧 `mode_session_arg` **只认 `--session <绝对路径>`**，其余形态（`-c`/`-r`/会话 id/部分 uuid）回落 default，不复制 pi 的会话查找语义。
+- **启动自愈**：`session_start` 比对"本会话应有的模式 vs 本进程 `activeMode`"，不一致就带 `--session` 精确重启；**同一（会话, 模式）120s 内只尝试一次**（`mode-restart-guard.json`），第二次仍不一致改为告警，防"解决不了就无限重启"。headless（`-p`/RPC）不重启、只 `console.warn`，避免打断非交互运行。
+- **`modes-state.json` 退役**：不再作为模式来源（文件留着无害、gitignored）。`modes.json` 里遗留的 `current` 字段同样不再有意义（`check-conventions.sh` 本就禁止它入库）。
+
+**理由**：
+- **可行性来自实测**：把本仓库真实的 `bootstrap.ts` 当扩展、用 SDK 在**同一进程**里跑多次工厂（initial / reload / newSession / reload#2 …），确认 pi 在 `/reload`、`/new`、`/resume`、fork 时都会**重跑扩展工厂**。所以"按会话决定注册哪些功能"在架构上成立，**不需要**改成"全注册 + 事后 `setActiveTools`"那种会破坏功能隔离（钩子/命令仍常驻）的做法。工厂执行时 pi 不把会话告诉扩展（`createAgentSessionServices()` 不接 `sessionManager`、无相关环境变量），所以会话身份由启动器（`PI_SESSION_MODE`）与 `session_start` 自愈两端补齐，而不是改 vendor。
+- **同一实验暴露了一个真 bug**：`bootstrap.ts` 的来源判据只看 `PI_AGENT_MODE` 非空——第二次工厂执行会把 `PI_AGENT_MODE_SOURCE` 从 `file` 翻成 `env`，第三次起把**第一次**的值当成外部注入**钉死**。实测（磁盘从 full 改 minimal）：第 1 轮 full、第 2 轮正确解析为 minimal、**第 3 轮起又变回 full 且此后永不跟随**。旧设计靠"每次 `/mode` 都换进程"掩盖了它，会话作用域化后它会立刻表现为"切了模式不生效"。修复：判据改为 `SOURCE`，并把"解析 + 进程内来源标记"收敛成 `resolveStartupMode()` 单一入口（bootstrap 只调用它）。
+- **为什么 bash 不自己解析会话**：`--session` 还接受会话 id / 部分 uuid，`-c`/`-r` 是 pi 自己的查找语义（`resolveSessionPath` / `findMostRecentSession` / 选择器）。在 bash 里复制一份必然与上游漂移，而"漂移"正是本项目补丁栈反复踩过的坑；宁可 bash 解析不出就回落 default，由 pi 侧检测到不一致后自愈收敛。
+
+**代价与约束**：
+- 非默认模式（roleplay/lean/minimal）下，`/new`、进程内 `/resume`、`-c`/`-r` 启动会**多一次自动重启**（约 1–3 秒 + 一次前缀重算）。
+- **模式仍不是热切换**：人设是 CLI 参数、功能集在注册期确定，重启语义不变（README"为什么不做热重载"的三条理由仍成立；其中"记忆命名空间不该中途变"一条因会话作用域化而弱化——同一次会话内命名空间现在是稳定的，除非用户主动切模式）。
+- 会话文件被移动/改名/导出后记录不再匹配 → 回落 default（有意为之：那本来就是一个新会话）。
+- `hard-rules.ts` 里"运行时状态不入库（如 `modes-state.json`）"的示例改成 `modes-sessions.json` → 注入面基线刷新，**所有会话的前缀失效一次**（一次性、有意的）。
+- 删掉 `getCurrentMode`/`setCurrentMode`/`loadModeState`/`saveModeState`/`modeStatePath` 与 `ModesFile.current`（会话记录取代全局状态），相关测试改写为新模型。
+
+**验证**：
+- `test-supervisor.sh` **65 项**（新增：会话记录命中/换会话不继承/未知模式回落/记录损坏/`mode_session_arg` 四种形态/旧 `modes-state.json` 退役）；`mode-switch.test.ts` **28 项**（含"三连工厂执行不漂移"回归——旧代码在此必红、以及自愈重启与防环）。
+- `vitest` 72 文件 / **795 用例**；`npx tsc --noEmit -p custom/` 通过；`check-conventions` / `check-dead-exports` / `check-features` / `check-doc-links` / `check-injection-surface` 通过。
+- **真实 bootstrap 5 轮实测**（SDK 挂本仓库 `bootstrap.ts`，临时 agent 目录）：新会话无记录 → full（63 个自定义工具）；写入会话记录 roleplay + 软来源 → 11 个工具且 `ns=roleplay`；**第 3 轮仍是 roleplay**（旧代码在这里漂回 full）；记录改回 full → 回到 63 个工具，不再钉死在首轮值。
+- `./my-pi.sh -p` 无头冒烟与会话续接实测见 `PROGRESS.md`。
+
 ### [2026-10-06] 上游同步 v0.99.1 → v1.0.4：补丁栈按真实中间态重新生成；fullscreen 采用默认；兼容面逐项实测
 **背景**：用户要求把 vendored pi 同步到上游最新（156 提交 / 837 文件 / `+42684 -116560`，删除量远大于新增，主体是 `packages/agent` 的实验 harness 整块移除），并明确"fullscreen 先设为默认，用不惯再改回去；确保不要出现冲突"。
 
