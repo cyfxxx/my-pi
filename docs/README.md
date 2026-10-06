@@ -53,6 +53,7 @@
 | [operations/KEY-BOOTSTRAP-ANALYSIS.md](operations/KEY-BOOTSTRAP-ANALYSIS.md) | **私钥引导包分析**：把私钥压缩加密后同步到 GitHub 是否可行——实测仓库为公开、三方案对比、为何 SSH 私钥不该搬运、方案 A 的落地设计（age -p 口令包/口令与落盘纪律/守门/轮换/演练）与风险清单 |
 | [operations/UPSTREAM-UPDATE.md](operations/UPSTREAM-UPDATE.md) | **更新 vendored pi 的完整流程**：同步前体检（`check-upstream.sh` 六段报告怎么读）→ 决策 → 同步 → 验证；以及「上游出现不想要的变更怎么办」的四档手段与补丁维护约定 |
 | [operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md](operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md) | 上游 v0.87.0 → d2931ad3 跳版实测报告（130 提交 / 744 文件）：逐条变更、破坏性项、需评估项与遥测结论 |
+| [operations/UPSTREAM-CHANGES-v0.99.1-to-28dcce2ba.md](operations/UPSTREAM-CHANGES-v0.99.1-to-28dcce2ba.md) | 上游 v0.99.1 → v1.0.4 跳版实测报告（156 提交 / 837 文件 / −116,560 行）：fullscreen 默认、agent harness 删除、新包 `env`，以及**逐项实测的本仓库兼容面**（适配器 API/事件/CLI/settings 全兼容） |
 
 ### 设计与目标
 

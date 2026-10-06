@@ -2,6 +2,9 @@
 
 > 目的：为与 DSH（DeepSeek Harness）的对比分析提供**可核查**的实现事实。
 > 范围：`/root/my-pi/vendor/pi/`（上游 pi v0.99.1 + `patches/` 001–009）与 `/root/my-pi/custom/`（my-pi 自定义层）。
+> **时点提示（2026-10-05）**：vendored pi 已同步到 **v1.0.4（`28dcce2ba`）**。本文的 `file:line` 与逐字原文取自 **v0.99.1**；
+> 上游那 156 个提交会移动行号（`custom/` 侧未受影响）。代码级引用请以当前树为准，历史结论（阈值/擦除/压力分档等语义）与本次跳版报告
+> [operations/UPSTREAM-CHANGES-v0.99.1-to-28dcce2ba.md](../operations/UPSTREAM-CHANGES-v0.99.1-to-28dcce2ba.md) 对齐后再引用。
 > 与 [`docs/development/CONTEXT-MANAGEMENT-COMPARISON.md`](CONTEXT-MANAGEMENT-COMPARISON.md) 不重复：压缩阈值/擦除/spill/压力分档/system prompt 变动/暖前缀只做**补充与更正**，矛盾处**以代码为准并在第五节列出**。
 >
 > 引用约定：`vendor/pi` 的路径省略前缀 `/root/my-pi/vendor/pi/packages/`；`custom/` 的路径省略 `/root/my-pi/custom/`。
