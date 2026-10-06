@@ -122,17 +122,36 @@ if [ "$SMOKE" = "1" ]; then
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，
   # "问一句就退出"变成长期挂起。已加 `if (!ctx.hasUI) { 只对账种子; return; }` 网关；
   # 本步骤因此改为**严格要求 rc=0**，以锁住该修复（若再挂住，先查调度器网关）。
+  #
+  # 2026-10-06：同一提示词在免费 provider（freellmapi）上实测响应 4.6s–145s（一次 v1.0.4 升级后
+  # 的复测里连续 3 次超 90s），单次判定会把"provider 慢"误报成"进程没退出"。改为**失败重试一次**：
+  # 真挂起（原 bug 是必现的）两次都失败，仍会被拦住；而 provider 抖动不再假红。
   smoke_log=/tmp/golden-smoke.log
-  timeout 90 ./my-pi.sh -p "回复 OK" >"$smoke_log" 2>&1
-  smoke_rc=$?
-  reply="$(grep -vE '^\[supervisor\]|^\s*$' "$smoke_log" | tail -1)"
-  if [ "$smoke_rc" -eq 0 ]; then
+  smoke_attempt=0
+  smoke_ok=0
+  while [ "$smoke_attempt" -lt 2 ]; do
+    smoke_attempt=$((smoke_attempt + 1))
+    timeout 90 ./my-pi.sh -p "回复 OK" >"$smoke_log" 2>&1
+    smoke_rc=$?
+    reply="$(grep -vE '^\[supervisor\]|^\s*$' "$smoke_log" | tail -1)"
+    if [ "$smoke_rc" -eq 0 ]; then
+      smoke_ok=1
+      break
+    fi
+    if [ -n "$reply" ]; then
+      echo "  ⚠ 第 $smoke_attempt 次：有回复（${reply:0:40}）但进程未退出"
+    else
+      echo "  ⚠ 第 $smoke_attempt 次：90s 内无回复"
+    fi
+    [ "$smoke_attempt" -lt 2 ] && echo "  ↻ provider 抖动/挂起待区分：重试一次"
+  done
+  if [ "$smoke_ok" -eq 1 ]; then
     pass "headless smoke（正常退出）"
   elif [ -n "$reply" ]; then
-    fail "headless smoke（有回复但进程未退出：检查 autopilot 的无头调度网关与未 unref 的句柄）"
+    fail "headless smoke（两次都有回复但进程未退出：检查 autopilot 的无头调度网关与未 unref 的句柄）"
     tail -10 "$smoke_log"
   else
-    fail "headless smoke（无回复，见 $smoke_log）"
+    fail "headless smoke（两次均无回复，见 $smoke_log）"
     tail -10 "$smoke_log"
   fi
 fi
