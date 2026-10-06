@@ -11,7 +11,7 @@ import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from '@e
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
-import { sendMessage } from '../../adapters/ui-adapter';
+import { sendMessage, sendMessageAfterRebind } from '../../adapters/ui-adapter';
 
 import { formatRestartLine, normalizeResumeIntent, planRestartNotice, tailKindFromSessionFile } from '../../core/restart-intent';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
@@ -870,7 +870,12 @@ export function register(pi: ExtensionAPI): void {
             tail: tailKindFromSessionFile(ctx.sessionManager?.getSessionFile?.()),
             env: process.env.PI_RESTART_RESUME,
           });
-          sendMessage(pi, { customType: plan.customType, content: plan.content, display: plan.channel === 'turn' }, plan.channel === 'turn' ? { triggerTurn: true } : { deliverAs: 'nextTurn' });
+          if (plan.channel === 'turn') {
+            // 延后触发：避开 pi 会话替换的 rebind 竞态（见 adapters/ui-adapter.ts 的注释）
+            sendMessageAfterRebind(pi, { customType: plan.customType, content: plan.content, display: true });
+          } else {
+            sendMessage(pi, { customType: plan.customType, content: plan.content, display: false }, { deliverAs: 'nextTurn' });
+          }
         }
       }
     },

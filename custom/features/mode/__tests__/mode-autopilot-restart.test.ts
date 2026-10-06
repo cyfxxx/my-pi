@@ -40,7 +40,7 @@ interface FakePi {
 
 let dir: string;
 const SESS = '/tmp/my-pi-mode-autopilot.jsonl';
-const ENV_KEYS = ['PI_CODING_AGENT_DIR', 'PI_AGENT_MODE', 'PI_AGENT_MODE_SOURCE', 'PI_SESSION_MODE', 'PI_ADMIN_STATE_FILE'];
+const ENV_KEYS = ['PI_CODING_AGENT_DIR', 'PI_AGENT_MODE', 'PI_AGENT_MODE_SOURCE', 'PI_SESSION_MODE', 'PI_ADMIN_STATE_FILE', 'PI_RESTART_RESUME_DELAY_MS'];
 let savedEnv: Record<string, string | undefined>;
 
 function makeFakePi(): FakePi {
@@ -113,6 +113,7 @@ beforeEach(() => {
     }),
   );
   process.env.PI_CODING_AGENT_DIR = dir;
+  process.env.PI_RESTART_RESUME_DELAY_MS = '0'; // 触发回合的注入默认会延后（避 rebind 竞态）；测试里同步验证
   process.env.PI_ADMIN_STATE_FILE = join(dir, 'state.json');
   delete process.env.PI_AGENT_MODE;
   delete process.env.PI_AGENT_MODE_SOURCE;
@@ -203,6 +204,22 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     expect(note?.content).toContain('不需要继续执行任务');
     expect(note?.content).toContain('intent-none');
     expect(pi.sent).toHaveLength(0); // 没有真用户消息 = 没有触发回合
+  });
+
+  it('触发续跑会延后（避开 pi 会话替换的 rebind 竞态），而不是在 session_start 里同步发', async () => {
+    const { writeRestartRequest } = await import('../../autopilot/logic');
+    process.env.PI_RESTART_RESUME_DELAY_MS = '40';
+    const pi = await setupBoth();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    writeRestartRequest('restart_hang', { targetSession: SESS, reason: '看门狗恢复', intent: 'continue' });
+    await handlers[1]({}, ctx());
+
+    // 同步阶段：还没发（否则会撞上 rebind）
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-resume')).toHaveLength(0);
+    await new Promise((r) => setTimeout(r, 90));
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-resume')).toHaveLength(1);
+    process.env.PI_RESTART_RESUME_DELAY_MS = '0';
   });
 
   it('admin_restart 写盘失败 → 不 shutdown、明确告知（不制造"进程没了、也没重启"）', async () => {

@@ -96,6 +96,39 @@ export function sendMessage<T = unknown>(
 }
 
 /**
+ * 延后一小段时间再发"会触发回合"的自定义消息。
+ *
+ * 为什么不能在 `session_start` 里同步触发：pi 的会话替换（`/resume`、崩溃恢复后的 `--session`
+ * 续接）顺序是 `teardownCurrent` → `createRuntime`（**这里发出 session_start**）→
+ * `finishSessionReplacement` → `rebindSession`（把新会话绑回 TUI/扩展宿主）。在 session_start 里
+ * 立刻触发回合，回复可能落在"换绑前的会话"上被丢弃——实测：请求与响应都发生了、也没有任何报错，
+ * 但 assistant 条目偶发不落盘（重启后"自动续跑"看起来毫无反应）。延后触发让换绑先完成。
+ *
+ * 延迟可用 `PI_RESTART_RESUME_DELAY_MS` 覆盖（测试里设 0）。
+ */
+export function sendMessageAfterRebind(
+  pi: ExtensionAPI,
+  message: { customType: string; content: string; display: boolean },
+  delayMs = 600,
+): void {
+  const raw = Number(process.env.PI_RESTART_RESUME_DELAY_MS);
+  const delay = Number.isFinite(raw) && raw >= 0 ? raw : delayMs;
+  const fire = () => {
+    try {
+      sendMessage(pi, message, { triggerTurn: true });
+    } catch {
+      /* 会话可能已关闭：放弃这次唤醒（通知本身已进 restartLog 的上下文） */
+    }
+  };
+  if (delay === 0) {
+    fire();
+    return;
+  }
+  const timer = setTimeout(fire, delay);
+  timer.unref?.();
+}
+
+/**
  * 发送用户消息
  */
 export function sendUserMessage(

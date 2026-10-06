@@ -13,7 +13,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { registerCommand, getThinkingLevel, setThinkingLevel, sendMessage } from '../../adapters/ui-adapter';
+import { registerCommand, getThinkingLevel, setThinkingLevel, sendMessage, sendMessageAfterRebind } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   loadModes,
@@ -262,11 +262,12 @@ export function register(pi: ExtensionAPI): void {
               env: process.env.PI_RESTART_RESUME,
             });
             try {
-              sendMessage(
-                pi,
-                { customType: plan.customType, content: plan.content, display: plan.channel === 'turn' },
-                plan.channel === 'turn' ? { triggerTurn: true } : { deliverAs: 'nextTurn' },
-              );
+              if (plan.channel === 'turn') {
+                // 延后触发：避开 pi 会话替换的 rebind 竞态（见 adapters/ui-adapter.ts）
+                sendMessageAfterRebind(pi, { customType: plan.customType, content: plan.content, display: true });
+              } else {
+                sendMessage(pi, { customType: plan.customType, content: plan.content, display: false }, { deliverAs: 'nextTurn' });
+              }
             } catch {
               /* 注入失败不阻塞启动 */
             }
