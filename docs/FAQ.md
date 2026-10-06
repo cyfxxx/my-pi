@@ -285,7 +285,8 @@ TTL 笔记另有自动回收（`notes.json`）。
 npm run check                 # 隔离边界验证
 npx tsc --noEmit -p custom/   # 类型检查
 npx vitest run                # 单元测试
-npm run golden                # 行为防退化基准（19 步；--fast 仅结构守门，--smoke 加无头冒烟）
+npm run golden                # 行为防退化基准（19 步；--fast 仅结构守门，--smoke 加无头冒烟；
+                              # 第 19 步真实模式切换场景默认跳过，PI_GOLDEN_SCENARIO=1 开启）
 bash scripts/install-hooks.sh # 启用 git 钩子（提交前自动跑上述快检）
 ```
 

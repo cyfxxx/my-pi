@@ -12,7 +12,14 @@
 
 2. **让痕迹持久且有轮次**：`pi-supervisor.sh` 写 `recovery/rounds.jsonl`（每轮一行：会话/模式/命名空间/人设/读到的 action/退出码/决策/耗时/lostRestart/crashLog）与 `recovery/rounds/round-N.log`（crash log **按轮保留**，只留最近 20 轮）。旧行为是 `/tmp/my-pi-crash-\$\$.log` 每轮覆盖 + audit 只记崩溃恢复，本轮排查用户报障时连"上一轮为什么退出"都看不到。同时新增**实时**检测：`detect_lost_restart`——进程正常退出、action 已不在，但 restartLog 的时间戳落在**本轮** [roundStart, now] 内 → 告警 + audit + 轮次记录标 `lostRestart:true`。判据刻意收紧（上一轮留下的日志是"通知未消费"，不是"被吞"），所以正常重启不误报。
 
-3. **让用户路径可复现**：`scripts/test-scenario-mode-restart.mjs` = **真 pty + 真 supervisor + 真 pi + 真 bootstrap 扩展**，在隔离的 agent/memory 目录里启动 `--session <新会话>`、在 TUI 里输入 `/mode roleplay`、等新进程注入通知、`/quit` 收尾，17 项断言（round-1 full/persona=false、round-2 roleplay + persona + ns=roleplay + 同一会话路径、无 lostRestart、通知内容适配模式且不泄露路径/内部措辞、`modes-sessions.json` 记录正确）。**这是唯一能挡住本轮那个 bug 的检查**（当时 tsc/vitest/golden 全绿）。进 golden 第 19 步：`--fast` 跳过、全量默认跑（约 4 分钟，`PI_SCENARIO_SKIP=1` 可显式跳过）。
+3. **让用户路径可复现**：`scripts/test-scenario-mode-restart.mjs` = **真 pty + 真 supervisor + 真 pi + 真 bootstrap 扩展**，在隔离的 agent/memory 目录里启动 `--session <新会话>`、在 TUI 里输入 `/mode roleplay`、等新进程注入通知、`/quit` 收尾，17 项断言（round-1 full/persona=false、round-2 roleplay + persona + ns=roleplay + 同一会话路径、无 lostRestart、通知内容适配模式且不泄露路径/内部措辞、`modes-sessions.json` 记录正确）。**这是唯一能挡住本轮那个 bug 的检查**（当时 tsc/vitest/golden 全绿）。进 golden 第 19 步，但**默认跳过**、用 `PI_GOLDEN_SCENARIO=1` 开启（`--fast` 一律跳过）。
+
+**为什么默认不挂在 pre-push 默认路径（实测约束，不是偷懒）**：本场景约 4 分钟，加上门禁其余步骤让
+pre-push 跑到约 7.5 分钟时，`git push` 期间那条 SSH 连接会被远端关闭（实测 `Connection to ssh.github.com
+closed by remote host`，push 失败；重试会再跑一遍门禁、同样失败）。默认门禁实测 **5m36s** 通过（留约 2
+分钟余量），带场景则越界。因此：**改到 mode / supervisor / bootstrap / 通知 这些面时**显式
+`PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh` 跑一次；场景脚本本身也接受 `PI_SCENARIO_SKIP=1`
+与缺 `script`/`stty` 时的自动跳过。
 
 **设计上的两条纪律**：检测器不许变成噪音源（error 才 alert；lost-restart 只认本轮窗口）；检测器**不许写状态**（体检只读有专门用例）。
 

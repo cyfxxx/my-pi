@@ -2132,7 +2132,7 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **③ 真实生命周期场景**：新增 `scripts/test-scenario-mode-restart.mjs`（真 pty + 真 supervisor + 真 pi + 真 bootstrap，隔离 agent/memory，输入 `/mode roleplay`）——**17 项全绿**。实测两轮记录：
   `{"run":1,"mode":"full","namespace":"","persona":false,"adminAction":"restart","exitCode":0,"decision":"restart","lostRestart":false}`
   `{"run":2,"mode":"roleplay","namespace":"roleplay","persona":true,"decision":"exit","lostRestart":false}`
-  会话文件里出现 `[模式] 已切换：full → roleplay … 不要向用户复述本条提示`。进 golden 第 19 步（`--fast` 跳过、约 4 分钟、`PI_SCENARIO_SKIP=1` 可跳过）。
+  会话文件里出现 `[模式] 已切换：full → roleplay … 不要向用户复述本条提示`。进 golden 第 19 步（**默认跳过**、`PI_GOLDEN_SCENARIO=1` 开启；`--fast` 跳过）。**为什么不默认跑**：实测约束——默认门禁 5m36s 通过，加上本场景约 4 分钟后 `git push` 的 SSH 连接会被远端关闭（`Connection to ssh.github.com closed by remote host`，push 失败且重试同样失败）。
 - **顺带**：`PI_MEMORY_DIR` 支持外部覆盖（supervisor / `my-pi.sh` / `dev.sh`），否则场景会写用户真实记忆库。
 - **文档计数同步**：`scripts/README`（golden 17→**19 步** + 三个新脚本）、`VISION` 安全网 17 步/772 用例 → **19 步/811 用例**、`FAQ` 12→19 步、`TROUBLESHOOTING` 冒烟步骤 14→**20**。
 - 验证：`tsc` 干净；`vitest` 73 文件 / 811 用例；`test-supervisor.sh` 86 项；`test-state-audit.mjs` 39 项；`golden --fast`（19 步，场景跳过）；全量 golden（含模式切换场景）。
