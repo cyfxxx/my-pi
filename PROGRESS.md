@@ -2147,3 +2147,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **落地**：新增 `custom/core/restart-intent.ts` + 18 项单测（三层优先级 / 七种盘面形态 / 256KB 截断容错 / 两条文案）；`restartLog` 增 `intent` 字段；`admin_restart` 增 `resume` 参数；接线测试 5 项；supervisor 92 项（含恢复日志不抢 action）；状态体检 41 项（含 `restart-intent-invalid`）。
 - **端到端证据**（真 pty 场景，19 项全绿）：round-2 进程 argv 带 `roleplay.md`、env 带 `PI_MEMORY_NAMESPACE=roleplay`；**会话文件里没有 user/assistant/custom_message 条目** → 切模式零回合。场景因此不再依赖模型与网络。
 - 设计记录见 `DECISIONS.md` 同日条目。
+
+### 使用层面故障台账 `docs/BUG-REPLAYS.md`（2026-10-06）
+
+- 把"实际使用中才发现"的 7 类事故（模式状态被 git 回退、来源判据翻转、通知消费吞掉重启请求、
+  重启后白跑回合、入口漂移丢人设、重启无提示、功能名拼错）整理成**指纹 → 可执行复现命令 →
+  现在由谁挡住**的台账，并列出三个通用排查入口（`state-audit.mjs` / `rounds.jsonl` / `daily-health`）。
+- 约定：新增一行必须给可执行命令；从 `docs/README.md` 与 `scripts/README.md` 双向可达。

@@ -20,6 +20,7 @@
 |------|------|
 | [FAQ.md](FAQ.md) | 安装/启动/配置/技能与 packs/备份/性能的常见问答 |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | 系统化故障诊断：启动、功能加载、配置、网络、性能、数据 |
+| [BUG-REPLAYS.md](BUG-REPLAYS.md) | **使用层面故障台账**：每条事故的指纹 / 可执行复现命令 / 现在由谁挡住（事故 → 守门，防"同坑再踩"） |
 
 ### 开发
 
