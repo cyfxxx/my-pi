@@ -16,7 +16,7 @@
  * shortcuts 的键**（由 gen-registrations.mjs 从代码生成），不在这里硬编码功能清单。
  * 只取 tools 会误判——`mode` / `intervention` 只注册命令或钩子，没有工具（2026-10-06 实测）。
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditState, buildSnapshot, summarize } from './lib-state-audit.mjs';
@@ -37,8 +37,32 @@ function knownFeatures() {
   }
 }
 
+/**
+ * 数一下**同时在跑**的 my-pi 实例（node 进程且 environ 里带本 agent 目录）。
+ * 只做诊断提示（info）：多实例共享状态文件，是"会话莫名跳走/模式被改"的常见来源。
+ * 非 Linux（没有 /proc）或读不到时返回 undefined，静默跳过。
+ */
+function countRunningInstances(dir) {
+  try {
+    let n = 0;
+    for (const pid of readdirSync('/proc')) {
+      if (!/^\d+$/.test(pid)) continue;
+      try {
+        const env = readFileSync(`/proc/${pid}/environ`, 'utf-8');
+        const argv = readFileSync(`/proc/${pid}/cmdline`, 'utf-8');
+        if (env.includes(`PI_CODING_AGENT_DIR=${dir}`) && argv.includes('cli.js')) n++;
+      } catch {
+        /* 进程刚退出 */
+      }
+    }
+    return n;
+  } catch {
+    return undefined;
+  }
+}
+
 const agentDir = process.env.PI_CODING_AGENT_DIR || join(ROOT, 'portable/agent');
-const findings = auditState(buildSnapshot({ agentDir, knownFeatures: knownFeatures() }));
+const findings = auditState(buildSnapshot({ agentDir, knownFeatures: knownFeatures(), runningInstances: countRunningInstances(agentDir) }));
 const stats = summarize(findings);
 const failed = stats.alert || (STRICT && stats.warning > 0);
 

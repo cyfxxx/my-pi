@@ -67,8 +67,8 @@ function makeAgent(files = {}) {
   return dir;
 }
 
-function findingsOf(dir, { env = {}, exists = undefined, knownFeatures = FEATURES } = {}) {
-  return auditState(buildSnapshot({ agentDir: dir, knownFeatures, now: NOW, env, exists }));
+function findingsOf(dir, { env = {}, exists = undefined, knownFeatures = FEATURES, runningInstances = undefined } = {}) {
+  return auditState(buildSnapshot({ agentDir: dir, knownFeatures, now: NOW, env, exists, runningInstances }));
 }
 
 const codes = (fs) => fs.map((f) => f.code);
@@ -101,6 +101,13 @@ console.log('状态体检：不变量两侧用例');
   check('健康状态：零 error / 零 warning', summarize(f).error === 0 && summarize(f).warning === 0, JSON.stringify(codes(f)));
 }
 
+check('多实例（≥2）→ 仅 info 提示共享状态文件', (() => {
+  const d = makeAgent(healthyFiles());
+  dirs.push(d);
+  const f = findingsOf(d, { runningInstances: 2 });
+  return has(f, 'multiple-instances') && f.find((x) => x.code === 'multiple-instances').level === 'info';
+})());
+check('单实例 → 不提示', !has(agent(healthyFiles()).findings, 'multiple-instances'));
 check('modes.json 缺失 → modes-missing（error）', has(agent({ modes: undefined, sessions: undefined }).findings, 'modes-missing'));
 check('modes.json 损坏 → modes-corrupt（error）', has(agent({ modes: '{ not json' }).findings, 'modes-corrupt'));
 check('default 指向未知模式 → modes-default-unknown（error）', has(agent(healthyFiles({ modes: { default: 'nope', modes: {} } })).findings, 'modes-default-unknown'));
@@ -170,6 +177,42 @@ console.log('状态体检：重启/崩溃行为异常（recovery/rounds.jsonl）
   })());
 
   check('没有 rounds.jsonl（新设备/未跑过）→ 不告警', !has(agent(healthyFiles()).findings, 'rounds-corrupt-lines'));
+}
+
+console.log('状态体检：多实例探测（CLI 级，真起两个进程）');
+{
+  const { spawn } = await import('node:child_process');
+  const instDir = makeAgent(healthyFiles());
+  dirs.push(instDir);
+  const fakeCli = join(instDir, 'cli.js');
+  writeFileSync(fakeCli, 'setTimeout(() => {}, 30000);\n');
+  const kids = [0, 1].map(() =>
+    spawn(process.execPath, [fakeCli], {
+      env: { ...process.env, PI_CODING_AGENT_DIR: instDir },
+      stdio: 'ignore',
+      detached: false,
+    }),
+  );
+  await new Promise((r) => setTimeout(r, 400)); // 等它们起来（cmdline/environ 可读）
+  const out = spawnSync('node', [CLI, '--json'], {
+    encoding: 'utf-8',
+    env: { ...process.env, PI_CODING_AGENT_DIR: instDir },
+  });
+  let parsed = null;
+  try {
+    parsed = JSON.parse(out.stdout);
+  } catch {
+    /* 断言会报错 */
+  }
+  const codes = (parsed?.findings ?? []).map((f) => f.code);
+  check('CLI 能探测到多个实例并给 info 提示', codes.includes('multiple-instances'), JSON.stringify(codes));
+  for (const k of kids) {
+    try {
+      k.kill('SIGKILL');
+    } catch {
+      /* 已退出 */
+    }
+  }
 }
 
 console.log('状态体检：只读性 + 真值不漂移');

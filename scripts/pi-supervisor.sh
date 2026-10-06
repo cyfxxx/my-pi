@@ -113,18 +113,18 @@ snippet() { [ -f "$1" ] && tail -3 "$1" | tr '\n' ' ' | cut -c1-160 || echo ""; 
 # ── admin state（重启/切换会话请求，由 admin_* 工具写入）──
 export PI_ADMIN_STATE_FILE="${PI_ADMIN_STATE_FILE:-$AGENT_DIR/autopilot/state.json}"
 ADMIN_STATE_FILE="$PI_ADMIN_STATE_FILE"
-ACT=""; TARGET=""; PROV=""; MODEL=""; LTS=""
+ACT=""; TARGET=""; PROV=""; MODEL=""; LTS=""; LOWNER=""
 read_admin_action() {
-  ACT=""; TARGET=""; PROV=""; MODEL=""; LTS=""
+  ACT=""; TARGET=""; PROV=""; MODEL=""; LTS=""; LOWNER=""
   [ -f "$ADMIN_STATE_FILE" ] || return 0
   local out
   # 第 5 个字段是 restartLog 的时间戳（毫秒）：即使 action 已被清掉也要读出来，
   # detect_lost_restart 靠它判定"这一轮写下的重启请求被吞了"（见下方注释）。
   # ownerPid 过滤：多实例共享同一份 state.json 时，只认**自己的**请求（pi 的 ppid 就是这个
   # supervisor）；没有 ownerPid 的（老请求/手工写的）照旧认领，保持向后兼容。
-  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const me=+process.argv[2];const mine=!s.ownerPid||+s.ownerPid===me;const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=mine&&fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);const logTs=(s.restartLog&&+s.restartLog.timestamp)||0;process.stdout.write([ok?s.action:"",ok?s.targetSession||"":"",ok?s.targetProvider||"":"",ok?s.targetModel||"":"",String(logTs)].join("\u001f"))}catch{}' "$ADMIN_STATE_FILE" "${SUPERVISOR_OWNER_PID:-$$}" 2>/dev/null)
+  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const me=+process.argv[2];const mine=!s.ownerPid||+s.ownerPid===me;const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=mine&&fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);const logTs=(s.restartLog&&+s.restartLog.timestamp)||0;const logOwner=(s.restartLog&&s.restartLog.ownerPid)||"";process.stdout.write([ok?s.action:"",ok?s.targetSession||"":"",ok?s.targetProvider||"":"",ok?s.targetModel||"":"",String(logTs),String(logOwner)].join("\u001f"))}catch{}' "$ADMIN_STATE_FILE" "${SUPERVISOR_OWNER_PID:-$$}" 2>/dev/null)
   [ -n "$out" ] || return 0
-  IFS=$'\x1f' read -r ACT TARGET PROV MODEL LTS <<<"$out"
+  IFS=$'\x1f' read -r ACT TARGET PROV MODEL LTS LOWNER <<<"$out"
 }
 clear_admin_action() {
   node -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
@@ -148,8 +148,11 @@ now_ms() {
 # 消费"，属另一种情况，交给 daily-health 的 notice-undelivered 按 TTL 判），因此正常重启不会误报。
 # 用法：detect_lost_restart <action> <restartLogTsMs> <roundStartMs> <nowMs>
 detect_lost_restart() {
-  local act="$1" lts="$2" start="$3" now="$4"
+  local act="$1" lts="$2" start="$3" now="$4" owner="${5:-}"
   case "$act" in restart|restart_hang|switch_session|set_model) return 1 ;; esac
+  # 别人的日志（ownerPid 指向别的实例）不是"被吞"，是"不是我的"：多实例共享 state.json 时
+  # 必须区分开，否则每个实例的退出都会记一条假的 lost_restart。
+  if [ -n "$owner" ] && [ "$owner" != "${SUPERVISOR_OWNER_PID:-$$}" ]; then return 1; fi
   case "$lts" in ''|*[!0-9]*) return 1 ;; esac
   [ "$lts" -ge "$start" ] 2>/dev/null || return 1
   [ "$lts" -le $(( now + 1000 )) ] 2>/dev/null || return 1
@@ -392,7 +395,7 @@ while true; do
     read_admin_action
     # 关键自检：本轮写下的重启请求没有被 supervisor 读到 → 那次重启被吞了（见 detect_lost_restart）。
     LOST="false"
-    if detect_lost_restart "$ACT" "$LTS" "$ROUND_START_MS" "$(now_ms)"; then
+    if detect_lost_restart "$ACT" "$LTS" "$ROUND_START_MS" "$(now_ms)" "$LOWNER"; then
       LOST="true"
       log "⚠ 本轮写下的重启请求没有落地（action=${ACT:-空}，日志 ts=$LTS，轮次起点 $ROUND_START_MS）："
       log "  若刚才切过模式或请求过重启，说明那次重启被吞了（进程退出但没重拉）。记录见 $ROUNDS_LOG"

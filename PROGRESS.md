@@ -2187,3 +2187,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **可见性**：`rounds.jsonl` 超 800 行轮转为最近 400 行；`daily-health` 汇总行加 `重启=/崩溃恢复=`。
 - 验证：supervisor 104 项、状态体检 52 项、mode-switch 39 项、admin 工具 27 项、用量度量 46 项；
   台账 `docs/BUG-REPLAYS.md` 增 3 行（多实例串扰 / 防环单槽 / 写盘失败静默退出）。
+
+### 多实例下半场：归属判定不误伤 / 真多进程锁测试 / 实例数可见（2026-10-06）
+
+- 修 `detect_lost_restart` 的误伤：别人的重启日志不再被记成 `lost_restart`（`read_admin_action` 多输出 `restartLog.ownerPid`，判定要求"日志是我的"）；stub CLI 端到端补两侧用例。
+- 新增 `mode-store-lock.test.ts`：4 个真进程在锁下写 START/END 不得交错、N 进程各写一条会话记录全部保留、结构断言防漏接锁。
+- `state-audit` 新增"同时在跑的实例数"（≥2 → info），CLI 级测试真起两个假实例验证。
+- 计数：supervisor **111**、状态体检 **55**、vitest 75 文件 / **841** 用例；BUG-REPLAYS 台账 +1 行（归属判定误伤）。

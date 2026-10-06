@@ -132,7 +132,7 @@ echo "=== detect_lost_restart（重启请求被吞的判定）==="
 # 判据刻意收紧：action 已不在，但 restartLog 的时间戳落在**本轮** [roundStart, now] 内 —— 这正是
 # "刚写下的请求没落地"。上一轮留下的日志不在窗口内（那是"通知没被消费"，交给 daily-health 按 TTL 判），
 # 所以正常重启（新进程只是还没消费通知）不会误报。
-lost() { detect_lost_restart "$1" "$2" "$3" "$4" && echo yes || echo no; }
+lost() { detect_lost_restart "$1" "$2" "$3" "$4" "${5:-}" && echo yes || echo no; }
 check "本轮写下的请求 + action 被清 → 判定为丢" "yes" "$(lost none 1000500 1000000 1001000)"
 check "空 action（读不到动作）同样判定为丢" "yes" "$(lost '' 1000500 1000000 1001000)"
 check "边界：正好等于轮次起点 → 判定为丢" "yes" "$(lost none 1000000 1000000 1001000)"
@@ -142,6 +142,9 @@ check "set_model 同样不算丢" "no" "$(lost set_model 1000500 1000000 1001000
 check "没有时间戳 → 不算丢" "no" "$(lost none '' 1000000 1001000)"
 check "坏时间戳 → 不算丢（不崩）" "no" "$(lost none abc 1000000 1001000)"
 check "时间戳在未来（时钟回拨）→ 不算丢" "no" "$(lost none 9999999 1000000 1001000)"
+check "别人的日志（ownerPid=别的实例）→ 不算丢（多实例不能互相误报）" "no" "$(lost none 1000500 1000000 1001000 424242)"
+check "自己的日志（ownerPid=本实例）→ 照旧判定为丢" "yes" "$(lost none 1000500 1000000 1001000 $$)"
+check "日志没有 ownerPid（老请求）→ 照旧判定为丢" "yes" "$(lost none 1000500 1000000 1001000 '')"
 
 echo ""
 echo "=== recovery_args（崩溃恢复的续接参数）==="
@@ -242,8 +245,10 @@ if (n === 0) {
     action: 'restart',
     targetSession: '/tmp/session-cur.jsonl',
     reason: '端到端测试',
+    // 生产里 pi 就是这么写的：ownerPid = 它的 ppid = 拉起它的 supervisor
+    ownerPid: process.ppid,
     timestamp: Date.now(),
-    restartLog: { action: 'restart', reason: '端到端测试', timestamp: Date.now() },
+    restartLog: { action: 'restart', reason: '端到端测试', ownerPid: process.ppid, timestamp: Date.now() },
   }));
 }
 process.exit(0);
@@ -268,6 +273,8 @@ check "重启动作已被消费（不留 action）" "none" \
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).action))' "$LOOP/state.json" 2>/dev/null || echo missing)"
 check "restartLog 保留（供新进程注入重启通知）" "端到端测试" \
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).restartLog?.reason))' "$LOOP/state.json" 2>/dev/null || echo missing)"
+check "ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行" "2" "$(cat "$LOOP/runs")"
+
 
 # 轮次记录（结构化复盘入口）+ 按轮 crash log：正常重启必须留 2 轮且**不得**误报 lostRestart
 ROUNDS="$LOOP/agent/recovery/rounds.jsonl"
@@ -311,6 +318,37 @@ check "崩溃审计留下 lost_restart 记录" "yes" "$(grep -q 'lost_restart' "
 unset PI_AGENT_MODE
 unset PI_AGENT_MODE_SOURCE
 unset PI_SESSION_MODE
+
+echo ""
+echo "=== 多实例隔离：别人的请求不得被本实例执行（端到端，stub CLI）==="
+FOREIGN="$TMP/foreign"
+mkdir -p "$FOREIGN/agent"
+cat > "$FOREIGN/cli.js" <<'STUB'
+const fs = require('node:fs');
+const dir = process.env.LOOP_DIR;
+const n = fs.existsSync(`${dir}/runs`) ? Number(fs.readFileSync(`${dir}/runs`, 'utf8')) : 0;
+fs.writeFileSync(`${dir}/runs`, String(n + 1));
+if (n === 0) {
+  // 模拟"另一个 my-pi 实例"写的请求：ownerPid 指向别的 supervisor
+  fs.writeFileSync(process.env.PI_ADMIN_STATE_FILE, JSON.stringify({
+    action: 'restart',
+    targetSession: '/tmp/other-instance.jsonl',
+    reason: '别的实例的请求',
+    ownerPid: process.ppid + 1,
+    timestamp: Date.now(),
+    restartLog: { action: 'restart', reason: '别的实例的请求', ownerPid: process.ppid + 1, timestamp: Date.now() },
+  }));
+}
+process.exit(0);
+STUB
+LOOP_DIR="$FOREIGN" MY_PI_CLI="$FOREIGN/cli.js" MY_PI_AGENT_DIR="$FOREIGN/agent" \
+  PI_ADMIN_STATE_FILE="$FOREIGN/state.json" \
+  bash "$ROOT/scripts/pi-supervisor.sh" >"$FOREIGN/out.log" 2>&1
+check "别人的请求不触发本实例重启" "1" "$(cat "$FOREIGN/runs")"
+check "别人的请求原样留在 state.json（不被清掉，等它的主人）" "restart" \
+  "$(node -e 'process.stdout.write(String(JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")).action))' "$FOREIGN/state.json" 2>/dev/null || echo missing)"
+check "没有把别人的请求记成 lostRestart（那是被吞，不是不是我的）" "false" \
+  "$(node -e 'const l=require("node:fs").readFileSync(process.argv[1],"utf8").trim().split("\n").filter(Boolean).map(JSON.parse);process.stdout.write(String(l.at(-1).lostRestart))' "$FOREIGN/agent/recovery/rounds.jsonl" 2>/dev/null || echo missing)"
 
 echo "=== apply_mode（模式解析：入库配置 + 会话记录）==="
 # 配置与会话记录分离：modes.json 只放 default + 模式定义（入库）；"哪个会话用哪个模式"放

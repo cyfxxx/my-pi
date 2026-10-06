@@ -31,6 +31,7 @@
 | 8 | **多实例串扰**：两个 my-pi 同时跑（实测同日出现过两个 supervisor），A 写的重启请求被 B 的 supervisor 执行 → 会话被跨实例重启/续错 | `rounds.jsonl` 里出现不属于本实例的 session；用户"重启后跑到了别的会话" | `npx vitest run custom/features/autopilot/__tests__/restart-log.test.ts`；`bash scripts/test-supervisor.sh`（ownerPid 认领/不认领两侧） | 写入端带 `ownerPid`（pi 的 ppid）+ supervisor 只认自己的请求（无 ownerPid 的老请求照旧认领） |
 | 9 | **防环标记单槽互相覆盖**：两个会话/实例各自自愈时，后写的把先写的防环标记顶掉 → 双方反复放行、来回重启 | `mode-restart-guard.json` 里只剩一条 key；`rounds.jsonl` 同一会话短时间内多次 restart | `npx vitest run custom/features/mode/__tests__/mode-switch.test.ts -t '多会话/多实例'` | 标记改多键 `{ "<会话>::<模式>": ts }`（旧格式兼容迁移）+ 上限/过期裁剪 |
 | 10 | **写盘失败静默退出**：`admin_restart`/`admin_set_model`/`admin_switch_session` 请求写不下去仍 `shutdown` → 进程没了、配置/会话也没变 | 无 state.json 变化却退出了；下一次启动配置未生效 | `npx vitest run custom/features/autopilot/__tests__/admin-tools.test.ts -t '写盘失败'`；`npx vitest run custom/features/mode/__tests__/mode-autopilot-restart.test.ts -t '写盘失败'` | 三个工具 + mode 的 `requestModeRestart` 一律"写失败就不退出 + 明确文案" |
+| 11 | **归属判定的误伤**：加了 ownerPid 隔离后，别人的重启日志在本实例退出时被记成 `lost_restart`（"请求被吞"）→ 每日体检假告警 | `rounds.jsonl` 里 `lostRestart:true` 而 `adminAction` 为空、且会话属于别的实例 | `bash scripts/test-supervisor.sh`（"别人的日志 → 不算丢"三例） | `detect_lost_restart` 增加第 5 个判据"日志的 ownerPid 必须是本实例"；`read_admin_action` 多输出一个 `LOWNER` 字段 |
 
 ## 相关
 

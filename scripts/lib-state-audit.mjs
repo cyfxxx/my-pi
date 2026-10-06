@@ -75,12 +75,20 @@ function parseOf(entry) {
  * `knownFeatures` 由调用方给（CLI 取 scripts/registration-baseline.json 的键 = 从代码生成的
  * 功能名真值），本库不硬编码功能清单——那正是"双份真值"的老毛病。
  */
-export function buildSnapshot({ agentDir, knownFeatures = [], now = Date.now(), env = process.env, exists = existsSync }) {
+export function buildSnapshot({
+  agentDir,
+  knownFeatures = [],
+  now = Date.now(),
+  env = process.env,
+  exists = existsSync,
+  runningInstances,
+}) {
   return {
     agentDir,
     now,
     knownFeatures,
     exists,
+    runningInstances,
     env: {
       PI_AGENT_MODE: env.PI_AGENT_MODE,
       PI_AGENT_MODE_SOURCE: env.PI_AGENT_MODE_SOURCE,
@@ -283,6 +291,16 @@ export function auditState(snap) {
         '看 recovery/rounds/round-N.log 尾部与 recovery-audit.jsonl；修根因后再清 crash-count',
       );
     }
+  }
+
+  // ── 多实例：状态文件是共享的（跨实例重启已由 ownerPid 隔离，但同名会话同时打开仍会互相干扰）──
+  if (typeof snap.runningInstances === 'number' && snap.runningInstances >= 2) {
+    add(
+      'info',
+      'multiple-instances',
+      `检测到 ${snap.runningInstances} 个 my-pi 实例在跑：它们共享 state.json / modes-sessions.json（跨实例重启已由 ownerPid 隔离），但同一个会话被两个实例打开仍会互相覆盖`,
+      '确认这是有意的（例如 tmux + web 各一个）；否则关掉多余实例',
+    );
   }
 
   // ── 环境变量：硬覆盖会把"按会话"整条链跳过 ──
