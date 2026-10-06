@@ -10,7 +10,7 @@ MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # pi 只识别 PI_CODING_AGENT_DIR；技能（config/skills）与会话（config/sessions）都在其下。
 # PI_MEMORY_DIR 由 custom/core/config.ts 解析（记忆/工具归档等数据落点）。
 export PI_CODING_AGENT_DIR="$MY_PI_ROOT/portable/agent"
-export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"
+export PI_MEMORY_DIR="${PI_MEMORY_DIR:-$MY_PI_ROOT/portable/memory}"
 
 # 确保目录存在（config/sessions 由 pi 自行创建）
 mkdir -p "$PI_CODING_AGENT_DIR" "$PI_MEMORY_DIR"

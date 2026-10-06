@@ -2123,3 +2123,16 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **修法**：① `consumeRestartLog()` 只清 `restartLog`，保留 `action` 及其它字段（action 的消费者只有 supervisor）；② 重启请求写盘失败时不再退出进程（返回提交结果，失败则告警留在原进程）；② 模式切换的通知改由 mode 功能在**新模式进程**按模式生成（`formatModeSwitchNotice`：已切换 A→B + 定位/功能面/思考档位/人设/记忆命名空间 + "不要复述本条提示"），写入端只带 `notice:'mode'`+`mode`/`from`；autopilot 用 `isModeOwnedNotice()` 让位（不注入也不消费）；③ 通知消费即清 + 10 分钟 TTL，`targetSession` 对不上的留给别的会话。
 - **验证**：把 `ops.ts` + `autopilot/index.ts` 切回旧实现 → 接线测试与 3 项 `action` 断言立即变红（`expected 'none' to be 'restart'`）；新增 `mode-autopilot-restart.test.ts`（**同时注册真实 mode 与真实 autopilot**，按注册顺序跑两个 `session_start`，锁"autopilot 让位 + 请求存活 + 通用通知不注入"）与 `restart-log.test.ts` 的跨 TS/bash 契约测试（`MY_PI_SUPERVISOR_LIB=1 source scripts/pi-supervisor.sh` 调真实 `read_admin_action`）；`mode-switch.test.ts` 36 项；`vitest` **73 文件 / 811 用例**、`tsc`、`test-supervisor.sh` 65 项全绿。
 - 记录：`DECISIONS.md` 同日条目（含"为什么不把通知留在旧进程"与"为什么不塞进 autopilot"）；`custom/features/mode/README.md` 新增"切换后的注入通知（模型侧）"；`custom/features/autopilot/README.md` 补两条纪律；`docs/FAQ.md` 一句话。
+
+### 使用层面错误的检测与预防：状态体检 / 轮次记录 / 真实 pty 场景（2026-10-06）
+
+- **需求**：用户提问"代码层面的错误已有各种检查，使用层面的错误除了实际使用中去发现，还有没有别的方法"。复盘逃逸面后分三层落地。
+- **① 运行时状态不变量**：新增 `scripts/lib-state-audit.mjs`（判定：人设文件丢失、功能名拼错、default/会话记录指向未知模式、会话记录指向不存在的会话文件、重启请求超 300s 窗口未执行、重启通知超 TTL 未消费、env 硬覆盖按会话模式、遗留字段/文件）+ `state-audit.mjs` CLI（只读、`--json/--strict/--quiet`、error→exit 1）+ `test-state-audit.mjs`（**39 项**：两侧用例 / healthy 零 finding / 只读性 / 三处真值不漂移 / CLI 退出码）。挂三处同一份判断力：CLI、`doctor.sh [12]`（实测 25 正常 0 警告）、`daily-health.mjs`（error→alert、warning→留痕；实测坏 modes.json → `状态异常=1` 且 reasons 里点名 `modes-corrupt`）。golden 第 18 步。
+- **② 轮次记录 + 实时丢请求检测**：`pi-supervisor.sh` 新增 `recovery/rounds.jsonl`（每轮：会话/模式/ns/人设/action/退出码/决策/耗时/lostRestart/crashLog）与 `recovery/rounds/round-N.log`（crash log **按轮保留**，留最近 20 轮）；新增纯函数 `detect_lost_restart`（只认"本轮写的日志 + action 已不在"）→ 告警 + audit + 轮次标记。`test-supervisor.sh` 65 → **86 项**（含 stub CLI 复刻本轮故障时序的端到端用例：被吞的重启不重拉、但必须留痕；以及"正常重启不误报"的边界断言）。
+- **③ 真实生命周期场景**：新增 `scripts/test-scenario-mode-restart.mjs`（真 pty + 真 supervisor + 真 pi + 真 bootstrap，隔离 agent/memory，输入 `/mode roleplay`）——**17 项全绿**。实测两轮记录：
+  `{"run":1,"mode":"full","namespace":"","persona":false,"adminAction":"restart","exitCode":0,"decision":"restart","lostRestart":false}`
+  `{"run":2,"mode":"roleplay","namespace":"roleplay","persona":true,"decision":"exit","lostRestart":false}`
+  会话文件里出现 `[模式] 已切换：full → roleplay … 不要向用户复述本条提示`。进 golden 第 19 步（`--fast` 跳过、约 4 分钟、`PI_SCENARIO_SKIP=1` 可跳过）。
+- **顺带**：`PI_MEMORY_DIR` 支持外部覆盖（supervisor / `my-pi.sh` / `dev.sh`），否则场景会写用户真实记忆库。
+- **文档计数同步**：`scripts/README`（golden 17→**19 步** + 三个新脚本）、`VISION` 安全网 17 步/772 用例 → **19 步/811 用例**、`FAQ` 12→19 步、`TROUBLESHOOTING` 冒烟步骤 14→**20**。
+- 验证：`tsc` 干净；`vitest` 73 文件 / 811 用例；`test-supervisor.sh` 86 项；`test-state-audit.mjs` 39 项；`golden --fast`（19 步，场景跳过）；全量 golden（含模式切换场景）。

@@ -2,6 +2,24 @@
 
 ## 格式
 
+### [2026-10-06] 使用层面错误的"检测与预防"：三层地基（状态不变量 / 轮次记录 / 真实生命周期场景）
+
+**背景**：用户提问"代码层面的错误已经有各种检查，使用层面的错误除了实际使用中去发现，还有没有别的办法"。把历史事故摊开看逃逸面——`modes.json` 被 git 静默回退、`PI_AGENT_MODE_SOURCE` 翻转（第 3 轮工厂执行才暴露）、`restartLog` 只写不读、`dev.sh` 不注入人设、本轮的"通知消费吞掉重启请求"——**没有一条是"某函数算错了"**，全是跨进程生产者/消费者、同相位顺序、功能集组合、失败路径、TUI/终端交互层面的问题，而且几乎都是**静默**的。
+
+**决策（三条腿，各有分工）**：
+
+1. **让坏状态自己出声**：新增 `scripts/lib-state-audit.mjs`（判定，纯函数吃快照）+ `scripts/state-audit.mjs`（CLI，只读、零 LLM）。判的是"配置与运行时状态自相矛盾 / 指向不存在的东西"：人设文件丢失（启动器静默不注入）、功能名拼错（静默少功能）、`default` 与会话记录指向未知模式（静默回 full）、会话模式记录指向不存在的会话文件、重启请求超 supervisor 的 300s 窗口未执行、重启通知超 TTL 未被消费、`PI_AGENT_MODE` 硬覆盖按会话模式、遗留字段/文件。**同一份判断力挂三处**：CLI（`--json/--strict/--quiet`）、`doctor.sh [12]`、`daily-health.mjs`（error→alert、warning→留痕）——daily 那条**每天自动跑**，把"用户下次踩到"变成"当天自报"。口径守门 `test-state-audit.mjs` 39 项：每条不变量的两侧用例 + healthy 零 finding + **只读性**（跑完不动文件）+ **三处真值不漂移**（FIXED_MODES ↔ `lib-mode.sh`/`logic.ts`、功能名 ↔ `ALL_FEATURES`）+ CLI 退出码语义。
+
+2. **让痕迹持久且有轮次**：`pi-supervisor.sh` 写 `recovery/rounds.jsonl`（每轮一行：会话/模式/命名空间/人设/读到的 action/退出码/决策/耗时/lostRestart/crashLog）与 `recovery/rounds/round-N.log`（crash log **按轮保留**，只留最近 20 轮）。旧行为是 `/tmp/my-pi-crash-\$\$.log` 每轮覆盖 + audit 只记崩溃恢复，本轮排查用户报障时连"上一轮为什么退出"都看不到。同时新增**实时**检测：`detect_lost_restart`——进程正常退出、action 已不在，但 restartLog 的时间戳落在**本轮** [roundStart, now] 内 → 告警 + audit + 轮次记录标 `lostRestart:true`。判据刻意收紧（上一轮留下的日志是"通知未消费"，不是"被吞"），所以正常重启不误报。
+
+3. **让用户路径可复现**：`scripts/test-scenario-mode-restart.mjs` = **真 pty + 真 supervisor + 真 pi + 真 bootstrap 扩展**，在隔离的 agent/memory 目录里启动 `--session <新会话>`、在 TUI 里输入 `/mode roleplay`、等新进程注入通知、`/quit` 收尾，17 项断言（round-1 full/persona=false、round-2 roleplay + persona + ns=roleplay + 同一会话路径、无 lostRestart、通知内容适配模式且不泄露路径/内部措辞、`modes-sessions.json` 记录正确）。**这是唯一能挡住本轮那个 bug 的检查**（当时 tsc/vitest/golden 全绿）。进 golden 第 19 步：`--fast` 跳过、全量默认跑（约 4 分钟，`PI_SCENARIO_SKIP=1` 可显式跳过）。
+
+**设计上的两条纪律**：检测器不许变成噪音源（error 才 alert；lost-restart 只认本轮窗口）；检测器**不许写状态**（体检只读有专门用例）。
+
+**顺带**：`PI_MEMORY_DIR` 改为可被外部覆盖（`${PI_MEMORY_DIR:-...}`，supervisor / `my-pi.sh` / `dev.sh` 一致）——隔离场景不能在用户真实记忆库里跑。
+
+**未做（明确的下一步候选）**：假 provider（让场景不依赖真实模型与网络抖动）；故障注入组（写盘失败 / 状态文件损坏 / 会话被移动 / 两实例并发）；`docs/BUG-REPLAYS.md`（事故 → 复现场景 → 覆盖它的门禁）；把"证据等级"（实测 vs 估算）写进文档纪律。
+
 ### [2026-10-06] 修"模式切换导致的重启被吞掉（进程直接退出）"+"切换后的注入信息不适配模式"
 
 **现象**（用户实测）：在角色扮演会话里 `/new` 正常；**从新会话重新加载角色扮演会话**时，进程直接退出，终端留下一串未被读走的终端查询应答（`10;rgb:…11;rgb:…64;1;2;6;…c`，即 OSC 10/11 与 DA1 的回复被 shell 回显），模式没换；历史里反而多了一条"系统已重启"的注入——而那次重启并没有发生。

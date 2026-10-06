@@ -121,8 +121,18 @@ step "18. 运行时状态不变量（使用层面静默失效）"
 # 用合成状态逐条锁定两侧行为，并校验三处真值不漂移（FIXED_MODES / 功能名清单）。
 if node scripts/test-state-audit.mjs >/tmp/golden-stateaudit.log 2>&1; then pass "$(tail -1 /tmp/golden-stateaudit.log)"; else fail "状态体检守门（见 /tmp/golden-stateaudit.log）"; tail -20 /tmp/golden-stateaudit.log; fi
 
+step "19. 模式切换场景（真实 pty + supervisor + pi，约 4 分钟）"
+# 唯一一条"用户路径"级检查：在真 pty 里输入 /mode roleplay，断言进程真的重拉、新进程跑在 roleplay
+# （人设+命名空间）并把**适配模式**的通知注入会话文件。2026-10-06 的真实故障（切模式后进程直接退出、
+# 模式没换）在当时的全部门禁下都是绿的——只有这一层能挡住它。缺 script/stty 或未构建 dist 时自跳过。
+if [ "$FAST" = "1" ]; then
+  skip "模式切换场景（--fast 跳过）"
+elif [ "${PI_SCENARIO_SKIP:-0}" = "1" ]; then
+  skip "模式切换场景（PI_SCENARIO_SKIP=1）"
+elif node scripts/test-scenario-mode-restart.mjs >/tmp/golden-scenario.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario.log)"; else fail "模式切换场景（见 /tmp/golden-scenario.log）"; tail -20 /tmp/golden-scenario.log; fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "19. 无头会话冒烟"
+  step "20. 无头会话冒烟"
   # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
   # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，

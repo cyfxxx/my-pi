@@ -15,7 +15,7 @@
 未读通知（否则会把该给交互会话看的报告标记成已读而丢失）。调度器自己的工作进程走
 `--no-extensions -p`，不加载扩展、不会回到这个钩子。
 
-**守门**：`bash scripts/golden-tasks.sh --smoke` 第 14 步严格要求无头运行 `rc=0`（此前容忍挂起）。
+**守门**：`bash scripts/golden-tasks.sh --smoke` 第 20 步严格要求无头运行 `rc=0`（此前容忍挂起）。
 
 ## 0. 提交被拦：`check-isolation` 误报 "vendor/pi 有未提交的修改"
 
