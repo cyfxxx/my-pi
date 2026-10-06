@@ -32,14 +32,15 @@
 ## 注册面
 
 - 命令：`/mode <list|help|模式名>`
-- 钩子：`session_start`（按**本会话**应有的模式做一致性校验，不一致就自愈重启；非 full 时提示当前模式）
+- 钩子：`session_start`（按**本会话**应有的模式做一致性校验，不一致就自愈重启；非 full 时提示当前模式；
+  若本次启动正是为模式切换而重启的，则按新模式注入一条模型侧通知——见下文"切换后的注入通知"）
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `index.ts` | 注册命令/钩子；切换、自动重启请求、按会话的一致性校验与自愈 |
-| `logic.ts` | 模式定义/读写/归一化、`resolveEffectiveMode`/`resolveStartupMode`、会话记录表、`isFeatureEnabled`、`applyModeRuntime` |
+| `index.ts` | 注册命令/钩子；切换、自动重启请求、按会话的一致性校验与自愈、消费并注入切换通知 |
+| `logic.ts` | 模式定义/读写/归一化、`resolveEffectiveMode`/`resolveStartupMode`、会话记录表、`isFeatureEnabled`、`applyModeRuntime`、`formatModeSwitchNotice` |
 
 ## 数据：配置、会话记录、进程来源**三者分开**
 
@@ -91,15 +92,40 @@ pi 的新会话文件**在首条 user/assistant 消息之前不落盘**（`Sessi
 
 - **只改思考档位**（功能集/人设/命名空间都没变）→ 立即生效，**不重启**（记录照样写入）。
 - **功能集或人设/命名空间变化** → 先确认会话空闲（`ctx.isIdle()`），再写**本会话**的记录，
-  然后走**既有**的 admin restart 通道（`writeRestartRequest('restart', { targetSession })` +
-  `ctx.shutdown()`），由 `scripts/pi-supervisor.sh` 用 `--session` 精确续接当前会话。回来后
-  supervisor 已按该会话重新注入人设与命名空间，bootstrap 也按新模式过滤了功能。
+  然后走**既有**的 admin restart 通道（`writeRestartRequest('restart', { targetSession, notice:'mode',
+  mode, from })` + `ctx.shutdown()`），由 `scripts/pi-supervisor.sh` 用 `--session` 精确续接当前会话。
+  回来后 supervisor 已按该会话重新注入人设与命名空间，bootstrap 也按新模式过滤了功能。
 - **响应进行中**（`isIdle()` 为 false）→ 拒绝切换并提示等本轮结束后重跑。**什么都不落盘**：
   否则会出现"配置已改、进程没重启"的半切换状态，比不切更难排查（pi 自己的 `/reload` 也有
   同样的保护）。
+- **重启请求写盘失败** → **不退出进程**，改为红色告警并让用户手动重启。否则用户看到的是
+  "进程没了、模式也没换、还没有重启"——与"通知消费吞掉 action"那次故障同一种症状（静默退出）。
 - **会话不落盘**（`--no-session` / 内存会话）→ 没有按会话记录的落点，只切换思考档位并说明限制，
   不写任何状态、不重启。
 - 切换提示里会列出"哪些配置需要重启"，并明确说明正在自动重启。
+
+## 切换后的注入通知（模型侧）
+
+进程重启后**历史还在，但模型不知道自己在哪个档位**。所以切换通知必须注入，而且必须满足三条：
+
+1. **由新模式进程注入**。写入端（旧进程）只写请求，不写通知：旧进程仍是旧功能集/旧人设，
+   在那里注入等于"用旧档位的嘴说新档位的话"，角色扮演下还会在错误的人设里落一条记录。
+2. **内容是模式信息，不是进程内部状态**。`formatModeSwitchNotice` 输出
+   `[模式] 已切换：full → roleplay` + 定位 + 启用功能 + 思考档位/人设/记忆命名空间，
+   并显式要求"不要向用户复述本条提示，也不要提及模式切换或进程重启"（人设模式不破戏）。
+   内部措辞（"按会话模式自愈：进程原为 full"）与会话文件路径只进 `state.json` 供排查，
+   **不进模型上下文**。
+3. **一次切换只注入一次**：通知借 `restartLog` 传递、消费即清（只清 `restartLog`），
+   并带 10 分钟 TTL——那次重启没落成（请求被吞、用户手工换会话、崩溃恢复续了别的会话）时
+   直接丢弃，不让模型看到一条"已切换"的过期断言。
+
+归属用 `restartLog.notice = 'mode'` 标记：autopilot 见到它就**不注入也不消费**自己的通用
+「系统已重启」通知（`isModeOwnedNotice`），把这条日志原样留给 mode 的 `session_start`。
+`targetSession` 对不上的通知也不消费（别的会话的重启，留给它自己的进程）。
+
+> 这条链路曾有一个真实故障（2026-10-06）：旧进程写请求后，autopilot 的通知消费顺手把
+> `action` 清成 `none`，supervisor 便**不重启而是直接退出**——用户看到的是"注入了一条系统已重启、
+> 进程却退出、模式也没换"。根因与修法记在 [`DECISIONS.md`](../../../DECISIONS.md)。
 
 ## 启动一致性校验与自愈（防"静默不生效"）
 

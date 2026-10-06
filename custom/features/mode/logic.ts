@@ -364,3 +364,35 @@ export function modeFeaturesLabel(config: ModeConfig): string {
   if (config.features.length === 0) return '启用功能: 无（仅内置工具）';
   return `启用功能: ${config.features.join('、')}`;
 }
+
+/**
+ * 模式切换通知的有效期。
+ *
+ * 通知由**切换前**的进程写入、由**切换后**的进程注入，中间只隔一次进程启动（本机实测 ≈40s）。
+ * 超过这个窗口还没被消费，说明那次重启没落成（请求被吞、用户手工换会话、崩溃恢复续了别的会话），
+ * 此时注入只会让模型看到一条"已切换"的过期断言，故直接丢弃。
+ */
+export const MODE_NOTICE_TTL_MS = 10 * 60_000;
+
+/**
+ * 构造"模式已切换"的模型侧注入文本。
+ *
+ * 为什么由 mode 功能自己写（而不是沿用 autopilot 的通用「系统已重启」）：
+ *   1. 通用措辞说的是"进程重启了"，模式切换要说的其实是"**你现在在哪个档位**"——
+ *      人设/功能面/记忆命名空间都换了，模型必须知道，否则会拿旧档位的方式回答；
+ *   2. 通用措辞带内部细节（`按会话模式自愈：进程原为 full` + 会话文件路径），
+ *      这些对模型没有用，还占前缀；
+ *   3. 角色扮演这类人设模式下，通用措辞会直接破戏，所以要显式要求"别复述本条提示"。
+ *
+ * 文本必须是**逐字节确定**的（无时间戳/路径/版本号）：它是注入面的一部分，同输入必同输出。
+ */
+export function formatModeSwitchNotice(from: string, to: string, config: ModeConfig): string {
+  const lines = [`[模式] 已切换：${from} → ${to}`];
+  if (config.description) lines.push(`定位: ${config.description}`);
+  lines.push(modeFeaturesLabel(config));
+  const attrs = [config.appendPrompt ? '人设已注入' : '无人设', `记忆命名空间 ${config.memoryNamespace || '默认'}`];
+  if (config.thinking) attrs.unshift(`思考档位 ${config.thinking}`);
+  lines.push(attrs.join(' | '));
+  lines.push('历史上下文已保留，直接继续本会话。不要向用户复述本条提示，也不要提及模式切换或进程重启。');
+  return lines.join('\n');
+}

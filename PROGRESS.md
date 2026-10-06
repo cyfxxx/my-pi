@@ -2115,3 +2115,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **主要代价**：补丁栈维护（`main.ts` churn 268/6774，锚点稳定但每次同步要重放）；`PI_SESSION_FILE` 的 env 静默失真面（同 2026-10-05 事故类型）；13 KB 人设搬进 `before_agent_start`（实测 **last-wins + 整段替换**、注册顺序变成语义、预算要新开档位）；丢掉"扩展挂了人设仍在"；命名空间需在**工厂期**设置（memory 的 `session_start` 早于 mode 且会写 notes）；bash 侧解析作废 + 约 1/4 supervisor 测试重写；热切换的工具集中途变化与新通知；真实链路验证需新基建。
 - **触发条件**：非默认模式下频繁 `/new`/`-c`/`-r` 被 ≈40s 重启打断；出现多会话频繁切模式的工作流；上游自带"扩展在工厂期拿到会话"的 API（那时无需补丁）。
 - 逐条记录与"若实施必须保留的不变量"（`modes-sessions.json` 键语义不变、不得停在 P₀、P₀+ 阶段 roleplay 仍走重启）见 `DECISIONS.md` 同日条目；feature 侧入口提示见 `custom/features/mode/README.md`。
+
+### 修复：模式切换导致的重启被"通知消费"吞掉 / 切换后的注入不适配模式（2026-10-06）
+
+- **现象**：在角色扮演会话里 `/new` 正常；**从新会话重新加载角色扮演会话**时进程直接退出（终端留下未被读走的 OSC 10/11 + DA1 应答乱码），模式没换，历史里却多了一条"系统已重启"的注入。
+- **根因**：`session_start` 阶段 mode 先写重启请求（`action='restart'`），autopilot 随后消费重启通知时执行 `writeState({restartLog:null, action:'none'})`——`writeState` 是"默认值 + 覆盖"，把同一轮刚写下的 `action` 一起抹掉。supervisor 读 `state.json` 见 `action=none` 便不再重拉而是退出。因为 `autopilot` 只在 full/lean 注册，roleplay（无 autopilot）里反而正常——所以表现为"从 full 会话切回 roleplay 会话必中"。
+- **修法**：① `consumeRestartLog()` 只清 `restartLog`，保留 `action` 及其它字段（action 的消费者只有 supervisor）；② 重启请求写盘失败时不再退出进程（返回提交结果，失败则告警留在原进程）；② 模式切换的通知改由 mode 功能在**新模式进程**按模式生成（`formatModeSwitchNotice`：已切换 A→B + 定位/功能面/思考档位/人设/记忆命名空间 + "不要复述本条提示"），写入端只带 `notice:'mode'`+`mode`/`from`；autopilot 用 `isModeOwnedNotice()` 让位（不注入也不消费）；③ 通知消费即清 + 10 分钟 TTL，`targetSession` 对不上的留给别的会话。
+- **验证**：把 `ops.ts` + `autopilot/index.ts` 切回旧实现 → 接线测试与 3 项 `action` 断言立即变红（`expected 'none' to be 'restart'`）；新增 `mode-autopilot-restart.test.ts`（**同时注册真实 mode 与真实 autopilot**，按注册顺序跑两个 `session_start`，锁"autopilot 让位 + 请求存活 + 通用通知不注入"）与 `restart-log.test.ts` 的跨 TS/bash 契约测试（`MY_PI_SUPERVISOR_LIB=1 source scripts/pi-supervisor.sh` 调真实 `read_admin_action`）；`mode-switch.test.ts` 36 项；`vitest` **73 文件 / 811 用例**、`tsc`、`test-supervisor.sh` 65 项全绿。
+- 记录：`DECISIONS.md` 同日条目（含"为什么不把通知留在旧进程"与"为什么不塞进 autopilot"）；`custom/features/mode/README.md` 新增"切换后的注入通知（模型侧）"；`custom/features/autopilot/README.md` 补两条纪律；`docs/FAQ.md` 一句话。

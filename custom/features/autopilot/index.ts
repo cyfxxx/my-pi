@@ -33,6 +33,7 @@ import {
   readState,
   writeRestartRequest,
   consumeRestartLog,
+  isModeOwnedNotice,
   listTasks,
   addTask,
   deleteTask,
@@ -818,7 +819,10 @@ export function register(pi: ExtensionAPI): void {
       // 为什么重启、该继续做什么"。原项目在 session_start 消费 restartLog 并注入一条
       // 用户消息；迁移时漏了消费端（restartLog 写入但无人读），表现为"重启后没有任何提示"。
       // 网关：仅交互会话消费，否则 headless/-p 子进程会先把它吃掉。
-      if (ctx.hasUI && !restartNoticeShown) {
+      // 例外：`notice: 'mode'` 的重启由 mode 功能自己注入（它要说明新模式的人设/功能/命名空间，
+      // 通用措辞既说不清、又会在**旧模式**的进程里落一条）：这里既不注入也不消费，原样留给它。
+      const pendingLog = ctx.hasUI && !restartNoticeShown ? readState().restartLog : null;
+      if (ctx.hasUI && !restartNoticeShown && !isModeOwnedNotice(pendingLog)) {
         const log = consumeRestartLog();
         if (log && log.action && log.action !== 'none') {
           restartNoticeShown = true;

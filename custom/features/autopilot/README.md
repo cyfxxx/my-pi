@@ -79,6 +79,12 @@
 - 重启通知：`session_start` 消费 `consumeRestartLog()` 并以 `ctx.ui.notify` + `sendUserMessage`
   注入"系统已重启。操作/原因"，仅交互会话消费（headless `-p` 子进程会先吃掉 restartLog）。
   写入端保留在 `restartLog` 字段，supervisor 只清 `action`——两边都不可省。
+  - **消费只清 `restartLog`，绝不动 `action`**（2026-10-06 修）：`action` 的消费者只有 supervisor
+    （`clear_admin_action`）。旧实现顺手把 `action` 清成 `none`，于是同一轮 `session_start` 里
+    mode 刚写下的自愈重启请求被通知消费取消 → supervisor 直接退出（用户看到"注入了系统已重启、
+    进程却退出、模式没换"）。
+  - **`notice:'mode'` 的日志让位**：模式切换的通知由 mode 功能在**新模式进程**里按模式生成
+    （要说清人设/功能面/记忆命名空间），这里 `isModeOwnedNotice()` 命中时既不注入也不消费。
 
 ## 相关
 

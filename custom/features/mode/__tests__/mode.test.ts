@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyModeRuntime,
+  formatModeSwitchNotice,
   normalizeModesFile,
   isFeatureEnabled,
   isLockedMode,
@@ -73,6 +74,44 @@ describe('固定模式', () => {
     expect(modeFeaturesLabel({ ...cfg(), features: ['*'] })).toContain(`全部（${ALL_FEATURES.length}）`);
     expect(modeFeaturesLabel(cfg())).toContain('无');
     expect(modeFeaturesLabel({ ...cfg(), features: ['memory'] })).toContain('memory');
+  });
+});
+
+describe('formatModeSwitchNotice（模式切换后的模型侧注入）', () => {
+  const rp = cfg({
+    description: '角色扮演：标枪',
+    features: ['web-search', 'memory'],
+    thinking: 'low',
+    appendPrompt: 'modes/roleplay.md',
+    memoryNamespace: 'roleplay',
+  });
+
+  it('说清"切到哪儿"与生效内容，而不是进程内部状态', () => {
+    const text = formatModeSwitchNotice('full', 'roleplay', rp);
+    expect(text).toContain('已切换：full → roleplay');
+    expect(text).toContain('角色扮演：标枪');
+    expect(text).toContain('启用功能: web-search、memory');
+    expect(text).toContain('思考档位 low');
+    expect(text).toContain('人设已注入');
+    expect(text).toContain('记忆命名空间 roleplay');
+    // 角色扮演下通用措辞会破戏，必须显式要求别提这条提示
+    expect(text).toContain('不要向用户复述本条提示');
+  });
+
+  it('无人设/无命名空间/无思考档位时不留悬空字段', () => {
+    const text = formatModeSwitchNotice('full', 'minimal', cfg({ description: '' }));
+    expect(text).toContain('无人设');
+    expect(text).toContain('记忆命名空间 默认');
+    expect(text).not.toContain('思考档位');
+    expect(text).not.toContain('定位:');
+  });
+
+  it('逐字节确定（注入面纪律：同输入必同输出，且不含路径/时间戳）', () => {
+    const a = formatModeSwitchNotice('full', 'roleplay', rp);
+    const b = formatModeSwitchNotice('full', 'roleplay', rp);
+    expect(a).toBe(b);
+    expect(a).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(a).not.toMatch(/\/(root|home|tmp|var)\//);
   });
 });
 

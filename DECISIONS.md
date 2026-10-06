@@ -2,6 +2,26 @@
 
 ## 格式
 
+### [2026-10-06] 修"模式切换导致的重启被吞掉（进程直接退出）"+"切换后的注入信息不适配模式"
+
+**现象**（用户实测）：在角色扮演会话里 `/new` 正常；**从新会话重新加载角色扮演会话**时，进程直接退出，终端留下一串未被读走的终端查询应答（`10;rgb:…11;rgb:…64;1;2;6;…c`，即 OSC 10/11 与 DA1 的回复被 shell 回显），模式没换；历史里反而多了一条"系统已重启"的注入——而那次重启并没有发生。
+
+**根因（可复现）**：`session_start` 阶段两个钩子按注册顺序执行（mode 先、autopilot 后）：mode 自愈先写重启请求（`action='restart'` + `restartLog`），随后 autopilot 消费重启通知时执行 `writeState({ restartLog: null, action: 'none' })`。`writeState` 是"默认值 + 覆盖"，于是这一写把**同一轮刚写下的 `action` 一起抹掉**；supervisor 的 `read_admin_action` 读到 `action=none` 就直接 `exit`，pi 也不再有下一轮——用户看到的就是"注入了一条系统已重启、进程却退出、模式也没换"。
+
+**为什么只在部分路径复现**：`autopilot` 只在 full/lean 里注册。roleplay（无 autopilot）里没人消费那条日志，所以"在角色扮演会话里 `/new`"反而正常；而"从新会话切回角色扮演会话"的进程是 full，必中。这也解释了为什么此前的手工验证没暴露它。
+
+**决策**：
+1. **`consumeRestartLog()` 只清 `restartLog`，`action` 与其它字段原样保留**。`action` 的唯一消费者是 supervisor（`clear_admin_action`）；扩展侧的"消费通知"不得代清待执行动作。回归测试跨到真 bash：`restart-log.test.ts` 用 `MY_PI_SUPERVISOR_LIB=1 source scripts/pi-supervisor.sh` 调真实 `read_admin_action`，断言消费通知之后仍读到 `restart` + 目标会话。
+2. **写盘失败时不再退出进程**：`requestModeRestart` 返回是否真的提交成功，失败就红色告警留在原进程——"进程没了、模式也没换、还没有重启"与本次故障是同一种用户可见症状，不能让任何一条失败路径再产生它。
+3. **模式切换的通知改由 mode 功能在"新模式进程"里生成**，写入端只在 `restartLog` 里带 `notice:'mode'` + `mode`/`from`；autopilot 用 `isModeOwnedNotice()` 让位（不注入也不消费）。通知文本由 `formatModeSwitchNotice()` 产出：`已切换：A → B` + 定位 + 启用功能 + 思考档位/人设/记忆命名空间 + "不要向用户复述本条提示"。内部措辞（"按会话模式自愈：进程原为 full"）与会话文件路径只留在 `state.json` 供排查，**不进模型上下文**。消费即清，并带 10 分钟 TTL：那次重启没落成（请求被吞、用户手工换会话、崩溃恢复续了别的会话）时丢弃，不让模型看到过期的"已切换"断言。
+4. 通用「系统已重启」通知继续服务非模式类重启（`admin_restart`/`set_model`/`switch_session`/watchdog）。
+
+**为什么不把通知留在旧进程注入**：旧进程仍是旧功能集、旧人设，在那里注入等于"用旧档位的嘴说新档位的话"；角色扮演下还会在错误的人设里落下一条记录（这正是用户感到"注入的信息不适配模式"的一层）。
+
+**为什么不顺手把 mode 的通知也塞进 autopilot**：通知内容要读模式配置（人设/命名空间/功能面），属于 mode 的语义；autopilot 只该负责"重启"这条通用基础设施。边界靠 `notice` 标记显式划开，而不是靠钩子注册顺序（顺序是实现的巧合，不是契约）。
+
+**验收**：tsc 干净；vitest **73 文件 / 811 项**（新增 16 项）；`test-supervisor.sh` 65 项；mode-switch 36 项覆盖"写入端不消费 / 新模式进程注入一次 / 别会话不消费 / 过期丢弃 / 普通启动不注入 / 不一致时不消费"；`formatModeSwitchNotice` 逐字节确定、无路径与时间戳。跨功能接线测试 `mode-autopilot-restart.test.ts` **同时注册真实 mode 与真实 autopilot**、按注册顺序跑完两个 `session_start`（只靠各自单测锁不住"谁在什么顺序下消费了什么"）。回归证据：把 `ops.ts` + `autopilot/index.ts` 切回旧实现，该接线测试与 3 项 `action` 断言立即变红（`expected 'none' to be 'restart'`）。
+
 ### [2026-10-06] 模式"免重启"（方案 P）评估：**暂不实施**——记录三档划分、实测对价与触发条件
 
 **背景**：会话作用域化落地后，用户追问"方案 P 有什么代价"。P = 让扩展在**工厂期**就知道本次要加载哪个会话，从而把"模式 → 注册哪些功能"彻底按会话决定，`/new`、`/resume`、`/reload` 都不再需要重启。

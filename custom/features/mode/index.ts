@@ -13,7 +13,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { registerCommand, getThinkingLevel, setThinkingLevel } from '../../adapters/ui-adapter';
+import { registerCommand, getThinkingLevel, setThinkingLevel, sendUserMessage } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   loadModes,
@@ -29,10 +29,13 @@ import {
   shouldRequestModeRestart,
   applyModeRuntime,
   modeFeaturesLabel,
+  formatModeSwitchNotice,
+  MODE_NOTICE_TTL_MS,
 } from './logic';
 // 重启请求由 supervisor 消费，属跨功能基础设施；本项目约定跨功能引用只走对方 logic.ts。
 // （若将来出现第三个消费者，应上移到 custom/core/。）
-import { writeRestartRequest } from '../autopilot/logic';
+// `readState`/`consumeRestartLog` 只在"取自己那条待注入通知"时用到（见 takePendingModeNotice）。
+import { writeRestartRequest, readState, consumeRestartLog } from '../autopilot/logic';
 
 const MODE_HELP = `用法:
   /mode              显示当前模式
@@ -165,7 +168,7 @@ export function register(pi: ExtensionAPI): void {
         lines.push('', '以下配置需要重启才能生效，正在自动重启并续接当前会话：');
         for (const change of result.changes) lines.push(`  - ${change}`);
         ctx.ui.notify(lines.join('\n'), 'info');
-        requestModeRestart(ctx, subcmd);
+        requestModeRestart(ctx, subcmd, activeMode);
         return;
       }
       if (result.thinkingChanged) {
@@ -203,9 +206,9 @@ export function register(pi: ExtensionAPI): void {
             `[模式] 本会话应使用 ${intended}，本进程以 ${activeMode} 运行：正在自动重启并按会话模式续接…`,
             'warning',
           );
-          // 原因写清楚是"自愈"而不是"用户切换"：这句会经 admin restartLog 变成用户可见的
-          // 重启通知（autopilot 的 session_start 消费），不能沿用 /mode 的措辞。
-          requestModeRestart(ctx, intended, `按会话模式自愈：本会话应为 ${intended}，进程原为 ${activeMode}`);
+          // 原因写清楚是"自愈"而不是"用户切换"：这句只进 state.json 供排查，模型侧的通知
+          // 由**新模式进程**按模式生成（见 takePendingModeNotice），不沿用这里的内部措辞。
+          requestModeRestart(ctx, intended, activeMode, `按会话模式自愈：本会话应为 ${intended}，进程原为 ${activeMode}`);
           return;
         } else {
           ctx.ui.notify(
@@ -214,12 +217,55 @@ export function register(pi: ExtensionAPI): void {
             'warning',
           );
         }
+        // 不一致就到此为止：本进程仍在旧档位，既不注入切换通知（会说假话），
+        // 也不消费它——留给真正切成功的那一轮（含用户看到告警后自己重启的那次）。
+        return;
       }
       if (!ctx.hasUI) return;
+      // 刚因模式切换重启过 → 在**新模式进程**里注入模式相关的通知（人设/功能/命名空间都对得上）。
+      // 顺序重要：必须在一致性校验之后（不一致的进程仍在旧档位，注入等于说假话），
+      // 且必须只注入一次（takePendingModeNotice 消费即清）。
+      const notice = takePendingModeNotice(sessionFile);
+      if (notice && notice.to === activeMode) {
+        try {
+          sendUserMessage(pi, formatModeSwitchNotice(notice.from, notice.to, getModeConfig(activeMode) ?? activeConfig));
+        } catch {
+          /* 注入失败不阻塞启动 */
+        }
+      }
       if (activeMode === 'full') return;
       ctx.ui.notify(`[模式] ${activeMode}: ${activeConfig.description}`, 'info');
     },
   });
+}
+
+/**
+ * 取出"本次启动是因为模式切换"的待注入通知（**只在新模式进程里调用**）。
+ *
+ * 写入端是 `requestModeRestart`（旧进程，带 `notice:'mode'`），消费端在这里：
+ *   - 只认自己写的标记（`notice === 'mode'`），autopilot 的通用通知也据此让位；
+ *   - 只认本会话（`targetSession` 对得上），别的会话的通知留给它自己的进程；
+ *   - 超期的通知直接丢弃（那次重启没落成，注入只会说假话）；
+ *   - 消费只清 `restartLog`，**不碰 `action`**：action 的消费者是 supervisor。
+ */
+function takePendingModeNotice(sessionFile: string | undefined): { from: string; to: string } | null {
+  try {
+    const log = readState().restartLog;
+    if (!log || log.notice !== 'mode') return null;
+    const ts = typeof log.timestamp === 'number' ? log.timestamp : 0;
+    if (!ts || Date.now() - ts > MODE_NOTICE_TTL_MS) {
+      consumeRestartLog(); // 过期：清掉，免得下次再撞上
+      return null;
+    }
+    const target = typeof log.targetSession === 'string' ? log.targetSession : '';
+    if (target && target !== sessionFile) return null; // 别的会话的重启，留给它
+    const from = typeof log.from === 'string' ? log.from : '';
+    const to = typeof log.mode === 'string' ? log.mode : '';
+    consumeRestartLog();
+    return from && to ? { from, to } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 当前会话文件（内存会话 / --no-session 返回 undefined） */
@@ -241,26 +287,53 @@ function sessionFileOf(ctx: {
  * 回来后 supervisor 已按该会话的模式重新解析（人设 + 记忆命名空间），bootstrap 也重新
  * 按新模式过滤功能。这条路已有 supervisor 测试兜底，不引入新机制。
  *
- * `reason` 会进 `restartLog` 并被 autopilot 的 `session_start` 变成用户可见的重启通知，
- * 所以调用方要写清是"用户切换"还是"启动自愈"。
+ * `reason` 只进 `restartLog` 供排查（含内部状态，如"进程原为 full"）；模型侧看到的是
+ * `notice:'mode'` + `mode`/`from` 这组结构化字段，由**新模式进程**（takePendingModeNotice）
+ * 按模式渲染成适配的文本。autopilot 见到 `notice:'mode'` 不再注入它自己的通用通知。
+ *
+ * 返回是否真的提交成功：**写盘失败时绝不退出**。否则就是"进程没了、模式也没换、还没有重启"——
+ * 与 2026-10-06 那个"通知消费吞掉 action"的故障同一种用户可见症状（静默退出）。
  */
 function requestModeRestart(
   ctx: {
     sessionManager?: { getSessionFile?: () => string | undefined };
     shutdown?: () => void;
+    ui?: { notify?: (message: string, level?: 'info' | 'warning' | 'error') => void };
   },
   modeName: string,
+  from: string,
   reason = `切换模式为 ${modeName}`,
-): void {
+): boolean {
+  let written = false;
   try {
     const sessionFile = sessionFileOf(ctx);
-    writeRestartRequest('restart', { targetSession: sessionFile, reason });
+    writeRestartRequest('restart', {
+      targetSession: sessionFile,
+      reason,
+      notice: 'mode',
+      mode: modeName,
+      from,
+    });
+    written = true;
   } catch {
-    /* 写盘失败时仍尝试退出，由用户手工重启 */
+    /* 写盘失败：下面告警，不退出 */
+  }
+  if (!written) {
+    try {
+      ctx.ui?.notify?.(
+        `重启请求写盘失败，未退出进程（模式记录已写入，重启后 ${modeName} 才会生效）。` +
+          `请手动重启：退出后重新启动，或检查 PI_ADMIN_STATE_FILE 指向的路径。`,
+        'error',
+      );
+    } catch {
+      /* 连告警都发不出去就只能留在原进程 */
+    }
+    return false;
   }
   try {
     ctx.shutdown?.();
   } catch {
     /* 非交互环境无 shutdown */
   }
+  return true;
 }

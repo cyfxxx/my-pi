@@ -31,6 +31,7 @@ import {
   resolveStartupMode,
   shouldRequestModeRestart,
   isModeForcedByEnv,
+  MODE_NOTICE_TTL_MS,
 } from '../logic';
 
 type Handler = (event: unknown, ctx?: unknown) => unknown;
@@ -94,6 +95,16 @@ afterEach(() => {
 
 const modesJson = (): string => readFileSync(join(dir, 'modes.json'), 'utf-8');
 const sessionsFile = (): string => join(dir, 'modes-sessions.json');
+const statePath = (): string => join(dir, 'state.json');
+const sentOf = (pi: FakePi): string[] => pi.sent as string[];
+
+/** 复刻 pi-supervisor.sh 的 clear_admin_action：只清 action/timestamp，保留 restartLog */
+function clearAction(): void {
+  const s = JSON.parse(readFileSync(statePath(), 'utf-8'));
+  s.action = 'none';
+  s.timestamp = 0;
+  writeFileSync(statePath(), JSON.stringify(s));
+}
 
 describe('会话模式记录（current 不入库、按会话隔离）', () => {
   it('没有记录 → 回落 default；default 来自 modes.json', () => {
@@ -225,9 +236,11 @@ describe('自愈重启防环', () => {
 function makeFakePi(): FakePi {
   const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
   const hooks = new Map<string, Handler[]>();
+  const sent: string[] = [];
   return {
     commands,
     hooks,
+    sent,
     registerTool: () => {},
     registerCommand: (name: string, opts: { handler: (args: string, ctx: unknown) => Promise<void> }) => {
       commands.set(name, opts);
@@ -242,7 +255,9 @@ function makeFakePi(): FakePi {
     },
     appendEntry: () => {},
     sendMessage: () => {},
-    sendUserMessage: () => {},
+    sendUserMessage: (content: unknown) => {
+      sent.push(String(content));
+    },
     getActiveTools: () => [],
     setActiveTools: () => {},
     getThinkingLevel: () => 'high',
@@ -329,6 +344,15 @@ describe('/mode <name> 记录到当前会话 + 自动重启', () => {
     expect(notify.mock.calls.some((c) => String(c[0]).includes('未知模式'))).toBe(true);
   });
 
+  it('重启请求写盘失败 → 不退出进程，明确告警（防止"静默退出、模式也没换"）', async () => {
+    const pi = await setup();
+    mkdirSync(statePath(), { recursive: true }); // 目标路径是目录 → 原子写的 rename 会失败
+    const { ctx, notify, shutdown } = cmdCtx();
+    await pi.commands.get('mode')!.handler('roleplay', ctx);
+    expect(shutdown).not.toHaveBeenCalled();
+    expect(notify.mock.calls.some((c) => String(c[0]).includes('写盘失败'))).toBe(true);
+  });
+
   it('会话不落盘（--no-session）→ 不重启、不写记录，并说明限制', async () => {
     const pi = await setup();
     const { ctx, notify, shutdown } = cmdCtx(true, null);
@@ -409,5 +433,105 @@ describe('session_start 按会话自愈（模式是会话属性）', () => {
     const { ctx, shutdown } = cmdCtx(true, null);
     await pi.hooks.get('session_start')![0]({}, ctx);
     expect(shutdown).not.toHaveBeenCalled();
+  });
+});
+
+describe('模式切换后的注入通知（由新模式进程生成）', () => {
+  it('重启请求带 mode 归属，且写入端**不消费**它（留给新模式进程）', async () => {
+    setSessionMode(SESS, 'roleplay');
+    const pi = await setup(); // 旧进程：full
+    const { ctx } = cmdCtx();
+    await pi.hooks.get('session_start')![0]({}, ctx);
+
+    const state = JSON.parse(readFileSync(statePath(), 'utf-8'));
+    expect(state.action).toBe('restart'); // 请求仍在：不会被"通知消费"顺手取消
+    expect(state.restartLog).toMatchObject({
+      action: 'restart',
+      notice: 'mode',
+      mode: 'roleplay',
+      from: 'full',
+      targetSession: SESS,
+    });
+    expect(sentOf(pi)).toHaveLength(0); // 旧进程（旧档位）不注入任何通知
+  });
+
+  it('新模式进程注入一次，内容是模式信息而不是内部状态', async () => {
+    setSessionMode(SESS, 'roleplay');
+    const fullPi = await setup();
+    await fullPi.hooks.get('session_start')![0]({}, cmdCtx().ctx); // 旧进程写下请求
+    clearAction(); // supervisor 消费
+
+    process.env.PI_SESSION_MODE = 'roleplay';
+    const rpPi = await setup(); // 新进程：roleplay
+    const { ctx } = cmdCtx();
+    await rpPi.hooks.get('session_start')![0]({}, ctx);
+
+    const sent = sentOf(rpPi);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain('已切换：full → roleplay');
+    expect(sent[0]).toContain('启用功能: web-search、memory');
+    expect(sent[0]).toContain('思考档位 low');
+    expect(sent[0]).toContain('人设已注入');
+    expect(sent[0]).toContain('记忆命名空间 roleplay');
+    expect(sent[0]).toContain('不要向用户复述');
+    // 内部措辞与会话路径不能进模型上下文
+    expect(sent[0]).not.toContain('进程原为');
+    expect(sent[0]).not.toContain(SESS);
+    expect(sent[0]).not.toContain('自愈');
+
+    // 同进程再来一次 session_start（/reload 等）不重复注入
+    await rpPi.hooks.get('session_start')![0]({}, ctx);
+    expect(sentOf(rpPi)).toHaveLength(1);
+  });
+
+  it('通知属别的会话 → 不注入也不消费（留给那个会话的进程）', async () => {
+    const other = '/tmp/my-pi-mode-other.jsonl';
+    setSessionMode(other, 'roleplay');
+    setSessionMode(SESS, 'roleplay'); // 本会话也在 roleplay：新进程不会触发自愈，才能看清"不消费"
+    const fullPi = await setup();
+    const otherCtx = cmdCtx(true, other).ctx;
+    await fullPi.hooks.get('session_start')![0]({}, otherCtx); // 为**别的**会话写下请求
+    clearAction();
+
+    process.env.PI_SESSION_MODE = 'roleplay';
+    const rpPi = await setup();
+    await rpPi.hooks.get('session_start')![0]({}, cmdCtx().ctx); // 本会话是 SESS
+    expect(sentOf(rpPi)).toHaveLength(0);
+    const state = JSON.parse(readFileSync(statePath(), 'utf-8'));
+    expect(state.restartLog?.targetSession).toBe(other); // 原样留着
+  });
+
+  it('过期通知（重启没落成）→ 丢弃且不再注入', async () => {
+    setSessionMode(SESS, 'roleplay');
+    const fullPi = await setup();
+    await fullPi.hooks.get('session_start')![0]({}, cmdCtx().ctx);
+    clearAction();
+    const s = JSON.parse(readFileSync(statePath(), 'utf-8'));
+    s.restartLog.timestamp = Date.now() - MODE_NOTICE_TTL_MS - 1000;
+    writeFileSync(statePath(), JSON.stringify(s));
+
+    process.env.PI_SESSION_MODE = 'roleplay';
+    const rpPi = await setup();
+    await rpPi.hooks.get('session_start')![0]({}, cmdCtx().ctx);
+    expect(sentOf(rpPi)).toHaveLength(0);
+    expect(JSON.parse(readFileSync(statePath(), 'utf-8')).restartLog).toBeNull();
+  });
+
+  it('本进程与会话记录不一致时不消费通知（留给真正切成功的那一轮）', async () => {
+    setSessionMode(SESS, 'roleplay');
+    const fullPi = await setup(); // 旧进程：full
+    const c = cmdCtx().ctx;
+    await fullPi.hooks.get('session_start')![0]({}, c); // 写下自愈请求（并占住防环标记）
+    clearAction();
+    // 同一进程再走一次 session_start：仍在旧档位 + 防环窗口内 → 只告警
+    await fullPi.hooks.get('session_start')![0]({}, cmdCtx().ctx);
+    expect(JSON.parse(readFileSync(statePath(), 'utf-8')).restartLog.notice).toBe('mode'); // 日志没被消费掉
+    expect(sentOf(fullPi)).toHaveLength(0);
+  });
+
+  it('没有重启记录时普通启动不注入（新会话不该收到切换通知）', async () => {
+    const pi = await setup();
+    await pi.hooks.get('session_start')![0]({}, cmdCtx().ctx);
+    expect(sentOf(pi)).toHaveLength(0);
   });
 });

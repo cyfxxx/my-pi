@@ -143,12 +143,25 @@ export function writeAutopilotConfig(cfg: ReturnType<typeof defaultAutopilotConf
 
 // ── admin state ──
 
-export interface AdminState {
-  action: 'none' | 'restart' | 'switch_session' | 'set_model' | 'restart_hang';
+export interface RestartRequestOpts {
   targetSession?: string;
   targetModel?: string;
   targetProvider?: string;
   reason?: string;
+  /**
+   * 通知归属。`'mode'` = 这条重启由 mode 功能自己按模式生成注入文本，
+   * autopilot 的通用「系统已重启」通知必须让位（否则模式切换后注入的是通用措辞，
+   * 既说不到新模式，也会在错误的进程/人设里落一条记录）。
+   */
+  notice?: string;
+  /** 目标模式名（`notice: 'mode'` 时填写） */
+  mode?: string;
+  /** 切换前的模式名（`notice: 'mode'` 时填写） */
+  from?: string;
+}
+
+export interface AdminState extends RestartRequestOpts {
+  action: 'none' | 'restart' | 'switch_session' | 'set_model' | 'restart_hang';
   timestamp: number;
   restartLog: Record<string, unknown> | null;
 }
@@ -184,7 +197,7 @@ export function writeState(state: Partial<AdminState>): void {
 
 export function writeRestartRequest(
   action: 'restart' | 'switch_session' | 'set_model' | 'restart_hang',
-  opts: { targetSession?: string; targetModel?: string; targetProvider?: string; reason?: string } = {},
+  opts: RestartRequestOpts = {},
 ): void {
   const now = Date.now();
   writeState({
@@ -195,10 +208,34 @@ export function writeRestartRequest(
   });
 }
 
+/**
+ * 这条重启日志是否归 mode 功能自己通知（autopilot 必须让位）。
+ *
+ * 模式切换的通知要说的是"你现在在哪个档位"（人设/功能面/记忆命名空间），
+ * 只有 mode 功能写得出来；而且它必须在**新模式进程**里生成——autopilot 若在旧进程
+ * 抢先注入，不但内容是通用措辞，还会顺手把 mode 的待通知日志消费掉。
+ */
+export function isModeOwnedNotice(log: Record<string, unknown> | null | undefined): boolean {
+  return Boolean(log) && log?.notice === 'mode';
+}
+
+/**
+ * 消费重启通知日志。
+ *
+ * **只清 `restartLog`，其它字段原样保留**（2026-10-06 修）。旧实现写
+ * `{ restartLog: null, action: 'none' }`，而 `writeState` 是"默认值 + 覆盖"，于是它会把
+ * 同一轮 `session_start` 里**刚写下的重启请求**一起抹掉：mode 自愈先写 restart、autopilot
+ * 随后消费时把 action 清成 none，supervisor 读到 `action=none` 就直接退出——用户看到的是
+ * "注入了一条系统已重启、进程却直接退出、模式也没换"。只在 autopilot 注册的模式（full/lean）
+ * 里复现，roleplay（无 autopilot）反而正常，所以表现为"从新会话切回角色扮演会话就退出"。
+ *
+ * 语义边界：`action` 的消费者只有 supervisor（`clear_admin_action` 会显式清它），
+ * 扩展侧的消费不得越权代清。
+ */
 export function consumeRestartLog(): Record<string, unknown> | null {
   const state = readState();
   if (state.restartLog) {
-    writeState({ restartLog: null, action: 'none' });
+    writeState({ ...state, restartLog: null });
     return state.restartLog;
   }
   return null;
