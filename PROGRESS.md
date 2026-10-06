@@ -2104,4 +2104,5 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **端到端（真实启动器 + stub CLI）**：`--session <roleplay 会话>` → `PI_SESSION_MODE=roleplay` + 人设参数 + `PI_MEMORY_NAMESPACE=roleplay`；无会话参数 → full、不注入人设；`--session abc123`（id 形态）→ 回落 default，交给 pi 侧自愈。
 - **端到端（真实无头运行）**：`./my-pi.sh -p` 新会话正常回复；对带 roleplay 记录的会话 `--session <file> -p`，模型用 bash 工具写出 `$PI_MEMORY_NAMESPACE` = `roleplay`（证明启动器按会话解析生效）。
 - **边界**：非默认模式下 `/new`、进程内 `/resume`、`-c`/`-r` 会多一次自动重启；会话文件移动/改名后回落 default；模式仍非热切换（人设是 CLI 参数）。
+- **重启成本实测**（2026-10-06，回答"方案 P 有什么代价"时补测；本机 `node -e 1` 仅 0.35s，慢的是 pi 自身启动 + 23MB dist）：`node cli.js --help` 无扩展 33.7s、带 bootstrap 扩展 43.7s、经 supervisor 43.9s、`PI_OFFLINE=1` 39.9s；同进程内重载扩展 9.4s（首次冷 jiti）/ **0.9s（warm）**。→ 一次重启 ≈40s、热重载 ≈1s，这是方案 P 真正的收益量级（前缀重放两边都省不掉）。
 - 验证：`test-supervisor.sh` 65 项、`mode-switch.test.ts` 28 项、`vitest` 72 文件 / **795 用例**、`tsc`、`check-conventions`/`check-dead-exports`/`check-features`/`check-doc-links`/`check-injection-surface`（基线已刷新）、`golden --fast` 17 步全绿、全量 golden。
