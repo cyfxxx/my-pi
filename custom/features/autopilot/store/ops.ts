@@ -164,6 +164,14 @@ export interface RestartRequestOpts {
    * `auto`（缺省）= 由会话盘面尾部判定。判据与消费者见 custom/core/restart-intent.ts。
    */
   intent?: RestartResumeIntent;
+  /**
+   * 写入这条请求的**宿主 supervisor 的 pid**（= pi 进程的 ppid）。
+   *
+   * 为什么需要：多实例并存时它们共享同一份 `state.json`（实测出现过两个 supervisor 同时在跑）。
+   * A 实例写的请求会被 B 实例的 supervisor 读到并执行——于是 A 的会话被"跨实例"重启/续错会话。
+   * 带上 ownerPid 后，supervisor 只认自己的请求；缺省（老请求/手工写的）照旧被认领。
+   */
+  ownerPid?: number;
 }
 
 export interface AdminState extends RestartRequestOpts {
@@ -206,11 +214,15 @@ export function writeRestartRequest(
   opts: RestartRequestOpts = {},
 ): void {
   const now = Date.now();
+  // ownerPid：pi 的父进程就是拉起它的 supervisor（`process.ppid`）。取不到就不写该字段
+  // （老的/手工写的请求没有 ownerPid → supervisor 照旧认领，保持向后兼容）。
+  const ownerPid = typeof process.ppid === 'number' && process.ppid > 0 ? process.ppid : undefined;
+  const withOwner = { ownerPid, ...opts };
   writeState({
     action,
-    ...opts,
+    ...withOwner,
     timestamp: now,
-    restartLog: { action, ...opts, timestamp: now },
+    restartLog: { action, ...withOwner, timestamp: now },
   });
 }
 

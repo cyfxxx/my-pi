@@ -127,8 +127,15 @@ function supervisorDecision(): { act: string; target: string } {
     'read_admin_action',
     `printf '%s|%s' "$ACT" "$TARGET"`,
   ].join('; ');
+  // 请求里带着 ownerPid（= 写入进程的 ppid）；这里把它交给 supervisor 的"本实例身份"钩子，
+  // 让契约测试聚焦"消费通知不会代清 action"，而不是实例归属（归属另有专门用例）。
+  const owner = readState().ownerPid;
   const out = execFileSync('bash', ['-c', script], {
-    env: { ...process.env, PI_ADMIN_STATE_FILE: statePath },
+    env: {
+      ...process.env,
+      PI_ADMIN_STATE_FILE: statePath,
+      SUPERVISOR_OWNER_PID: owner === undefined ? '' : String(owner),
+    },
     encoding: 'utf-8',
   });
   const [act = '', target = ''] = out.split('|');

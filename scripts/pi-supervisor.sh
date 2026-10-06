@@ -33,6 +33,10 @@ CRASH_COUNT_FILE="$RECOVERY_DIR/crash-count"
 ROUNDS_LOG="$RECOVERY_DIR/rounds.jsonl"
 ROUND_LOG_DIR="$RECOVERY_DIR/rounds"
 ROUND_LOG_KEEP="${ROUND_LOG_KEEP:-20}"   # 只留最近 N 轮 crash log
+ROUNDS_MAX_LINES="${ROUNDS_MAX_LINES:-800}"   # rounds.jsonl 超过这么多行就轮转（只留最近一半）
+# 本实例的"身份"：admin 请求里的 ownerPid 要跟它比。缺省就是本 supervisor 的 pid；
+# 允许外部覆盖只为测试（`test-supervisor.sh` / restart-log 的跨语言契约测试要能钉住它）。
+SUPERVISOR_OWNER_PID="${SUPERVISOR_OWNER_PID:-$$}"
 ROUND_INDEX=0
 RUN_SESSION=""
 LAST_SESSION=""   # 上一轮实际加载的会话（崩溃恢复用它精确续接，见 recovery_args）
@@ -116,7 +120,9 @@ read_admin_action() {
   local out
   # 第 5 个字段是 restartLog 的时间戳（毫秒）：即使 action 已被清掉也要读出来，
   # detect_lost_restart 靠它判定"这一轮写下的重启请求被吞了"（见下方注释）。
-  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);const logTs=(s.restartLog&&+s.restartLog.timestamp)||0;process.stdout.write([ok?s.action:"",ok?s.targetSession||"":"",ok?s.targetProvider||"":"",ok?s.targetModel||"":"",String(logTs)].join("\u001f"))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
+  # ownerPid 过滤：多实例共享同一份 state.json 时，只认**自己的**请求（pi 的 ppid 就是这个
+  # supervisor）；没有 ownerPid 的（老请求/手工写的）照旧认领，保持向后兼容。
+  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const me=+process.argv[2];const mine=!s.ownerPid||+s.ownerPid===me;const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=mine&&fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);const logTs=(s.restartLog&&+s.restartLog.timestamp)||0;process.stdout.write([ok?s.action:"",ok?s.targetSession||"":"",ok?s.targetProvider||"":"",ok?s.targetModel||"":"",String(logTs)].join("\u001f"))}catch{}' "$ADMIN_STATE_FILE" "${SUPERVISOR_OWNER_PID:-$$}" 2>/dev/null)
   [ -n "$out" ] || return 0
   IFS=$'\x1f' read -r ACT TARGET PROV MODEL LTS <<<"$out"
 }
@@ -166,6 +172,12 @@ record_round() { # <decision> <action> <target> <exitCode> <lost> <durationMs> [
     "$([ -n "$MODE_APPEND_ABS" ] && echo true || echo false)" \
     "$(json_escape "$act")" "$(json_escape "$target")" "$code" "$decision" "$dur" "$lost" \
     "$(json_escape "$(basename "${CRASH_LOG:-}")")" "$extra" >>"$ROUNDS_LOG" 2>/dev/null || true
+  # 轮转：事故复盘只看最近几轮，文件不该无限长（crash log 已在上面按轮保留）
+  local lines
+  lines=$(wc -l <"$ROUNDS_LOG" 2>/dev/null || echo 0)
+  if [ "${lines:-0}" -gt "$ROUNDS_MAX_LINES" ] 2>/dev/null; then
+    tail -n $((ROUNDS_MAX_LINES / 2)) "$ROUNDS_LOG" >"$ROUNDS_LOG.tmp" 2>/dev/null && mv "$ROUNDS_LOG.tmp" "$ROUNDS_LOG"
+  fi
 }
 
 # ── admin 请求 → 续接参数（纯函数，test-supervisor.sh 直接测）──

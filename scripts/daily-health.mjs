@@ -267,6 +267,24 @@ const singleCmd =
     : null;
 const singleRatio = singleCmd ? singleCmd.single / singleCmd.total : null;
 
+// 重启/崩溃轮次（supervisor 的 recovery/rounds.jsonl）：只做**可见性**计数——
+// "异常"判定在 scripts/lib-state-audit.mjs（lost-restart-recent 等），这里只报数量，
+// 让日报能看出"今天重启了几次、有没有崩溃恢复"。
+let restartCount = 0;
+let recoveryCount = 0;
+try {
+  const since = Date.now() - WINDOW_MS;
+  for (const r of loadJSONL(join(AGENT, 'recovery', 'rounds.jsonl'))) {
+    if (typeof r.ts !== 'number' || r.ts < since) continue;
+    const d = String(r.decision ?? '');
+    if (d === 'restart' || d === 'switch_session' || d === 'set_model') restartCount++;
+    else if (d.startsWith('recover') || d === 'circuit_breaker' || d === 'max_recovery_rounds') recoveryCount++;
+  }
+  if (recoveryCount > 0) notes.push(`本窗口有 ${recoveryCount} 轮崩溃恢复（看 recovery/rounds.jsonl 与 round-N.log）`);
+} catch {
+  /* rounds.jsonl 缺失/坏行不阻塞 */
+}
+
 let entryCount = 0;
 let sizeMB = 0;
 try {
@@ -384,7 +402,7 @@ const bashStepStr = bashPerStep ? `p50=${bashPerStep.p50}/p90=${bashPerStep.p90}
 const singleCmdStr = singleCmd
   ? `${(singleRatio * 100).toFixed(1)}%(${singleCmd.single}/${singleCmd.total})`
   : 'n/a(旧记录无字段)';
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 结论=${verdict}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);

@@ -295,14 +295,19 @@ export function registerAdminTools(pi: PiApi): void {
       }
       const confirmed = await ctx.confirm?.('切换模型', `将切换为 ${provider}/${model}，需要重启 Agent。是否继续？`);
       if (!confirmed) return `已保存配置但未重启。下次启动将使用 ${provider}/${model}`;
-      writeRestartRequest('set_model', {
-        targetSession: ctx.sessionFile,
-        targetProvider: provider,
-        targetModel: model,
-        reason: `切换模型为 ${provider}/${model}`,
-        // 用户驱动的模型切换：不需要"接上工作"（判据见 custom/core/restart-intent.ts）
-        intent: 'none',
-      });
+      try {
+        writeRestartRequest('set_model', {
+          targetSession: ctx.sessionFile,
+          targetProvider: provider,
+          targetModel: model,
+          reason: `切换模型为 ${provider}/${model}`,
+          // 用户驱动的模型切换：不需要"接上工作"（判据见 custom/core/restart-intent.ts）
+          intent: 'none',
+        });
+      } catch {
+        // 配置已保存但重启请求写不下去：明确告知，不 shutdown（避免"进程没了、模型也没换"）
+        return `已保存配置但未能提交重启请求（写盘失败）：下次启动将使用 ${provider}/${model}。请检查 PI_ADMIN_STATE_FILE 指向的路径。`;
+      }
       ctx.shutdown?.();
       return `正在重启以加载模型 ${provider}/${model}...`;
     },

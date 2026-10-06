@@ -88,6 +88,12 @@
     `resume=false` → `sendMessage(..., { deliverAs: 'nextTurn' })` 的上下文备注（零成本、
     不触发回合、不写会话文件）。旧行为是无条件 `sendUserMessage`：切模式/换模型这类没有在途
     任务的重启也白烧一次"重启后首轮全量重放"（实测 ≈80k），还可能让模型凭空编任务。
+  - **写入端带 `ownerPid`**（= pi 的 ppid，即拉起它的 supervisor）：多实例并存时它们共享同一份
+    `state.json`，A 写的请求会被 B 的 supervisor 读到并执行（跨实例重启/续错会话）。supervisor
+    只认自己的请求；没有 `ownerPid` 的老请求/手工请求照旧认领（向后兼容）。
+  - **写盘失败一律不 `shutdown`**（`admin_restart` / `admin_set_model` / `admin_switch_session`）：
+    否则就是"进程没了、配置也没生效"的静默退出；改为返回明确错误文案。同款纪律见 mode 的
+    `requestModeRestart`。
   - 写入端的 `intent`：`/mode`、`set_model`、`switch_session` → `none`；看门狗 `restart_hang`、
     自动 failover → `continue`；`admin_restart` 由**模型自己**用 `resume` 参数声明（它此刻
     上下文完整，判断零成本）；缺省 `auto` = 交给盘面尾部判。

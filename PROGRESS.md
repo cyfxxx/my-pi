@@ -2175,3 +2175,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 场景 26→**33 项**：假 provider `hangNext(1)` 让回合卡在模型调用里 → 真实输入触发回合 → 半途 `SIGTERM` pi → supervisor 重拉 → 盘面尾部=工作在途 → **自动续跑**（新请求最后一条输入就是续跑指令 + 固定回复落盘）。覆盖了崩溃恢复/`admin_restart` 的**默认**路径（本功能的原始意图）。
 - 坑与修法：pi 会把 `process.title` 写成窗口标题，第一次回合后 `/proc/<pid>/cmdline` 只剩标题 → 按 argv 找进程静默失败；改为 `/proc/<pid>/exe`=node + environ 带场景隔离 agent 目录（已写进脚本注释）。
 - 未做：故障注入组（写盘失败/状态损坏/两实例并发）。
+
+### 并发与失败路径硬化（2026-10-06）
+
+- **多实例隔离**：重启请求带 `ownerPid`（pi 的 ppid），supervisor 只认自己的实例；无 ownerPid 的老请求照旧认领。
+- **跨进程锁 + 多键防环**：`modes-sessions.json` 与 `mode-restart-guard.json` 共用 `core/file-lock.ts` 的锁；
+  guard 从单槽 `{key,ts}` 改为 `{ "<会话>::<模式>": ts }`（旧格式兼容迁移、过期与条数裁剪）——
+  单槽时代两个会话/实例的自愈会互相覆盖并来回重启。
+- **写盘失败不再静默退出**：`admin_restart`/`admin_set_model`/`admin_switch_session` 与 mode 的
+  `requestModeRestart` 一律"写失败就不 shutdown + 明确文案"。
+- **可见性**：`rounds.jsonl` 超 800 行轮转为最近 400 行；`daily-health` 汇总行加 `重启=/崩溃恢复=`。
+- 验证：supervisor 104 项、状态体检 52 项、mode-switch 39 项、admin 工具 27 项、用量度量 46 项；
+  台账 `docs/BUG-REPLAYS.md` 增 3 行（多实例串扰 / 防环单槽 / 写盘失败静默退出）。

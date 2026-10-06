@@ -9,7 +9,7 @@
  * PI_ADMIN_STATE_FILE 指向同一目录下的 state.json。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { registerTool } from '../../../adapters/tool-adapter';
@@ -419,6 +419,33 @@ describe('registerAdminTools', () => {
     expect(state.targetProvider).toBe('deepseek');
     expect(state.targetModel).toBe('deepseek-chat');
     expect(state.targetSession).toBe('/tmp/sess.jsonl');
+  });
+
+  it('重启请求写盘失败 → 不 shutdown、明确告知（防"进程没了、模型也没换"）', async () => {
+    mkdirSync(statePath, { recursive: true }); // 目标路径是目录 → 原子写的 rename 必失败
+    writeModelsFile({ providers: { deepseek: { models: [{ id: 'deepseek-chat' }] } } });
+    writeSettingsFile({ defaultProvider: 'old', defaultModel: 'old-m' });
+    const { tools, pi } = collectTools();
+    registerAdminTools(pi);
+
+    let shutdownCalled = false;
+    const text = await runTool(
+      tools,
+      'admin_set_model',
+      { provider: 'deepseek', model: 'deepseek-chat' },
+      {
+        hasUI: true,
+        sessionManager: { getSessionFile: () => '/tmp/sess.jsonl' },
+        ui: { confirm: async () => true },
+        shutdown: () => {
+          shutdownCalled = true;
+        },
+      },
+    );
+    expect(text).toContain('未能提交重启请求');
+    expect(text).toContain('下次启动将使用 deepseek/deepseek-chat');
+    expect(shutdownCalled).toBe(false);
+    rmSync(statePath, { recursive: true, force: true });
   });
 
   it('admin_status 汇总设置、模型数与待处理动作', async () => {

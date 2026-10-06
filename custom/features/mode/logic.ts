@@ -26,6 +26,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { getAgentDir } from '../../core/config';
+import { withFileLock } from '../../core/file-lock';
 
 export interface ModeConfig {
   description: string;
@@ -107,6 +108,25 @@ const SESSION_MODE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** 同一（会话, 目标模式）在这个窗口内只自动重启一次，防"解决不了就无限重启" */
 const MODE_RESTART_GUARD_MS = 120_000;
+/** 防环标记的保留期与条数上限（只控制文件大小；判定用 MODE_RESTART_GUARD_MS） */
+const MODE_RESTART_GUARD_RETENTION_MS = 60 * 60 * 1000;
+const MODE_RESTART_GUARD_MAX_KEYS = 50;
+
+/**
+ * mode 运行时状态的**跨进程锁**（会话记录表 + 自愈防环标记共用一把）。
+ *
+ * 为什么需要：这两份文件都是"读 → 改 → 写"，而多实例并存是实测过的（同一天出现过两个
+ * supervisor 同时跑）。`writeJSONSync` 的原子写只防半截文件，防不住"A 读 → B 读 → A 写 → B 写"
+ * 的丢更新：B 会把 A 刚记下的会话模式覆盖掉（表现为"切了模式又变回 default"），
+ * 单槽的防环标记也会被互相覆盖（表现为自愈重启循环）。锁拿不到时 `withFileLock` 告警后
+ * 按无锁继续，退化为与加锁前相同的行为，不会更差。
+ */
+function modeStoreLockPath(): string {
+  return join(getAgentDir(), '.mode-store.lock');
+}
+function withModeStoreLock<T>(fn: () => T): T {
+  return withFileLock(modeStoreLockPath(), fn);
+}
 
 /** 读会话模式记录（缺失/损坏都返回空表，不抛） */
 function loadSessionModes(): Record<string, SessionModeRecord> {
@@ -152,13 +172,15 @@ export function getSessionMode(sessionFile: string | undefined | null): string |
   return rec.mode in loadModes().modes ? rec.mode : null;
 }
 
-/** 把模式记录到**指定会话**（只写旁路表，完全不碰入库的 modes.json） */
+/** 把模式记录到**指定会话**（只写旁路表，完全不碰入库的 modes.json；读改写全程持锁） */
 export function setSessionMode(sessionFile: string, modeName: string): void {
-  const now = Date.now();
-  const all = loadSessionModes();
-  all[sessionFile] = { mode: modeName, updatedAt: new Date(now).toISOString() };
-  pruneSessionModes(all, now);
-  writeSessionModes(all);
+  withModeStoreLock(() => {
+    const now = Date.now();
+    const all = loadSessionModes();
+    all[sessionFile] = { mode: modeName, updatedAt: new Date(now).toISOString() };
+    pruneSessionModes(all, now);
+    writeSessionModes(all);
+  });
 }
 
 /**
@@ -171,20 +193,50 @@ export function shouldRequestModeRestart(sessionFile: string, modeName: string):
   const key = `${sessionFile}::${modeName}`;
   const file = modeRestartGuardPath();
   const now = Date.now();
-  let last: { key?: unknown; ts?: unknown } = {};
+  return withModeStoreLock(() => {
+    const guards = loadRestartGuards(file);
+    const last = guards[key];
+    if (typeof last === 'number' && now - last < MODE_RESTART_GUARD_MS) return false;
+    guards[key] = now;
+    pruneRestartGuards(guards, now);
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify(guards), 'utf-8');
+    } catch {
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * 读自愈防环标记：`{ "<会话>::<模式>": ts }`。
+ *
+ * 兼容 2026-10-06 之前的**单条**格式 `{key, ts}`（只记最后一次，多会话并存时会互相覆盖 →
+ * 防环失效、可能来回重启）。旧格式读进来即迁移（下一次写入就是新格式）。
+ */
+function loadRestartGuards(file: string): Record<string, number> {
   try {
-    last = JSON.parse(readFileSync(file, 'utf-8')) as typeof last;
+    const raw = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+    if (typeof raw.key === 'string' && typeof raw.ts === 'number') return { [raw.key]: raw.ts };
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+    }
+    return out;
   } catch {
-    /* 没有/损坏 → 视为从未尝试 */
+    return {};
   }
-  if (last.key === key && typeof last.ts === 'number' && now - last.ts < MODE_RESTART_GUARD_MS) return false;
-  try {
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, JSON.stringify({ key, ts: now }), 'utf-8');
-  } catch {
-    return false;
-  }
-  return true;
+}
+
+/** 丢掉过期键并限制条数（多实例/多会话并存时不能让标记文件无限长） */
+function pruneRestartGuards(guards: Record<string, number>, now: number): void {
+  const fresh = Object.entries(guards)
+    .filter(([, ts]) => now - ts <= MODE_RESTART_GUARD_RETENTION_MS)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MODE_RESTART_GUARD_MAX_KEYS);
+  for (const key of Object.keys(guards)) delete guards[key];
+  for (const [k, ts] of fresh) guards[k] = ts;
 }
 
 const DEFAULT_MODES: ModesFile = { default: 'full', modes: {} };

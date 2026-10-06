@@ -175,11 +175,16 @@ export function register(pi: ExtensionAPI): void {
       if (!confirmed) return '已取消会话切换';
       const reason = typeof args.reason === 'string' ? args.reason : undefined;
       // 用户驱动的会话切换：新会话不该自动跑起来（判据见 custom/core/restart-intent.ts）
-      writeRestartRequest('switch_session', {
-        targetSession: session.path,
-        reason: reason || `切换到会话 ${session.id}`,
-        intent: 'none',
-      });
+      try {
+        writeRestartRequest('switch_session', {
+          targetSession: session.path,
+          reason: reason || `切换到会话 ${session.id}`,
+          intent: 'none',
+        });
+      } catch {
+        // 写盘失败**不要 shutdown**：否则就是"进程没了、会话也没切"的静默退出
+        return `切换请求写盘失败，未重启（仍停留在当前会话）。请检查 PI_ADMIN_STATE_FILE 指向的路径与磁盘状态。`;
+      }
       ctx.shutdown?.();
       return `正在切换到会话 ${session.id}...`;
     },
@@ -203,12 +208,17 @@ export function register(pi: ExtensionAPI): void {
       const reason = typeof args.reason === 'string' ? args.reason : undefined;
       // 显式带上当前会话：supervisor 用 --session 重拉，不依赖「最近会话」推断
       // （多会话并存/子代理会话更新时间更晚时会续错会话）。
-      writeRestartRequest('restart', {
-        targetSession: ctx?.sessionFile,
-        reason: reason || '手动重启',
-        // 让模型在**它能知情的这一刻**声明意图：比"重启后先跑一个回合再让它自己判断"省一次全量请求
-        intent: normalizeResumeIntent(args.resume),
-      });
+      try {
+        writeRestartRequest('restart', {
+          targetSession: ctx?.sessionFile,
+          reason: reason || '手动重启',
+          // 让模型在**它能知情的这一刻**声明意图：比"重启后先跑一个回合再让它自己判断"省一次全量请求
+          intent: normalizeResumeIntent(args.resume),
+        });
+      } catch {
+        // 写盘失败**不要 shutdown**：那会变成"进程没了、也没有重启"的静默退出（2026-10-06 修 mode 的同款纪律）
+        return '重启请求写盘失败，未重启。请检查 PI_ADMIN_STATE_FILE 指向的路径与磁盘状态后重试。';
+      }
       ctx?.shutdown?.();
       return '已提交重启请求，Agent 即将重启。';
     },

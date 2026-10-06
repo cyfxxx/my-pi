@@ -48,7 +48,7 @@
 |------|------|------|
 | `portable/agent/modes.json` | `default` + 自定义模式定义（配置） | 是（`.gitignore` 用 `!portable/agent/modes.json` 放行） |
 | `portable/agent/modes-sessions.json` | `{ "<会话文件绝对路径>": { mode, updatedAt } }`（会话的运行时选择） | 否（被 `portable/agent/*` 忽略） |
-| `portable/agent/mode-restart-guard.json` | 自愈重启的防环标记（同一会话+模式只自动重启一次） | 否 |
+| `portable/agent/mode-restart-guard.json` | 自愈重启的防环标记：`{ "<会话>::<模式>": ts }`（多键；同一键在窗口内只自动重启一次） | 否 |
 | `portable/agent/modes/<name>.md` | 人设文件（`appendPrompt`，经 `pi --append-system-prompt` 注入） | 是 |
 | 环境变量 | `PI_AGENT_MODE`+`PI_AGENT_MODE_SOURCE`（外部硬覆盖）、`PI_SESSION_MODE`（启动器按会话解析的**软**来源）、`PI_MEMORY_NAMESPACE`（记忆命名空间，由启动器注入） | — |
 
@@ -56,6 +56,12 @@
 后果是——一次 `/mode roleplay` 只是把入库文件改脏，随后任何 git 操作（`checkout` / `stash` /
 `restore` / `pull`，包括另一台设备拉下来的版本）都会把它**静默退回 `full`**，用户看到的现象就是
 "切了模式、重启后没生效"。
+
+**并发写者**：`modes-sessions.json` 与 `mode-restart-guard.json` 都是"读 → 改 → 写"，而多实例并存是
+实测过的（同一天出现过两个 supervisor 同时跑）。两份文件共用一把跨进程文件锁
+（`portable/agent/.mode-store.lock`，`core/file-lock.ts`），防环标记也从**单槽** `{key, ts}` 改成
+**多键** `{ "<会话>::<模式>": ts }`——单槽时代 B 会话一写就把 A 的标记顶掉，两边的自愈会互相放行、
+来回重启（旧格式读进来仍生效，下次写入即迁移）。
 
 **为什么用旁路表而不是 `appendEntry`**（pi 官方的"扩展按会话持久化状态"通道，`plan-mode` 在用）：
 pi 的新会话文件**在首条 user/assistant 消息之前不落盘**（`SessionManager._persist` 的

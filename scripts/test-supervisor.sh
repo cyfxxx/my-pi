@@ -82,6 +82,22 @@ write_state "{\"action\":\"restart\",\"timestamp\":$OLD}"
 read_admin_action
 check "过期 restart → 空动作" "" "$ACT"
 
+# ownerPid 隔离：多实例共享 state.json 时只认自己的请求（pi 的 ppid 就是本 supervisor）
+write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"ownerPid\":$$,\"targetSession\":\"/tmp/mine.jsonl\"}"
+read_admin_action
+check "ownerPid=自己 → 认领" "restart" "$ACT"
+check "ownerPid=自己 → 目标会话" "/tmp/mine.jsonl" "$TARGET"
+
+OTHER_PID=$(( $$ + 4242 ))
+write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"ownerPid\":$OTHER_PID,\"targetSession\":\"/tmp/other.jsonl\"}"
+read_admin_action
+check "ownerPid=别的实例 → 不认领（避免跨实例重启/续错会话）" "" "$ACT"
+check "别人的请求保持原样（不被本实例清掉）" "$OTHER_PID" "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).ownerPid))' "$PI_ADMIN_STATE_FILE")"
+
+write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"targetSession\":\"/tmp/legacy.jsonl\"}"
+read_admin_action
+check "没有 ownerPid（老请求/手工写）→ 照旧认领" "restart" "$ACT"
+
 write_state "{\"action\":\"switch_session\",\"timestamp\":$(now_ms),\"targetSession\":\"/tmp/s.jsonl\"}"
 read_admin_action
 check "switch_session → ACT" "switch_session" "$ACT"
@@ -135,6 +151,19 @@ rec_of() { recovery_args "$1"; printf '%s' "${ADMIN_ARGS[*]}"; }
 check "有本轮会话 → --session 精确续接" "--session /tmp/s.jsonl" "$(rec_of /tmp/s.jsonl)"
 check "拿不到会话 → --continue 兜底" "--continue" "$(rec_of '')"
 check "绝不返回空参数（空参会让 pi 新建会话）" "yes" "$([ -n "$(rec_of '')" ] && echo yes || echo no)"
+
+echo ""
+echo "=== record_round 轮转（rounds.jsonl 不该无限长）==="
+ROUNDS_T="$TMP/rounds.jsonl"
+: > "$ROUNDS_T"
+for i in $(seq 1 810); do printf '{"ts":%s,"run":%s,"decision":"exit"}\n' "$i" "$i" >> "$ROUNDS_T"; done
+ROUNDS_LOG="$ROUNDS_T"
+RUN_SESSION="/tmp/s.jsonl"; MODE_NAME="full"; MODE_NS=""; MODE_APPEND_ABS=""; CRASH_LOG="/tmp/x.log"; ROUND_INDEX=811
+ROUNDS_MAX_LINES=800
+record_round exit "" "" 0 false 1
+check "超过上限后轮转（只留最近一半）" "400" "$(wc -l < "$ROUNDS_T" | tr -d ' ')"
+check "轮转保留的是最新记录（末行是刚写的 run=811）" "811" "$(node -e 'const l=require("node:fs").readFileSync(process.argv[1],"utf8").trim().split("\n");process.stdout.write(String(JSON.parse(l.at(-1)).run))' "$ROUNDS_T")"
+check "轮转后每行都是完整 JSON（没有半行）" "yes" "$(node -e 'const l=require("node:fs").readFileSync(process.argv[1],"utf8").trim().split("\n");try{l.forEach(x=>JSON.parse(x));process.stdout.write("yes")}catch{process.stdout.write("no")}' "$ROUNDS_T")"
 
 echo ""
 echo "=== mark_recovery_restart_log（崩溃恢复的重启日志）==="

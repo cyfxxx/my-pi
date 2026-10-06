@@ -2,6 +2,29 @@
 
 ## 格式
 
+### [2026-10-06] 并发与失败路径硬化：多实例隔离（ownerPid）、跨进程锁与多键防环、写盘失败不退出
+
+历史事故多是"单实例假设"下的静默失效；实测**多实例是常态**（同一天出现过两个 supervisor 同时在跑，
+crash log 4066/31099）。这一批把"多写者 + 失败路径"补齐：
+
+1. **`state.json` 跨实例串扰**：多实例共享同一份 admin state，A 写的重启请求会被 B 的 supervisor
+   读到并执行（跨实例重启、续错会话）。现在写入端带 `ownerPid`（= pi 的 `ppid`，即拉起它的 supervisor），
+   supervisor 只认自己的；**没有 ownerPid 的老请求/手工请求照旧认领**（向后兼容，不制造"请求永远没人管"）。
+   代价：实例被强杀后残留的请求不再被下一个实例执行——由状态体检的 `restart-request-stale` 兜住。
+2. **防环标记单槽 + 会话记录丢更新**：两份 mode 运行时文件都是读改写，多实例会互相覆盖
+   （`modes-sessions.json` 丢记录 → 会话模式莫名回 default；单槽 guard → 两个会话的自愈互相放行、来回重启）。
+   现在两者共用一把跨进程文件锁（`core/file-lock.ts`，拿不到锁降级为无锁并告警，绝不死锁），
+   guard 改为**多键** `{ "<会话>::<模式>": ts }`（旧单条格式兼容迁移 + 过期/条数裁剪）。
+3. **写盘失败静默退出**：`admin_restart`/`admin_set_model`/`admin_switch_session` 在请求写不下去时仍
+   `shutdown` → "进程没了、配置也没生效"。现在一律"写失败就不退出 + 明确文案"，与 mode 的
+   `requestModeRestart` 同款纪律（该纪律来自 2026-10-06 那次"通知消费吞掉请求"的事故）。
+4. **`rounds.jsonl` 轮转**（超 800 行只留最近 400）+ `daily-health` 汇总行新增 `重启=/崩溃恢复=` 计数
+   （只做可见性；"异常"判定仍在 `lib-state-audit` 的 `lost-restart-recent`/`restart-loop`/`recovery-storm`）。
+
+**验证**：supervisor 96→**104** 项（ownerPid 两侧、`recovery_args`、恢复日志不抢 action、轮转完整性）、
+状态体检 50→**52** 项（guard 新旧两种格式）、mode-switch 36→**39** 项（多键互不覆盖 / 旧格式迁移 / 上限裁剪）、
+admin 工具新增"写盘失败不 shutdown"用例；`daily-health` 实测输出 `重启=0 崩溃恢复=0`。
+
 ### [2026-10-06] 场景自带假 provider：把"有没有产生模型请求"变成计数级事实
 
 **背景**：真 provider 让回合级断言变成概率事件——仓库既有实测：同一提示词响应 4.6s–145s（免费 provider 抖动，曾把"进程没写完就退出"误报成挂起，导致无头冒烟改成"失败重试一次"）。于是"切模式到底有没有白跑一个回合""续跑那次模型到底收到了什么"都只能靠间接证据。

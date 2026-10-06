@@ -114,6 +114,11 @@ check('modes-sessions.json 损坏 → sessions-corrupt（warning）', (() => { c
 check('会话记录的模式已不存在 → session-mode-unknown（warning）', has(agent(healthyFiles({ sessions: { '/tmp/x.jsonl': { mode: 'gone', updatedAt: new Date(NOW).toISOString() } } })).findings, 'session-mode-unknown'));
 check('会话文件不存在（新记录）→ session-file-missing（warning）', has(agent(healthyFiles({ sessions: { '/tmp/gone.jsonl': { mode: 'roleplay', updatedAt: new Date(NOW - 60_000).toISOString() } } })).findings, 'session-file-missing'));
 check('会话文件不存在且超保留期 → 只提示孤儿', (() => { const f = agent(healthyFiles({ sessions: { '/tmp/old.jsonl': { mode: 'roleplay', updatedAt: new Date(NOW - 30 * 24 * 3600_000).toISOString() } } })).findings; return has(f, 'session-record-orphan') && !has(f, 'session-file-missing'); })());
+check('防环标记（多键新格式）最近的键刚触发过 → 仅 info', (() => {
+  const f = agent(healthyFiles({ guard: { '/s/a.jsonl::roleplay': NOW - 10_000, '/s/b.jsonl::lean': NOW - 900_000 } })).findings;
+  return has(f, 'guard-recent') && f.find((x) => x.code === 'guard-recent').level === 'info';
+})());
+check('防环标记（多键新格式）全部过期 → 不提示', !has(agent(healthyFiles({ guard: { '/s/a.jsonl::roleplay': NOW - 900_000 } })).findings, 'guard-recent'));
 check('防环标记损坏 → guard-unreadable（warning）', has(agent(healthyFiles({ guard: '{bad' })).findings, 'guard-unreadable'));
 check('防环标记时间戳在未来 → guard-clock-skew（warning）', has(agent(healthyFiles({ guard: { key: 'k', ts: NOW + 600_000 } })).findings, 'guard-clock-skew'));
 check('刚触发过自愈 → 仅 info', (() => { const f = agent(healthyFiles({ guard: { key: 'k', ts: NOW - 10_000 } })).findings; return has(f, 'guard-recent') && f.find((x) => x.code === 'guard-recent').level === 'info'; })());

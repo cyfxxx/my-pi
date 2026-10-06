@@ -177,11 +177,18 @@ export function auditState(snap) {
   if (files.guard.present && !guard.ok) {
     add('warning', 'guard-unreadable', `mode-restart-guard.json 无法解析（${guard.reason}）：自愈重启的防环标记失效，可能重复重启一次`, '删除该文件即可重建');
   } else if (guard.ok && guard.value && typeof guard.value === 'object') {
-    const ts = typeof guard.value.ts === 'number' ? guard.value.ts : 0;
-    if (ts - now > CLOCK_SKEW_MS) {
-      add('warning', 'guard-clock-skew', `防环标记的时间戳在未来（${new Date(ts).toISOString()}）：本机时钟回拨过？`, '删除 mode-restart-guard.json 即可重建');
-    } else if (ts > 0 && now - ts <= RESTART_GUARD_MS) {
-      add('info', 'guard-recent', `刚刚触发过模式自愈重启（${Math.round((now - ts) / 1000)}s 前，键=${String(guard.value.key ?? '?')}）：若不是刚切过模式，请查会话模式记录`);
+    // 格式演进：2026-10-06 之前是单条 `{key, ts}`；之后是 `{ "<会话>::<模式>": ts }`（多键，
+    // 多实例/多会话并存时互相不再覆盖）。两种都要认。
+    const legacy = typeof guard.value.key === 'string' && typeof guard.value.ts === 'number';
+    const entries = legacy
+      ? [[String(guard.value.key), Number(guard.value.ts)]]
+      : Object.entries(guard.value).filter(([, ts]) => typeof ts === 'number' && Number.isFinite(ts));
+    const newest = entries.reduce((acc, [, ts]) => (ts > acc ? ts : acc), 0);
+    const newestKey = entries.find(([, ts]) => ts === newest)?.[0] ?? '?';
+    if (newest - now > CLOCK_SKEW_MS) {
+      add('warning', 'guard-clock-skew', `防环标记的时间戳在未来（${new Date(newest).toISOString()}）：本机时钟回拨过？`, '删除 mode-restart-guard.json 即可重建');
+    } else if (newest > 0 && now - newest <= RESTART_GUARD_MS) {
+      add('info', 'guard-recent', `刚刚触发过模式自愈重启（${Math.round((now - newest) / 1000)}s 前，键=${newestKey}）：若不是刚切过模式，请查会话模式记录`);
     }
   }
 

@@ -25,10 +25,16 @@ interface SentCustom {
   options?: Record<string, unknown>;
 }
 
+interface FakeTool {
+  name: string;
+  execute: (id: string, params: Record<string, unknown>, s?: unknown, u?: unknown, piCtx?: unknown) => Promise<{ content: { type: string; text?: string }[] }>;
+}
+
 interface FakePi {
   hooks: Map<string, Handler[]>;
   sent: string[]; // sendUserMessage（真用户消息，会触发回合）
   custom: SentCustom[]; // sendMessage（custom 消息；是否触发回合看 options）
+  tools: FakeTool[];
   [k: string]: unknown;
 }
 
@@ -41,16 +47,20 @@ function makeFakePi(): FakePi {
   const hooks = new Map<string, Handler[]>();
   const sent: string[] = [];
   const custom: SentCustom[] = [];
+  const tools: FakeTool[] = [];
   const api: Record<string, unknown> = {
     hooks,
     sent,
     custom,
+    tools,
     on: (ev: string, h: Handler) => {
       const arr = hooks.get(ev) ?? [];
       arr.push(h);
       hooks.set(ev, arr);
     },
-    registerTool: () => {},
+    registerTool: (def: unknown) => {
+      tools.push(def as FakeTool);
+    },
     registerCommand: () => {},
     registerShortcut: () => {},
     registerFlag: () => {},
@@ -193,6 +203,25 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     expect(note?.content).toContain('不需要继续执行任务');
     expect(note?.content).toContain('intent-none');
     expect(pi.sent).toHaveLength(0); // 没有真用户消息 = 没有触发回合
+  });
+
+  it('admin_restart 写盘失败 → 不 shutdown、明确告知（不制造"进程没了、也没重启"）', async () => {
+    const pi = await setupBoth();
+    const tool = pi.tools.find((t) => t.name === 'admin_restart');
+    expect(tool, JSON.stringify(pi.tools.map((t) => t.name))).toBeTruthy();
+    mkdirSync(join(dir, 'state.json'), { recursive: true }); // PI_ADMIN_STATE_FILE 指向的路径变目录 → 写必失败
+    let shutdownCalled = false;
+    const res = await tool!.execute('c1', { reason: '测试写盘失败', resume: 'none' }, undefined, undefined, {
+      sessionFile: SESS,
+      shutdown: () => {
+        shutdownCalled = true;
+      },
+    });
+    const text = res.content[0]?.text ?? '';
+    expect(text).toContain('写盘失败');
+    expect(text).toContain('未重启');
+    expect(shutdownCalled).toBe(false);
+    rmSync(join(dir, 'state.json'), { recursive: true, force: true });
   });
 
   it('没注册 autopilot 的模式（roleplay/lean）里由 mode 兜底消费通用重启日志', async () => {

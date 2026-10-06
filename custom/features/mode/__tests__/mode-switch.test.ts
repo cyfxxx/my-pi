@@ -227,6 +227,37 @@ describe('自愈重启防环', () => {
     expect(shouldRequestModeRestart(SESS, 'roleplay')).toBe(false);
   });
 
+  it('多会话/多实例并存：A 的标记不会被 B 覆盖（单槽时代的真实 bug）', () => {
+    // 旧实现只存一条 {key, ts}：B 一写就把 A 的防环标记顶掉 → A 的第二次自愈又放行 → 来回重启。
+    expect(shouldRequestModeRestart('/tmp/a.jsonl', 'roleplay')).toBe(true);
+    expect(shouldRequestModeRestart('/tmp/b.jsonl', 'lean')).toBe(true);
+    expect(shouldRequestModeRestart('/tmp/a.jsonl', 'roleplay')).toBe(false); // 仍被拦
+    expect(shouldRequestModeRestart('/tmp/b.jsonl', 'lean')).toBe(false);
+    const guards = JSON.parse(readFileSync(join(dir, 'mode-restart-guard.json'), 'utf-8'));
+    expect(Object.keys(guards).length).toBe(2);
+  });
+
+  it('兼容旧单条格式 {key, ts}（读进来继续生效，下次写入迁移成多键）', () => {
+    writeFileSync(
+      join(dir, 'mode-restart-guard.json'),
+      JSON.stringify({ key: `${SESS}::roleplay`, ts: Date.now() - 1000 }),
+    );
+    expect(shouldRequestModeRestart(SESS, 'roleplay')).toBe(false); // 旧标记仍生效
+    expect(shouldRequestModeRestart('/tmp/other.jsonl', 'roleplay')).toBe(true);
+    const guards = JSON.parse(readFileSync(join(dir, 'mode-restart-guard.json'), 'utf-8'));
+    expect(Object.keys(guards).length).toBe(2); // 迁移成多键，旧键保留
+  });
+
+  it('标记文件不会无限长：超过上限只留最近的键', () => {
+    const many: Record<string, number> = {};
+    for (let i = 0; i < 80; i++) many[`/tmp/s${i}.jsonl::roleplay`] = Date.now() - i * 1000;
+    writeFileSync(join(dir, 'mode-restart-guard.json'), JSON.stringify(many));
+    expect(shouldRequestModeRestart('/tmp/new.jsonl', 'roleplay')).toBe(true);
+    const guards = JSON.parse(readFileSync(join(dir, 'mode-restart-guard.json'), 'utf-8'));
+    expect(Object.keys(guards).length).toBeLessThanOrEqual(50);
+    expect(guards['/tmp/new.jsonl::roleplay']).toBeGreaterThan(0);
+  });
+
   it('换会话或换模式是新的键 → 重新放行', () => {
     expect(shouldRequestModeRestart(SESS, 'roleplay')).toBe(true);
     expect(shouldRequestModeRestart(SESS, 'lean')).toBe(true);
