@@ -400,4 +400,13 @@ describe('session_start 按会话自愈（模式是会话属性）', () => {
     await pi.hooks.get('session_start')![0]({}, noUi);
     expect(shutdown).not.toHaveBeenCalled();
   });
+
+  it('会话不落盘（--no-session）且模式不一致 → 不重启（没有可精确续接的目标）', async () => {
+    // 构造不一致：进程按 roleplay 启动（软来源），会话却无文件 → intended=default≠activeMode
+    process.env.PI_SESSION_MODE = 'roleplay';
+    const pi = await setup();
+    const { ctx, shutdown } = cmdCtx(true, null);
+    await pi.hooks.get('session_start')![0]({}, ctx);
+    expect(shutdown).not.toHaveBeenCalled();
+  });
 });

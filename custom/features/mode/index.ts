@@ -191,26 +191,27 @@ export function register(pi: ExtensionAPI): void {
       // 外部硬覆盖（source=env）跳过——那是用户/测试的显式强制，不是异常。
       const mismatched = !isModeForcedByEnv() && intended !== activeMode;
       if (mismatched) {
-        if (!ctx.hasUI) {
-          // 无 UI（headless -p / RPC）：重启会打断本次非交互运行，只留下可排查的告警。
-          console.warn(
-            `[模式] 本会话应使用 ${intended}，本进程以 ${activeMode} 运行（headless 不自动重启）`,
-          );
-          return;
-        }
-        if (shouldRequestModeRestart(sessionFile ?? '', intended)) {
+        if (!sessionFile) {
+          // 没有会话文件（--no-session / 内存会话）：没有可精确续接的目标，重启只会把这个
+          // 临时会话丢掉，所以只留下可排查的告警。
+          console.warn(`[模式] 本会话不落盘，无法按会话自愈（应为 ${intended}，本进程 ${activeMode}）`);
+        } else if (!ctx.hasUI) {
+          // 无 UI（headless -p / RPC）：重启会打断本次非交互运行，同样只告警。
+          console.warn(`[模式] 本会话应使用 ${intended}，本进程以 ${activeMode} 运行（headless 不自动重启）`);
+        } else if (shouldRequestModeRestart(sessionFile, intended)) {
           ctx.ui.notify(
             `[模式] 本会话应使用 ${intended}，本进程以 ${activeMode} 运行：正在自动重启并按会话模式续接…`,
             'warning',
           );
           requestModeRestart(ctx, intended);
           return;
+        } else {
+          ctx.ui.notify(
+            `[模式] 本会话应使用 ${intended}，本进程为 ${activeMode}；刚刚已尝试自动重启仍未生效。` +
+              `\n请手动执行 /mode ${intended}，或检查 modes-sessions.json 与会话路径是否对得上。`,
+            'warning',
+          );
         }
-        ctx.ui.notify(
-          `[模式] 本会话应使用 ${intended}，本进程为 ${activeMode}；刚刚已尝试自动重启仍未生效。` +
-            `\n请手动执行 /mode ${intended}，或检查 modes-sessions.json 与会话路径是否对得上。`,
-          'warning',
-        );
       }
       if (!ctx.hasUI) return;
       if (activeMode === 'full') return;
