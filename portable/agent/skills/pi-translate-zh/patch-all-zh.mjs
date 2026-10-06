@@ -337,6 +337,8 @@ sections.push(() => {
 			"`重新加载键盘绑定、扩展、技能、提示模板、主题和上下文文件`",
 		],
 		["`Quit ${APP_NAME}`", "`退出 pi`"],
+		['"Set thinking level"', "`设置思考深度`"],
+		['"Report a bug to the Pi developers"', "`向 Pi 开发者提交 bug 报告`"],
 	]);
 	return `命令描述 (${n} 条)`;
 });
@@ -384,6 +386,11 @@ sections.push(() => {
 		],
 		['label: "Theme"', "label: `主题`"],
 		['label: "  automatic"', "label: `  自动`"], // v0.99.1: 主题项 "Automatic" → "  automatic"（前导两空格）
+		['description: "Theme created from your terminal\'s colors"', "description: `来自终端颜色的主题`"],
+		['description: "off; streaming while the agent runs; idle also between runs while continuation stays profitable"', "description: `关闭；代理运行期间流式输出；代理停止后空闲期间也继续（若划算）`"],
+		['description: "Disable verbose printing at startup (header: keep only the startup header)"', "description: `启动时关闭详细打印（标题：仅保留启动标题）`"],
+		['description: "Interface layout; regular mode uses the terminal\'s normal scrollback"', "description: `界面布局；常规模式使用终端正常滚动缓冲`"],
+		['description: "Lines per mouse-wheel event in fullscreen mode; \'auto\' speeds up fast wheel spins where the terminal does not"', "description: `全屏模式下每次鼠标滚轮事件的行数；\'auto\' 在终端不支持快速滚轮时加速`"],
 		[
 			'description: "Use separate themes for light and dark terminal appearance"',
 			"description: `为浅色和深色终端分别使用不同主题`",
@@ -749,6 +756,17 @@ sections.push(() => {
 		['"Custom summarization instructions"', '"自定义汇总说明"'],
 		['"Waiting for authentication..."', '"等待认证..."'],
 		// === v8 新增：启动区段标题 + 通用消息 ===
+		['"Thinking..."', '"思考中..."'],
+		['"Error"', '"错误"'],
+		['"Operation aborted"', '"操作已取消"'],
+		['"Cache miss"', '"缓存未命中"'],
+		['"Cache miss after model switch"', '"切换模型后缓存未命中"'],
+		['"Model refresh timed out; searching cached models."', '"模型刷新超时；使用缓存模型。"'],
+		['"No account providers available."', '"没有可用的账户提供商。"'],
+		['"No login providers available."', '"没有可用的登录提供商。"'],
+		['"No changelog entries found."', '"没有找到更新日志条目。"'],
+		['"Sign in with an account"', '"使用账户登录"'],
+		['"Sign in with an API key"', '"使用 API 密钥登录"'],
 		['"Skills"', '"技能"'],
 		['"Prompts"', '"提示词"'],
 		['"Extensions"', '"扩展"'],
