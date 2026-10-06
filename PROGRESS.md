@@ -2075,3 +2075,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   - `core/secrets.ts` 短 token 窗口 —— 值长度下限 8 与 NIST SP 800-63B 一致且避免误报，代码里写明是刻意取舍。
 - 验证：`vitest` 72 文件 / **784 用例**（新增 12 项：memory +3、link +1、voice +5、subagent +3）、
   `npx tsc --noEmit -p custom/`、全量 `golden`。
+
+### 上游同步 v0.99.1 → v1.0.4（2026-10-06）
+
+- **规模**：156 提交 / 837 文件 / `+42684 -116560`（删除主体是 `packages/agent` 的实验 harness）；新增包 `env`（SSH 远程执行 + daemon），删除 `packages/session-backends`，`durable` 大幅扩展。逐条报告见
+  `docs/operations/UPSTREAM-CHANGES-v0.99.1-to-28dcce2ba.md`。
+- **补丁栈**：`001`（上游改了根 `package.json`）、`006`/`007`（上下文停留在更早的 `footer.ts`，在 v0.99.1 基线上也已失配）三个补丁按真实中间态重新生成；
+  `002` 里的 `packages/README.md` 包清单刷新。判据是**终态字节级一致**——`footer.ts` 终态 blob 与同步前相同（`219e23255`），
+  且在 v1.0.4 基线上 9 个补丁全部线性应用、0 三方合并、0 冲突标记。
+- **兼容面（实测，不是推断）**：适配器仍只依赖 `coding-agent` + `tui`（agent harness 删除对本仓库零影响）；`ExtensionAPI` 26→27（只多 `registerToolRenderer`）、
+  `ExtensionContext` 18→18、事件名集合零变化、我们注册的 18 个事件全在；CLI flag、`tsconfig.base.json`、Node 要求、`settings.json` 各键均未变；技能仍从 `agentDir/skills` 加载；`build.sh` 无需改。
+- **模型数据**：上游 provider `azure-openai-responses` 改名 `azure` → 构建时缺 `azure.json`，用 `npm run hydrate-model-data`（`--data-only`，只写 gitignore 的数据目录，不动上游源码）补齐。
+- **行为变化**：TUI 默认 fullscreen（按用户决定采用；回退：`tuiMode: "regular"` 或 `--tui-mode regular`）、Home/End 语义变更、`--provider` 不带 `--model` 直接报错（我们成对传参，无影响）。
+- **门禁**：无头冒烟改"失败重试一次"——v1.0.4 复测时连续 3 次 90s 无回复，实测免费 provider 同一提示词 4.6s–145s 抖动；真挂起是必现的，两次都失败仍会被拦住。
+- 基础设施：重建 dist（stamp `086d6fc51`）、刷新自愈缓存（v1.0.4）、新建离线归档 `vendor/pi-28dcce2ba45c.bundle`（70M，含当前 PINNED）。
+- 文档：新增本次跳版报告；`docs/README.md` 索引、`UPSTREAM-UPDATE.md` 待办表（"接 MCP 前先升到 v0.99.2"标记已满足、新增 `env` 复用评估）、`PI-RUNTIME-AUDIT.md` 时点提示。
+- 验证：`tsc`、`vitest` 72 文件 / 784 用例、`golden --smoke` 全绿、`doctor.sh` 24 正常 / 1 警告 / 0 异常、`./my-pi.sh -p` 冒烟正常。

@@ -2,6 +2,31 @@
 
 ## 格式
 
+### [2026-10-06] 上游同步 v0.99.1 → v1.0.4：补丁栈按真实中间态重新生成；fullscreen 采用默认；兼容面逐项实测
+**背景**：用户要求把 vendored pi 同步到上游最新（156 提交 / 837 文件 / `+42684 -116560`，删除量远大于新增，主体是 `packages/agent` 的实验 harness 整块移除），并明确"fullscreen 先设为默认，用不惯再改回去；确保不要出现冲突"。
+
+**决策**：
+- **先修补丁、再同步，判定标准是"净效果逐字一致"**：
+  - `001-branding.patch` 重新生成（上游改了根 `package.json` 的 `workspaces`/`scripts` 段），净效果仍只有 `name: my-pi` + `piConfig`；
+  - `006-footer-cost-and-cache-window` / `007-footer-reorder` 重新生成：它们的上下文停留在一个更早的 `footer.ts`（`this.session.sessionManager.getEntries()`），**在 v0.99.1 基线上也已无法线性应用**（此前只能靠 `git apply --3way` 或手工落地）。新补丁取 vendor 本地提交链的真实中间态（`595ce1589 → 9dd28ff19 → ac57dc758`），`+/-` 行与原补丁逐字一致，只有一行上下文与 index 行更新；
+  - `002-local-pi-mods.patch` 里的 `packages/README.md` 包清单刷新（补 `durable`/`env`/`codemode`/`mcp`，去掉已删的 `session-backends`，并修掉一个失效链接）。
+  - 验收：在 v1.0.4 基线临时 worktree 里**逐补丁线性 `git apply`，9/9 成功、0 三方合并、0 冲突标记**；`footer.ts` 终态 blob `219e23255` 与同步前完全一致。
+- **fullscreen 采用上游默认**（用户决定）：`portable/agent/settings.json` 不写 `tuiMode`，即走 v1.0.4 的 `fullscreen`；回退只需加 `"tuiMode": "regular"` 或 `--tui-mode regular`。同步后实测 `getTuiMode()` 默认 `fullscreen`、`--tui-mode <regular|fullscreen>` 存在。
+- **模型数据用 `--data-only` 生成**：构建时 `check:model-data` 报缺 `azure.json`（上游把 provider `azure-openai-responses` 改名 `azure`）。数据目录是 gitignore 的生成物，用 `npm run hydrate-model-data` 只写数据、**不动上游源码**（`vendor/pi` 保持干净）。
+- **无头冒烟改为"失败重试一次"**：v1.0.4 复测时连续 3 次 90s 无回复，实测同一提示词响应 4.6s–145s（免费 provider 抖动）。真挂起是必现的（原 bug），两次都失败仍会被拦住；provider 抖动不再假红。
+- **刻意不动**：`docs/development/PI-RUNTIME-AUDIT.md` 的行号引用保留 v0.99.1 时点（加时点提示），不假装它自动跟随新版；`UPSTREAM-UPDATE.md` 待办表里"接 MCP 前先升到 v0.99.2"标记为已满足。
+
+**理由**：
+- 同步的失败模式不是"跑不起来"，而是**静默失真**：补丁用三方合并"成功"落地时，没人看得见它到底合成了什么。所以本次把判据从"能应用"提升到"终态字节级一致 + 净差异可枚举"。
+- 兼容面结论全部来自实测而非"看起来没问题"：`ExtensionAPI` 26 → 27（只多 `registerToolRenderer`）、`ExtensionContext` 18 → 18、事件名集合**零变化**、我们注册的 18 个事件全在、CLI 依赖的 flag 全在、`tsconfig.base.json` 与 Node 要求未变、技能仍从 `agentDir/skills` 加载、`build.sh` 无需改。
+
+**代价与约束**：
+- 采用 fullscreen 默认带来客观行为变化：**终端原生 scrollback 不再承载历史**（`tmux capture-pane`、xterm.js 滚动条只看到当前视口），滚动/搜索改为应用内（滚轮、`Ctrl+Shift+F`、`Ctrl+Home/End`），退出时默认把 transcript 打印回正常缓冲区。
+- 三个补丁被重新生成，历史 patch 文件的 index/上下文不再对应旧基线（旧基线的重放能力随之失效；这是有意的——同一补丁不该同时服务两个基线）。
+- `vendor/` 下多了一个离线归档（`pi-28dcce2ba45c.bundle`，70M），旧的三个归档不含当前 PINNED（doctor 会提示，属预期）。
+
+**验证**：`tsc --noEmit -p custom/` 通过；`vitest` 72 文件 / 784 用例；`test-supervisor.sh` 56、`test-web-terminal` 36、`test-usage-metrics` 46、`test-prepush-scope` 7；`golden --smoke` 全绿；`doctor.sh` 24 正常 / 1 警告（旧归档）/ 0 异常；`./my-pi.sh -p "回复 OK"` 实测正常回复并自行退出。
+
 ### [2026-10-05] 全面检查 MEDIUM 收口：记忆 RMW 加跨进程锁；link/voice/subagent 边界加固；runner 与 secrets 经实测维持原样
 **背景**：上一轮修完 pre-push 门禁分级、模式解析判据、压缩归因、failover 选型后，把 `pi-full-audit` 报告里剩下的 MEDIUM/LOW 逐条核实。结论是**真问题就修，伪问题给证据不动代码**（审计报告本身不可全信：同批 6 处"文档计数漂移"里 3 处是误报）。
 
