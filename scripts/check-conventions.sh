@@ -118,6 +118,20 @@ fi
 # 步数以"冒烟之前最大的那个编号"为准（4/5 在 --fast 分支里声明两次；第 20 步是 --smoke 专属）
 SMOKE_LINE="$(grep -n 'if \[ "\$SMOKE" = "1" \]' scripts/golden-tasks.sh | head -1 | cut -d: -f1)"
 GOLDEN_STEPS="$(head -n "${SMOKE_LINE:-99999}" scripts/golden-tasks.sh | grep -oE '^[[:space:]]*step "[0-9]+' | grep -oE '[0-9]+' | sort -n | uniq | tail -1)"
+
+# BUG-REPLAYS 台账：每行必须带**可执行命令**（防"注意一下"式的失效条目——台账的价值就在于可重跑）
+if [ -f docs/BUG-REPLAYS.md ]; then
+  LEDGER_ROWS="$(grep -cE '^\| [0-9]+ \|' docs/BUG-REPLAYS.md)"
+  LEDGER_NO_CMD="$(grep -E '^\| [0-9]+ \|' docs/BUG-REPLAYS.md | grep -vE '(node |bash |npx |scripts/|my-pi\.sh)' || true)"
+  if [ "${LEDGER_ROWS:-0}" -lt 5 ]; then
+    bad "docs/BUG-REPLAYS.md 台账只剩 $LEDGER_ROWS 行（应 >=5；是不是被删了？）"
+  elif [ -n "$LEDGER_NO_CMD" ]; then
+    bad "docs/BUG-REPLAYS.md 有 $(( $(printf '%s\n' "$LEDGER_NO_CMD" | wc -l) )) 行没有可执行命令（每行必须能重跑）："
+    printf '%s\n' "$LEDGER_NO_CMD" | cut -c1-100 | sed 's/^/       /'
+  else
+    ok "BUG-REPLAYS 台账每行都带可执行命令（$LEDGER_ROWS 行）"
+  fi
+fi
 DOC_STEPS="$(grep -oE '行为防退化基准 \*\*[0-9]+ 步\*\*' scripts/README.md | grep -oE '[0-9]+' | head -1)"
 if [ -n "$DOC_STEPS" ] && [ "$DOC_STEPS" != "$GOLDEN_STEPS" ]; then
   bad "scripts/README.md 写的是 golden $DOC_STEPS 步，实际 $GOLDEN_STEPS 步"

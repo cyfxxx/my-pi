@@ -108,6 +108,8 @@ writeFileSync(
             name: 'Scenario Model',
             contextWindow: 131072,
             maxTokens: 8192,
+            // reasoning: false → pi 会把思考档位设为 off（会话里会出现 thinking_level_change:off）。
+            // 这是"非推理模型"的正常表现，**不是档位错乱**；排查场景失败时别误判。
             reasoning: false,
             compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
           },

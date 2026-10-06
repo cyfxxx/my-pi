@@ -2223,4 +2223,5 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 
 - 根因（vendor 代码顺序）：会话替换 = `teardownCurrent` → `createRuntime`（发 `session_start`）→ `finishSessionReplacement` → `rebindSession`；在 session_start 里同步触发回合会跑在"未换绑"的会话上，响应可能被丢弃（与观测一致：请求/响应都发生、assistant 不落盘、无报错）。
 - 修法：`adapters/ui-adapter.ts` 新增 `sendMessageAfterRebind()`（默认延后 600ms，`PI_RESTART_RESUME_DELAY_MS` 可覆盖），两个消费者（autopilot + mode 兜底）改用它；单测验证"延后而非同步发"，接线测试 8 项通过。
-- 证据边界：场景仍偶发失败（且出现新形态：重启后进程偶尔以非预期档位起来 → 自愈接管 → 无续跑通知，怀疑与场景的 SIGTERM 催停编排有关），故场景对该条保持软提示；要彻底解决需 vendor 侧"换绑完成"事件。
+- 证据边界：场景仍偶发失败。**更正**：一度以为的"重启后档位错乱"实为假模型 `reasoning:false` 导致 pi 把思考档位设为 `off`，不是档位问题；失败归因于场景的 SIGTERM 催停编排时序。故场景对该条保持软提示；要彻底解决需 vendor 侧"换绑完成"事件。
+- 新增守门：`docs/BUG-REPLAYS.md` 每行必须带可执行命令（`scripts/check-conventions.sh` D 节；故意改成"注意检查…"立即失败，改回即通过）。
