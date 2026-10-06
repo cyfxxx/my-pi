@@ -128,6 +128,24 @@ check "坏时间戳 → 不算丢（不崩）" "no" "$(lost none abc 1000000 100
 check "时间戳在未来（时钟回拨）→ 不算丢" "no" "$(lost none 9999999 1000000 1001000)"
 
 echo ""
+echo "=== mark_recovery_restart_log（崩溃恢复的重启日志）==="
+# 崩溃恢复没有 admin action，新进程本来不知道自己是重启来的；写一条 intent=auto 的只读日志，
+# 由新进程按会话盘面尾部判是否续跑（core/restart-intent.ts）。绝不能覆盖真正待执行的动作。
+state_field() { node -e 'const s=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));const v=eval(process.argv[2]);process.stdout.write(v===undefined?"undefined":String(v))' "$PI_ADMIN_STATE_FILE" "$1"; }
+state_reason() { node -e 'const s=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String(s.restartLog?.reason??""))' "$PI_ADMIN_STATE_FILE"; }
+rm -f "$PI_ADMIN_STATE_FILE"
+mark_recovery_restart_log external
+check "恢复日志：文件缺失也能写出来" "auto" "$(state_field 's.restartLog.intent')"
+check "恢复日志：action 保持 none（不伪造待执行动作）" "none" "$(state_field 's.action')"
+check "恢复日志：原因写明崩溃恢复" "yes" "$(case "$(state_reason)" in *崩溃恢复*) echo yes;; *) echo no;; esac)"
+check "恢复日志：分类写进 reason" "yes" "$(case "$(state_reason)" in *external*) echo yes;; *) echo no;; esac)"
+
+write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"reason\":\"keep\",\"restartLog\":{\"reason\":\"old\"}}"
+mark_recovery_restart_log pi_self
+check "有待执行动作时不抢日志（action 保留）" "restart" "$(state_field 's.action')"
+check "有待执行动作时不抢日志（restartLog 保留）" "old" "$(state_field 's.restartLog.reason')"
+
+echo ""
 echo "=== build_admin_args（重启续接参数，绝不能为空）==="
 # 回归：曾因主循环每轮开头 EXTRA_ARGS=() 覆盖了 case 分支写入的 --session，
 # 重启后 pi 以空参启动并新建会话（用户回不到原会话）。续接参数必须经过

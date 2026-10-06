@@ -11,7 +11,15 @@ import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from '@e
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
-import { sendUserMessage } from '../../adapters/ui-adapter';
+import { sendMessage } from '../../adapters/ui-adapter';
+
+import {
+  decideRestartResume,
+  formatResumePrompt,
+  formatResumeSkippedNote,
+  normalizeResumeIntent,
+  tailKindFromSessionFile,
+} from '../../core/restart-intent';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { listSessions, resolveSession } from '../../adapters/session-adapter';
 import { formatSessionList } from './store/sessions';
@@ -172,7 +180,12 @@ export function register(pi: ExtensionAPI): void {
       const confirmed = await ctx.confirm?.('切换会话', `将切换到会话 ${session.id}，需要重启 Agent。是否继续？`);
       if (!confirmed) return '已取消会话切换';
       const reason = typeof args.reason === 'string' ? args.reason : undefined;
-      writeRestartRequest('switch_session', { targetSession: session.path, reason: reason || `切换到会话 ${session.id}` });
+      // 用户驱动的会话切换：新会话不该自动跑起来（判据见 custom/core/restart-intent.ts）
+      writeRestartRequest('switch_session', {
+        targetSession: session.path,
+        reason: reason || `切换到会话 ${session.id}`,
+        intent: 'none',
+      });
       ctx.shutdown?.();
       return `正在切换到会话 ${session.id}...`;
     },
@@ -180,15 +193,28 @@ export function register(pi: ExtensionAPI): void {
 
   registerTool(pi, {
     name: 'admin_restart',
-    description: '重启 Agent 程序（写重启请求，由 supervisor 重新拉起；当前会话会自动保存）。如不需要重启请拒绝调用。',
+    description:
+      '重启 Agent 程序（写重启请求，由 supervisor 重新拉起；当前会话会自动保存）。如不需要重启请拒绝调用。' +
+      '重启后默认由会话盘面判断要不要继续执行任务：若你还有下一步要做，传 resume=continue；' +
+      '若重启就是你这一步的最后动作、之后等用户指示，传 resume=none。',
     parameters: {
       reason: { type: 'string', description: '重启原因（可选）', optional: true },
+      resume: {
+        type: 'string',
+        description: "重启后是否继续执行任务：'continue'（我还有下一步）/'none'（重启即收尾）/'auto'（默认，由盘面判断）",
+        optional: true,
+      },
     },
     execute: async (args, ctx) => {
       const reason = typeof args.reason === 'string' ? args.reason : undefined;
       // 显式带上当前会话：supervisor 用 --session 重拉，不依赖「最近会话」推断
       // （多会话并存/子代理会话更新时间更晚时会续错会话）。
-      writeRestartRequest('restart', { targetSession: ctx?.sessionFile, reason: reason || '手动重启' });
+      writeRestartRequest('restart', {
+        targetSession: ctx?.sessionFile,
+        reason: reason || '手动重启',
+        // 让模型在**它能知情的这一刻**声明意图：比"重启后先跑一个回合再让它自己判断"省一次全量请求
+        intent: normalizeResumeIntent(args.resume),
+      });
       ctx?.shutdown?.();
       return '已提交重启请求，Agent 即将重启。';
     },
@@ -821,6 +847,13 @@ export function register(pi: ExtensionAPI): void {
       // 网关：仅交互会话消费，否则 headless/-p 子进程会先把它吃掉。
       // 例外：`notice: 'mode'` 的重启由 mode 功能自己注入（它要说明新模式的人设/功能/命名空间，
       // 通用措辞既说不清、又会在**旧模式**的进程里落一条）：这里既不注入也不消费，原样留给它。
+      //
+      // 2026-10-06：注入**分两条通道**——"要不要继续执行任务"由 core/restart-intent.ts 判：
+      //   resume=true  → triggerTurn 的真回合（接上被中断的工作，成本换连续性）
+      //   resume=false → deliverAs:'nextTurn' 的上下文备注（不触发回合、不写会话文件、零成本；
+      //                  等下一次真正要跑时与用户消息一起出现）
+      // 旧行为是无条件 sendUserMessage（无条件触发一个回合），切模式/换模型这类没有在途任务的
+      // 重启也白烧一次"重启后首轮全量重放"（仓库既有实测 ≈80k），还可能让模型凭空编任务。
       const pendingLog = ctx.hasUI && !restartNoticeShown ? readState().restartLog : null;
       if (ctx.hasUI && !restartNoticeShown && !isModeOwnedNotice(pendingLog)) {
         const log = consumeRestartLog();
@@ -835,7 +868,28 @@ export function register(pi: ExtensionAPI): void {
             line += ` | 会话: ${log.targetSession}`;
           }
           ctx.ui.notify(line, 'info');
-          sendUserMessage(pi, `[系统] ${line}。历史上下文已恢复，请从中断处继续当前任务。`);
+          const decision = decideRestartResume({
+            intent: log.intent,
+            tail: tailKindFromSessionFile(ctx.sessionManager?.getSessionFile?.()),
+            env: process.env.PI_RESTART_RESUME,
+          });
+          if (decision.resume) {
+            sendMessage(
+              pi,
+              { customType: 'my-pi-restart-resume', content: `[系统] ${formatResumePrompt(line)}`, display: true },
+              { triggerTurn: true },
+            );
+          } else {
+            sendMessage(
+              pi,
+              {
+                customType: 'my-pi-restart-note',
+                content: `[系统] ${formatResumeSkippedNote(line, decision.reason)}`,
+                display: false,
+              },
+              { deliverAs: 'nextTurn' },
+            );
+          }
         }
       }
     },

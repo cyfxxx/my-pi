@@ -194,6 +194,9 @@ export function auditState(snap) {
       }
     }
     const log = admin.value.restartLog;
+    if (log && typeof log === 'object' && log.intent !== undefined && !['continue', 'none', 'auto'].includes(log.intent)) {
+      add('warning', 'restart-intent-invalid', `重启日志的 intent=${JSON.stringify(log.intent)} 无法识别：会按 auto 处理（由会话盘面判断是否继续执行任务）`, '删掉 state.json 里的 restartLog 即可（瞬时状态）');
+    }
     if (log && typeof log === 'object') {
       const lts = typeof log.timestamp === 'number' ? log.timestamp : 0;
       if (lts > 0 && now - lts > MODE_NOTICE_TTL_MS) {

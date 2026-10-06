@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getAgentDir } from '../../../core/config';
 import { writeJSONSync } from '../../../core/atomic-write';
+import type { RestartResumeIntent } from '../../../core/restart-intent';
 import { localDay } from '../../../core/text';
 import { readTasks, telemetryPath, withStoreLock } from './storage';
 import type {
@@ -158,6 +159,11 @@ export interface RestartRequestOpts {
   mode?: string;
   /** 切换前的模式名（`notice: 'mode'` 时填写） */
   from?: string;
+  /**
+   * 重启后要不要继续执行任务：`continue` / `none` 由**写入端**声明（谁请求重启谁最清楚），
+   * `auto`（缺省）= 由会话盘面尾部判定。判据与消费者见 custom/core/restart-intent.ts。
+   */
+  intent?: RestartResumeIntent;
 }
 
 export interface AdminState extends RestartRequestOpts {
@@ -437,6 +443,8 @@ export function executeFailover(
     targetProvider: target.provider,
     targetModel: target.model,
     reason: `failover: ${reason}`,
+    // 自动 failover 是任务**中途**换模型：重启后必须接上（判据见 core/restart-intent.ts）
+    intent: 'continue',
   });
   return `正在切换模型 ${target.provider}/${target.model} 并重启...`;
 }

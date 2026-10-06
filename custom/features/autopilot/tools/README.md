@@ -7,7 +7,7 @@
 
 | 文件 | 工具 | 职责 | 主要导出 |
 |------|------|------|----------|
-| `admin-tools.ts` | `autopilot_policy`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model` | 策略展示、运行状态、配置读写（敏感键掩码 + 可写键白名单）、会话列表/切换、重启请求、模型列表/切换 | `listProviders`、`formatPolicyText`、`formatAdminStatus`、`formatModelsList`、`isSensitiveKey`、`maskSensitive`、`readConfigField`、`safeConfigKeys`、`parseConfigValue` |
+| `admin-tools.ts` | `autopilot_policy`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model` | 策略展示、运行状态、配置读写（敏感键掩码 + 可写键白名单）、会话列表/切换、重启请求（`admin_restart` 支持 `resume=continue|none|auto` 声明"重启后是否继续执行任务"）、模型列表/切换 | `listProviders`、`formatPolicyText`、`formatAdminStatus`、`formatModelsList`、`isSensitiveKey`、`maskSensitive`、`readConfigField`、`safeConfigKeys`、`parseConfigValue` |
 | `schedule-tool.ts` | `schedule_task` | 定时任务增删改查/启停（`add/list/update/delete/enable/disable/pause/resume`） | `SCHEDULE_ACTIONS`、`parseScheduleAdd`、`collectScheduleUpdates`、`executeScheduleAction`、`registerScheduleTool` |
 | `verify-tools.ts` | `verify_report`、`verify_config`、`verify_test` | LLM-as-a-Verifier：验证记录统计报告、验证配置读写、Best-of-N 试跑（候选生成/评审可注入） | `computeVerifierReport`、`formatVerifierReport`、`buildVerifierReport`、`currentVerifierConfig`、`applyVerifierConfigPatch`、`runVerifyTest`、`registerVerifyTools` |
 

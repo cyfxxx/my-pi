@@ -193,6 +193,28 @@ build_admin_args() {
   esac
 }
 
+# ── 崩溃恢复的重启日志（让新进程知道"我是崩溃后被拉起的"）──
+#
+# 崩溃恢复路径**不走 admin action**（没有待执行动作），于是新进程完全不知道自己是重启来的，
+# 更不会接上被崩溃打断的工作。这里写一条**只读日志**（不是 action）：
+#   intent=auto → 新进程按会话盘面尾部判是否续跑（被打断的继续、已收尾的不动，见
+#   custom/core/restart-intent.ts）。
+# 绝不覆盖真正待执行的 action：那种情况下日志归 supervisor 的下一次重启所有。
+mark_recovery_restart_log() { # <crashClass>
+  local cls="${1:-unknown}"
+  node -e '
+    const fs = require("fs");
+    const p = process.argv[1], cls = process.argv[2];
+    let s = { action: "none", timestamp: 0, restartLog: null };
+    try { s = { ...s, ...JSON.parse(fs.readFileSync(p, "utf8")) }; } catch { /* 缺失/损坏 → 用骨架 */ }
+    // 有待执行动作时不抢它的日志（node -e 顶层不能用 return，故写成条件块）
+    if (!(s.action && s.action !== "none")) {
+      s.restartLog = { action: "restart", reason: `崩溃恢复（${cls}）`, intent: "auto", timestamp: Date.now() };
+      fs.writeFileSync(p, JSON.stringify(s));
+    }
+  ' "$ADMIN_STATE_FILE" "$cls" 2>/dev/null || true
+}
+
 # ── 健康检查：核心模块可完整加载（无扩展）──
 health_check() {
   log "健康检查..."
@@ -454,6 +476,7 @@ while true; do
     reset_crash_count
     RECOVERY_ROUNDS=0
     CONSECUTIVE_FAIL=0
+    mark_recovery_restart_log "$CLASS"
     ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" --no-context-files "$@" --continue)
     sleep 1
     continue

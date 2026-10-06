@@ -300,6 +300,8 @@ export function registerAdminTools(pi: PiApi): void {
         targetProvider: provider,
         targetModel: model,
         reason: `切换模型为 ${provider}/${model}`,
+        // 用户驱动的模型切换：不需要"接上工作"（判据见 custom/core/restart-intent.ts）
+        intent: 'none',
       });
       ctx.shutdown?.();
       return `正在重启以加载模型 ${provider}/${model}...`;

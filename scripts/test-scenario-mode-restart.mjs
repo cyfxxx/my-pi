@@ -10,15 +10,19 @@
  * 本场景用**真 pty + 真 supervisor + 真 pi + 真 bootstrap 扩展**跑一遍那条用户路径：
  *   1. 在隔离的 agent/memory 目录里以 full 启动，`--session <新会话文件>`；
  *   2. 在 TUI 里输入 `/mode roleplay`（人设 + 记忆命名空间 + 功能集都要换档）；
- *   3. 等 round-1 记录 decision=restart、并等**新模式进程**把 `[模式] 已切换：full → roleplay`
- *      注入会话文件；
- *   4. `/quit` 收尾。
+ *   3. 等 round-1 记录 decision=restart，并等 round-2 的 pi 进程真的起来（看 `ps`，
+ *      **不是**盲发输入——实测盲发 `/quit` 会排队成一条用户消息、反而触发一个回合，
+ *      把"零回合"这条断言污染掉）；
+ *   4. 发一次 `/quit`（必要时重试/SIGTERM）收尾。
  * 断言（全部来自真实落盘产物，不看单测）：
  *   - round-1 是 full（persona=false / ns 空），decision=restart，**lostRestart=false**；
  *   - round-2 是 roleplay：mode=roleplay、namespace=roleplay、persona=true（=真的换了档，
  *     这正是旧 bug 里"模式没换"的反面）；
- *   - 会话文件里有适配模式的通知（含"不要向用户复述"，且不泄露会话路径/内部措辞）；
+ *   - **会话文件里没有新增任何 user/assistant 消息** = 切模式**不再白跑一个模型回合**
+ *     （2026-10-06 起通知走 deliverAs:'nextTurn' 的零成本通道：不触发回合、不写会话文件）；
  *   - `modes-sessions.json` 把该会话记成 roleplay；全程没有 lostRestart。
+ *
+ * 因为不再需要模型回合，本场景**不依赖 provider/网络**（确定性），只依赖 pty 与已构建的 dist。
  *
  * 用法：
  *   node scripts/test-scenario-mode-restart.mjs                 # 约 3 分钟（两轮真实启动）
@@ -113,6 +117,30 @@ const rows = () => {
     return [];
   }
 };
+/** round-2 的 pi 进程（argv 里同时有 --extension 与 --session <SESS>；supervisor 只有后者） */
+function findPiProcess() {
+  try {
+    const out = spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' }).stdout || '';
+    for (const line of out.split('\n')) {
+      const m = line.trim().match(/^(\d+)\s+(.*)$/);
+      if (!m) continue;
+      const [, pid, args] = m;
+      if (args.includes('--extension') && args.includes(SESS) && !args.includes('pi-supervisor.sh')) {
+        let env = '';
+        try {
+          env = readFileSync(`/proc/${pid}/environ`, 'utf8');
+        } catch {
+          /* 进程刚退出 / 无权限：env 为空，断言会说明 */
+        }
+        return { pid, args, env };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const sessionText = () => {
   try {
     return readFileSync(SESS, 'utf8');
@@ -149,14 +177,43 @@ try {
   }
   check('发送 /mode roleplay 后进程被真的重拉（decision=restart）', restarted, `尝试 ${attempts} 次；${JSON.stringify(rows())}`);
 
-  const noticeInjected = await waitFor(() => sessionText().includes('已切换：full → roleplay'), { label: '新模式进程注入切换通知', quiet: false });
-  check('新模式进程把切换通知注入了会话文件', noticeInjected, sessionText().slice(-400));
+  // 就绪判定必须**两件事都成立**再看输入：① round-2 的 pi 进程在 ps 里；② TUI 已画出首帧。
+  // 实测教训：在 TUI 就绪前往 pty 里写 `/quit`，多行会被合并成一条用户消息提交 —— 既触发了
+  // 一个回合（污染"切模式零回合"的断言），又因为文本不是精确的 `/quit` 而退不出去。
+  const proc = await waitFor(() => findPiProcess(), { timeout: 150_000, label: 'round-2 pi 进程' })
+    ? findPiProcess()
+    : null;
+  check('round-2 的 pi 进程真的起来了（ps 观测）', Boolean(proc), '未在 ps 里看到带 --extension 的 pi 进程');
+  const restartMark = output.length; // 此刻之后的新输出都属于 round-2
+  const tuiReady = await waitFor(() => output.slice(restartMark).includes('π - my-pi') || output.slice(restartMark).includes('~/my-pi'), {
+    timeout: 150_000,
+    label: 'round-2 TUI 首帧',
+    quiet: false,
+  });
+  check('round-2 的 TUI 画出首帧（可以安全输入）', tuiReady);
 
-  // 收尾：先请它自己退（/quit），不行就 SIGTERM（pi 的优雅关闭路径，仍会留下 exit 轮次记录）
-  child.stdin.write('/quit\r');
+  // 直接观测新进程的档位：argv 里应带 roleplay 人设，env 里应有记忆命名空间
+  check('round-2 进程 argv 带 roleplay 人设（--append-system-prompt）', Boolean(proc?.args.includes('roleplay.md')), proc?.args);
+  check('round-2 进程 env 里 PI_MEMORY_NAMESPACE=roleplay', Boolean(proc?.env.includes('PI_MEMORY_NAMESPACE=roleplay')), proc?.env?.slice(0, 200));
+
+  // 收尾：就绪后只发**一次**精确的 /quit；不退再补 Ctrl+C / Ctrl+D；最后 SIGTERM
+  const send = (text) => {
+    try {
+      if (child.stdin.writable) child.stdin.write(text);
+    } catch {
+      /* pty 已关 */
+    }
+  };
+  send('/quit\r');
   if (!(await waitFor(() => rows().some((r) => r.decision === 'exit'), { timeout: 60_000 }))) {
-    child.kill('SIGTERM');
-    await waitFor(() => rows().some((r) => r.decision === 'exit'), { timeout: 60_000, label: 'SIGTERM 后退出', quiet: false });
+    send('\u0003');
+    if (!(await waitFor(() => rows().some((r) => r.decision === 'exit'), { timeout: 30_000 }))) {
+      send('\u0004');
+      if (!(await waitFor(() => rows().some((r) => r.decision === 'exit'), { timeout: 30_000 }))) {
+        child.kill('SIGTERM');
+        await waitFor(() => rows().some((r) => r.decision === 'exit'), { timeout: 60_000, label: 'SIGTERM 后退出', quiet: false });
+      }
+    }
   }
 
   const roundRows = rows();
@@ -170,12 +227,24 @@ try {
   check('全程没有"重启请求被吞"', roundRows.every((r) => r.lostRestart === false), JSON.stringify(roundRows.filter((r) => r.lostRestart)));
   check('round-2 以会话精确续接（--session 同一路径）', Boolean(r2) && r2.session === SESS, `${r2?.session}`);
 
-  const text = sessionText();
-  check('通知写明"已切换：full → roleplay"', text.includes('已切换：full → roleplay'));
-  check('通知要求不要复述（人设模式不破戏）', text.includes('不要向用户复述本条提示'));
-  check('通知不泄露会话路径', !text.includes(SESS));
-  check('通知不带内部措辞（进程原为 / 自愈）', !text.includes('进程原为') && !text.includes('自愈'));
-  check('通知说明新模式的记忆命名空间', text.includes('记忆命名空间 roleplay'));
+  // 核心新性质：切模式**不触发模型回合** —— 会话文件里除了那个头，什么都不该多出来。
+  // 旧行为（无条件 sendUserMessage）会在这里留下 user(通知) + assistant 回复两行。
+  const entries = sessionText()
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        return {};
+      }
+    });
+  const roles = entries.map((e) => (e?.type === 'message' ? e.message?.role : e?.type));
+  check('切模式不触发模型回合：没有 assistant 消息', !roles.includes('assistant'), JSON.stringify(roles));
+  check('切模式不触发模型回合：也没有新增 user 消息', !roles.includes('user'), JSON.stringify(roles));
+  check('零成本通道：通知不落盘（无 custom_message）', !roles.includes('custom_message'), JSON.stringify(roles));
+  check('只允许元数据条目（session/model_change/thinking_level_change）', roles.every((r) => ['session', 'model_change', 'thinking_level_change'].includes(r)), JSON.stringify(roles));
 
   let sessions = {};
   try {
@@ -201,4 +270,4 @@ if (failed > 0) {
   console.log('  排查入口：portable/agent/recovery/rounds.jsonl（本场景为临时目录，用 PI_SCENARIO_KEEP=1 重跑保留现场）');
   process.exit(1);
 }
-console.log(`🎉 模式切换场景通过（${results.length} 项）：真实 pty 下 /mode 切档确实重启并换档，通知适配模式`);
+console.log(`🎉 模式切换场景通过（${results.length} 项）：真实 pty 下 /mode 切档确实重启并换档，且不触发多余回合`);

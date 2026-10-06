@@ -122,6 +122,8 @@ check('窗口内的重启请求不告警', !has(agent(healthyFiles({ admin: { ac
 check('无时间戳的重启请求 → restart-request-undated（warning）', has(agent(healthyFiles({ admin: { action: 'restart', timestamp: 0, restartLog: null } })).findings, 'restart-request-undated'));
 check('重启通知超期未消费 → notice-undelivered（warning）', has(agent(healthyFiles({ admin: { action: 'none', timestamp: 0, restartLog: { action: 'restart', notice: 'mode', timestamp: NOW - MODE_NOTICE_TTL_MS - 1000 } } })).findings, 'notice-undelivered'));
 check('新鲜的重启通知不告警（重启后未消费是正常中间态）', !has(agent(healthyFiles({ admin: { action: 'none', timestamp: 0, restartLog: { action: 'restart', notice: 'mode', timestamp: NOW - 5000 } } })).findings, 'notice-undelivered'));
+check('重启日志 intent 值非法 → restart-intent-invalid（warning）', has(agent(healthyFiles({ admin: { action: 'none', timestamp: 0, restartLog: { action: 'restart', intent: 'yes', timestamp: NOW - 1000 } } })).findings, 'restart-intent-invalid'));
+check('重启日志 intent 合法（continue/none/auto）不告警', !['continue', 'none', 'auto'].some((v) => has(agent(healthyFiles({ admin: { action: 'none', timestamp: 0, restartLog: { action: 'restart', intent: v, timestamp: NOW - 1000 } } })).findings, 'restart-intent-invalid')));
 check('state.json 损坏 → admin-state-unreadable（warning）', has(agent(healthyFiles({ admin: '{bad' })).findings, 'admin-state-unreadable'));
 check('env 硬覆盖 → env-hard-override（warning）', (() => { const { dir } = agent(healthyFiles()); return has(findingsOf(dir, { env: { PI_AGENT_MODE: 'roleplay' } }), 'env-hard-override'); })());
 check('env 回写值（SOURCE=file）不算硬覆盖', (() => { const { dir } = agent(healthyFiles()); return !has(findingsOf(dir, { env: { PI_AGENT_MODE: 'roleplay', PI_AGENT_MODE_SOURCE: 'file' } }), 'env-hard-override'); })());

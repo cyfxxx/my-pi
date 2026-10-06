@@ -13,7 +13,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
-import { registerCommand, getThinkingLevel, setThinkingLevel, sendUserMessage } from '../../adapters/ui-adapter';
+import { registerCommand, getThinkingLevel, setThinkingLevel, sendMessage } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import {
   loadModes,
@@ -228,7 +228,18 @@ export function register(pi: ExtensionAPI): void {
       const notice = takePendingModeNotice(sessionFile);
       if (notice && notice.to === activeMode) {
         try {
-          sendUserMessage(pi, formatModeSwitchNotice(notice.from, notice.to, getModeConfig(activeMode) ?? activeConfig));
+          // **零成本通道**：档位切换不需要"接上工作"，注入一条只在下一次真正要跑时出现的上下文备注
+          // （deliverAs:'nextTurn' 不触发回合、不写会话文件）。旧行为是 sendUserMessage → 每次切模式
+          // 都白跑一个模型回合（实测会话里能看到模型对着通知自问"我该继续做什么"）。
+          sendMessage(
+            pi,
+            {
+              customType: 'my-pi-mode-switch',
+              content: formatModeSwitchNotice(notice.from, notice.to, getModeConfig(activeMode) ?? activeConfig),
+              display: false,
+            },
+            { deliverAs: 'nextTurn' },
+          );
         } catch {
           /* 注入失败不阻塞启动 */
         }
@@ -313,6 +324,8 @@ function requestModeRestart(
       notice: 'mode',
       mode: modeName,
       from,
+      // 档位/人设变更不需要"接上工作"：不唤醒模型（见 custom/core/restart-intent.ts）
+      intent: 'none',
     });
     written = true;
   } catch {

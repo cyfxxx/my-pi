@@ -76,9 +76,20 @@
 - admin 工具写 `state.json`，由 `scripts/pi-supervisor.sh` 在退出时执行重启/切会话；
   重启参数经 `PENDING_ARGS` 跨轮传递（每轮开头的 `EXTRA_ARGS` 重置会吞掉直接写入的值），
   映射逻辑是纯函数 `build_admin_args`（`scripts/test-supervisor.sh` 有单测 + stub CLI 端到端回归）。
-- 重启通知：`session_start` 消费 `consumeRestartLog()` 并以 `ctx.ui.notify` + `sendUserMessage`
-  注入"系统已重启。操作/原因"，仅交互会话消费（headless `-p` 子进程会先吃掉 restartLog）。
-  写入端保留在 `restartLog` 字段，supervisor 只清 `action`——两边都不可省。
+- 重启通知：`session_start` 消费 `consumeRestartLog()` 并以 `ctx.ui.notify` 告知"系统已重启。操作/原因"，
+  仅交互会话消费（headless `-p` 子进程会先吃掉 restartLog）。写入端保留在 `restartLog` 字段，
+  supervisor 只清 `action`——两边都不可省。
+  - **要不要唤醒模型继续干活，由 `custom/core/restart-intent.ts` 判**（三层：写入端 `intent` →
+    会话盘面尾部 → `PI_RESTART_RESUME=off|auto|always`）：
+    `resume=true` → `sendMessage(..., { triggerTurn: true })` 真跑一个回合接上工作；
+    `resume=false` → `sendMessage(..., { deliverAs: 'nextTurn' })` 的上下文备注（零成本、
+    不触发回合、不写会话文件）。旧行为是无条件 `sendUserMessage`：切模式/换模型这类没有在途
+    任务的重启也白烧一次"重启后首轮全量重放"（实测 ≈80k），还可能让模型凭空编任务。
+  - 写入端的 `intent`：`/mode`、`set_model`、`switch_session` → `none`；看门狗 `restart_hang`、
+    自动 failover → `continue`；`admin_restart` 由**模型自己**用 `resume` 参数声明（它此刻
+    上下文完整，判断零成本）；缺省 `auto` = 交给盘面尾部判。
+  - 崩溃恢复路径由 supervisor 写一条 `intent: 'auto'` 的重启日志（`mark_recovery_restart_log`），
+    否则新进程完全不知道自己是崩溃后被拉起的、更不会接上被打断的工作。
   - **消费只清 `restartLog`，绝不动 `action`**（2026-10-06 修）：`action` 的消费者只有 supervisor
     （`clear_admin_action`）。旧实现顺手把 `action` 清成 `none`，于是同一轮 `session_start` 里
     mode 刚写下的自愈重启请求被通知消费取消 → supervisor 直接退出（用户看到"注入了系统已重启、

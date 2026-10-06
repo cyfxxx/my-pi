@@ -111,6 +111,8 @@ export function triggerHangRecovery(
   writeRestartRequest('restart_hang', {
     targetSession: sessionFile ?? latestSessionFile() ?? undefined,
     reason: `会话挂死（${idleMinutes} 分钟无活动）`,
+    // 回合卡死=工作在途被中断：重启后要接上（判据见 custom/core/restart-intent.ts）
+    intent: 'continue',
   });
   return true;
 }

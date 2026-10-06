@@ -15,6 +15,7 @@
 | `cli.ts` | 命令参数与补全解析 | `parseSubcommand`、`filterCompletions` |
 | `secrets.ts` | 敏感信息脱敏 | `scrubSecrets`、`SECRET_PATTERNS` |
 | `net-guard.ts` | SSRF 防护 | `isBlockedHost`、`isUrlAllowed` |
+| `restart-intent.ts` | "重启后要不要继续执行任务"的判据（意图 → 会话盘面尾部 → env 开关） | `decideRestartResume`、`tailKindFromSessionFile`、`normalizeResumeIntent`、`formatResumePrompt`、`formatResumeSkippedNote` |
 | `index.ts` | 统一 barrel | 汇总以上导出 |
 
 ## 约定
@@ -26,7 +27,7 @@
 
 ## 测试
 
-`__tests__/`：`net-guard.test.ts`、`secrets.test.ts`、`fs-json.test.ts`、`text.test.ts`、`cli.test.ts`。
+`__tests__/`：`net-guard.test.ts`、`secrets.test.ts`、`fs-json.test.ts`、`text.test.ts`、`cli.test.ts`、`restart-intent.test.ts`。
 
 ## 相关
 

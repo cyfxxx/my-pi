@@ -18,9 +18,17 @@ import { setSessionMode } from '../logic';
 
 type Handler = (event: unknown, ctx?: unknown) => unknown;
 
+interface SentCustom {
+  customType: string;
+  content: string;
+  display?: boolean;
+  options?: Record<string, unknown>;
+}
+
 interface FakePi {
   hooks: Map<string, Handler[]>;
-  sent: string[];
+  sent: string[]; // sendUserMessage（真用户消息，会触发回合）
+  custom: SentCustom[]; // sendMessage（custom 消息；是否触发回合看 options）
   [k: string]: unknown;
 }
 
@@ -32,9 +40,11 @@ let savedEnv: Record<string, string | undefined>;
 function makeFakePi(): FakePi {
   const hooks = new Map<string, Handler[]>();
   const sent: string[] = [];
+  const custom: SentCustom[] = [];
   const api: Record<string, unknown> = {
     hooks,
     sent,
+    custom,
     on: (ev: string, h: Handler) => {
       const arr = hooks.get(ev) ?? [];
       arr.push(h);
@@ -46,7 +56,9 @@ function makeFakePi(): FakePi {
     registerFlag: () => {},
     registerMessageRenderer: () => {},
     registerToolRenderer: () => {},
-    sendMessage: () => {},
+    sendMessage: (message: SentCustom, options?: Record<string, unknown>) => {
+      custom.push({ ...message, options });
+    },
     sendUserMessage: (content: unknown) => {
       sent.push(String(content));
     },
@@ -144,7 +156,8 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     expect(state.targetSession).toBe(SESS);
     expect(state.restartLog).toMatchObject({ notice: 'mode', mode: 'roleplay', from: 'full' });
     // autopilot 不得注入自己的通用"系统已重启"（模式切换的通知由新模式进程按模式生成）
-    expect(pi.sent.filter((s) => s.includes('系统已重启'))).toHaveLength(0);
+    expect(pi.sent).toHaveLength(0);
+    expect(pi.custom.filter((c) => c.content.includes('系统已重启'))).toHaveLength(0);
   });
 
   it('非模式类重启仍走 autopilot 的通用通知（让位只针对 notice=mode）', async () => {
@@ -152,9 +165,71 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     const pi = await setupBoth();
     const handlers = pi.hooks.get('session_start') ?? [];
 
-    writeRestartRequest('restart', { targetSession: SESS, reason: '手动重启' });
+    writeRestartRequest('restart', { targetSession: SESS, reason: '手动重启', intent: 'none' });
     await handlers[1]({}, ctx()); // 只跑 autopilot 的消费端
 
-    expect(pi.sent.some((s) => s.includes('系统已重启'))).toBe(true);
+    expect(pi.custom.some((c) => c.content.includes('系统已重启'))).toBe(true);
+  });
+
+  it('intent=none（换模型/切会话类）→ 零成本通道：不触发回合', async () => {
+    const { writeRestartRequest } = await import('../../autopilot/logic');
+    const pi = await setupBoth();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    writeRestartRequest('set_model', { targetSession: SESS, reason: '切换模型', intent: 'none' });
+    await handlers[1]({}, ctx());
+
+    const note = pi.custom.find((c) => c.customType === 'my-pi-restart-note');
+    expect(note?.options?.deliverAs).toBe('nextTurn');
+    expect(note?.options?.triggerTurn).toBeUndefined();
+    expect(note?.content).toContain('不需要继续执行任务');
+    expect(note?.content).toContain('intent-none');
+    expect(pi.sent).toHaveLength(0); // 没有真用户消息 = 没有触发回合
+  });
+
+  it('盘面尾部还有未回答的用户消息 + intent=auto → 触发回合接上工作', async () => {
+    const { writeRestartRequest } = await import('../../autopilot/logic');
+    // 会话盘面：最后一条是未回答的 user 消息（= 重启打断了一个正在进行的任务）
+    writeFileSync(
+      SESS,
+      [
+        JSON.stringify({ type: 'session', version: 3, id: 's1', timestamp: new Date().toISOString(), cwd: dir }),
+        JSON.stringify({ type: 'message', id: 'm1', message: { role: 'assistant', content: [{ type: 'text', text: '开始' }] } }),
+        JSON.stringify({ type: 'message', id: 'm2', message: { role: 'user', content: [{ type: 'text', text: '继续把这件事做完' }] } }),
+      ].join('\n') + '\n',
+    );
+    const pi = await setupBoth();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    writeRestartRequest('restart', { targetSession: SESS, reason: '看门狗恢复', intent: 'auto' });
+    await handlers[1]({}, ctx());
+
+    const resume = pi.custom.find((c) => c.customType === 'my-pi-restart-resume');
+    expect(resume?.options?.triggerTurn).toBe(true);
+    expect(resume?.content).toContain('如果你还有下一步行动，请继续执行');
+    expect(resume?.content).toContain('不要凭空开工');
+    expect(pi.sent).toHaveLength(0);
+  });
+
+  it('盘面尾部是 assistant 收尾（无在途工作）+ intent=auto → 不触发回合', async () => {
+    const { writeRestartRequest } = await import('../../autopilot/logic');
+    writeFileSync(
+      SESS,
+      [
+        JSON.stringify({ type: 'session', version: 3, id: 's1', timestamp: new Date().toISOString(), cwd: dir }),
+        JSON.stringify({ type: 'message', id: 'm1', message: { role: 'user', content: [{ type: 'text', text: '改个配置' }] } }),
+        JSON.stringify({ type: 'message', id: 'm2', message: { role: 'assistant', content: [{ type: 'text', text: '改完了，重启生效' }] } }),
+      ].join('\n') + '\n',
+    );
+    const pi = await setupBoth();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    writeRestartRequest('restart', { targetSession: SESS, reason: '模型自己请求的重启', intent: 'auto' });
+    await handlers[1]({}, ctx());
+
+    const note = pi.custom.find((c) => c.customType === 'my-pi-restart-note');
+    expect(note?.options?.deliverAs).toBe('nextTurn');
+    expect(note?.content).toContain('tail-assistant-text');
+    expect(pi.custom.some((c) => c.options?.triggerTurn === true)).toBe(false);
   });
 });

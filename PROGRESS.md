@@ -2136,3 +2136,14 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **顺带**：`PI_MEMORY_DIR` 支持外部覆盖（supervisor / `my-pi.sh` / `dev.sh`），否则场景会写用户真实记忆库。
 - **文档计数同步**：`scripts/README`（golden 17→**19 步** + 三个新脚本）、`VISION` 安全网 17 步/772 用例 → **19 步/811 用例**、`FAQ` 12→19 步、`TROUBLESHOOTING` 冒烟步骤 14→**20**。
 - 验证：`tsc` 干净；`vitest` 73 文件 / 811 用例；`test-supervisor.sh` 86 项；`test-state-audit.mjs` 39 项；`golden --fast`（19 步，场景跳过）；全量 golden（含模式切换场景）。
+
+### 重启后"要不要继续执行任务"的判据（2026-10-06）
+
+- **需求**：用户指出重启后原意是"自动继续执行任务"，但有些重启并不需要执行任务，要求给出判据方案。
+- **判据（三层，落在最便宜且信息最全的位置）**：① **写入端 `intent`**（`/mode`、`set_model`、`switch_session` → `none`；看门狗 `restart_hang`、自动 failover → `continue`；`admin_restart` 由模型用新参数 `resume` 自己声明，它此刻上下文完整、判断零成本）；② **会话盘面尾部**（未回答的 user / 带未完成工具调用的 assistant / 未消化的 toolResult / 未收尾的 custom → 继续；assistant 纯文本收尾、空会话 → 不继续）；③ `PI_RESTART_RESUME=off|auto|always` 强制。
+- **两条通道**：`resume=true` → `sendMessage(..., { triggerTurn: true })`（真回合，文案含"若已完成或不确定就停下来、不要凭空开工"）；`resume=false` → `sendMessage(..., { deliverAs: 'nextTurn' })`（**零成本**：不触发回合、不写会话文件）。
+- **为什么不让模型在重启后自己判断**：那要先跑一个回合才轮到它判断（成本已付），且它只看到历史、不知道用户是否还想继续。判断放在"它能知情的时刻"（调 `admin_restart`），只让被唤醒的模型决定"从哪儿继续"。
+- **顺带**：模式切换通知改走零成本通道（切模式恒 `intent:'none'`）；崩溃恢复路径由 supervisor 写 `intent:'auto'` 的只读日志（`mark_recovery_restart_log`），让被崩溃打断的工作能接上。
+- **落地**：新增 `custom/core/restart-intent.ts` + 18 项单测（三层优先级 / 七种盘面形态 / 256KB 截断容错 / 两条文案）；`restartLog` 增 `intent` 字段；`admin_restart` 增 `resume` 参数；接线测试 5 项；supervisor 92 项（含恢复日志不抢 action）；状态体检 41 项（含 `restart-intent-invalid`）。
+- **端到端证据**（真 pty 场景，19 项全绿）：round-2 进程 argv 带 `roleplay.md`、env 带 `PI_MEMORY_NAMESPACE=roleplay`；**会话文件里没有 user/assistant/custom_message 条目** → 切模式零回合。场景因此不再依赖模型与网络。
+- 设计记录见 `DECISIONS.md` 同日条目。
