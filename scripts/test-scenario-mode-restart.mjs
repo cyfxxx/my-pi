@@ -35,7 +35,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { startFakeProvider } from './lib-fake-provider.mjs';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -154,28 +154,54 @@ const rows = () => {
     return [];
   }
 };
-/** round-2 的 pi 进程（argv 里同时有 --extension 与 --session <SESS>；supervisor 只有后者） */
-function findPiProcess() {
+/** 找到本次场景的 pi 进程。**不能靠 argv**：pi 跑起来后会把 process.title 写成窗口标题
+ *  （实测第一次回合之后 /proc/<pid>/cmdline 就只剩标题），所以按 **exe=node + 环境里带本场景
+ *  的 agent 目录** 来认，再用 cmdline 排除 supervisor/健康检查。返回 {pid, args, env}。 */
+function findPiProcess(diagnose = false) {
+  let pids = [];
   try {
-    const out = spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' }).stdout || '';
-    for (const line of out.split('\n')) {
-      const m = line.trim().match(/^(\d+)\s+(.*)$/);
-      if (!m) continue;
-      const [, pid, args] = m;
-      if (args.includes('--extension') && args.includes(SESS) && !args.includes('pi-supervisor.sh')) {
-        let env = '';
-        try {
-          env = readFileSync(`/proc/${pid}/environ`, 'utf8');
-        } catch {
-          /* 进程刚退出 / 无权限：env 为空，断言会说明 */
-        }
-        return { pid, args, env };
-      }
-    }
-    return null;
+    pids = readdirSync('/proc').filter((d) => /^\d+$/.test(d));
   } catch {
     return null;
   }
+  const candidates = [];
+  for (const pid of pids) {
+    let exe = '';
+    let args = '';
+    let env = '';
+    try {
+      exe = readlinkSync(`/proc/${pid}/exe`);
+    } catch {
+      continue;
+    }
+    if (!/(^|\/)node$/.test(exe)) continue; // 只认 node 进程（排除 script/bash）
+    try {
+      args = readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').join(' ').trim();
+      env = readFileSync(`/proc/${pid}/environ`, 'utf8');
+    } catch {
+      continue;
+    }
+    if (!env.includes(`PI_CODING_AGENT_DIR=${AGENT}`)) continue; // 本场景专属的隔离目录
+    candidates.push({ pid, args, env });
+    if (args.includes('pi-supervisor.sh') || args.includes('--no-extensions')) continue; // supervisor / 健康检查
+    return { pid, args, env };
+  }
+  if (diagnose) console.log(`  （pid 候选 ${candidates.length} 个：${candidates.map((c) => `${c.pid}:${c.args.slice(0, 80)}`).join(' | ')}）`);
+  return null;
+}
+
+/** 请求体里最后一条"模型可见的输入"（custom/user）——用它断言"这次请求就是那次续跑"，
+ *  避免被历史里上一次的续跑指令误判（phase 2 的指令会留在 history 里）。 */
+function lastInputText(body) {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m?.role === 'user' || m?.role === 'custom') {
+      const c = m.content;
+      return typeof c === 'string' ? c : JSON.stringify(c ?? '');
+    }
+  }
+  return '';
 }
 
 const sessionText = () => {
@@ -290,11 +316,54 @@ try {
   check('续跑通道：新进程真的起了回合（会话里出现 my-pi-restart-resume）', resumeInjected, sessionText().slice(-400));
   const gotResumeRequest = await waitFor(() => provider.completions.length >= 1, { timeout: 60_000, label: '续跑回合的模型请求', quiet: false });
   check('续跑那次真的调用了模型（假 provider 收到请求）', gotResumeRequest, `completions=${provider.completions.length}`);
-  const resumeBody = JSON.stringify(provider.completions.at(-1)?.body ?? {});
-  check('模型请求体里带着续跑指令（说明模型真的收到了"接着做/别凭空开工"）', resumeBody.includes('不要凭空开工') && resumeBody.includes('系统已重启'));
+  const resumeInput = lastInputText(provider.completions.at(-1)?.body);
+  check('续跑请求的最后一条输入就是续跑指令（模型真的收到了"接着做/别凭空开工"）', resumeInput.includes('不要凭空开工') && resumeInput.includes('系统已重启'), resumeInput.slice(0, 160));
   const gotReply = await waitFor(() => sessionText().includes(REPLY_TEXT), { timeout: 60_000, label: '假 provider 的回复落盘' });
   check('假 provider 的固定回复落进会话（回合真的跑完了）', gotReply, sessionText().slice(-300));
   check('整场只跑了这一个模型回合（切模式那次为 0）', provider.completions.length === 1, `completions=${provider.completions.length}`);
+
+  // ③ `intent=auto`（**缺省**：没人声明意图）→ 由会话盘面尾部判。这里让一个回合**卡在模型调用里**
+  //    再半途重启，模拟"任务被中断"，应当自动续跑。这条是崩溃恢复/admin_restart 的默认路径，
+  //    也是本功能的原始意图，此前只有单测覆盖。
+  const completionsBeforePhase3 = provider.completions.length;
+  provider.hangNext(1); // 下一次模型请求挂住 = 回合进行中
+  provider.setReply('SCENARIO-REPLY-PHASE3');
+  send('请把刚才的结论再列一次\r'); // 真实输入 → 真的起一个回合（会卡在模型调用上）
+  const stuckTurn = await waitFor(() => provider.completions.length > completionsBeforePhase3, { timeout: 60_000, label: '被中断的那次请求', quiet: false });
+  check('构造出"回合进行中"（模型请求已发出并挂住）', stuckTurn, `completions=${provider.completions.length}`);
+  const tailInFlight = await waitFor(() => {
+    const r = readRoles();
+    return r.lastIndexOf('user') > r.lastIndexOf('assistant');
+  }, { timeout: 30_000, label: '盘面尾部=工作在途', quiet: false });
+  check('盘面尾部是"工作在途"（最后一条 user 晚于最后一条 assistant）', tailInFlight, JSON.stringify(readRoles()));
+
+  // 写一条**不带 intent** 的重启请求（= 生产者的缺省写法）→ 半途 SIGTERM → supervisor 重拉
+  const restartsBeforePhase3 = rows().filter((r) => r.decision === 'restart').length;
+  writeFileSync(
+    join(AGENT, 'autopilot', 'state.json'),
+    JSON.stringify({
+      action: 'restart',
+      timestamp: Date.now(),
+      targetSession: SESS,
+      reason: '场景：回合进行中被重启',
+      restartLog: { action: 'restart', reason: '场景：回合进行中被重启', targetSession: SESS, timestamp: Date.now() },
+    }),
+  );
+  const p3 = findPiProcess();
+  if (!p3) findPiProcess(true); // 打候选诊断，避免下次还要猜
+  check('找到正在跑的 pi 进程（准备半途杀掉）', Boolean(p3), `未找到 pi 进程；args=${p3?.args ?? '(none)'}`);
+  if (p3) process.kill(Number(p3.pid), 'SIGTERM');
+  const restartedByAuto = await waitFor(() => rows().filter((r) => r.decision === 'restart').length > restartsBeforePhase3, {
+    timeout: 150_000,
+    label: '缺省 intent 路径的重拉',
+  });
+  check('缺省 intent 的重启被真的执行（第三次重拉）', restartedByAuto, JSON.stringify(rows()));
+  const autoResumed = await waitFor(() => provider.completions.length > completionsBeforePhase3 + 1, { timeout: 150_000, label: 'auto 续跑回合' });
+  check('auto 路径：被中断的任务自动续跑（发出新的模型请求）', autoResumed, `completions=${provider.completions.length}`);
+  const autoInput = lastInputText(provider.completions.at(-1)?.body);
+  check('auto 续跑请求的最后一条输入就是续跑指令', autoInput.includes('不要凭空开工'), autoInput.slice(0, 200));
+  const autoReply = await waitFor(() => sessionText().includes('SCENARIO-REPLY-PHASE3'), { timeout: 60_000, label: 'phase3 回复落盘' });
+  check('auto 续跑回合真的跑完（固定回复落盘）', autoReply, sessionText().slice(-300));
 
   // 收尾：round-3 可能正在流式回复；/quit → Ctrl+C → Ctrl+D → SIGTERM
   send('/quit\r');

@@ -121,7 +121,7 @@ step "18. 运行时状态不变量（使用层面静默失效）"
 # 用合成状态逐条锁定两侧行为，并校验三处真值不漂移（FIXED_MODES / 功能名清单）。
 if node scripts/test-state-audit.mjs >/tmp/golden-stateaudit.log 2>&1; then pass "$(tail -1 /tmp/golden-stateaudit.log)"; else fail "状态体检守门（见 /tmp/golden-stateaudit.log）"; tail -20 /tmp/golden-stateaudit.log; fi
 
-step "19. 模式切换场景（真实 pty + supervisor + pi，约 4 分钟）"
+step "19. 模式切换场景（真实 pty + supervisor + pi，约 8 分钟）"
 # 唯一一条"用户路径"级检查：在真 pty 里输入 /mode roleplay，断言进程真的重拉、新进程跑在 roleplay
 # （人设+命名空间）并把**适配模式**的通知注入会话文件。2026-10-06 的真实故障（切模式后进程直接退出、
 # 模式没换）在当时的全部门禁下都是绿的——只有这一层能挡住它。缺 script/stty 或未构建 dist 时自跳过。

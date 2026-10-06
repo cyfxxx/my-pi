@@ -15,7 +15,8 @@
  *   p.completions   // 只含 /chat/completions（= 真正跑了模型回合的次数）
  *   await p.close()
  *
- * 选项：`hang` = 不回应（用于"回合卡在半途"的场景）；`replyText` = 固定回复内容。
+ * 选项：`hang` = 全部不回应、`hangFirst` = 前 n 次不回应（用于"回合卡在半途"的场景）；
+ * `replyText` = 固定回复内容。运行期可用 `hangNext(n)` / `setReply(text)` 动态调整。
  */
 import { createServer } from 'node:http';
 
@@ -36,9 +37,11 @@ function sseChunk(res, model, delta, finish = null) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang = false } = {}) {
+export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang = false, hangFirst = 0 } = {}) {
   const sockets = new Set();
   const requests = [];
+  let hangCount = Math.max(0, hangFirst);
+  let reply = replyText;
   const server = createServer((req, res) => {
     let raw = '';
     req.on('data', (c) => (raw += c.toString('utf8')));
@@ -62,13 +65,16 @@ export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang 
         return;
       }
 
-      // hang：把连接挂住不回应（模拟"回合进行中"）
-      if (hang) return;
+      // hang：把连接挂住不回应（模拟"回合进行中"）；hangNext(n) 可让接下来 n 次挂住
+      if (hang || hangCount > 0) {
+        if (hangCount > 0) hangCount--;
+        return;
+      }
 
       const model = typeof body?.model === 'string' ? body.model : 'scenario-model';
       if (body?.stream) {
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-        sseChunk(res, model, { role: 'assistant', content: replyText });
+        sseChunk(res, model, { role: 'assistant', content: reply });
         sseChunk(res, model, {}, 'stop');
         res.write('data: [DONE]\n\n');
         res.end();
@@ -79,7 +85,7 @@ export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang 
         object: 'chat.completion',
         created: Math.floor(Date.now() / 1000),
         model,
-        choices: [{ index: 0, message: { role: 'assistant', content: replyText }, finish_reason: 'stop' }],
+        choices: [{ index: 0, message: { role: 'assistant', content: reply }, finish_reason: 'stop' }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       });
     });
@@ -94,6 +100,15 @@ export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang 
     port,
     get requests() {
       return requests;
+    },
+    /** 让接下来 n 次模型请求挂住（模拟"回合进行中被重启"）；返回 n 便于链式断言 */
+    hangNext(n = 1) {
+      hangCount = Math.max(0, n);
+      return hangCount;
+    },
+    /** 换一个后续回复内容（用来区分不同回合的落盘证据） */
+    setReply(text) {
+      reply = text;
     },
     /** 只统计真正跑模型回合的请求 */
     get completions() {
