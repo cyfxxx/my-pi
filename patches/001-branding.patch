@@ -1,5 +1,5 @@
 diff --git a/package.json b/package.json
-index 00e32f3..04241f6 100644
+index fed2ac44e..32ef46c89 100644
 --- a/package.json
 +++ b/package.json
 @@ -1,7 +1,11 @@
@@ -14,4 +14,4 @@ index 00e32f3..04241f6 100644
 +	},
  	"workspaces": [
  		"packages/*",
- 		"packages/session-backends/*",
+ 		"packages/coding-agent/examples/extensions/with-deps",

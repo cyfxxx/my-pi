@@ -1,16 +1,16 @@
 diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
-index 5db6d8817..59e64492c 100644
+index 595ce1589..9dd28ff19 100644
 --- a/packages/coding-agent/src/modes/interactive/components/footer.ts
 +++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
-@@ -87,6 +87,7 @@ export class FooterComponent implements Component {
+@@ -120,6 +120,7 @@ export class FooterComponent implements Component {
  		// Calculate cumulative usage from ALL session entries (not just post-compaction messages)
  		const usageTotals = createUsageTotals();
  		let latestCacheHitRate: number | undefined;
 +		const recentTurnUsage: Array<{ promptTokens: number; cacheRead: number }> = [];
  
- 		for (const entry of this.session.sessionManager.getEntries()) {
+ 		for (const entry of sessionManager.getEntries()) {
  			if (entry.type === "usage") {
-@@ -98,6 +99,7 @@ export class FooterComponent implements Component {
+@@ -131,6 +132,7 @@ export class FooterComponent implements Component {
  					entry.message.usage.input + entry.message.usage.cacheRead + entry.message.usage.cacheWrite;
  				latestCacheHitRate =
  					latestPromptTokens > 0 ? (entry.message.usage.cacheRead / latestPromptTokens) * 100 : undefined;
@@ -18,7 +18,7 @@ index 5db6d8817..59e64492c 100644
  			} else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
  				addUsageToTotals(usageTotals, entry.message.usage);
  			} else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
-@@ -134,16 +136,23 @@ export class FooterComponent implements Component {
+@@ -183,16 +185,23 @@ export class FooterComponent implements Component {
  		if (sessionPromptTotal > 0) statsParts.push(`Σ${formatTokens(sessionPromptTotal)}`);
  		if (usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
  		if (usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
@@ -47,7 +47,7 @@ index 5db6d8817..59e64492c 100644
  			statsParts.push(`CH${hitRates.join("/")}%`);
  		}
  
-@@ -157,8 +166,10 @@ export class FooterComponent implements Component {
+@@ -206,8 +215,10 @@ export class FooterComponent implements Component {
  			? state.model.provider === "kimi-coding" || this.session.modelRuntime.isUsingSubscription(state.model.provider)
  			: false;
  		if (usageTotals.cost || usingSubscription) {

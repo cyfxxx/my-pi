@@ -3,7 +3,7 @@ new file mode 100644
 index 000000000..df594152e
 --- /dev/null
 +++ b/packages/README.md
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,56 @@
 +# packages — 上游 pi 包（只读同步）
 +
 +此目录包含上游 pi 框架包。这些包从 earendil-works/pi 同步，**不应直接修改**。
@@ -13,20 +13,25 @@ index 000000000..df594152e
 +2. 使用 `scripts/sync-upstream.sh` 从上游同步
 +3. 管理补丁（具体脚本请参考项目根目录 `scripts/` 目录）
 +
++包清单随上游增删而变（v0.99.1→v1.0.4 删掉 `session-backends/`、新增 `env/`）；
++同步后请用 `ls packages/` 核对本页，别让它悄悄过期。
++
 +## 目录结构
 +
 +```
 +packages/
++├── agent/                 — Agent 核心（Agent / agent loop / 代理流）
 +├── ai/                    — AI 核心库（LLM API 抽象，provider 实现）
-+├── agent/                 — Agent 核心（运行时，session 管理）
 +├── chord/                 — 核心框架（context, delta, facets, node）
 +├── client/                — 客户端库
++├── codemode/              — 模型写 JS 调工具的沙箱运行时
 +├── coding-agent/          — 编码代理（主 CLI + 框架核心 + 工具系统）
++├── durable/               — 持久会话与存储（SQLite / watch / 结构化并发）
++├── env/                   — SSH 远程执行环境与 daemon
 +├── evals/                 — 评估框架
++├── mcp/                   — MCP 客户端
 +├── protocol/              — 协议定义（CBOR 序列化）
 +├── server/                — 服务器（transport 层）
-+├── session-backends/
-+│   └── sqlite-node/       — SQLite 会话后端
 +├── telemetry/             — 遥测收集
 +└── tui/                   — 终端 UI 组件（native bindings）
 +```
@@ -35,15 +40,18 @@ index 000000000..df594152e
 +
 +| 目录 | 用途 |
 +|------|------|
++| `agent/` | Agent 核心（Agent / agent loop / 代理流） |
 +| `ai/` | AI 核心库（LLM API 抽象，provider 实现） |
-+| `agent/` | Agent 核心（运行时，session 管理） |
 +| `chord/` | 核心框架（context, delta, facets, node） |
 +| `client/` | 客户端库 |
++| `codemode/` | 模型写 JS 调工具的沙箱运行时 |
 +| `coding-agent/` | 编码代理（主 CLI + 框架核心 + 工具系统） |
++| `durable/` | 持久会话与存储（SQLite / watch / 结构化并发） |
++| `env/` | SSH 远程执行环境与 daemon |
 +| `evals/` | 评估框架 |
++| `mcp/` | MCP 客户端 |
 +| `protocol/` | 协议定义（CBOR 序列化） |
 +| `server/` | 服务器（transport 层） |
-+| `session-backends/sqlite-node/` | SQLite 会话后端 |
 +| `telemetry/` | 遥测收集 |
 +| `tui/` | 终端 UI 组件（native bindings） |
 +
@@ -51,7 +59,7 @@ index 000000000..df594152e
 +
 +- [自定义层](../custom/README.md)
 +- [补丁管理](../patches/README.md)
-+- [上游同步文档](../custom/docs/UPSTREAM-SYNC.md)
++- [上游同步流程](../docs/operations/UPSTREAM-UPDATE.md)
 diff --git a/packages/ai/scripts/check-model-data.ts b/packages/ai/scripts/check-model-data.ts
 index 5c61b52c4..789780489 100644
 --- a/packages/ai/scripts/check-model-data.ts

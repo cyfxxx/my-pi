@@ -1,15 +1,15 @@
 diff --git a/packages/coding-agent/src/modes/interactive/components/footer.ts b/packages/coding-agent/src/modes/interactive/components/footer.ts
-index 59e64492c..ae7e56f8b 100644
+index 9dd28ff19..ac57dc758 100644
 --- a/packages/coding-agent/src/modes/interactive/components/footer.ts
 +++ b/packages/coding-agent/src/modes/interactive/components/footer.ts
-@@ -86,20 +86,12 @@ export class FooterComponent implements Component {
+@@ -119,20 +119,12 @@ export class FooterComponent implements Component {
  
  		// Calculate cumulative usage from ALL session entries (not just post-compaction messages)
  		const usageTotals = createUsageTotals();
 -		let latestCacheHitRate: number | undefined;
 -		const recentTurnUsage: Array<{ promptTokens: number; cacheRead: number }> = [];
  
- 		for (const entry of this.session.sessionManager.getEntries()) {
+ 		for (const entry of sessionManager.getEntries()) {
  			if (entry.type === "usage") {
  				addUsageToTotals(usageTotals, entry.usage);
  			} else if (entry.type === "message" && entry.message.role === "assistant") {
@@ -23,7 +23,7 @@ index 59e64492c..ae7e56f8b 100644
  			} else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
  				addUsageToTotals(usageTotals, entry.message.usage);
  			} else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
-@@ -131,36 +123,19 @@ export class FooterComponent implements Component {
+@@ -180,36 +172,19 @@ export class FooterComponent implements Component {
  
  		// Build stats line
  		// Patch (004-footer-tweaks): 前 3 字段改为 Σ总输入(prompt 总量=命中+未命中) / ↑累计未命中 / ↓累计输出；R/W 并入 Σ。
@@ -67,7 +67,7 @@ index 59e64492c..ae7e56f8b 100644
  		// Kimi Coding is subscription-backed despite using API-key authentication.
  		const usingSubscription = state.model
  			? state.model.provider === "kimi-coding" || this.session.modelRuntime.isUsingSubscription(state.model.provider)
-@@ -216,6 +191,13 @@ export class FooterComponent implements Component {
+@@ -265,6 +240,13 @@ export class FooterComponent implements Component {
  			statsParts.push(`${theme.fg("dim", "•")} ${theme.bold(theme.fg("warning", "xp"))}`);
  		}
  
