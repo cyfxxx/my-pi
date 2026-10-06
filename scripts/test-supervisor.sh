@@ -96,11 +96,36 @@ write_state '{ 坏 JSON'
 read_admin_action
 check "坏 JSON → 空动作（不崩）" "" "$ACT"
 
+write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"restartLog\":{\"timestamp\":$(( $(now_ms) - 1000 ))}}"
+read_admin_action
+check "读出 restartLog 时间戳（供丢请求判定）" "yes" "$([ -n "$LTS" ] && [ "$LTS" -gt 0 ] && echo yes || echo no)"
+
+write_state "{\"action\":\"none\",\"timestamp\":0,\"restartLog\":{\"timestamp\":1234567890}}"
+read_admin_action
+check "action 已被清也要读出 restartLog 时间戳" "1234567890" "$LTS"
+check "action 已被清 → ACT 为空" "" "$ACT"
+
 write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"reason\":\"keep\"}"
 clear_admin_action
 read_admin_action
 check "clear_admin_action → 动作清空" "" "$ACT"
 check "clear 保留其它字段" "keep" "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).reason))' "$PI_ADMIN_STATE_FILE")"
+
+echo ""
+echo "=== detect_lost_restart（重启请求被吞的判定）==="
+# 判据刻意收紧：action 已不在，但 restartLog 的时间戳落在**本轮** [roundStart, now] 内 —— 这正是
+# "刚写下的请求没落地"。上一轮留下的日志不在窗口内（那是"通知没被消费"，交给 daily-health 按 TTL 判），
+# 所以正常重启（新进程只是还没消费通知）不会误报。
+lost() { detect_lost_restart "$1" "$2" "$3" "$4" && echo yes || echo no; }
+check "本轮写下的请求 + action 被清 → 判定为丢" "yes" "$(lost none 1000500 1000000 1001000)"
+check "空 action（读不到动作）同样判定为丢" "yes" "$(lost '' 1000500 1000000 1001000)"
+check "边界：正好等于轮次起点 → 判定为丢" "yes" "$(lost none 1000000 1000000 1001000)"
+check "上一轮留下的日志（早于轮次起点）→ 不算丢" "no" "$(lost none 999000 1000000 1001000)"
+check "有 action（会重启）→ 不算丢" "no" "$(lost restart 1000500 1000000 1001000)"
+check "set_model 同样不算丢" "no" "$(lost set_model 1000500 1000000 1001000)"
+check "没有时间戳 → 不算丢" "no" "$(lost none '' 1000000 1001000)"
+check "坏时间戳 → 不算丢（不崩）" "no" "$(lost none abc 1000000 1001000)"
+check "时间戳在未来（时钟回拨）→ 不算丢" "no" "$(lost none 9999999 1000000 1001000)"
 
 echo ""
 echo "=== build_admin_args（重启续接参数，绝不能为空）==="
@@ -184,6 +209,43 @@ check "重启动作已被消费（不留 action）" "none" \
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).action))' "$LOOP/state.json" 2>/dev/null || echo missing)"
 check "restartLog 保留（供新进程注入重启通知）" "端到端测试" \
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).restartLog?.reason))' "$LOOP/state.json" 2>/dev/null || echo missing)"
+
+# 轮次记录（结构化复盘入口）+ 按轮 crash log：正常重启必须留 2 轮且**不得**误报 lostRestart
+ROUNDS="$LOOP/agent/recovery/rounds.jsonl"
+rounds_field() { node -e 'const l=require("node:fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map(JSON.parse);process.stdout.write(String(eval(process.argv[2])))' "$ROUNDS" "$1" 2>/dev/null || echo missing; }
+check "轮次记录：两轮 restart → exit" "restart,exit" "$(rounds_field 'l.map(r=>r.decision).join(",")')"
+check "正常重启不误报 lostRestart" "0" "$(rounds_field 'l.filter(r=>r.lostRestart).length')"
+check "轮次记录含模式与退出码" "full:0" "$(rounds_field 'l[0].mode+":"+l[1].exitCode')"
+check "crash log 按轮保留" "yes" "$([ -f "$LOOP/agent/recovery/rounds/round-1.log" ] && [ -f "$LOOP/agent/recovery/rounds/round-2.log" ] && echo yes || echo no)"
+
+echo ""
+echo "=== 丢重启请求：端到端（stub 复刻 2026-10-06 的吞请求时序）==="
+# 真实故障时序：mode 自愈在 session_start 里写 action=restart，autopilot 随后消费重启通知时
+# 把 action 清成 none（writeState 覆盖）。supervisor 读不到动作 → 直接退出：用户看到"注入了一条
+# 系统已重启、进程却退出了、模式也没换"。本用例锁：①不重拉是事实（记录在案）②必须留痕告警。
+LOST_DIR="$TMP/lost"
+mkdir -p "$LOST_DIR/agent"
+cat > "$LOST_DIR/cli.js" <<'STUB'
+const fs = require('node:fs');
+const dir = process.env.LOOP_DIR;
+const n = fs.existsSync(`${dir}/runs`) ? Number(fs.readFileSync(`${dir}/runs`, 'utf8')) : 0;
+fs.writeFileSync(`${dir}/runs`, String(n + 1));
+fs.writeFileSync(process.env.PI_ADMIN_STATE_FILE, JSON.stringify({
+  action: 'none',                // ← 被"通知消费"顺手清掉了
+  timestamp: 0,
+  restartLog: { action: 'restart', notice: 'mode', mode: 'roleplay', from: 'full', timestamp: Date.now() },
+}));
+process.exit(0);
+STUB
+LOOP_DIR="$LOST_DIR" MY_PI_CLI="$LOST_DIR/cli.js" MY_PI_AGENT_DIR="$LOST_DIR/agent" \
+  PI_ADMIN_STATE_FILE="$LOST_DIR/state.json" \
+  bash "$ROOT/scripts/pi-supervisor.sh" >"$LOST_DIR/out.log" 2>&1
+LOST_ROUNDS="$LOST_DIR/agent/recovery/rounds.jsonl"
+check "被吞的重启不会重拉（用户看到的就是退出）" "1" "$(cat "$LOST_DIR/runs")"
+check "supervisor 明确告警而不是静默退出" "yes" "$(grep -q '重启请求没有落地' "$LOST_DIR/out.log" && echo yes || echo no)"
+check "轮次记录标出 lostRestart=true" "true" "$(node -e 'const l=require("node:fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map(JSON.parse);process.stdout.write(String(l.at(-1).lostRestart))' "$LOST_ROUNDS" 2>/dev/null || echo missing)"
+check "轮次记录含决策与退出码" "exit:0" "$(node -e 'const l=require("node:fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map(JSON.parse);const r=l.at(-1);process.stdout.write(`${r.decision}:${r.exitCode}`)' "$LOST_ROUNDS" 2>/dev/null || echo missing)"
+check "崩溃审计留下 lost_restart 记录" "yes" "$(grep -q 'lost_restart' "$LOST_DIR/agent/recovery/recovery-audit.jsonl" && echo yes || echo no)"
 
 # 隔离外部环境泄漏：本机 shell 可能残留 PI_AGENT_MODE/PI_AGENT_MODE_SOURCE
 # （来自某次 bootstrap 回写），不 unset 会让"无会话记录"等用例被 env 短路。

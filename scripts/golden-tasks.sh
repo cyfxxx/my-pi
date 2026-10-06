@@ -115,8 +115,14 @@ step "17. pre-push 门禁范围判定（纯数据降级不得误放代码）"
 # prepush-scope.sh 决定 pre-push 跑全量还是快检，判错会静默削弱推送防线 → 用临时仓库锁四类判定。
 if bash scripts/test-prepush-scope.sh >/tmp/golden-prepushscope.log 2>&1; then pass "$(tail -1 /tmp/golden-prepushscope.log)"; else fail "pre-push 范围判定（见 /tmp/golden-prepushscope.log）"; tail -15 /tmp/golden-prepushscope.log; fi
 
+step "18. 运行时状态不变量（使用层面静默失效）"
+# tsc/vitest 判的是"实现对不对"；这一层判"配置与运行时状态有没有自相矛盾"。实测事故：
+# 人设文件缺失被启动器静默吞掉、功能名拼错静默少功能、重启请求写了没落地、重启通知没被消费。
+# 用合成状态逐条锁定两侧行为，并校验三处真值不漂移（FIXED_MODES / 功能名清单）。
+if node scripts/test-state-audit.mjs >/tmp/golden-stateaudit.log 2>&1; then pass "$(tail -1 /tmp/golden-stateaudit.log)"; else fail "状态体检守门（见 /tmp/golden-stateaudit.log）"; tail -20 /tmp/golden-stateaudit.log; fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "18. 无头会话冒烟"
+  step "19. 无头会话冒烟"
   # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
   # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，

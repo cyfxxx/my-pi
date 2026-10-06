@@ -27,6 +27,17 @@ CACHE_CLI="$RECOVERY_DIR/cache/dist/cli.js"
 AUDIT="$RECOVERY_DIR/recovery-audit.jsonl"
 CRASH_COUNT_FILE="$RECOVERY_DIR/crash-count"
 
+# ── 结构化轮次记录 + 按轮 crash log（都在 gitignored 的 recovery/ 下）──
+# 事故复盘的唯一入口：每轮一行 JSON（谁、什么模式、读到的 action、退出码、决策、是否丢请求）。
+# 旧行为是"每轮覆盖 /tmp 里一个 crash log + 只在崩溃时写 audit"，出事后无从还原（2026-10-06 实测）。
+ROUNDS_LOG="$RECOVERY_DIR/rounds.jsonl"
+ROUND_LOG_DIR="$RECOVERY_DIR/rounds"
+ROUND_LOG_KEEP="${ROUND_LOG_KEEP:-20}"   # 只留最近 N 轮 crash log
+ROUND_INDEX=0
+RUN_SESSION=""
+ROUND_START_MS="0"
+ROUND_DUR_MS=0
+
 CRASH_THRESHOLD="${CRASH_THRESHOLD:-3}"
 CIRCUIT_BREAKER_THRESHOLD="${CIRCUIT_BREAKER_THRESHOLD:-5}"
 MAX_RECOVERY_ROUNDS="${MAX_RECOVERY_ROUNDS:-5}"
@@ -34,7 +45,9 @@ CRASH_WINDOW_MS="${CRASH_WINDOW_MS:-86400}"  # 秒
 FIX_TIMEOUT="${PI_FIX_TIMEOUT:-240}"
 
 export PI_CODING_AGENT_DIR="$AGENT_DIR"
-export PI_MEMORY_DIR="$ROOT/portable/memory"
+# PI_MEMORY_DIR 可被外部显式覆盖：真实生命周期场景（scripts/test-scenario-mode-restart.mjs）
+# 要在隔离目录里跑整套 supervisor + pi，不能让场景读写真记忆库。未设置时行为与以前完全一致。
+export PI_MEMORY_DIR="${PI_MEMORY_DIR:-$ROOT/portable/memory}"
 
 # ── 包管理子命令直通（install/remove/uninstall/list/update）──
 # pi 的包管理分发要求 argv[0] 就是子命令本身（package-manager-cli.ts 的
@@ -75,7 +88,7 @@ apply_mode() {
 }
 
 log() { echo "[supervisor] $*" >&2; }
-mkdir -p "$RECOVERY_DIR"
+mkdir -p "$RECOVERY_DIR" "$ROUND_LOG_DIR"
 
 # ── 崩溃计数（24h 时间窗）──
 read_crash_count() { cat "$CRASH_COUNT_FILE" 2>/dev/null || echo 0; }
@@ -95,17 +108,63 @@ snippet() { [ -f "$1" ] && tail -3 "$1" | tr '\n' ' ' | cut -c1-160 || echo ""; 
 # ── admin state（重启/切换会话请求，由 admin_* 工具写入）──
 export PI_ADMIN_STATE_FILE="${PI_ADMIN_STATE_FILE:-$AGENT_DIR/autopilot/state.json}"
 ADMIN_STATE_FILE="$PI_ADMIN_STATE_FILE"
-ACT=""; TARGET=""
+ACT=""; TARGET=""; PROV=""; MODEL=""; LTS=""
 read_admin_action() {
-  ACT=""; TARGET=""; PROV=""; MODEL=""
+  ACT=""; TARGET=""; PROV=""; MODEL=""; LTS=""
   [ -f "$ADMIN_STATE_FILE" ] || return 0
   local out
-  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);process.stdout.write(ok?[s.action,s.targetSession||"",s.targetProvider||"",s.targetModel||""].join("\u001f"):"")}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
+  # 第 5 个字段是 restartLog 的时间戳（毫秒）：即使 action 已被清掉也要读出来，
+  # detect_lost_restart 靠它判定"这一轮写下的重启请求被吞了"（见下方注释）。
+  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);const logTs=(s.restartLog&&+s.restartLog.timestamp)||0;process.stdout.write([ok?s.action:"",ok?s.targetSession||"":"",ok?s.targetProvider||"":"",ok?s.targetModel||"":"",String(logTs)].join("\u001f"))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null)
   [ -n "$out" ] || return 0
-  IFS=$'\x1f' read -r ACT TARGET PROV MODEL <<<"$out"
+  IFS=$'\x1f' read -r ACT TARGET PROV MODEL LTS <<<"$out"
 }
 clear_admin_action() {
   node -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
+}
+
+now_ms() {
+  local v
+  v="$(date +%s%3N 2>/dev/null)"
+  case "$v" in ''|*[!0-9]*) v="$(( $(date +%s) * 1000 ))" ;; esac
+  printf '%s' "$v"
+}
+
+# ── 判定"刚结束的这一轮写下的重启请求被吞了"（纯函数，test-supervisor.sh 直接测）──
+#
+# 实测故障（2026-10-06）：mode 自愈在 session_start 里写 action=restart，autopilot 随后消费重启
+# 通知时把 action 清成 none（`writeState` 是"默认值+覆盖"），supervisor 读不到 action 就**直接退出**：
+# 用户看到"注入了一条系统已重启、进程却退出了、模式也没换"，且事后无从复盘。
+#
+# 判据刻意收紧，只认"**本轮**写的日志"：action 已不在，但 restartLog 的时间戳落在本轮的
+# [roundStart, now] 内 —— 这正是"刚写的请求没落地"。上一轮留下的日志不在窗口内（那是"通知没被
+# 消费"，属另一种情况，交给 daily-health 的 notice-undelivered 按 TTL 判），因此正常重启不会误报。
+# 用法：detect_lost_restart <action> <restartLogTsMs> <roundStartMs> <nowMs>
+detect_lost_restart() {
+  local act="$1" lts="$2" start="$3" now="$4"
+  case "$act" in restart|restart_hang|switch_session|set_model) return 1 ;; esac
+  case "$lts" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$lts" -ge "$start" ] 2>/dev/null || return 1
+  [ "$lts" -le $(( now + 1000 )) ] 2>/dev/null || return 1
+  return 0
+}
+
+# ── 结构化轮次记录（事故复盘入口）──
+#
+# 为什么需要：此前只有 /tmp/my-pi-crash-$$.log（**每轮覆盖**）与只记崩溃恢复的
+# recovery-audit.jsonl，于是"上一轮为什么退出、读到了什么 action、用什么参数重启"事后无法还原
+# （2026-10-06 排查用户报障时实测：最新 crash log 为空、没有轮次概念）。每轮一行 JSON：
+# 轮次/会话/模式/命名空间/人设/读到的 action/退出码/决策/耗时/是否丢了重启请求。
+# 文件在 gitignored 的 recovery/ 下，只追加。
+json_escape() { printf '%s' "${1:-}" | tr -d '"\\' | tr '\n\r\t' '   ' | cut -c1-300; }
+record_round() { # <decision> <action> <target> <exitCode> <lost> <durationMs> [extra-json]
+  local decision="$1" act="$2" target="$3" code="$4" lost="$5" dur="$6" extra="${7:-}"
+  [ -n "$extra" ] && extra=",${extra}"
+  printf '{"ts":%s,"run":%s,"session":"%s","mode":"%s","namespace":"%s","persona":%s,"adminAction":"%s","target":"%s","exitCode":%s,"decision":"%s","durationMs":%s,"lostRestart":%s,"crashLog":"%s"%s}\n' \
+    "$(now_ms)" "$ROUND_INDEX" "$(json_escape "$RUN_SESSION")" "$(json_escape "$MODE_NAME")" "$(json_escape "$MODE_NS")" \
+    "$([ -n "$MODE_APPEND_ABS" ] && echo true || echo false)" \
+    "$(json_escape "$act")" "$(json_escape "$target")" "$code" "$decision" "$dur" "$lost" \
+    "$(json_escape "$(basename "${CRASH_LOG:-}")")" "$extra" >>"$ROUNDS_LOG" 2>/dev/null || true
 }
 
 # ── admin 请求 → 续接参数（纯函数，test-supervisor.sh 直接测）──
@@ -259,15 +318,31 @@ while true; do
   # 会话参数按 argv 顺序取最后一个：本轮实际启动的命令行是 `$@` + EXTRA_ARGS
   # （EXTRA_ARGS 是 admin 重启写入的 --session，优先级更高）。
   apply_mode "$@" "${EXTRA_ARGS[@]}"
-  log "启动 Pi..."
-  CRASH_LOG="/tmp/my-pi-crash-$$.log"
+  # 本轮事实：会话（供轮次记录与丢请求判定）、起始时刻、按轮保留的 crash log。
+  RUN_SESSION="$(mode_session_arg "$@" "${EXTRA_ARGS[@]}")"
+  ROUND_INDEX=$((ROUND_INDEX + 1))
+  ROUND_START_MS="$(now_ms)"
+  CRASH_LOG="$ROUND_LOG_DIR/round-${ROUND_INDEX}.log"
+  # crash log 必须**按轮保留**：旧实现是 /tmp/my-pi-crash-$$.log，每轮覆盖，
+  # 事故复盘时连"上一轮为什么退出"都看不到（2026-10-06 实测）。只留最近 ROUND_LOG_KEEP 轮。
+  ls -1t "$ROUND_LOG_DIR"/round-*.log 2>/dev/null | tail -n +$((ROUND_LOG_KEEP + 1)) | xargs -r rm -f 2>/dev/null || true
+  log "启动 Pi...（第 $ROUND_INDEX 轮，模式 ${MODE_NAME}${MODE_NS:+ / ns=$MODE_NS}）"
   node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}" "${EXTRA_ARGS[@]}" 2>"$CRASH_LOG"
   EXIT_CODE=$?
+  ROUND_DUR_MS=$(( $(now_ms) - ROUND_START_MS ))
 
   # 正常退出或用户中断：先看 admin state 是否请求重启/切换会话，否则退出
   if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ] || [ "$EXIT_CODE" -eq 143 ]; then
     reset_crash_count
     read_admin_action
+    # 关键自检：本轮写下的重启请求没有被 supervisor 读到 → 那次重启被吞了（见 detect_lost_restart）。
+    LOST="false"
+    if detect_lost_restart "$ACT" "$LTS" "$ROUND_START_MS" "$(now_ms)"; then
+      LOST="true"
+      log "⚠ 本轮写下的重启请求没有落地（action=${ACT:-空}，日志 ts=$LTS，轮次起点 $ROUND_START_MS）："
+      log "  若刚才切过模式或请求过重启，说明那次重启被吞了（进程退出但没重拉）。记录见 $ROUNDS_LOG"
+      audit "lost_restart" "" "warn" "false" "action=${ACT:-none} logTs=$LTS roundStart=$ROUND_START_MS"
+    fi
     case "$ACT" in
       restart|restart_hang)
         log "admin 请求重启（$ACT），重新启动..."
@@ -276,6 +351,7 @@ while true; do
         # 写入 PENDING_ARGS（而非 EXTRA_ARGS）：EXTRA_ARGS 在下一轮开头会被重置。
         build_admin_args "$ACT" "$TARGET" "$PROV" "$MODEL"
         PENDING_ARGS=("${ADMIN_ARGS[@]}")
+        record_round restart "$ACT" "$TARGET" "$EXIT_CODE" "$LOST" "$ROUND_DUR_MS"
         log "续接参数: ${PENDING_ARGS[*]}"
         continue
         ;;
@@ -285,6 +361,7 @@ while true; do
           clear_admin_action
           build_admin_args "$ACT" "$TARGET" "$PROV" "$MODEL"
           PENDING_ARGS=("${ADMIN_ARGS[@]}")
+          record_round set_model "$ACT" "$TARGET" "$EXIT_CODE" "$LOST" "$ROUND_DUR_MS" ",\"provider\":\"$(json_escape "$PROV")\",\"model\":\"$(json_escape "$MODEL")\""
           log "续接参数: ${PENDING_ARGS[*]}"
           continue
         fi
@@ -294,10 +371,12 @@ while true; do
         clear_admin_action
         build_admin_args "$ACT" "$TARGET" "$PROV" "$MODEL"
         PENDING_ARGS=("${ADMIN_ARGS[@]}")
+        record_round switch_session "$ACT" "$TARGET" "$EXIT_CODE" "$LOST" "$ROUND_DUR_MS"
         log "续接参数: ${PENDING_ARGS[*]}"
         continue
         ;;
     esac
+    record_round exit "$ACT" "$TARGET" "$EXIT_CODE" "$LOST" "$ROUND_DUR_MS"
     exit "$EXIT_CODE"
   fi
 
@@ -319,6 +398,7 @@ while true; do
   if [ "$COUNT" -ge "$CIRCUIT_BREAKER_THRESHOLD" ]; then
     log "已连续崩溃 $COUNT 次（>=熔断阈值 $CIRCUIT_BREAKER_THRESHOLD），停止恢复"
     audit "$CLASS" "$SNIP" "circuit_breaker" "false" "熔断"
+    record_round circuit_breaker "" "" "$EXIT_CODE" false "$ROUND_DUR_MS" ",\"crashClass\":\"$(json_escape "$CLASS")\",\"crashCount\":$COUNT"
     break
   fi
 
@@ -326,6 +406,7 @@ while true; do
   if [ "$RECOVERY_ROUNDS" -gt "$MAX_RECOVERY_ROUNDS" ]; then
     log "已达最大恢复轮数 $MAX_RECOVERY_ROUNDS，停止"
     audit "$CLASS" "$SNIP" "max_rounds" "false" "超过最大恢复轮数"
+    record_round max_recovery_rounds "" "" "$EXIT_CODE" false "$ROUND_DUR_MS" ",\"crashClass\":\"$(json_escape "$CLASS")\",\"crashCount\":$COUNT"
     break
   fi
 
@@ -368,6 +449,7 @@ while true; do
   DUR=$(( $(date +%s) - START ))
   if [ "$RECOVERY_OK" -eq 1 ] && health_check; then
     audit "$CLASS" "$SNIP" "recover" "true" "恢复成功" "$DUR"
+    record_round recover_restart "" "$TARGET" "$EXIT_CODE" false "$ROUND_DUR_MS" ",\"crashClass\":\"$(json_escape "$CLASS")\",\"recoveryMs\":$(( DUR * 1000 ))"
     log "恢复成功，重启..."
     reset_crash_count
     RECOVERY_ROUNDS=0
@@ -378,6 +460,7 @@ while true; do
   fi
 
   audit "$CLASS" "$SNIP" "recover" "false" "恢复失败/健康检查不通过" "$DUR"
+  record_round recover_retry "" "$TARGET" "$EXIT_CODE" false "$ROUND_DUR_MS" ",\"crashClass\":\"$(json_escape "$CLASS")\",\"recoveryOk\":false"
   log "恢复失败，1s 后重试"
   sleep 1
 done

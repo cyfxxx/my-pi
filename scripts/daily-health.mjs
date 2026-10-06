@@ -29,6 +29,7 @@
  */
 import { readFileSync, statSync, existsSync, appendFileSync, mkdirSync, readdirSync, openSync, readSync, closeSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { auditState, buildSnapshot } from './lib-state-audit.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -301,13 +302,34 @@ try {
   /* seeds 缺失不阻塞 */
 }
 
-const GUARD_SCRIPTS = ['scripts/golden-tasks.sh', 'scripts/daily-health.mjs', 'scripts/check-isolation.sh', 'scripts/check-features.sh'];
+const GUARD_SCRIPTS = ['scripts/golden-tasks.sh', 'scripts/daily-health.mjs', 'scripts/check-isolation.sh', 'scripts/check-features.sh', 'scripts/lib-state-audit.mjs', 'scripts/state-audit.mjs'];
 try {
   const out = execFileSync('git', ['-C', ROOT, 'status', '--porcelain', '--', ...GUARD_SCRIPTS], { encoding: 'utf8', timeout: 5000 });
   const dirty = out.split('\n').map((l) => l.slice(3).trim()).filter(Boolean);
   if (dirty.length) reasons.push(`守门脚本有未提交改动: ${dirty.join(', ')}`);
 } catch {
   /* git 不可用不阻塞 */
+}
+
+// ── 运行时状态不变量（使用层面静默失效的每日体检）──
+// 为什么放在这里：代码门禁判"实现对不对"，而用户撞到的是"配置与状态被静默吞掉"——人设文件
+// 丢失、功能名拼错、会话模式记录指向不存在的会话、重启请求写了没落地、重启通知没被消费、
+// env 硬覆盖按会话模式。这些都只有真的去用才发现；每天一次、确定性、只读的体检能把它变成
+// "系统自报"。判定与文案只有一份（scripts/lib-state-audit.mjs），doctor 与 CLI 调同一份。
+// error 级进 reasons（会 alert），warning/info 只进 notes（留痕，不打扰）。
+let stateErrors = [];
+let stateWarnings = 0;
+try {
+  const baseline = JSON.parse(readFileSync(join(ROOT, 'scripts/registration-baseline.json'), 'utf8'));
+  const knownFeatures = [...new Set([...Object.keys(baseline.tools ?? {}), ...Object.keys(baseline.commands ?? {}), ...Object.keys(baseline.shortcuts ?? {})])];
+  const findings = auditState(buildSnapshot({ agentDir: AGENT, knownFeatures }));
+  stateErrors = findings.filter((f) => f.level === 'error');
+  const warns = findings.filter((f) => f.level === 'warning');
+  stateWarnings = warns.length;
+  for (const f of stateErrors) reasons.push(`状态异常 ${f.code}: ${f.message}`);
+  for (const f of warns) notes.push(`状态警告 ${f.code}: ${f.message}`);
+} catch (err) {
+  notes.push(`状态体检未执行: ${err?.message ?? err}`);
 }
 
 if (records.length >= 3 && hit !== null && hit < HIT_FLOOR) {
@@ -362,7 +384,7 @@ const bashStepStr = bashPerStep ? `p50=${bashPerStep.p50}/p90=${bashPerStep.p90}
 const singleCmdStr = singleCmd
   ? `${(singleRatio * 100).toFixed(1)}%(${singleCmd.single}/${singleCmd.total})`
   : 'n/a(旧记录无字段)';
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 结论=${verdict}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);

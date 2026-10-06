@@ -139,7 +139,7 @@ echo ""
 
 # ---- 6. 运维脚本 ----
 echo "6. 运维脚本"
-for script in build.sh dev.sh doctor.sh sync-upstream.sh check-upstream.sh check-isolation.sh check-features.sh check-dead-exports.mjs check-patches-behavior.mjs gen-registrations.mjs check-seeds-headless.mjs install-hooks.sh vendor-bundle.sh run-ts.sh lib-mode.sh memory-store.mjs memory-lifecycle.mjs reseed-seeds.mjs test-supervisor.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh check-doc-links.mjs pi-supervisor.sh pi-source-build.sh daily-health.mjs knowledge-fetch.py tool-stats-sync.mjs task-summarizer.mjs searxng-config.sh knowledge-ingest.mjs sync-memory.sh; do
+for script in build.sh dev.sh doctor.sh sync-upstream.sh check-upstream.sh check-isolation.sh check-features.sh check-dead-exports.mjs check-patches-behavior.mjs gen-registrations.mjs check-seeds-headless.mjs install-hooks.sh vendor-bundle.sh run-ts.sh lib-mode.sh memory-store.mjs memory-lifecycle.mjs reseed-seeds.mjs test-supervisor.sh setup-external.sh patch-playwright-core.mjs golden-tasks.sh check-injection-surface.sh lib-state-audit.mjs state-audit.mjs test-state-audit.mjs check-doc-links.mjs pi-supervisor.sh pi-source-build.sh daily-health.mjs knowledge-fetch.py tool-stats-sync.mjs task-summarizer.mjs searxng-config.sh knowledge-ingest.mjs sync-memory.sh; do
   if [ -f "scripts/$script" ]; then
     echo "  ✅ scripts/$script"
   else

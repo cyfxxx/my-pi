@@ -227,10 +227,29 @@ else
 fi
 
 echo ""
+# ── 12. 运行时状态不变量（使用层面静默失效）──
+# 与环境可复现性不同：这里查"状态与配置自相矛盾 / 指向不存在的东西"——人设文件丢失（启动器静默
+# 不注入）、功能名拼错（静默少功能）、会话模式记录指向不存在的会话、重启请求写了没落地、重启通知
+# 没被消费、env 硬覆盖按会话模式。只读：判定与文案在 scripts/lib-state-audit.mjs，
+# daily-health 的每日体检调同一份（同一份判断力，不养两套口径）。
+echo "[12] 运行时状态不变量"
+if node "$ROOT/scripts/state-audit.mjs" --json >/tmp/doctor-state.json 2>/tmp/doctor-state.err; then
+  STATE_SUMMARY="$(node -e 'const d=require("/tmp/doctor-state.json");process.stdout.write(`异常=${d.error} 警告=${d.warning} 提示=${d.info}`)' 2>/dev/null || echo '解析失败')"
+  ok "状态自洽（$STATE_SUMMARY）"
+else
+  STATE_ERRS="$(node -e 'try{const d=require("/tmp/doctor-state.json");process.stdout.write(d.findings.filter(f=>f.level==="error").map(f=>`${f.code}: ${f.message}${f.fix?` → ${f.fix}`:""}`).join("\n"))}catch{}' 2>/dev/null)"
+  if [ -n "$STATE_ERRS" ]; then
+    while IFS= read -r line; do [ -n "$line" ] && bad "$line"; done <<<"$STATE_ERRS"
+  else
+    warn "状态体检脚本执行失败（见 /tmp/doctor-state.err）"
+  fi
+fi
+
+echo ""
 echo "=== 结果：$OK 正常 / $WARN 警告 / $BAD 异常 ==="
 if [ "$BAD" -gt 0 ]; then
-  [ "$FIX" = "1" ] && echo "部分项修复失败，请按上面提示处理" || echo "运行 bash scripts/doctor.sh --fix 自动修复可修复项"
+  [ "$FIX" = "1" ] && echo "部分项修复失败，请按上面提示处理" || echo "运行 bash scripts/doctor.sh --fix 自动修复可修复项；状态不变量类异常请按该项的 → 提示人工处理"
   exit 1
 fi
-[ "$WARN" -gt 0 ] && echo "无阻断性异常（警告项多为可选能力）"
+[ "$WARN" -gt 0 ] && echo "无阻断性异常（警告项多为可选能力，或需人工确认的运行时状态）"
 exit 0
