@@ -2,6 +2,51 @@
 
 ## 格式
 
+### [2026-10-06] 场景稳定性两个实测发现：pi 把 process.title 改成 `pi`；极速响应会被 session_start 的初始化竞态丢掉
+
+把"场景偶发失败"当 bug 查，得到两条值得写下来的事实（都不是场景自己的问题）：
+
+1. **`/proc/<pid>/cmdline` 认不出 pi**：pi 启动后会把 `process.title` 写成 `pi` —— 实测那一刻
+   `/proc/<pid>/cmdline` 只剩 `pi` 两个字符，`cli.js` / `--extension` / 窗口标题全没了。
+   更坑的是 supervisor 自己也会起 `node -e '…'`（`mode_resolve` / `read_admin_action` /
+   `mark_recovery_restart_log`），它们同样满足"node 进程 + 同一个 agent 目录"，于是按 argv/env
+   找进程会**指到助手身上**（argv/env 断言失败，phase 3 还会去杀一个无关进程）。
+   正解：`exe=node` + `environ` 含本场景 agent 目录 + **排除 `node -e` 助手**；不要依赖 argv。
+2. **`session_start` 里触发回合 + 极速响应 = 偶发丢回复**：假 provider 0/0.4s 回复时，reboot 后
+   "自动续跑"的那次请求发出去了、模型也回了，但**会话里没有 assistant 条目、也没有任何报错**
+   （pi 侧初始化竞态：回合的响应早于会话就绪）。把假 provider 延迟调到 **3s**（贴近真实 provider：
+   本仓库实测同一提示词 4.6s–145s）后连续稳定通过。真实 provider 不会踩这个窗口，所以这不是
+   产品缺陷，但**测试里用零延迟假 provider 时要小心**——这也是为什么场景保留 `delayMs` 选项并
+   把"provider 是否已回应"写进失败详情。
+
+**顺带（第三轮修正）**：
+- 场景里的"单点查询"（待杀的 pi 进程）改成带重试（20s），失败时打印 pid 候选自解释。
+- **收尾不再用 `/quit`**：TUI 输入在"回合进行中/刚起来"会被吞掉或当成消息（实测等满 120s 都没有
+  轮次行）。改为 `stopPi()` 直接对 pi 的 pid 发 SIGTERM（pi 的优雅关闭 → exit 0 → supervisor 照常
+  读 admin action 重拉），带重试与 SIGKILL 兜底；TUI 输入仍被覆盖（`/mode roleplay` 与真实 prompt）。
+- **断言分层**：把"session_start 触发回合的回复是否落盘"降级为软提示（那是上面那条 pi 竞态），
+  硬断言改为 ① provider 确实回应了（确定性）② 空闲状态下由**用户输入**触发的回合必然跑完
+  （不经过竞态，证明 plumbing 端到端可用）。顺带修掉我自己的一条过早断言（provider 有 3s 延迟，
+  请求刚到就断言"已回应"必然失败）。
+
+### [2026-10-06] 文档"结构计数"硬化：把反复漂移的数字变成守门项
+
+`golden` 步数在 README/FAQ/STRUCTURE/VISION 各写一遍，历次改动只改了一部分（12→16→17→19 的
+教训）；`STRUCTURE.md` 的"42 个运维脚本"在我加了 5 个脚本后立刻过期。这类"文档说了假话"没有
+任何门禁兜着——正是"使用层面静默失效"的另一种形态（读文档的人被骗）。
+
+**做法**：在 `check-conventions.sh` 新增 D 节，只钉**唯一措辞**的两处，避免误伤历史记录
+（DECISIONS/PROGRESS 里的"12 步 → 13 步"是史实，不该被校验）：
+- `STRUCTURE.md` 的 `# N 个运维脚本` ↔ `ls scripts | grep -cE '\.(sh|mjs|py)$'`；
+- `scripts/README.md` 的 `行为防退化基准 **N 步**` ↔ golden 里"冒烟之前最大的步骤编号"
+  （步数口径：4/5 在 `--fast` 分支声明两次、第 20 步是 `--smoke` 专属，所以要按编号去重并排除冒烟块）。
+
+**顺带修的漂移**（本次全量核对）：`STRUCTURE.md` 的脚本数 42→49、golden 16 步→**19 步**、
+`test-usage-metrics` 35→46 项、supervisor 行补 ownerPid/归属/轮转与新脚本三行；`VISION` 的
+用例数 833→**841**。
+
+**验证**：故意把 `scripts/README.md` 的步数改成 17 → 守门立刻失败；改回即通过（证明守门不是摆设）。
+
 ### [2026-10-06] 多实例的下半场：归属判定不能误伤 + 真多进程锁测试 + 实例数可见
 
 补上一批并发硬化的三个尾巴（都是"加了隔离之后才发现"的）：

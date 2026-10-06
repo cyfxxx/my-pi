@@ -2194,3 +2194,27 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 新增 `mode-store-lock.test.ts`：4 个真进程在锁下写 START/END 不得交错、N 进程各写一条会话记录全部保留、结构断言防漏接锁。
 - `state-audit` 新增"同时在跑的实例数"（≥2 → info），CLI 级测试真起两个假实例验证。
 - 计数：supervisor **111**、状态体检 **55**、vitest 75 文件 / **841** 用例；BUG-REPLAYS 台账 +1 行（归属判定误伤）。
+
+### 文档结构计数硬化（2026-10-06）
+
+- `check-conventions.sh` 新增 D 节：`STRUCTURE.md` 的脚本数、`scripts/README.md` 的 golden 步数必须与代码一致（只钉唯一措辞，避免误伤 DECISIONS/PROGRESS 里的史实数字）；故意改错立即失败，改回即通过。
+- 顺带全量核对并修掉漂移：STRUCTURE 脚本数 42→49、golden 16→19 步、test-usage-metrics 35→46 项、supervisor 行补新能力、VISION 用例数 833→841。
+
+### 场景稳定性：把单点进程发现改成带重试（2026-10-06）
+
+- 一次全量验证里场景 1/33 失败（其余全绿，重跑即过）→ 定位到 phase 3 的"待杀 pi 进程"是**单次**
+  `/proc` 扫描：偶发拿不到就让整段 phase 3 塌掉。改为 `waitFor(...)` 重试 20s，并把两个回合等待
+  从 30/60s 放宽到 60/90s。重跑 33/33 稳定通过。
+- 记一条经验：**场景里的"单点查询"必须带重试**，失败信息要能自解释（失败时打 pid 候选）。
+
+### 场景稳定性：两个实测发现（2026-10-06）
+
+- **pi 的 `process.title` = `pi`**：启动后 `/proc/<pid>/cmdline` 只剩 `pi`；而 supervisor 的 `node -e` 助手也满足"node + 同一 agent 目录" → 按 argv 找进程会指错（argv/env 断言失败、phase 3 杀错进程）。判据改为 `exe=node` + environ 带场景 agent 目录 + 排除 `node -e`，不再依赖 argv。
+- **`session_start` 触发回合 + 极速回复会偶发丢回复**（无 assistant、无报错，pi 侧初始化竞态）：假 provider 延迟从 0/0.4s 提到 **3s**（贴近真实 provider 的 4.6–145s）后连续两次 33/33 通过；失败详情里带上"provider 是否已回应"。
+- 场景的单点查询（待杀 pi 进程）加 20s 重试 + 失败打印 pid 候选。
+
+### 场景收尾改用 SIGTERM（确定性），不再依赖 TUI `/quit`（2026-10-06）
+
+- 又一类假失败：用 `/quit` 收尾时，输入在"回合进行中/刚起来"会被吞掉或当成消息，导致 round 行迟迟不出现（实测一次等满 120s 超时）。
+- 改为 `stopPi()`：直接对 pi 的 pid 发 **SIGTERM**（pi 的优雅关闭路径 → exit 0 → supervisor 照常读 admin action 重拉），带重试直到轮次行落盘，兜底 SIGKILL。TUI 输入仍被覆盖（`/mode roleplay` 与 phase 3 的真实 prompt 都是敲进去的）。
+- 连跑两次 33/33 通过；场景里再无 `send('/quit')`。

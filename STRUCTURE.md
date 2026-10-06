@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 42 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh）
+├── scripts/             # 49 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -49,7 +49,7 @@ for p in patches/*.patch; do git -C vendor/pi apply --3way "$p"; done
 my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 
 - `adapters/`：唯一允许 runtime import `vendor/pi/` 的地方（`import type` 除外）
-- `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`（原子写）、`net-guard.ts`（SSRF 防护）
+- `core/`：路径解析、功能注册表，以及纯工具 `secrets.ts`（脱敏）、`atomic-write.ts`（原子写）、`net-guard.ts`（SSRF 防护）、`file-lock.ts`（跨进程文件锁）、`restart-intent.ts`（重启后是否续跑的判据与注入计划）
 - `features/`：每个功能必须包含 `logic.ts`（纯逻辑出口/barrel，零 Pi 依赖）和 `index.ts`（通过 adapter 注册）；`__tests__/` 为 vitest 单测
   - 小功能直接把模块铺在功能根目录（如 `tmux/logic.ts`、`browser/impl.ts`）
   - 大功能在功能根下按职责建一层子包，`logic.ts` 仅作 barrel：`memory/{store,recall,mine,tools}`、`voice/{audio,stt,tts}`、`autopilot/{store,run,tools}`、`subagent/{core,ui}`、`plan-mode/{core,ui}`、`context/{budget,usage-diag}`、`web-search/{config,search,fetch,concurrency}`、`link/{types,config,net,card,guards,state,display,protocol}`
@@ -121,14 +121,16 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `check-doc-links.mjs`：文档内部相对链接一致性校验
 - `web-terminal.sh`：浏览器终端启动器（在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务；只绑回环），见 [custom/web-terminal/README.md](custom/web-terminal/README.md)
 - `test-web-terminal.mjs`：web-terminal 的进程级守门（鉴权/栅栏/穿越/WS 双向/resize/孤儿会话回收），零 LLM 消耗；缺 `script`/`stty` 时显式 SKIP
-- `test-usage-metrics.mjs`：成本度量口径守门（35 项；合成数据驱动 `daily-health.mjs`，锁定命中率取自每轮用量而非工具级台账、前缀前端变更/首段分叉/冷启动/工具声明体积/**回合内 bash 调用分布**会告警），零 LLM 消耗
-- `golden-tasks.sh`：行为防退化基准 16 步（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包；`--fast` 跳过 tsc+vitest，`--smoke` 追加无头冒烟）
+- `test-usage-metrics.mjs`：成本度量口径守门（46 项；合成数据驱动 `daily-health.mjs`，锁定命中率取自每轮用量而非工具级台账、前缀前端变更/首段分叉/冷启动/工具声明体积/**回合内 bash 调用分布**会告警），零 LLM 消耗
+- `golden-tasks.sh`：行为防退化基准 **19 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围/**运行时状态不变量**/**模式切换场景**；`--fast` 跳过 tsc+vitest 与真实场景，`--smoke` 追加无头冒烟＝第 20 步；第 19 步真实场景默认跳过，`PI_GOLDEN_SCENARIO=1` 开启）
 - `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
 - `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg shim）
 - `searxng-config.sh`：生成 SearXNG `settings.yml`（禁用不可达引擎、bing 指向 cn.bing.com；`--force/--probe`）
 - `pi-supervisor.sh` / `pi-source-build.sh`：崩溃自愈外壳与源码缓存构建（`--no-build` 仅缓存现有 dist）
-- `test-supervisor.sh`：supervisor 纯函数行为测试（崩溃分类 / admin state 解析；库模式 source，无需网络/provider）
-- `daily-health.mjs`：每日健康检查（加权命中率/未命中每次/输出占比/前缀前端变更次数/首段分叉/冷启动/工具声明体积/**每步 bash 调用分位与单命令占比**/记忆库/种子失配/守门脏改；读每轮用量 `.usage-diag.jsonl` 与 `prefix-fingerprints.jsonl`）
+- `test-supervisor.sh`：supervisor 行为测试 **111 项**（崩溃分类 / admin state 解析含 ownerPid 实例隔离与丢失请求归属 / `recovery_args` / 恢复日志 / 轮次记录与轮转；库模式 source + stub CLI 端到端，无需网络/provider）
+- `state-audit.mjs` / `lib-state-audit.mjs` / `test-state-audit.mjs`：运行时状态不变量体检（人设丢失/功能名拼错/会话记录悬空/重启请求没落地/通知未消费/env 硬覆盖/实例数/rounds 异常）与其 **55 项**口径守门
+- `test-scenario-mode-restart.mjs` / `lib-fake-provider.mjs`：真实生命周期场景（真 pty + supervisor + pi，本地假 provider，**33 项**）与其假 provider
+- `daily-health.mjs`：每日健康检查（加权命中率/未命中每次/输出占比/前缀前端变更次数/首段分叉/冷启动/工具声明体积/**每步 bash 调用分位与单命令占比**/记忆库/种子失配/守门脏改/**运行时状态异常与重启计数**；读每轮用量 `.usage-diag.jsonl`、`prefix-fingerprints.jsonl` 与 `recovery/rounds.jsonl`）
 - `memory-lifecycle.mjs`：记忆生命周期只读报告（零 LLM，调 `analyzeLifecycle` 出淘汰/升格/冲突/垃圾/聚合五类候选；`--json`/`--limit`；供 `daily-review` 定时任务消费，headless 下无 `/memory lifecycle` 命令）
 - `knowledge-fetch.py`：知识源抓取（落 `portable/memory/knowledge/`）
 - `books.py` / `test-books.mjs`：书籍知识库框架（探针/索引/按需提页/报告/自检）与守门；两端通用（手机 phone / PC worker），见 [packs/books/SKILL.md](packs/books/SKILL.md)

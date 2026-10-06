@@ -16,7 +16,9 @@
  *   await p.close()
  *
  * 选项：`hang` = 全部不回应、`hangFirst` = 前 n 次不回应（用于"回合卡在半途"的场景）；
- * `replyText` = 固定回复内容。运行期可用 `hangNext(n)` / `setReply(text)` 动态调整。
+ * `replyText` = 固定回复内容；`delayMs` = 响应延迟（**建议 ≥300ms**：0 延迟会命中 pi 在
+ * session_start 触发回合时的初始化竞态，偶发丢回复，让"回合跑完"这类断言假失败）。
+ * 运行期可用 `hangNext(n)` / `setReply(text)` 动态调整。
  */
 import { createServer } from 'node:http';
 
@@ -37,7 +39,7 @@ function sseChunk(res, model, delta, finish = null) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang = false, hangFirst = 0 } = {}) {
+export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang = false, hangFirst = 0, delayMs = 0 } = {}) {
   const sockets = new Set();
   const requests = [];
   let hangCount = Math.max(0, hangFirst);
@@ -72,14 +74,17 @@ export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang 
       }
 
       const model = typeof body?.model === 'string' ? body.model : 'scenario-model';
+      const respond = () => {
       if (body?.stream) {
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
         sseChunk(res, model, { role: 'assistant', content: reply });
         sseChunk(res, model, {}, 'stop');
         res.write('data: [DONE]\n\n');
         res.end();
+        entry.respondedAt = Date.now();
         return;
       }
+      entry.respondedAt = Date.now();
       json(res, 200, {
         id: 'chatcmpl-fake',
         object: 'chat.completion',
@@ -88,6 +93,11 @@ export async function startFakeProvider({ replyText = 'SCENARIO-REPLY-OK', hang 
         choices: [{ index: 0, message: { role: 'assistant', content: reply }, finish_reason: 'stop' }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       });
+      };
+      // 响应延迟：**真实 provider 不会 0ms 回**。实测 0 延迟会命中 pi 的一个初始化竞态
+      // （session_start 触发的回合在极速响应下偶发丢回复），让基于"回复落盘"的断言假失败。
+      if (delayMs > 0) setTimeout(respond, delayMs);
+      else respond();
     });
   });
   server.on('connection', (s) => {

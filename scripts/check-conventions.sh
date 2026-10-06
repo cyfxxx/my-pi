@@ -103,6 +103,28 @@ else
   ok "生产代码无动态 import"
 fi
 
+# ── D. 文档里的"结构计数"必须与代码一致 ──
+# 这类数字漂移反复发生（golden 步数在 README/FAQ/STRUCTURE/VISION 里各写一遍，12→16→17→19
+# 只改了一部分；脚本数写在 STRUCTURE 里、加了脚本没人改）。这里只钉**唯一措辞**的两处，
+# 避免误伤历史记录（DECISIONS/PROGRESS 里的"12 步 → 13 步"是史实，不该被校验）。
+SCRIPT_COUNT="$(ls scripts | grep -cE '\.(sh|mjs|py)$')"
+DOC_SCRIPT_COUNT="$(grep -oE '# [0-9]+ 个运维脚本' STRUCTURE.md | grep -oE '[0-9]+' | head -1)"
+if [ -n "$DOC_SCRIPT_COUNT" ] && [ "$DOC_SCRIPT_COUNT" != "$SCRIPT_COUNT" ]; then
+  bad "STRUCTURE.md 写的是 $DOC_SCRIPT_COUNT 个运维脚本，实际 $SCRIPT_COUNT 个（改了 scripts/ 记得同步）"
+else
+  ok "STRUCTURE.md 的脚本数与实际一致（$SCRIPT_COUNT）"
+fi
+
+# 步数以"冒烟之前最大的那个编号"为准（4/5 在 --fast 分支里声明两次；第 20 步是 --smoke 专属）
+SMOKE_LINE="$(grep -n 'if \[ "\$SMOKE" = "1" \]' scripts/golden-tasks.sh | head -1 | cut -d: -f1)"
+GOLDEN_STEPS="$(head -n "${SMOKE_LINE:-99999}" scripts/golden-tasks.sh | grep -oE '^[[:space:]]*step "[0-9]+' | grep -oE '[0-9]+' | sort -n | uniq | tail -1)"
+DOC_STEPS="$(grep -oE '行为防退化基准 \*\*[0-9]+ 步\*\*' scripts/README.md | grep -oE '[0-9]+' | head -1)"
+if [ -n "$DOC_STEPS" ] && [ "$DOC_STEPS" != "$GOLDEN_STEPS" ]; then
+  bad "scripts/README.md 写的是 golden $DOC_STEPS 步，实际 $GOLDEN_STEPS 步"
+else
+  ok "scripts/README.md 的 golden 步数与实际一致（$GOLDEN_STEPS）"
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "🎉 约定守门全部通过"
