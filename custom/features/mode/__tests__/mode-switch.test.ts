@@ -350,6 +350,7 @@ describe('session_start 按会话自愈（模式是会话属性）', () => {
     const state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf-8'));
     expect(state.action).toBe('restart');
     expect(state.targetSession).toBe(SESS);
+    expect(state.reason).toContain('自愈');
     expect(notify.mock.calls.some((c) => String(c[0]).includes('自动重启'))).toBe(true);
   });
 

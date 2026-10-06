@@ -203,7 +203,9 @@ export function register(pi: ExtensionAPI): void {
             `[模式] 本会话应使用 ${intended}，本进程以 ${activeMode} 运行：正在自动重启并按会话模式续接…`,
             'warning',
           );
-          requestModeRestart(ctx, intended);
+          // 原因写清楚是"自愈"而不是"用户切换"：这句会经 admin restartLog 变成用户可见的
+          // 重启通知（autopilot 的 session_start 消费），不能沿用 /mode 的措辞。
+          requestModeRestart(ctx, intended, `按会话模式自愈：本会话应为 ${intended}，进程原为 ${activeMode}`);
           return;
         } else {
           ctx.ui.notify(
@@ -238,6 +240,9 @@ function sessionFileOf(ctx: {
  * 由 `scripts/pi-supervisor.sh` 在进程退出后消费：带 `--session` 精确续接当前会话，
  * 回来后 supervisor 已按该会话的模式重新解析（人设 + 记忆命名空间），bootstrap 也重新
  * 按新模式过滤功能。这条路已有 supervisor 测试兜底，不引入新机制。
+ *
+ * `reason` 会进 `restartLog` 并被 autopilot 的 `session_start` 变成用户可见的重启通知，
+ * 所以调用方要写清是"用户切换"还是"启动自愈"。
  */
 function requestModeRestart(
   ctx: {
@@ -245,10 +250,11 @@ function requestModeRestart(
     shutdown?: () => void;
   },
   modeName: string,
+  reason = `切换模式为 ${modeName}`,
 ): void {
   try {
     const sessionFile = sessionFileOf(ctx);
-    writeRestartRequest('restart', { targetSession: sessionFile, reason: `切换模式为 ${modeName}` });
+    writeRestartRequest('restart', { targetSession: sessionFile, reason });
   } catch {
     /* 写盘失败时仍尝试退出，由用户手工重启 */
   }
