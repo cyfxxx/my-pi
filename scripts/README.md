@@ -10,7 +10,7 @@
 | `dev.sh` | 开发模式运行源码（tsx 直接跑 vendor 的 `cli.ts`，不构建；tsx 来自根 `node_modules`） |
 | `sync-upstream.sh` | 上游同步 + 自动修复：临时 worktree 确定性重建补丁栈 → 重建 dist → 刷自愈缓存 → 类型检查（`PI_SYNC_DRY_RUN=1` 只读预演）。**同步前先跑 `check-upstream.sh`** |
 | `lib-vendor.sh` | 被 build/sync/doctor source 的共享逻辑（补丁幂等应用、依赖一致性、vendor exclude） |
-| `lib-mode.sh` | 被 `pi-supervisor.sh` / `dev.sh` source 的**模式解析**共享逻辑：读 `modes.json`（配置）+ `modes-state.json`（运行时 current，gitignored），产出 `MODE_NAME`/`MODE_NS`/`MODE_APPEND_ABS`（人设绝对路径）。此前只写在 supervisor 里，导致 `dev.sh` 静默不注入人设 |
+| `lib-mode.sh` | 被 `pi-supervisor.sh` / `dev.sh` source 的**模式解析**共享逻辑：读 `modes.json`（配置）+ `modes-sessions.json`（会话→模式记录，gitignored），产出 `MODE_NAME`/`MODE_NS`/`MODE_APPEND_ABS`（人设绝对路径）并导出 `PI_SESSION_MODE`（pi 侧的软来源）。模式是**会话属性**：新会话用 `modes.json` 的 default；bash 只认 `--session <绝对路径>`，`-c`/`-r`/会话 id 等形态交给 pi 侧 `session_start` 自愈。此前只写在 supervisor 里，导致 `dev.sh` 静默不注入人设 |
 | `pi-source-build.sh` | 构建 vendor/pi 并把 dist 缓存为「好 pi」（崩溃自愈用）；`--no-build` 仅缓存现有 dist |
 | `run-ts.sh` | 以 tsx 运行「需加载 my-pi TypeScript 逻辑」的脚本（`custom/` 用无扩展名导入，Node 裸跑解析不了）；headless 写记忆/入库的统一入口。tsx 由 `custom/package.json` 声明（根 `node_modules/.bin/tsx`）——**不要再用 `vendor/pi` 那份**：上游 v0.99.0 起已删除该依赖，本地副本是升级残留，fresh `npm ci` 后消失 |
 

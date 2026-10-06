@@ -5,8 +5,8 @@
 # 本脚本以库模式 source 它，只测不依赖网络/CLI/provider 的纯逻辑：
 #   - classify_crash：崩溃分类（transient / external / pi_self），含 ANSI 色码剥离
 #   - read_admin_action / clear_admin_action：admin state 的新鲜度与字段解析
-#   - apply_mode：模式解析（modes.json 配置 + modes-state.json 运行时状态、人设/命名空间、
-#     外部 PI_AGENT_MODE 覆盖优先级）与主循环命令行装配
+#   - apply_mode：模式解析（modes.json 配置 + modes-sessions.json 会话记录、人设/命名空间、
+#     外部 PI_AGENT_MODE 覆盖优先级、--session 参数提取）与主循环命令行装配
 #
 # 用法：bash scripts/test-supervisor.sh
 set -uo pipefail
@@ -186,19 +186,23 @@ check "restartLog 保留（供新进程注入重启通知）" "端到端测试" 
   "$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).restartLog?.reason))' "$LOOP/state.json" 2>/dev/null || echo missing)"
 
 # 隔离外部环境泄漏：本机 shell 可能残留 PI_AGENT_MODE/PI_AGENT_MODE_SOURCE
-# （来自某次 bootstrap 回写），不 unset 会让"无状态文件"等用例被 env 短路。
+# （来自某次 bootstrap 回写），不 unset 会让"无会话记录"等用例被 env 短路。
 unset PI_AGENT_MODE
 unset PI_AGENT_MODE_SOURCE
+unset PI_SESSION_MODE
 
-echo "=== apply_mode（模式解析：入库配置 + 运行时状态）==="
-# 配置与状态分离：modes.json 只放 default + 模式定义（入库）；current 放 modes-state.json（gitignored）。
+echo "=== apply_mode（模式解析：入库配置 + 会话记录）==="
+# 配置与会话记录分离：modes.json 只放 default + 模式定义（入库）；"哪个会话用哪个模式"放
+# modes-sessions.json（gitignored，键是会话文件绝对路径）。新会话没有记录 → default。
 # 这层契约必须由 bash 侧也锁住——模式解析在 lib-mode.sh，pi 侧在 mode/logic.ts，两边读同一组文件。
 # 用局部 AGENT_DIR 指向临时目录，避免污染真实 agent 目录（也避开救援 playbook 对真实路径的断言）。
 MODE_AGENT="$TMP/mode-agent"
 mkdir -p "$MODE_AGENT/modes"
 AGENT_DIR="$MODE_AGENT"
-write_modes() { # write_modes <current>；传空串表示不写状态文件
-  rm -f "$AGENT_DIR/modes-state.json"
+SESS_A="$TMP/sess-a.jsonl"
+SESS_B="$TMP/sess-b.jsonl"
+write_modes() { # write_modes [会话文件] [模式名]；不给参数 = 不写会话记录
+  rm -f "$AGENT_DIR/modes-sessions.json"
   cat > "$AGENT_DIR/modes.json" <<'JSON'
 {
   "default": "full",
@@ -214,63 +218,88 @@ write_modes() { # write_modes <current>；传空串表示不写状态文件
 }
 JSON
   printf '人设占位\n' > "$AGENT_DIR/modes/roleplay.md"
-  if [ -n "$1" ]; then
-    printf '{"current":"%s"}' "$1" > "$AGENT_DIR/modes-state.json"
+  if [ -n "${1:-}" ]; then
+    printf '{"%s":{"mode":"%s","updatedAt":"2026-10-06T00:00:00.000Z"}}' "$1" "$2" > "$AGENT_DIR/modes-sessions.json"
   fi
 }
 
-write_modes ""
+write_modes
 apply_mode
-check "无状态文件 → 回落 default(full)" "full" "$MODE_NAME"
-check "无状态文件 → 不注入人设" "" "${MODE_ARGS[*]:-}"
-check "无状态文件 → 命名空间为空" "" "$PI_MEMORY_NAMESPACE"
+check "无会话记录 → 回落 modes.json 的 default(full)" "full" "$MODE_NAME"
+check "无会话记录 → 不注入人设" "" "${MODE_ARGS[*]:-}"
+check "无会话记录 → 命名空间为空" "" "$PI_MEMORY_NAMESPACE"
+check "无会话记录 → 导出 PI_SESSION_MODE（软来源）" "full" "$PI_SESSION_MODE"
 
-write_modes roleplay
+write_modes "$SESS_A" roleplay
+apply_mode --session "$SESS_A"
+check "会话记录 roleplay → 模式名" "roleplay" "$MODE_NAME"
+check "会话记录 roleplay → 注入人设（绝对路径）" "--append-system-prompt $MODE_AGENT/modes/roleplay.md" "${MODE_ARGS[*]:-}"
+check "会话记录 roleplay → 记忆命名空间" "roleplay" "$PI_MEMORY_NAMESPACE"
+check "会话记录 roleplay → PI_SESSION_MODE 同步" "roleplay" "$PI_SESSION_MODE"
+
+apply_mode --session "$SESS_B"
+check "另一个会话（无记录）→ 回落 default，不继承 A" "full" "$MODE_NAME"
+
+# 记录里指向已删除的模式名要忽略（pi 侧 getSessionMode 同样校验），不能凭空返回不存在的档位
+printf '{"%s":{"mode":"does-not-exist"}}' "$SESS_A" > "$AGENT_DIR/modes-sessions.json"
+apply_mode --session "$SESS_A"
+check "会话记录指向未知模式 → 回落 default" "full" "$MODE_NAME"
+
+# 记录损坏（坏 JSON / 非对象）不能让启动失败
+printf '{ not json' > "$AGENT_DIR/modes-sessions.json"
+apply_mode --session "$SESS_A"
+check "会话记录损坏 → 回落 default" "full" "$MODE_NAME"
+
+# 只认绝对路径：mode_session_arg 的契约（id/相对路径不解析，交给 pi 侧自愈）
+check "mode_session_arg：取 --session 的绝对路径" "$SESS_A" "$(mode_session_arg --session "$SESS_A")"
+check "mode_session_arg：多个 --session 取最后一个（argv 后者覆盖）" "$SESS_B" \
+  "$(mode_session_arg --session "$SESS_A" --continue --session "$SESS_B")"
+check "mode_session_arg：会话 id / 相对路径一律不认" "" "$(mode_session_arg --session abc123)"
+check "mode_session_arg：无该参数 → 空" "" "$(mode_session_arg --continue -p hi)"
+
+# 旧行为（current 在 modes.json / modes-state.json）已不再是模式来源：新会话一律 default
+printf '{"current":"roleplay"}' > "$AGENT_DIR/modes-state.json"
+write_modes
 apply_mode
-check "状态文件 roleplay → 模式名" "roleplay" "$MODE_NAME"
-check "状态文件 roleplay → 注入人设（绝对路径）" "--append-system-prompt $MODE_AGENT/modes/roleplay.md" "${MODE_ARGS[*]:-}"
-check "状态文件 roleplay → 记忆命名空间" "roleplay" "$PI_MEMORY_NAMESPACE"
+check "旧 modes-state.json 不再是模式来源（新会话仍 default）" "full" "$MODE_NAME"
 
-rm -f "$AGENT_DIR/modes-state.json"
-node -e 'const fs=require("fs");const p=process.argv[1];const j=JSON.parse(fs.readFileSync(p,"utf8"));j.current="roleplay";fs.writeFileSync(p,JSON.stringify(j,null,2))' "$AGENT_DIR/modes.json"
-apply_mode
-check "旧格式（current 在 modes.json）仍生效 — 迁移兼容" "roleplay" "$MODE_NAME"
-
-write_modes roleplay
+write_modes "$SESS_A" roleplay
 rm -f "$AGENT_DIR/modes/roleplay.md"
-apply_mode
+apply_mode --session "$SESS_A"
 check "人设文件缺失 → 不注入 --append-system-prompt" "" "${MODE_ARGS[*]:-}"
 check "人设文件缺失 → 命名空间仍注入" "roleplay" "$PI_MEMORY_NAMESPACE"
 
 # 外部注入必须同时给 PI_AGENT_MODE_SOURCE=env：lib-mode.sh 与 pi 侧
 # resolveEffectiveMode 共用同一判据，bootstrap 回写写的是 source="file"，
 # 只给 mode 不给 source 会被当成回写值，模式永远切不动。
-write_modes roleplay
+write_modes "$SESS_A" roleplay
 export PI_AGENT_MODE=minimal
 export PI_AGENT_MODE_SOURCE=env
-apply_mode
+apply_mode --session "$SESS_A"
 unset PI_AGENT_MODE
 unset PI_AGENT_MODE_SOURCE
-check "外部注入 PI_AGENT_MODE 优先于状态文件" "minimal" "$MODE_NAME"
+check "外部注入 PI_AGENT_MODE 优先于会话记录" "minimal" "$MODE_NAME"
 
 # 回归（2026-10-05 真实事故）：pi 进程 bootstrap 回写 PI_AGENT_MODE=<旧模式> + SOURCE=file，
-# supervisor 若把它当外部注入，状态文件里的 roleplay 就永远切不动。
-write_modes roleplay
+# supervisor 若把它当外部注入，会话记录里的 roleplay 就永远切不动。
+write_modes "$SESS_A" roleplay
 export PI_AGENT_MODE=full
 export PI_AGENT_MODE_SOURCE=file
-apply_mode
+apply_mode --session "$SESS_A"
 unset PI_AGENT_MODE
 unset PI_AGENT_MODE_SOURCE
-check "bootstrap 回写（source=file）→ 仍以状态文件为准" "roleplay" "$MODE_NAME"
+check "bootstrap 回写（source=file）→ 仍以会话记录为准" "roleplay" "$MODE_NAME"
 
 # 未知模式名的外部注入要忽略（pi 侧 getModeConfig 校验），不能凭空返回一个不存在的档位
-write_modes roleplay
+write_modes "$SESS_A" roleplay
 export PI_AGENT_MODE=does-not-exist
 export PI_AGENT_MODE_SOURCE=env
-apply_mode
+apply_mode --session "$SESS_A"
 unset PI_AGENT_MODE
 unset PI_AGENT_MODE_SOURCE
-check "未知模式名的 env 注入 → 回落状态文件" "roleplay" "$MODE_NAME"
+check "未知模式名的 env 注入 → 回落会话记录" "roleplay" "$MODE_NAME"
+
+unset PI_SESSION_MODE
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then

@@ -80,7 +80,6 @@ describe('mode: normalizeModesFile 容错', () => {
   it('自定义模式缺字段被归一化，锁定模式由代码注入且不可被文件覆盖', async () => {
     const n = normalizeModesFile({
       default: 'roleplay',
-      current: 'roleplay',
       modes: {
         roleplay: { features: ['memory'], thinking: 5 },
         full: { features: ['evil'] },
@@ -90,14 +89,13 @@ describe('mode: normalizeModesFile 容错', () => {
     expect(n.modes.roleplay.thinking).toBeNull();
     expect(n.modes.full.features).toEqual(['*']);
     expect(n.default).toBe('roleplay');
-    expect(n.current).toBe('roleplay');
     expect(Object.keys(n.modes)).toContain('minimal');
   });
 
-  it('非法 current/default → 回退 full', async () => {
+  it('非法 default → 回退 full；遗留的 current 字段不再有意义（模式按会话记录）', async () => {
     const n = normalizeModesFile({ current: 'missing', default: 'nope', modes: {} });
     expect(n.default).toBe('full');
-    expect(n.current).toBe('full');
     expect(Object.keys(n.modes)).toContain('full');
+    expect('current' in n).toBe(false);
   });
 });

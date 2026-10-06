@@ -19,7 +19,7 @@ export const HARD_RULES = [
   '- `vendor/pi/` 永不直接修改；改动一律经 `patches/`（补丁是唯一真值），改完必须重建 dist 才生效。',
   '- Pi API 只出现在 `custom/adapters/`；`custom/features/` 的逻辑层零 Pi 依赖。',
   '- 前缀缓存是第一成本杠杆：**不改写已发送历史**，新信息一律 append-only；不在会话中途改工具集或工作区文档。',
-  '- 运行时/每环境状态不入库（如 `modes-state.json`、`deviceId`）；提交只暂存本会话的显式路径，禁止 `git add -A`。',
+  '- 运行时/每环境状态不入库（如 `modes-sessions.json`、`deviceId`）；提交只暂存本会话的显式路径，禁止 `git add -A`。',
   '- 长任务用后台任务/tmux 启动后立即结束回合，同轮内不等待；用户提问先回答再动手。',
 ].join('\n');
 

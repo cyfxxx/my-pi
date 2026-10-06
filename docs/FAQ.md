@@ -125,9 +125,13 @@ pi-backup restore --backup <路径>   # 从本地归档恢复到仓库根
 
 ### Q: 如何切换运行模式？
 
-模式由环境变量 `PI_AGENT_MODE` 控制，取值为 `full`（默认，全部功能）、`minimal`
-（仅内置工具，无自定义功能；测试/修复用）、`roleplay`（标枪人设，秘书舰·已誓约：web-search + 隔离记忆）或 `lean`（原 full 去掉 browser/voice/link/autopilot，成本敏感会话）；模式配置定义在
-`custom/features/mode/logic.ts`。
+在会话里用 `/mode <名称>`（`/mode list` 看全部）。模式**只作用于当前会话**：新会话用
+`portable/agent/modes.json` 的 `default`，续接会话自动回到它自己上次的模式（对应关系存在
+`portable/agent/modes-sessions.json`，不入库）。可用档位：`full`（默认，全部功能）、`minimal`
+（仅内置工具，无自定义功能；测试/修复用）、`roleplay`（标枪人设，秘书舰·已誓约：web-search +
+隔离记忆）或 `lean`（去掉 browser/voice/link/autopilot，成本敏感会话）。功能集/人设变更需要重启，
+`/mode` 会自动重启并续接当前会话；也可以用环境变量 `PI_AGENT_MODE=<名称>` 强制覆盖整次运行
+（跳过按会话解析与一致性校验，供测试/临时使用）。
 
 ### Q: 如何压缩上下文？
 

@@ -14,10 +14,12 @@ CLI_SRC="$ROOT/vendor/pi/packages/coding-agent/src/cli.ts"
 [ -f "$CLI_SRC" ] || { echo "❌ 未找到 $CLI_SRC，请先运行：bash scripts/build.sh" >&2; exit 1; }
 
 # 模式 = 启动档位：与 supervisor 走同一套解析（lib-mode.sh），否则 dev 下静默缺人设。
+# 模式按会话记录（modes-sessions.json）；这里同样只认 `--session <绝对路径>`。
 # shellcheck source=scripts/lib-mode.sh
 . "$ROOT/scripts/lib-mode.sh"
-mode_resolve "$ROOT/portable/agent"
+mode_resolve "$ROOT/portable/agent" "$(mode_session_arg "$@")"
 export PI_MEMORY_NAMESPACE="$MODE_NS"
+export PI_SESSION_MODE="$MODE_NAME"
 MODE_ARGS=()
 if [ -n "$MODE_APPEND_ABS" ]; then
     MODE_ARGS=(--append-system-prompt "$MODE_APPEND_ABS")

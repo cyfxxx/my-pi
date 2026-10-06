@@ -71,7 +71,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
   - `npm/`、`git/`：`./my-pi.sh install` 安装的 npm / git 扩展包（来源记入 `settings.json` 的 `packages`）
   - `auth.json`、`models.json`、`models-store.json`、`trust.json`、`pi-link-*.json`：每环境独立、不入库
   - **入库白名单**（配置类）：`modes.json`、`scheduled-seeds.json`、`settings.json`、`AGENTS.md`、`injection-baseline.json`
-  - **运行时状态**（刻意不入库）：`modes-state.json`（当前模式：`/mode` 写入；混进入库文件会被 git 操作静默回退，见 `custom/features/mode/README.md`）、`autopilot/state.json`、`recovery/`、`sessions/`
+  - **运行时状态**（刻意不入库）：`modes-sessions.json`（会话→模式：`/mode` 写入，随会话生效；混进入库文件会被 git 操作静默回退，见 `custom/features/mode/README.md`）、`mode-restart-guard.json`（自愈重启防环标记）、`autopilot/state.json`、`recovery/`、`sessions/`
 - `memory/`：my-pi 自定义功能的数据（memory 功能的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
 
 `my-pi.sh` / `scripts/dev.sh` 只导出 `PI_CODING_AGENT_DIR`（pi 识别）与 `PI_MEMORY_DIR`（`custom/` 识别）；项目根不再有 `.pi/` 目录。
@@ -102,7 +102,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `dev.sh`：开发模式运行（tsx 直接跑 vendor 源码，不构建；tsx 来自根 `node_modules`）
 - `sync-upstream.sh`：上游同步 + 自动修复（merge → 幂等补丁 → 重建 dist → 刷新自愈缓存 → 类型检查；`PI_SYNC_DRY_RUN=1` 只读预演）
 - `lib-vendor.sh`：被 build/sync/doctor source 的共享逻辑（补丁幂等应用、依赖一致性判断）
-- `lib-mode.sh`：被 `pi-supervisor.sh` / `dev.sh` source 的模式解析共享逻辑（`modes.json` 配置 + `modes-state.json` 运行时 current → 模式名/记忆命名空间/人设绝对路径）；抽出来的原因是此前逻辑只在 supervisor 里，`dev.sh` 静默不注入人设
+- `lib-mode.sh`：被 `pi-supervisor.sh` / `dev.sh` source 的模式解析共享逻辑（`modes.json` 配置 + `modes-sessions.json` 会话记录 → 模式名/记忆命名空间/人设绝对路径，并导出 `PI_SESSION_MODE` 供 pi 侧采用）；`mode_session_arg` 从启动参数里取 `--session <绝对路径>`（其余形态交给 pi 侧自愈）。抽出来的原因是此前逻辑只在 supervisor 里，`dev.sh` 静默不注入人设
 - `check-isolation.sh`：验证隔离边界
 - `check-features.sh`：功能完整性（12 功能目录 + 生成式注册面基线 + 适配器 API + 钩子事件 + 配置/脚本/补丁）
 - `gen-registrations.mjs`：从代码生成/校验注册面基线（`registration-baseline.json`；`--update` 刷新）——替代原先手写清单，防漂移

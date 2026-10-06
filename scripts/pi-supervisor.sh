@@ -52,18 +52,23 @@ case "${1:-}" in
     ;;
 esac
 
-# ── 模式（modes.json + modes-state.json）→ 环境与启动参数 ──
+# ── 模式（modes.json + modes-sessions.json）→ 环境与启动参数 ──
 # 每轮启动前重解析：注入记忆命名空间、按模式附加人设（--append-system-prompt）。
 # 解析逻辑抽到 lib-mode.sh，供 dev.sh 共用——此前只写在这里，导致 dev.sh 静默不注入人设。
-# 注意：此处不导出 PI_AGENT_MODE，以免 supervisor 环境把首轮模式固化、导致 /mode 切换后无法刷新；
-# current 存在运行时状态文件（modes-state.json，gitignored），git 操作不会回退它。
+# 注意：此处不导出 PI_AGENT_MODE（那是外部硬覆盖位），以免 supervisor 环境把首轮模式固化、
+# 导致 /mode 切换后无法刷新；模式按**会话**记录在 modes-sessions.json（gitignored），
+# git 操作不会回退它。人设/命名空间的解析要知道"本次加载哪个会话"，故 apply_mode 接收本轮参数。
 # shellcheck source=scripts/lib-mode.sh
 . "$ROOT/scripts/lib-mode.sh"
 MODE_ARGS=()
 apply_mode() {
   MODE_ARGS=()
-  mode_resolve "$AGENT_DIR"
+  mode_resolve "$AGENT_DIR" "$(mode_session_arg "$@")"
   export PI_MEMORY_NAMESPACE="$MODE_NS"
+  # PI_SESSION_MODE 是 pi 侧的**软**来源（按会话解析）：只在没有 PI_AGENT_MODE 硬覆盖时生效，
+  # 且仍会被 session_start 的一致性校验复核。bash 只认 `--session <绝对路径>`，其它形态
+  # （-c / -r / 部分 uuid）解析不出来就回落 default，由 pi 侧检测到不一致后自愈重启。
+  export PI_SESSION_MODE="$MODE_NAME"
   if [ -n "$MODE_APPEND_ABS" ]; then
     MODE_ARGS=(--append-system-prompt "$MODE_APPEND_ABS")
   fi
@@ -214,7 +219,7 @@ SELF="${BASH_SOURCE[0]}"
 SELF_HASH="$(sha256sum "$SELF" 2>/dev/null | cut -c1-16)"
 
 if [ "${MY_PI_NO_SUPERVISOR:-0}" = "1" ]; then
-  apply_mode
+  apply_mode "$@"
   exec node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}"
 fi
 
@@ -251,7 +256,9 @@ while true; do
   # 重置只针对"未被消费的残留"，不会吃掉本轮要用的续接参数。
   EXTRA_ARGS=("${PENDING_ARGS[@]}")
   PENDING_ARGS=()
-  apply_mode
+  # 会话参数按 argv 顺序取最后一个：本轮实际启动的命令行是 `$@` + EXTRA_ARGS
+  # （EXTRA_ARGS 是 admin 重启写入的 --session，优先级更高）。
+  apply_mode "$@" "${EXTRA_ARGS[@]}"
   log "启动 Pi..."
   CRASH_LOG="/tmp/my-pi-crash-$$.log"
   node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}" "${EXTRA_ARGS[@]}" 2>"$CRASH_LOG"
