@@ -29,6 +29,7 @@ import {
   shouldRequestModeRestart,
   applyModeRuntime,
   modeFeaturesLabel,
+  isFeatureEnabled,
   formatModeSwitchNotice,
   MODE_NOTICE_TTL_MS,
 } from './logic';
@@ -36,6 +37,9 @@ import {
 // （若将来出现第三个消费者，应上移到 custom/core/。）
 // `readState`/`consumeRestartLog` 只在"取自己那条待注入通知"时用到（见 takePendingModeNotice）。
 import { writeRestartRequest, readState, consumeRestartLog } from '../autopilot/logic';
+// 兜底：roleplay/lean/minimal 里没注册 autopilot，通用重启日志否则**没人消费**（崩溃恢复后既没有
+// 通知也不会续跑，且完全静默）。mode 是唯一恒注册的功能，所以由它代劳。文案/通道选择在 core 里共用。
+import { formatRestartLine, isModeOwnedNoticeLog, planRestartNotice, tailKindFromSessionFile } from '../../core/restart-intent';
 
 const MODE_HELP = `用法:
   /mode              显示当前模式
@@ -242,6 +246,31 @@ export function register(pi: ExtensionAPI): void {
           );
         } catch {
           /* 注入失败不阻塞启动 */
+        }
+      }
+      // 兜底消费"通用"重启日志（非 mode 归属）：本模式没注册 autopilot 时没人管它。
+      // 只在不一致校验通过之后（上面已 return）、且只消费一次（consume 即清）。
+      if (!isFeatureEnabled('autopilot', activeConfig)) {
+        const log = readState().restartLog;
+        if (log && log.action && log.action !== 'none' && !isModeOwnedNoticeLog(log)) {
+          const consumed = consumeRestartLog();
+          if (consumed) {
+            ctx.ui.notify(formatRestartLine(consumed), 'info');
+            const plan = planRestartNotice({
+              log: consumed,
+              tail: tailKindFromSessionFile(sessionFile),
+              env: process.env.PI_RESTART_RESUME,
+            });
+            try {
+              sendMessage(
+                pi,
+                { customType: plan.customType, content: plan.content, display: plan.channel === 'turn' },
+                plan.channel === 'turn' ? { triggerTurn: true } : { deliverAs: 'nextTurn' },
+              );
+            } catch {
+              /* 注入失败不阻塞启动 */
+            }
+          }
         }
       }
       if (activeMode === 'full') return;

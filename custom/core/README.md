@@ -15,7 +15,7 @@
 | `cli.ts` | 命令参数与补全解析 | `parseSubcommand`、`filterCompletions` |
 | `secrets.ts` | 敏感信息脱敏 | `scrubSecrets`、`SECRET_PATTERNS` |
 | `net-guard.ts` | SSRF 防护 | `isBlockedHost`、`isUrlAllowed` |
-| `restart-intent.ts` | "重启后要不要继续执行任务"的判据（意图 → 会话盘面尾部 → env 开关） | `decideRestartResume`、`tailKindFromSessionFile`、`normalizeResumeIntent`、`formatResumePrompt`、`formatResumeSkippedNote` |
+| `restart-intent.ts` | "重启后要不要继续执行任务"的判据与**注入计划**（意图 → 会话盘面尾部 → env 开关；两个消费者共用文案与通道选择） | `decideRestartResume`、`planRestartNotice`、`formatRestartLine`、`isModeOwnedNoticeLog`、`tailKindFromSessionFile`、`normalizeResumeIntent`、`formatResumePrompt`、`formatResumeSkippedNote` |
 | `index.ts` | 统一 barrel | 汇总以上导出 |
 
 ## 约定

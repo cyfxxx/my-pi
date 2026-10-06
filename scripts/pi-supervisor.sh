@@ -35,6 +35,7 @@ ROUND_LOG_DIR="$RECOVERY_DIR/rounds"
 ROUND_LOG_KEEP="${ROUND_LOG_KEEP:-20}"   # 只留最近 N 轮 crash log
 ROUND_INDEX=0
 RUN_SESSION=""
+LAST_SESSION=""   # 上一轮实际加载的会话（崩溃恢复用它精确续接，见 recovery_args）
 ROUND_START_MS="0"
 ROUND_DUR_MS=0
 
@@ -200,19 +201,38 @@ build_admin_args() {
 #   intent=auto → 新进程按会话盘面尾部判是否续跑（被打断的继续、已收尾的不动，见
 #   custom/core/restart-intent.ts）。
 # 绝不覆盖真正待执行的 action：那种情况下日志归 supervisor 的下一次重启所有。
-mark_recovery_restart_log() { # <crashClass>
-  local cls="${1:-unknown}"
+mark_recovery_restart_log() { # <crashClass> [sessionFile]
+  local cls="${1:-unknown}" sf="${2:-}"
   node -e '
     const fs = require("fs");
-    const p = process.argv[1], cls = process.argv[2];
+    const p = process.argv[1], cls = process.argv[2], sf = process.argv[3];
     let s = { action: "none", timestamp: 0, restartLog: null };
     try { s = { ...s, ...JSON.parse(fs.readFileSync(p, "utf8")) }; } catch { /* 缺失/损坏 → 用骨架 */ }
     // 有待执行动作时不抢它的日志（node -e 顶层不能用 return，故写成条件块）
     if (!(s.action && s.action !== "none")) {
-      s.restartLog = { action: "restart", reason: `崩溃恢复（${cls}）`, intent: "auto", timestamp: Date.now() };
+      s.restartLog = {
+        action: "restart",
+        reason: `崩溃恢复（${cls}）`,
+        intent: "auto",
+        ...(sf ? { targetSession: sf } : {}),
+        timestamp: Date.now(),
+      };
       fs.writeFileSync(p, JSON.stringify(s));
     }
-  ' "$ADMIN_STATE_FILE" "$cls" 2>/dev/null || true
+  ' "$ADMIN_STATE_FILE" "$cls" "$sf" 2>/dev/null || true
+}
+
+# ── 崩溃恢复的续接参数（纯函数，test-supervisor.sh 直接测）──
+# 旧行为固定用 `--continue`：pi 会续上"最近会话"，但 **bash 侧解析不出它的模式** →
+# PI_SESSION_MODE 回落 default → pi 侧自愈再重启一次（多花 ≈40s），崩溃恢复的"有没有在途
+# 工作"判据也更容易判错。所以优先用**本轮实际加载的会话**精确续接。
+recovery_args() { # <lastSession> → ADMIN_ARGS
+  ADMIN_ARGS=()
+  if [ -n "${1:-}" ]; then
+    ADMIN_ARGS=(--session "$1")
+  else
+    ADMIN_ARGS=(--continue)
+  fi
 }
 
 # ── 健康检查：核心模块可完整加载（无扩展）──
@@ -342,6 +362,7 @@ while true; do
   apply_mode "$@" "${EXTRA_ARGS[@]}"
   # 本轮事实：会话（供轮次记录与丢请求判定）、起始时刻、按轮保留的 crash log。
   RUN_SESSION="$(mode_session_arg "$@" "${EXTRA_ARGS[@]}")"
+  [ -n "$RUN_SESSION" ] && LAST_SESSION="$RUN_SESSION"
   ROUND_INDEX=$((ROUND_INDEX + 1))
   ROUND_START_MS="$(now_ms)"
   CRASH_LOG="$ROUND_LOG_DIR/round-${ROUND_INDEX}.log"
@@ -476,8 +497,10 @@ while true; do
     reset_crash_count
     RECOVERY_ROUNDS=0
     CONSECUTIVE_FAIL=0
-    mark_recovery_restart_log "$CLASS"
-    ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" --no-context-files "$@" --continue)
+    mark_recovery_restart_log "$CLASS" "$LAST_SESSION"
+    recovery_args "$LAST_SESSION"
+    log "崩溃恢复续接参数: ${ADMIN_ARGS[*]}"
+    ORIG_ARGS=(--extension "$ROOT/custom/bootstrap.ts" --no-context-files "$@" ${ADMIN_ARGS[@]+"${ADMIN_ARGS[@]}"})
     sleep 1
     continue
   fi

@@ -79,6 +79,9 @@
 - 重启通知：`session_start` 消费 `consumeRestartLog()` 并以 `ctx.ui.notify` 告知"系统已重启。操作/原因"，
   仅交互会话消费（headless `-p` 子进程会先吃掉 restartLog）。写入端保留在 `restartLog` 字段，
   supervisor 只清 `action`——两边都不可省。
+  - 未注册 autopilot 的模式（roleplay/lean/minimal）里，这条通用日志由 `mode` 功能兜底消费
+    （否则崩溃恢复的日志没人读：没有通知也不续跑，且完全静默）。文案/通道选择在
+    `custom/core/restart-intent.ts` 共用。
   - **要不要唤醒模型继续干活，由 `custom/core/restart-intent.ts` 判**（三层：写入端 `intent` →
     会话盘面尾部 → `PI_RESTART_RESUME=off|auto|always`）：
     `resume=true` → `sendMessage(..., { triggerTurn: true })` 真跑一个回合接上工作；

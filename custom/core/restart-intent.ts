@@ -164,6 +164,52 @@ export function formatResumePrompt(noticeLine: string): string {
   );
 }
 
+/** 这条重启日志是否归 mode 功能自己通知（`notice: 'mode'`）——消费者据此让位 */
+export function isModeOwnedNoticeLog(log: Record<string, unknown> | null | undefined): boolean {
+  return Boolean(log) && log?.notice === 'mode';
+}
+
+/** 重启通知的文案行（消费者共用；含操作/原因/目标模型/会话路径） */
+export function formatRestartLine(log: Record<string, unknown>): string {
+  const reason = typeof log.reason === 'string' && log.reason ? log.reason : '(未指定原因)';
+  let line = `系统已重启。操作: ${String(log.action ?? '?')} | 原因: ${reason}`;
+  if (log.targetProvider || log.targetModel) {
+    line += ` | 目标模型: ${String(log.targetProvider ?? '-')}/${String(log.targetModel ?? '-')}`;
+  }
+  if (typeof log.targetSession === 'string' && log.targetSession) {
+    line += ` | 会话: ${log.targetSession}`;
+  }
+  return line;
+}
+
+/** 注入计划：`turn` = 真跑一个回合；`next-turn` = 零成本上下文备注；`none` = 什么都不注入 */
+export interface NoticePlan {
+  channel: 'turn' | 'next-turn';
+  customType: string;
+  content: string;
+  reason: string;
+}
+
+/**
+ * 把"这条重启日志该怎么告知模型"算成一个计划（纯函数；谁注入、用哪个通道由调用方决定）。
+ *
+ * 两个消费者共用它：\`features/autopilot\`（注册了 autopilot 的模式）与 \`features/mode\` 的兜底
+ * （roleplay/lean/minimal 里没注册 autopilot，通用日志否则**没人消费** → 崩溃恢复后既没有通知
+ * 也不会续跑，且完全静默）。
+ */
+export function planRestartNotice(opts: {
+  log: Record<string, unknown>;
+  tail: TranscriptTailKind;
+  env?: string | undefined;
+}): NoticePlan {
+  const line = formatRestartLine(opts.log);
+  const decision = decideRestartResume({ intent: opts.log.intent, tail: opts.tail, env: opts.env });
+  if (decision.resume) {
+    return { channel: 'turn', customType: 'my-pi-restart-resume', content: `[系统] ${formatResumePrompt(line)}`, reason: decision.reason };
+  }
+  return { channel: 'next-turn', customType: 'my-pi-restart-note', content: `[系统] ${formatResumeSkippedNote(line, decision.reason)}`, reason: decision.reason };
+}
+
 /** 不续跑时的上下文备注（`deliverAs: 'nextTurn'`：零成本，等下一次真正要跑时出现） */
 export function formatResumeSkippedNote(noticeLine: string, reason: string): string {
   return `${noticeLine}。本次重启不需要继续执行任务（判据: ${reason}）；历史上下文已恢复，等用户指示。`;

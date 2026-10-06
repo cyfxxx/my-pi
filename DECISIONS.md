@@ -2,6 +2,22 @@
 
 ## 格式
 
+### [2026-10-06] 把"重启链路"做透：行为异常进每日体检、崩溃恢复精确续接、无 autopilot 的模式补上兜底消费者
+
+延续"使用层面错误的检测与预防"，这一批处理重启链路自己的三个洞：
+
+1. **行为异常只有实时告警、没有每日兜底**：supervisor 的 `lost_restart` 只打在 stderr 与 `recovery-audit.jsonl`；没人看就没人知道。现在 `state-audit`（以及每天自动跑的 `daily-health`）读 `recovery/rounds.jsonl` 判三类：
+   - `lost-restart-recent`（**error**）：24h 内出现过"进程退出但没重拉"——用户会看到模式/配置没换；
+   - `restart-loop`（warning）：同一会话 10 分钟内被重启 ≥3 次 = "重启—不生效—再重启"循环或模式自愈反复触发；
+   - `recovery-storm`（warning）：1 小时内 ≥3 轮崩溃恢复 = pi/扩展在反复崩，恢复只是续命。
+   外加载入坏行的 `rounds-corrupt-lines`。口径守门 41→**50 项**。
+2. **崩溃恢复丢会话**：旧行为固定 `--continue`，pi 会续上"最近会话"但 **bash 解析不出它的模式** → `PI_SESSION_MODE` 回落 default → pi 侧自愈再重启一次（多花 ≈40s），而且"有没有在途工作"的判据更容易判错。现在 supervisor 记住本轮实际加载的会话（`LAST_SESSION`）并用 `--session` 精确续接（`recovery_args` 纯函数 + 3 项测试）；恢复日志也带上 `targetSession`。supervisor 测试 92→**96 项**。
+3. **没有 autopilot 的模式里，通用重启日志没人消费**（场景 phase 2 实测发现）：通知/续跑挂在 autopilot 的 `session_start`，而 roleplay/lean/minimal 不注册 autopilot → 崩溃恢复写的日志没人读：**既没有通知也不会续跑，且完全静默**。`mode` 是唯一恒注册的功能，故在"本模式未启用 autopilot"时由它兜底消费；文案与通道选择抽到 `core/restart-intent.ts` 的 `planRestartNotice`/`formatRestartLine` 两处共用（不复制一份判据）。
+
+**端到端证据**（真 pty 场景扩到 **22 项**）：切模式后零回合（会话文件无 user/assistant/custom_message）；随后写一条 `intent=continue` 的重启请求并退出 → 新进程**真的起了回合**（会话里出现 `my-pi-restart-resume`，指令含"不要凭空开工"），且档位/人设/命名空间/会话续接全部保持。
+
+**未做**：`intent=auto` 的"盘面尾部"路径目前靠单测+接线测试覆盖，端到端未证（需要先构造"被中断的任务"会话）；回合级断言若要完全不依赖 provider，仍需要假 provider。
+
 ### [2026-10-06] 重启后"要不要继续执行任务"的判据：写入端声明意图 + 会话盘面尾部 + env 开关
 
 **背景**（用户反馈）：重启后注入"系统已重启，请从中断处继续当前任务"的初衷是**自动接上被打断的工作**，但它走的是 `sendUserMessage` —— **无条件触发一个模型回合**。于是切模式、换模型、切会话、模型自己刚收尾就重启这些**没有在途任务**的重启也白烧一个回合（仓库既有实测：重启后首轮整段前缀重放 ≈80k），而且实测会话里能看到模型对着通知自问"我该继续做什么"、甚至凭空开工。

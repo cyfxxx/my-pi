@@ -2154,3 +2154,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   重启后白跑回合、入口漂移丢人设、重启无提示、功能名拼错）整理成**指纹 → 可执行复现命令 →
   现在由谁挡住**的台账，并列出三个通用排查入口（`state-audit.mjs` / `rounds.jsonl` / `daily-health`）。
 - 约定：新增一行必须给可执行命令；从 `docs/README.md` 与 `scripts/README.md` 双向可达。
+
+### 重启链路做透：行为异常进每日体检 / 崩溃恢复精确续接 / 无 autopilot 模式的兜底消费者（2026-10-06）
+
+- **① 行为异常每日兜底**：`state-audit` 读 `recovery/rounds.jsonl` 判 `lost-restart-recent`（error，24h 内"重启请求被吞"）、`restart-loop`（同会话 10 分钟 ≥3 次重启）、`recovery-storm`（1 小时 ≥3 轮崩溃恢复）、`rounds-corrupt-lines`；`daily-health` 每天自动跑同一份判据。守门 41→**50 项**。
+- **② 崩溃恢复精确续接**：supervisor 记住本轮加载的会话并用 `--session` 续接（旧行为 `--continue` 让 bash 解析不出模式 → 多一次自愈重启 ≈40s），恢复日志带 `targetSession`；`recovery_args` 纯函数 + 3 项测试，supervisor 92→**96 项**。
+- **③ 无 autopilot 模式的兜底消费者**：roleplay/lean/minimal 不注册 autopilot，通用重启日志没人消费（崩溃恢复后无通知、不续跑、且静默）→ 由恒注册的 `mode` 兜底；文案/通道抽到 `core/restart-intent.ts` 的 `planRestartNotice`/`formatRestartLine` 共用。
+- **端到端**：真 pty 场景扩到 **22 项**——切模式零回合 + `intent=continue` 重启后**真的起回合**续跑（会话里出现 `my-pi-restart-resume`）。
+- 环境：按用户确认给 git 加了 SSH 保活（`core.sshCommand = ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=6`），避免长门禁期间 push 连接被远端断开。

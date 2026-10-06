@@ -129,6 +129,14 @@ async function setupBoth(): Promise<FakePi> {
   return pi;
 }
 
+async function setupModeOnly(): Promise<FakePi> {
+  vi.resetModules();
+  const { register: registerMode } = await import('../index');
+  const pi = makeFakePi();
+  registerMode(pi as unknown as ExtensionAPI);
+  return pi;
+}
+
 function ctx() {
   const notify = vi.fn();
   return {
@@ -185,6 +193,27 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     expect(note?.content).toContain('不需要继续执行任务');
     expect(note?.content).toContain('intent-none');
     expect(pi.sent).toHaveLength(0); // 没有真用户消息 = 没有触发回合
+  });
+
+  it('没注册 autopilot 的模式（roleplay/lean）里由 mode 兜底消费通用重启日志', async () => {
+    const { writeRestartRequest } = await import('../../autopilot/logic');
+    // roleplay：features = web-search + memory（不含 autopilot）→ 通用日志本来没人消费，
+    // 崩溃恢复后既没有通知也不会续跑，而且完全静默（2026-10-06 场景实测发现）。
+    setSessionMode(SESS, 'roleplay');
+    process.env.PI_SESSION_MODE = 'roleplay';
+    const pi = await setupModeOnly();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    writeRestartRequest('restart_hang', { targetSession: SESS, reason: '崩溃恢复（external）', intent: 'continue' });
+    await handlers[0]({}, ctx()); // mode 的 session_start（本进程 activeMode=roleplay）
+
+    const resume = pi.custom.find((c) => c.customType === 'my-pi-restart-resume');
+    expect(resume, JSON.stringify(pi.custom)).toBeTruthy();
+    expect(resume?.options?.triggerTurn).toBe(true);
+    expect(resume?.content).toContain('系统已重启');
+    expect(resume?.content).toContain('不要凭空开工');
+    // 日志已被消费（不留悬空通知）
+    expect(JSON.parse(readFileSync(join(dir, 'state.json'), 'utf-8')).restartLog).toBeNull();
   });
 
   it('盘面尾部还有未回答的用户消息 + intent=auto → 触发回合接上工作', async () => {

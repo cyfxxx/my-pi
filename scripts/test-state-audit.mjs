@@ -60,6 +60,7 @@ function makeAgent(files = {}) {
   write('modes-sessions.json', files.sessions);
   write('mode-restart-guard.json', files.guard);
   write('autopilot/state.json', files.admin);
+  write('recovery/rounds.jsonl', files.rounds);
   write('modes-state.json', files.legacyState);
   write('modes/roleplay.md', files.persona);
   if (files.extra) for (const [rel, content] of Object.entries(files.extra)) write(rel, content);
@@ -129,6 +130,42 @@ check('env 硬覆盖 → env-hard-override（warning）', (() => { const { dir }
 check('env 回写值（SOURCE=file）不算硬覆盖', (() => { const { dir } = agent(healthyFiles()); return !has(findingsOf(dir, { env: { PI_AGENT_MODE: 'roleplay', PI_AGENT_MODE_SOURCE: 'file' } }), 'env-hard-override'); })());
 check('遗留 modes-state.json → 仅 info', (() => { const f = agent(healthyFiles({ legacyState: { current: 'full' } })).findings; return has(f, 'legacy-state-file') && f.find((x) => x.code === 'legacy-state-file').level === 'info'; })());
 check('findings 按严重度排序（error 在前）', (() => { const f = agent({ modes: '{bad', legacyState: { current: 'x' } }).findings; return f.length >= 2 && f[0].level === 'error'; })());
+
+console.log('状态体检：重启/崩溃行为异常（recovery/rounds.jsonl）');
+{
+  const round = (over) => JSON.stringify({ ts: NOW - 60_000, run: 1, session: '/tmp/s.jsonl', mode: 'full', decision: 'exit', lostRestart: false, ...over });
+  const rowsFile = (rows) => rows.join('\n') + '\n';
+
+  check('轮次记录正常（无丢请求/无循环/无恢复风暴）→ 不告警', (() => {
+    const f = agent(healthyFiles({ rounds: rowsFile([round({}), round({ run: 2, decision: 'restart' })]) })).findings;
+    return !has(f, 'lost-restart-recent') && !has(f, 'restart-loop') && !has(f, 'recovery-storm') && !has(f, 'rounds-corrupt-lines');
+  })());
+
+  check('24h 内有"重启请求被吞" → lost-restart-recent（error）', (() => {
+    const f = agent(healthyFiles({ rounds: rowsFile([round({ lostRestart: true })]) })).findings;
+    return has(f, 'lost-restart-recent') && f.find((x) => x.code === 'lost-restart-recent').level === 'error';
+  })());
+
+  check('丢请求超过 24h → 不再告警（历史账不进每日）', !has(agent(healthyFiles({ rounds: rowsFile([round({ lostRestart: true, ts: NOW - 25 * 3600_000 })]) })).findings, 'lost-restart-recent'));
+
+  check('同一会话 10 分钟内重启 3 次 → restart-loop（warning）', (() => {
+    const f = agent(healthyFiles({ rounds: rowsFile([round({ run: 1, ts: NOW - 300_000 }), round({ run: 2, ts: NOW - 200_000 }), round({ run: 3, ts: NOW - 100_000 })]) })).findings;
+    return has(f, 'restart-loop') && f.find((x) => x.code === 'restart-loop').level === 'warning';
+  })());
+
+  check('同一会话重启 3 次但跨 30 分钟 → 不算循环', !has(agent(healthyFiles({ rounds: rowsFile([round({ ts: NOW - 1_800_000 }), round({ ts: NOW - 900_000 }), round({ ts: NOW - 60_000 })]) })).findings, 'restart-loop'));
+
+  check('1 小时内 3 轮崩溃恢复 → recovery-storm（warning）', has(agent(healthyFiles({ rounds: rowsFile([round({ decision: 'recover_restart', crashClass: 'external', ts: NOW - 300_000 }), round({ decision: 'recover_retry', crashClass: 'external', ts: NOW - 200_000 }), round({ decision: 'circuit_breaker', crashClass: 'external', ts: NOW - 100_000 })]) })).findings, 'recovery-storm'));
+
+  check('崩溃恢复超过 1 小时 → 不算风暴', !has(agent(healthyFiles({ rounds: rowsFile([round({ decision: 'recover_retry', ts: NOW - 7200_000 }), round({ decision: 'recover_retry', ts: NOW - 5400_000 }), round({ decision: 'recover_retry', ts: NOW - 4000_000 })]) })).findings, 'recovery-storm'));
+
+  check('轮次记录有坏行 → rounds-corrupt-lines（warning），不崩', (() => {
+    const f = agent(healthyFiles({ rounds: rowsFile([round({}), '{ this is not json']) })).findings;
+    return has(f, 'rounds-corrupt-lines') && !has(f, 'lost-restart-recent');
+  })());
+
+  check('没有 rounds.jsonl（新设备/未跑过）→ 不告警', !has(agent(healthyFiles()).findings, 'rounds-corrupt-lines'));
+}
 
 console.log('状态体检：只读性 + 真值不漂移');
 {

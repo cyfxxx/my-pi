@@ -43,6 +43,12 @@ export const RESTART_GUARD_MS = 120_000;
 export const SESSION_MODE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 /** 时钟回拨判据：guard / 记录时间戳领先这么多就认为是异常 */
 const CLOCK_SKEW_MS = 120_000;
+/** 轮次记录的分析窗口：丢请求看 24h，重启循环看 10 分钟，恢复风暴看 1 小时 */
+const LOST_RESTART_WINDOW_MS = 24 * 60 * 60 * 1000;
+const RESTART_LOOP_WINDOW_MS = 10 * 60 * 1000;
+const RESTART_LOOP_THRESHOLD = 3;
+const RECOVERY_STORM_WINDOW_MS = 60 * 60 * 1000;
+const RECOVERY_STORM_THRESHOLD = 3;
 
 const LEVEL_ORDER = { error: 0, warning: 1, info: 2 };
 
@@ -84,6 +90,7 @@ export function buildSnapshot({ agentDir, knownFeatures = [], now = Date.now(), 
       sessions: readOf(join(agentDir, 'modes-sessions.json')),
       guard: readOf(join(agentDir, 'mode-restart-guard.json')),
       admin: readOf(join(agentDir, 'autopilot', 'state.json')),
+      rounds: readOf(join(agentDir, 'recovery', 'rounds.jsonl')),
       legacyState: readOf(join(agentDir, 'modes-state.json')),
     },
   };
@@ -203,6 +210,71 @@ export function auditState(snap) {
         const mins = Math.round((now - lts) / 60000);
         add('warning', 'notice-undelivered', `一条重启通知（action=${String(log.action ?? '?')}${log.notice ? `, notice=${String(log.notice)}` : ''}）${mins} 分钟未被消费：新模式进程没有把它注入（会话与会话文件对不上？或那次重启没发生）`, `看 portable/agent/recovery/rounds.jsonl 的对应轮次；必要时删除 state.json 里的 restartLog`);
       }
+    }
+  }
+
+  // ── recovery/rounds.jsonl：重启/崩溃本身的行为异常（使用层面才看得见）──
+  // supervisor 每轮写一行。这里做三件事：抓"请求被吞"（实时告警的每日兜底）、
+  // 抓"同一会话反复重启"（重启—不生效—再重启的循环）、抓"崩溃恢复风暴"（pi 在反复崩）。
+  // rounds.jsonl 是 **JSONL**（每行一个 JSON），不能用 parseOf 整体解析。
+  const roundsRaw = files.rounds.present ? files.rounds.raw : null;
+  if (typeof roundsRaw === 'string') {
+    const parsed = [];
+    let badLines = 0;
+    for (const line of roundsRaw.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        parsed.push(JSON.parse(line));
+      } catch {
+        badLines++;
+      }
+    }
+    if (badLines > 0) {
+      add('warning', 'rounds-corrupt-lines', `recovery/rounds.jsonl 有 ${badLines} 行无法解析（被截断/写坏）`, '备份后删除该文件，下一次启动会重建');
+    }
+    const at = (r) => (typeof r.ts === 'number' && r.ts > 0 ? r.ts : 0);
+    const recent = parsed.filter((r) => at(r) > 0 && now - at(r) >= 0);
+
+    const lost = recent.filter((r) => r.lostRestart === true && now - at(r) <= LOST_RESTART_WINDOW_MS);
+    if (lost.length > 0) {
+      const last = lost[lost.length - 1];
+      add(
+        'error',
+        'lost-restart-recent',
+        `最近 24h 有 ${lost.length} 轮「重启请求被吞」（进程退出但没重拉；最近一次 run=${String(last.run ?? '?')}）`,
+        '看 recovery/rounds.jsonl 与对应 recovery/rounds/round-N.log：这类重启不会生效，用户会看到模式/配置没换',
+      );
+    }
+
+    const loopWindow = recent.filter((r) => now - at(r) <= RESTART_LOOP_WINDOW_MS);
+    const bySession = new Map();
+    for (const r of loopWindow) {
+      const key = typeof r.session === 'string' && r.session ? r.session : '(未知会话)';
+      bySession.set(key, (bySession.get(key) ?? 0) + 1);
+    }
+    for (const [session, count] of bySession) {
+      if (count >= RESTART_LOOP_THRESHOLD) {
+        add(
+          'warning',
+          'restart-loop',
+          `同一会话 10 分钟内被重启 ${count} 次（${session}）：可能在「重启—不生效—再重启」循环，或模式自愈在反复触发`,
+          '看 recovery/rounds.jsonl 的 mode/decision 列；模式反复自愈说明会话模式记录与启动参数对不上',
+        );
+      }
+    }
+
+    const recoveryWindow = recent.filter((r) => now - at(r) <= RECOVERY_STORM_WINDOW_MS);
+    const recoveries = recoveryWindow.filter(
+      (r) => typeof r.decision === 'string' && (r.decision.startsWith('recover') || r.decision === 'circuit_breaker' || r.decision === 'max_recovery_rounds'),
+    );
+    if (recoveries.length >= RECOVERY_STORM_THRESHOLD) {
+      const classes = [...new Set(recoveries.map((r) => String(r.crashClass ?? '?')))].join('/');
+      add(
+        'warning',
+        'recovery-storm',
+        `1 小时内 ${recoveries.length} 轮崩溃恢复（分类 ${classes}）：pi/扩展在反复崩，恢复只是在续命`,
+        '看 recovery/rounds/round-N.log 尾部与 recovery-audit.jsonl；修根因后再清 crash-count',
+      );
     }
   }
 

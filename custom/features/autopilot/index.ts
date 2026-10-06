@@ -13,13 +13,7 @@ import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
 import { sendMessage } from '../../adapters/ui-adapter';
 
-import {
-  decideRestartResume,
-  formatResumePrompt,
-  formatResumeSkippedNote,
-  normalizeResumeIntent,
-  tailKindFromSessionFile,
-} from '../../core/restart-intent';
+import { formatRestartLine, normalizeResumeIntent, planRestartNotice, tailKindFromSessionFile } from '../../core/restart-intent';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { listSessions, resolveSession } from '../../adapters/session-adapter';
 import { formatSessionList } from './store/sessions';
@@ -859,37 +853,14 @@ export function register(pi: ExtensionAPI): void {
         const log = consumeRestartLog();
         if (log && log.action && log.action !== 'none') {
           restartNoticeShown = true;
-          const reason = typeof log.reason === 'string' && log.reason ? log.reason : '(未指定原因)';
-          let line = `系统已重启。操作: ${log.action} | 原因: ${reason}`;
-          if (log.targetProvider || log.targetModel) {
-            line += ` | 目标模型: ${String(log.targetProvider ?? '-')}/${String(log.targetModel ?? '-')}`;
-          }
-          if (typeof log.targetSession === 'string' && log.targetSession) {
-            line += ` | 会话: ${log.targetSession}`;
-          }
-          ctx.ui.notify(line, 'info');
-          const decision = decideRestartResume({
-            intent: log.intent,
+          ctx.ui.notify(formatRestartLine(log), 'info');
+          // 通道选择与文案由 core 统一算（features/mode 在没有 autopilot 的模式里做同样的兜底）
+          const plan = planRestartNotice({
+            log,
             tail: tailKindFromSessionFile(ctx.sessionManager?.getSessionFile?.()),
             env: process.env.PI_RESTART_RESUME,
           });
-          if (decision.resume) {
-            sendMessage(
-              pi,
-              { customType: 'my-pi-restart-resume', content: `[系统] ${formatResumePrompt(line)}`, display: true },
-              { triggerTurn: true },
-            );
-          } else {
-            sendMessage(
-              pi,
-              {
-                customType: 'my-pi-restart-note',
-                content: `[系统] ${formatResumeSkippedNote(line, decision.reason)}`,
-                display: false,
-              },
-              { deliverAs: 'nextTurn' },
-            );
-          }
+          sendMessage(pi, { customType: plan.customType, content: plan.content, display: plan.channel === 'turn' }, plan.channel === 'turn' ? { triggerTurn: true } : { deliverAs: 'nextTurn' });
         }
       }
     },

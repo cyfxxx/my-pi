@@ -196,7 +196,6 @@ try {
   check('round-2 进程 argv 带 roleplay 人设（--append-system-prompt）', Boolean(proc?.args.includes('roleplay.md')), proc?.args);
   check('round-2 进程 env 里 PI_MEMORY_NAMESPACE=roleplay', Boolean(proc?.env.includes('PI_MEMORY_NAMESPACE=roleplay')), proc?.env?.slice(0, 200));
 
-  // 收尾：就绪后只发**一次**精确的 /quit；不退再补 Ctrl+C / Ctrl+D；最后 SIGTERM
   const send = (text) => {
     try {
       if (child.stdin.writable) child.stdin.write(text);
@@ -204,6 +203,56 @@ try {
       /* pty 已关 */
     }
   };
+  const readRoles = () =>
+    sessionText()
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return {};
+        }
+      })
+      .map((e) => (e?.type === 'message' ? e.message?.role : e?.type));
+
+  // ① 切模式**零回合**：此刻 round-2 还活着，会话文件里不该有 user/assistant/custom_message。
+  // （旧行为无条件 sendUserMessage，会在这里留下 user(通知) + assistant 回复。）
+  const rolesAfterSwitch = readRoles();
+  check('切模式不触发模型回合：没有 assistant 消息', !rolesAfterSwitch.includes('assistant'), JSON.stringify(rolesAfterSwitch));
+  check('切模式不触发模型回合：也没有新增 user 消息', !rolesAfterSwitch.includes('user'), JSON.stringify(rolesAfterSwitch));
+  check('零成本通道：模式通知不落盘（无 custom_message）', !rolesAfterSwitch.includes('custom_message'), JSON.stringify(rolesAfterSwitch));
+  check('会话文件只含允许的条目类型', rolesAfterSwitch.every((r) => ['session', 'model_change', 'thinking_level_change'].includes(r)), JSON.stringify(rolesAfterSwitch));
+
+  // ② 续跑通道（端到端）：写一条 intent=continue 的重启请求（语义等价于看门狗/自动 failover
+  //    ——"工作在途被中断"），再 /quit 让 supervisor 重拉；新进程应当**真的起一个回合**接上。
+  //    这条通道此前只有单测/接线测试覆盖，这里证明它在真实生命周期里也成立。
+  const restartsBefore = rows().filter((r) => r.decision === 'restart').length;
+  const pendingReason = '场景：模拟被中断的任务';
+  mkdirSync(join(AGENT, 'autopilot'), { recursive: true });
+  writeFileSync(
+    join(AGENT, 'autopilot', 'state.json'),
+    JSON.stringify({
+      action: 'restart',
+      timestamp: Date.now(),
+      targetSession: SESS,
+      reason: pendingReason,
+      intent: 'continue',
+      restartLog: { action: 'restart', reason: pendingReason, intent: 'continue', targetSession: SESS, timestamp: Date.now() },
+    }),
+  );
+  send('/quit\r');
+  const restartedAgain = await waitFor(() => rows().filter((r) => r.decision === 'restart').length > restartsBefore, {
+    timeout: 120_000,
+    label: '第二次 restart',
+  });
+  check('intent=continue 的重启请求被真的执行（第二次重拉）', restartedAgain, JSON.stringify(rows()));
+  const resumeInjected = await waitFor(() => sessionText().includes('my-pi-restart-resume'), { timeout: 180_000, label: '续跑回合注入', quiet: false });
+  check('续跑通道：新进程真的起了回合（会话里出现 my-pi-restart-resume）', resumeInjected, sessionText().slice(-400));
+  check('续跑指令写明"没有下一步就停下、不要凭空开工"', sessionText().includes('不要凭空开工'));
+
+  // 收尾：round-3 可能正在流式回复；/quit → Ctrl+C → Ctrl+D → SIGTERM
   send('/quit\r');
   if (!(await waitFor(() => rows().some((r) => r.decision === 'exit'), { timeout: 60_000 }))) {
     send('\u0003');
@@ -216,35 +265,18 @@ try {
     }
   }
 
+  // ③ 轮次记录：三行，档位与续接都对
   const roundRows = rows();
-  const r1 = roundRows.find((r) => r.decision === 'restart');
-  const r2 = roundRows.find((r) => r.decision === 'exit');
-  check('至少两轮（进程真的被重拉，而不是直接退出）', roundRows.length >= 2, JSON.stringify(roundRows.map((r) => r.decision)));
-  check('round-1 跑在 full（人设/命名空间未注入）', Boolean(r1) && r1.mode === 'full' && r1.persona === false && r1.namespace === '', JSON.stringify(r1));
-  check('round-2 跑在 roleplay（真的换档了）', Boolean(r2) && r2.mode === 'roleplay', JSON.stringify(r2));
-  check('round-2 注入了人设', Boolean(r2) && r2.persona === true, JSON.stringify(r2));
+  const r1 = roundRows.find((r) => r.decision === 'restart' && r.mode === 'full');
+  const r2 = roundRows.find((r) => r.decision === 'restart' && r.mode === 'roleplay');
+  const r3 = roundRows.find((r) => r.decision === 'exit');
+  check('至少三轮（切模式重拉 + 续跑重拉 + 退出）', roundRows.length >= 3, JSON.stringify(roundRows.map((r) => r.decision)));
+  check('round-1 跑在 full（人设/命名空间未注入）', Boolean(r1) && r1.persona === false && r1.namespace === '', JSON.stringify(r1));
+  check('round-2 跑在 roleplay（真的换档了）', Boolean(r2) && r2.persona === true, JSON.stringify(r2));
   check('round-2 记忆命名空间=roleplay', Boolean(r2) && r2.namespace === 'roleplay', JSON.stringify(r2));
+  check('round-2/3 以会话精确续接（--session 同一路径）', Boolean(r2) && r2.session === SESS && Boolean(r3) && r3.session === SESS, `${r2?.session} / ${r3?.session}`);
+  check('最终退出的一轮仍在 roleplay（续跑没把档位带回 full）', Boolean(r3) && r3.mode === 'roleplay', JSON.stringify(r3));
   check('全程没有"重启请求被吞"', roundRows.every((r) => r.lostRestart === false), JSON.stringify(roundRows.filter((r) => r.lostRestart)));
-  check('round-2 以会话精确续接（--session 同一路径）', Boolean(r2) && r2.session === SESS, `${r2?.session}`);
-
-  // 核心新性质：切模式**不触发模型回合** —— 会话文件里除了那个头，什么都不该多出来。
-  // 旧行为（无条件 sendUserMessage）会在这里留下 user(通知) + assistant 回复两行。
-  const entries = sessionText()
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((l) => {
-      try {
-        return JSON.parse(l);
-      } catch {
-        return {};
-      }
-    });
-  const roles = entries.map((e) => (e?.type === 'message' ? e.message?.role : e?.type));
-  check('切模式不触发模型回合：没有 assistant 消息', !roles.includes('assistant'), JSON.stringify(roles));
-  check('切模式不触发模型回合：也没有新增 user 消息', !roles.includes('user'), JSON.stringify(roles));
-  check('零成本通道：通知不落盘（无 custom_message）', !roles.includes('custom_message'), JSON.stringify(roles));
-  check('只允许元数据条目（session/model_change/thinking_level_change）', roles.every((r) => ['session', 'model_change', 'thinking_level_change'].includes(r)), JSON.stringify(roles));
 
   let sessions = {};
   try {

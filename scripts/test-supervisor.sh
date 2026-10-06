@@ -128,6 +128,15 @@ check "坏时间戳 → 不算丢（不崩）" "no" "$(lost none abc 1000000 100
 check "时间戳在未来（时钟回拨）→ 不算丢" "no" "$(lost none 9999999 1000000 1001000)"
 
 echo ""
+echo "=== recovery_args（崩溃恢复的续接参数）==="
+# 回归：旧行为固定 --continue → pi 续上"最近会话"，但 bash 解析不出它的模式 → PI_SESSION_MODE
+# 回落 default → pi 侧自愈再重启一次（多花 ≈40s），且崩溃恢复的在途工作判据更容易判错。
+rec_of() { recovery_args "$1"; printf '%s' "${ADMIN_ARGS[*]}"; }
+check "有本轮会话 → --session 精确续接" "--session /tmp/s.jsonl" "$(rec_of /tmp/s.jsonl)"
+check "拿不到会话 → --continue 兜底" "--continue" "$(rec_of '')"
+check "绝不返回空参数（空参会让 pi 新建会话）" "yes" "$([ -n "$(rec_of '')" ] && echo yes || echo no)"
+
+echo ""
 echo "=== mark_recovery_restart_log（崩溃恢复的重启日志）==="
 # 崩溃恢复没有 admin action，新进程本来不知道自己是重启来的；写一条 intent=auto 的只读日志，
 # 由新进程按会话盘面尾部判是否续跑（core/restart-intent.ts）。绝不能覆盖真正待执行的动作。
@@ -144,6 +153,9 @@ write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"reason\":\"keep\"
 mark_recovery_restart_log pi_self
 check "有待执行动作时不抢日志（action 保留）" "restart" "$(state_field 's.action')"
 check "有待执行动作时不抢日志（restartLog 保留）" "old" "$(state_field 's.restartLog.reason')"
+rm -f "$PI_ADMIN_STATE_FILE"   # 先清掉上一个用例留下的待执行动作（否则函数会正确地拒绝抢日志）
+mark_recovery_restart_log pi_self /tmp/sess-x.jsonl
+check "恢复日志带上 targetSession（供新进程/审计定位）" "/tmp/sess-x.jsonl" "$(state_field 's.restartLog.targetSession')"
 
 echo ""
 echo "=== build_admin_args（重启续接参数，绝不能为空）==="
