@@ -2288,3 +2288,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 顺带确认：真 pty 场景在 0ms/600ms 下今天都通过（它的"回复未落盘"只是软警告），所以这条链路**必须用无头硬指标判**，
   不能拿 pty 场景当判别工具。
 - 未做：`steer` 与"纯空闲载体 + followUp"两组实验（决定 `sendMessageAfterRebind` 是否可以改成排队优先）。
+
+### 相位实验第二组：排队不会起回合，"空闲才触发"才是正解（2026-10-07）
+
+- `agent_settled` + `triggerTurn`（空闲）→ assistant=2 ✅；`agent_settled` + `followUp`/`steer` → assistant=1（**排队不起回合**）。
+- `session_start` + `steer`（忙碌）→ 不报错但也不起回合；`session_start` 先 `triggerTurn` 再 catch 退化 `followUp` → **rc=1，catch 不住**。
+- 结论：`triggerTurn` 只在空闲时合法、忙碌时是"catch 不住的致命错误"；`deliverAs` 三种排队语义都不触发回合。
+  → 正解是"先判空闲（`ctx.isIdle()`），忙则等 `agent_settled` 再 `triggerTurn`"，定时器降级为兜底；实施方案与验证范围已写进 `DECISIONS.md`（本轮未动代码）。

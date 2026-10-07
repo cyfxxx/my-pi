@@ -31,6 +31,23 @@
 **下一步（未做）**：用同一实验台测 `steer`、以及"纯空闲载体 + `followUp`/`triggerTurn`"两种组合，再决定
 `custom/adapters/ui-adapter.ts` 的 `sendMessageAfterRebind()` 是改成"排队优先"还是保留延时。
 
+**第二组实验（同日，做完）——"排队优先"也被证伪，正解是"空闲才触发"**：
+
+| 相位 / 发送方式 | rc | assistant | 结论 |
+|---|---|---|---|
+| `agent_settled` / `triggerTurn`（空闲） | 0 | **2** | 空闲时 `triggerTurn` **正常起回合** ✅ |
+| `agent_settled` / `deliverAs:'followUp'` | 0 | 1 | 排队**不会**起回合 |
+| `agent_settled` / `deliverAs:'steer'` | 0 | 1 | 同上 |
+| `session_start` / `steer`（忙碌） | 0 | 1 | steer 不报错（安全），但**不起回合** |
+| `session_start` / 先 `triggerTurn` 再 catch 退化 `followUp` | **1** | 0 | **抛错 catch 不住**：进程仍 rc=1（说明那个"already processing"不是从 `sendMessage` 同步抛出的，或属异步致命错误） |
+
+推论（三条都被实验钉住）：
+1. `triggerTurn` **只在 agent 空闲时合法**；忙碌时调用是致命错误，且**无法用 try/catch 兜住** → 绝不能"先试再说"。
+2. `deliverAs` 的三种排队语义（`followUp`/`steer`/`nextTurn`）**都不会起回合** → 不能用"排队优先"替代续跑的唤醒。
+3. 因此正解是：**先判空闲**——空闲就立刻 `triggerTurn`；忙碌则等 **`agent_settled`**（agent 真正静下来的事件，实验证明那一刻 `triggerTurn` 可用）再发；定时器只作最后兜底。
+
+**下一步（实施方案，未写代码）**：把 `custom/adapters/ui-adapter.ts` 的 `sendMessageAfterRebind()` 改成"`ctx.isIdle()` 判空闲 → 忙则挂 `agent_settled` 一次性订阅再发 → 定时器兜底"；验证需要 vitest + 两个真实 pty 场景（0ms 与默认）+ 无头实验台复跑（忙碌/空闲两组）。
+
 ### [2026-10-07] 「换绑完成事件」被证伪：重启路径是新进程 + `--session`，不走会话替换
 
 **想做的事**：把 2026-10-06 那版"在 `session_start` 之后延后 600ms 再触发续跑回合"换成**正序事件**
