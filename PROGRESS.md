@@ -2325,6 +2325,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 改动：`prefix-fingerprint.ts` 新增 `systemAppend` / `systemSections` / `systemChangedSections`
   与 `system:append-lost`/`system:append-back` 标签；`systemTextOf()` 对字符串 content **原样返回**
   （原来 JSON.stringify 把换行转义、分段解析失效）；丢失时写独立台账 + 有 UI 时告警；
-  `daily-health.mjs` 新增 `加固块丢失=N` 字段并一律 alert（不再混进"疑似整段重算"）。
+  `daily-health.mjs` 新增 `加固块缺失=N` 字段并一律 alert（不再混进"疑似整段重算"）。
+- **第二步（同日追加）**：把 `before_agent_start` 按「关键路径 vs 可选增强」分层——拿 system 文本 +
+  追加加固块只做纯字符串运算，其余（工具分层/顺序对齐/用量校准/提示）全部就地 try/catch。
+  关键不变量不再走"会静默失败的通道"。并补掉一个检测盲区：只看 `system:append-lost` 转换标记会
+  漏掉"某进程每轮都丢"（首条 `prev=null` → `changed` 恒为空），判据改为**逐条** `systemAppend===false`。
 - 按用户口径**不做自动重启**：这类"终端层卡死/前缀漂移"的处置是关掉该终端会话（见 `BUG-REPLAYS.md` 第 14/15/16 行）。
-- 验证：指纹单测 28 项、`test-usage-metrics.mjs` 53 项、`check-conventions.sh` 台账 16 行、`tsc -p custom/` 干净。
+- 验证：指纹单测 28 项、新增 `system-prompt-total.test.ts` **7 项**（抛错下 systemPrompt 逐字节不变 +
+  次序锁）、`test-usage-metrics.mjs` **56 项**、注入面基线未变、`check-conventions.sh` 台账 16 行、`tsc` 干净。

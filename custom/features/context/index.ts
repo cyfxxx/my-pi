@@ -415,90 +415,117 @@ export function register(pi: ExtensionAPI): void {
   });
 
   // 回合开始：应用工具分层 + 注入休眠组简介 + 用真实 contextWindow/用量校准预算
+  //
+  // ⚠️ 本处理器的返回值是**缓存关键路径**：它返回的 `systemPrompt` 会被 pi 投影成请求的 head
+  // system message（`forceSystemPrompt`，见 `core/extensions/runner.ts` 的 emitBeforeAgentStart）。
+  // 而 pi 对 `before_agent_start` 处理器的**异常是静默吞掉的**（只 emitError 给内存 listener，
+  // 不落盘）→ 抛错时投影不生效，请求退回"纯分段渲染"，my-pi 的加固块**整块消失**，
+  // system 位于请求最前 → 从第 0 个 token 起分叉 → 整段全价重放。
+  // 实测（2026-10-07）：一次翻转 = 147,555 token 全价重算，占该会话全部未命中的 60.8%。
+  //
+  // 因此这里按「**关键路径 vs 可选增强**」分层，判据是"失败了会不会改变前缀字节"：
+  //   · 关键路径 = 读 system 文本 → 追加加固块。只做纯字符串运算，不允许被任何 pi API 失败打断；
+  //   · 可选增强 = 工具分层、工具顺序对齐、用量校准、压力提示、休眠组摘要。全部就地 try/catch，
+  //     最坏情况只是"这一轮少了提示/少了对齐"，**绝不牵连前缀**。
+  // 回归锁：custom/features/context/__tests__/system-prompt-total.test.ts —— 用"会抛错的 pi/ctx"
+  // 断言产出的 systemPrompt 与正常路径**逐字节相同**。
   registerHook(pi, {
     event: 'before_agent_start',
     handler: async (event, ctx) => {
-      if (!layeringApplied) {
-        applyToolLayering(pi);
-        layeringApplied = true;
-      } else if (dormantToolsActive(pi)) {
-        // 计划模式退出等会恢复全量工具，这里自愈回分层
-        applyToolLayering(pi);
+      // ── 可选增强 1：工具分层（按需加载关闭时是空操作）──
+      try {
+        if (!layeringApplied) {
+          applyToolLayering(pi);
+          layeringApplied = true;
+        } else if (dormantToolsActive(pi)) {
+          // 计划模式退出等会恢复全量工具，这里自愈回分层
+          applyToolLayering(pi);
+        }
+      } catch {
+        /* 增强失败：不影响本次 system 文本 */
       }
-      // 统一本次渲染的工具顺序：重启恢复的首轮 options 可能仍是 transcript 顺序，
-      // 而 pi 的 setActiveTools 会以 getActiveToolNames() 重建 _baseSystemPromptOptions；
-      // 两者不一致时，system 的 tools 清单会在后续回合整体重排 -> 整段缓存失效
-      // （2026-09-27 实测：重启后第二个新回合一次 ~80k 全量重放）。
-      // 这里把本次渲染对齐到当前激活顺序，使首轮与后续回合 system 文本一致，
-      // 把两次失效收敛回首轮一次。
-      const sysOptions = (event as { systemPromptOptions?: { selectedTools?: string[] } })
-        .systemPromptOptions;
-      if (sysOptions && Array.isArray(sysOptions.selectedTools)) {
-        const active = getActiveTools(pi);
-        if (active.length > 0) sysOptions.selectedTools = active;
+      // ── 可选增强 2：统一本次渲染的工具顺序 ──
+      // 重启恢复的首轮 options 可能仍是 transcript 顺序，而 pi 的 setActiveTools 会以
+      // getActiveToolNames() 重建 _baseSystemPromptOptions；两者不一致时，system 的 tools 清单
+      // 会在后续回合整体重排 -> 整段缓存失效（2026-09-27 实测：重启后第二个新回合一次 ~80k 全量重放）。
+      // 顺序关键：**必须在读 `event.systemPrompt` 之前**——那个 getter 是惰性渲染，读它才定稿文本；
+      // 反了会白丢这份对齐（实测约 9 字节）。
+      const sysOptions = (event as { systemPromptOptions?: { selectedTools?: string[] } }).systemPromptOptions;
+      try {
+        if (sysOptions && Array.isArray(sysOptions.selectedTools)) {
+          const active = getActiveTools(pi);
+          if (active.length > 0) sysOptions.selectedTools = active;
+        }
+      } catch {
+        /* 增强失败：不影响本次 system 文本 */
       }
-      const usage = ctx.getContextUsage?.();
-      let compactThreshold: number | null = null;
-      if (usage) {
-        setContextWindow(usage.contextWindow);
-        if (usage.tokens != null) setUsedTokens(usage.tokens);
-        // 压缩阈值同时作为"压力分档基准"：窗口 1M 而阈值 256K 时，按窗口比例分档
-        // 永远到不了高档，模型会在压缩前收不到任何预警。
-        compactThreshold = computeCompactThreshold(usage.contextWindow, {
-          absoluteTokens: ABSOLUTE_TOKENS,
-          largeRatio: readEnvRatio('PI_CONTEXT_COMPACT_LARGE_RATIO'),
-          smallRatio: readEnvRatio('PI_CONTEXT_COMPACT_SMALL_RATIO'),
-        });
-        if (compactThreshold) setCompactThreshold(compactThreshold);
-      }
-      const e = event as { systemPrompt?: string };
-      if (typeof e.systemPrompt !== 'string') return;
-      // 压力提示：按"距压缩阈值"的比例分档（静态文本，仅跨档时变化，缓存友好；禁止注入精确数值）
-      const ratio =
-        compactThreshold && compactThreshold > 0 ? (usage?.tokens ?? 0) / compactThreshold : 0;
-      let pressureLine = '';
-      if (ratio >= 0.9) {
-        pressureLine =
-          '[上下文已接近压缩阈值；达到后会压缩并生成摘要，关键决策与待办会保留在摘要中；需精确保真的细节可先存 memory_store。]';
-      } else if (ratio >= 0.75) {
-        pressureLine = '[上下文已接近压缩阈值。]';
-      }
-      const advice = pressureLine
-        ? `${FULL_DELEGATION_ADVICE}\n${pressureLine}`
-        : LOW_PRESSURE_DELEGATION;
-      // 重启提示：锚定"重启后首轮全量重发前缀"的成本，取绝对阈值与压缩阈值 90% 的较小值，
-      // 避免阈值高于压缩阈值时提示永不触发（128K 窗口下压缩阈值约 109K）。
-      const restartCeiling =
-        compactThreshold && compactThreshold > 0
-          ? Math.min(RESTART_TOKENS, Math.floor(compactThreshold * 0.9))
-          : RESTART_TOKENS;
-      const restartHint =
-        usage?.tokens != null && usage.tokens > restartCeiling
-          ? '[如需重启，建议先 /compact，可避免重启后首轮全量重发前缀。]'
-          : '';
-      // 易变运行时提示（压力档/休眠工具摘要/重启提示）**不再写入 system prompt**：
-      // 它们位于前缀最前处，一旦变化就是整段缓存失效（实测单次 170K–316K 全价重算）。
-      // 改为"内容变化时才追加一条消息"（append-only，不删除旧的）：变化点落在尾部，
-      // 只影响其后的少量 token。对齐 DSH 的 change-only volatile context 做法。
-      // 休眠组摘要只在按需加载开启时出现：默认全部工具常驻，列休眠组只会误导模型。
-      const volatileText = [
-        advice,
-        TOOL_LAYERING ? buildSleepingSummary(new Set(getAllToolNames(pi))) : '',
-        restartHint,
-      ]
-        .filter(Boolean)
-        .join('\n\n');
-      let message: { customType: string; content: string; display: boolean } | undefined;
-      if (volatileText && volatileText !== lastVolatileContext) {
-        lastVolatileContext = volatileText;
-        message = { customType: VOLATILE_ADVICE_TAG, content: volatileText, display: false };
-      }
+      // ── 关键路径：拿 system 文本并追加加固块。走到这里，前面的失败都已被吞掉。──
       // system prompt 只追加**静态常量**，保持逐字节稳定（工具集变化本身无法避免）：
       // HARD_RULES = 不变量摘要（权威性留在 system 层），EFFICIENCY_ADVICE = 效率建议。
-      // 体积大且频繁变更的 AGENTS.md 正文已移出 system（见下面的工作区指令注入）。
       // 装配唯一入口 = buildSystemPrompt（P4 硬化：字节预算 + 易变内容守门）。
+      const e = event as { systemPrompt?: string };
+      const appended = typeof e.systemPrompt === 'string' ? buildSystemPrompt(e.systemPrompt) : undefined;
+      // ── 可选增强 3：用量校准 + 压力提示 + 休眠组摘要 ──
+      let message: { customType: string; content: string; display: boolean } | undefined;
+      try {
+        const usage = ctx.getContextUsage?.();
+        let compactThreshold: number | null = null;
+        if (usage) {
+          setContextWindow(usage.contextWindow);
+          if (usage.tokens != null) setUsedTokens(usage.tokens);
+          // 压缩阈值同时作为"压力分档基准"：窗口 1M 而阈值 256K 时，按窗口比例分档
+          // 永远到不了高档，模型会在压缩前收不到任何预警。
+          compactThreshold = computeCompactThreshold(usage.contextWindow, {
+            absoluteTokens: ABSOLUTE_TOKENS,
+            largeRatio: readEnvRatio('PI_CONTEXT_COMPACT_LARGE_RATIO'),
+            smallRatio: readEnvRatio('PI_CONTEXT_COMPACT_SMALL_RATIO'),
+          });
+          if (compactThreshold) setCompactThreshold(compactThreshold);
+        }
+        // 压力提示：按"距压缩阈值"的比例分档（静态文本，仅跨档时变化，缓存友好；禁止注入精确数值）
+        const ratio =
+          compactThreshold && compactThreshold > 0 ? (usage?.tokens ?? 0) / compactThreshold : 0;
+        let pressureLine = '';
+        if (ratio >= 0.9) {
+          pressureLine =
+            '[上下文已接近压缩阈值；达到后会压缩并生成摘要，关键决策与待办会保留在摘要中；需精确保真的细节可先存 memory_store。]';
+        } else if (ratio >= 0.75) {
+          pressureLine = '[上下文已接近压缩阈值。]';
+        }
+        const advice = pressureLine
+          ? `${FULL_DELEGATION_ADVICE}\n${pressureLine}`
+          : LOW_PRESSURE_DELEGATION;
+        // 重启提示：锚定"重启后首轮全量重发前缀"的成本，取绝对阈值与压缩阈值 90% 的较小值，
+        // 避免阈值高于压缩阈值时提示永不触发（128K 窗口下压缩阈值约 109K）。
+        const restartCeiling =
+          compactThreshold && compactThreshold > 0
+            ? Math.min(RESTART_TOKENS, Math.floor(compactThreshold * 0.9))
+            : RESTART_TOKENS;
+        const restartHint =
+          usage?.tokens != null && usage.tokens > restartCeiling
+            ? '[如需重启，建议先 /compact，可避免重启后首轮全量重发前缀。]'
+            : '';
+        // 易变运行时提示（压力档/休眠工具摘要/重启提示）**不再写入 system prompt**：
+        // 它们位于前缀最前处，一旦变化就是整段缓存失效（实测单次 170K–316K 全价重算）。
+        // 改为"内容变化时才追加一条消息"（append-only，不删除旧的）：变化点落在尾部，
+        // 只影响其后的少量 token。对齐 DSH 的 change-only volatile context 做法。
+        // 休眠组摘要只在按需加载开启时出现：默认全部工具常驻，列休眠组只会误导模型。
+        const volatileText = [
+          advice,
+          TOOL_LAYERING ? buildSleepingSummary(new Set(getAllToolNames(pi))) : '',
+          restartHint,
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+        if (volatileText && volatileText !== lastVolatileContext) {
+          lastVolatileContext = volatileText;
+          message = { customType: VOLATILE_ADVICE_TAG, content: volatileText, display: false };
+        }
+      } catch {
+        /* 增强失败：不影响本次 system 文本 */
+      }
       return {
-        systemPrompt: buildSystemPrompt(e.systemPrompt),
+        ...(appended !== undefined ? { systemPrompt: appended } : {}),
         ...(message ? { message } : {}),
       };
     },

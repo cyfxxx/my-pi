@@ -121,11 +121,16 @@ const isFrontBreak = (f) => {
 const frontChanges = fps.filter(isFrontBreak);
 const totalOnly = fps.filter((f) => (f.changed || []).includes('total'));
 
-// 加固块丢失（2026-10-07）：`before_agent_start` 处理器返回的 systemPrompt 没生效——pi 会把
+// 加固块缺失（2026-10-07）：`before_agent_start` 处理器返回的 systemPrompt 没生效——pi 会把
 // 该处理器的异常**静默吞掉**（只发给内存 listener），于是 my-pi 追加的 system 加固块整块消失，
 // 前缀从第 0 个 token 起分叉、整段全价重放（实测单次 147,555 token，占该会话全部未命中的 60.8%）。
-// 这是**确定事件**而非"疑似"：指纹里直接带 `system:append-lost`（且 `systemAppend:false`）。
-const appendLost = fps.filter((f) => (f.changed || []).includes('system:append-lost'));
+//
+// 判据用 `systemAppend === false`（**逐条记录**）而不是只看 `system:append-lost` 转换标记：
+// 转换标记在"新进程首次请求"处天然缺失（进程内 `lastFingerprint` 从 null 开始 → 首条 `changed`
+// 恒为空），所以"某个进程**每轮**都丢"这种最坏情况反而一个标记都不会产生（2026-10-07 补）。
+// `systemAppend` 只在 `context` 传了判据文本时才写；历史记录没有该字段 → 不参与判定。
+const appendMissing = fps.filter((f) => f.systemAppend === false);
+const appendLost = appendMissing.filter((f) => (f.changed || []).includes('system:append-lost'));
 
 // 分段分叉（2026-10-01 新增）：`messages@<start>-…` 给出前缀失效的**起点消息下标**。
 // 起点在头部（start=0）等价于整段重放——最贵的一类，旧口径只认 system/tools/head/level，
@@ -385,12 +390,14 @@ if (headBreaksUnexplained.length > 0) {
 if (headBreaksCompacted.length > 0) {
   notes.push(`压缩重放 ${headBreaksCompacted.length} 次（reason=${[...new Set(compactions.map((c) => c.reason).filter(Boolean))].join('/') || '?'}）：压缩改写前缀头部的固有代价`);
 }
-// 加固块丢失是**可判定的确定事件**（不是"疑似整段重算"），一律 alert：
+// 加固块缺失是**可判定的确定事件**（不是"疑似整段重算"），一律 alert：
 // 它意味着 pi 的 before_agent_start 结果没落地，是代码/时序问题，不是上下文代价。
-if (appendLost.length > 0) {
+if (appendMissing.length > 0) {
+  const lostNote = appendLost.length > 0 ? `，其中 ${appendLost.length} 次是"丢失转换"` : '';
   reasons.push(
-    `system 加固块丢失 ${appendLost.length} 次（进程内 system 漂移，非重启）→ 每次整段前缀作废；台账 logs/system-append-lost.jsonl`,
+    `system 加固块缺失 ${appendMissing.length} 条记录（进程内 system 漂移或处理器持续失败，非重启）→ 前缀作废；台账 logs/system-append-lost.jsonl`,
   );
+  if (lostNote) notes.push(`加固块缺失明细${lostNote}`);
 }
 const COLDSTART_CEIL = Number(process.env.PI_HEALTH_COLDSTART_CEIL || 8);
 if (coldStarts.length > COLDSTART_CEIL) {
@@ -418,7 +425,7 @@ const bashStepStr = bashPerStep ? `p50=${bashPerStep.p50}/p90=${bashPerStep.p90}
 const singleCmdStr = singleCmd
   ? `${(singleRatio * 100).toFixed(1)}%(${singleCmd.single}/${singleCmd.total})`
   : 'n/a(旧记录无字段)';
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块丢失=${appendLost.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);

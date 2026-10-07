@@ -50,10 +50,36 @@
   证据。`logs/system-append-lost.jsonl` 会在**下一次发生**时留下 `systemBytes`/`systemSections`/`changed`
   三元组，配合 UI 告警当场定位。**这是有意的取舍**：先保证"下次一定看得见"，不为一次无法复现的事件猜代码。
 
+**追加决策（同日，紧接上一步）：把关键路径做成 total，不再依赖"下次一定看得见"**
+
+上一步只解决"看得见"，没解决"不再发生"。进一步分析发现：**漏掉的其实不是"能不能查"，而是"关键
+不变量走了一条会静默失败的通道"**。因此把 `before_agent_start` 处理器按「关键路径 vs 可选增强」分层
+（判据 = 失败了会不会改变前缀字节）：
+
+- **关键路径**：读 `event.systemPrompt` → `buildSystemPrompt()` 追加加固块。只做纯字符串运算，
+  不被任何 pi API 失败打断。
+- **可选增强**：工具分层、工具顺序对齐、用量校准、压力提示、休眠组摘要 —— 全部就地 `try/catch`，
+  最坏情况只是"这一轮少了提示/少了对齐"，**绝不牵连前缀**。
+
+顺带发现并补掉一个**检测盲区**：只看 `system:append-lost` 转换标记会漏掉最坏情况——进程内
+`lastFingerprint` 从 `null` 开始，首条指纹 `changed` 恒为空数组，所以"某个进程**每轮**都丢"反而
+一个标记都不产生。判据改为**逐条** `systemAppend === false`，`daily-health` 据此 alert。
+
+**为什么不做"把加固块搬去启动期注入"（原方案 b）**：那样能让投影失败也不影响文本，但要付出的代价是
+**真值分裂**——文本要么写进 `APPEND_SYSTEM.md`（已 1793B / 预算 2048B，再塞 770B 会超），要么由
+bash 在启动前从 TS 常量生成一个文件（扩展在 pi 之后才加载 → 首次启动没有该文件，鸡生蛋）。
+把关键路径做成 total 后，残余风险只剩"pi 自己的渲染器抛错"与"纯字符串拼接抛错"，两者都近乎不可能，
+而且 new 的逐条判据会在真发生时立刻报警。**用几行 try/catch 换掉一次真值分裂，划算。**
+
 **验证**：`npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts` 28 项（新增 7 项：
 分段切分含嵌套 `<skill>` 不误切、追加块丢失/恢复标记、某段被改写与整块丢失的判别、无判据时不误报）；
-`node scripts/test-usage-metrics.mjs` 46 → **53 项**（新增：`加固块丢失=1` 触发 alert、且不被计入
-"前端变更"以免一次事件报两遍）；`bash scripts/check-conventions.sh` 台账 13 → **16 行**；`tsc -p custom/` 干净。
+新增 `custom/features/context/__tests__/system-prompt-total.test.ts` **7 项**（让 `ctx.getContextUsage` /
+`pi.getActiveTools` 分别/同时抛错，断言产出的 `systemPrompt` 仍与正常路径**逐字节相同**；另锁"读
+`event.systemPrompt` 必须发生在 `selectedTools` 对齐之后"的次序）；
+`node scripts/test-usage-metrics.mjs` 46 → **56 项**（`加固块缺失=1` 触发 alert、不被计入"前端变更"
+以免一次事件报两遍、以及"持续缺失无转换标记"的盲区回归）；`bash scripts/check-injection-surface.sh`
+基线未变（只动了导出面，没动注入文本）；`bash scripts/check-conventions.sh` 台账 13 → **16 行**；
+`tsc -p custom/` 干净。
 
 ### [2026-10-07] G3（压缩暖前缀重放）定案：代码核对确认死代码，**实测收益≈0，不打补丁**
 

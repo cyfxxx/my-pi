@@ -17,7 +17,9 @@
 import { HARD_RULES, EFFICIENCY_ADVICE } from './hard-rules';
 
 // 注入文本常量住在 `hard-rules.ts`（注入面基线对象），这里只装配与守门；对外重导出保持导入路径。
-export { EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE } from './hard-rules';
+// `HARD_RULES` 也一并重导出：本文件是 system 注入面的**唯一装配点**，调用方（含守门测试）
+// 应当只从这里取"实际会被追加的文本"，避免"测试从别处取常量、与真实装配漂移"造成的假绿。
+export { HARD_RULES, EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE } from './hard-rules';
 
 /**
  * system 层注入预算上限（字节）。

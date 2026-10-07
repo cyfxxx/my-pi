@@ -35,7 +35,7 @@ function check(name, cond, detail = '') {
 }
 
 /** 造一个临时 memory 目录：每轮用量 + 工具级台账 + 前缀指纹。同时造空的 agent 目录，保证用例自洽 */
-function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null, appendLost = 0 }) {
+function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null, appendLost = 0, appendMissingFlat = 0 }) {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-'));
   const mem = join(root, 'memory');
   const agent = join(root, 'agent');
@@ -114,6 +114,25 @@ function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes
       level: 'high',
       messageCount: 6,
       changed: ['system', 'system:append-lost'],
+    })),
+    // 加固块**持续**缺失（2026-10-07 补的检测盲区）：进程内首条指纹 prev=null → `changed` 恒为
+    // 空数组，所以"每轮都丢"反而一个 `system:append-lost` 转换标记都不产生。判据必须落到
+    // 逐条记录的 `systemAppend === false` 上，否则最坏情况静默通过。
+    ...Array.from({ length: appendMissingFlat }, (_, i) => ({
+      ts: now - 400 + i,
+      sinceLastMs: 5000,
+      total: `flat${i}`,
+      system: 'sFLAT',
+      systemAppend: false,
+      systemBytes: 7239,
+      systemSections: { preamble: 171, tools: 490, rules: 790, docs: 1271, addendum: 1816, skills: 2570, cwd: 24 },
+      systemChangedSections: [],
+      tools: 't2',
+      head: 'h1',
+      segments: seg('s0'),
+      level: 'high',
+      messageCount: 6,
+      changed: [],
     })),
     // 冷启动：无 sinceLastMs 的记录 = 进程首个请求（fingerprintRequest 在 prev=null 时省略该字段）
     ...Array.from({ length: coldStarts }, (_, i) => ({
@@ -368,7 +387,7 @@ function runHealth({ mem, agent }, extraEnv = {}) {
   }
 }
 
-// ── 用例 2f：system 加固块丢失（2026-10-07 实测：147,555 + 10,308 token 全价重放 = 会话未命中 60.8%）──
+// ── 用例 2f：system 加固块丢失/缺失（2026-10-07 实测：147,555 + 10,308 token 全价重放 = 会话未命中 60.8%）──
 // pi 会静默吞掉 `before_agent_start` 处理器的异常 → my-pi 追加的 system 加固块整块消失 →
 // 前缀从第 0 个 token 起分叉。这是**确定事件**，必须 alert，且不能被"压缩重放"那类免责说明吃掉。
 {
@@ -376,11 +395,26 @@ function runHealth({ mem, agent }, extraEnv = {}) {
   try {
     const out = runHealth(fixture);
     const first = out.trim().split('\n')[0];
-    check('加固块丢失被计数', out.includes('加固块丢失=1'), first);
-    check('加固块丢失触发 alert', out.includes('结论=alert'));
+    check('加固块缺失被计数', out.includes('加固块缺失=1'), first);
+    check('加固块缺失触发 alert', out.includes('结论=alert'));
     check('告警写明「进程内 system 漂移」而非压缩代价', out.includes('进程内 system 漂移'));
     check('告警指向独立台账', out.includes('system-append-lost.jsonl'));
-    check('加固块丢失不被计入前端变更', out.includes('前端变更=0'), first);
+    check('加固块缺失不被计入前端变更', out.includes('前端变更=0'), first);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+// 检测盲区回归：进程内"每轮都缺"时不会产生 `system:append-lost` 转换标记（首条 prev=null，
+// `changed` 恒为空），只看转换标记的实现会**静默通过**最坏情况。判据必须落在逐条 `systemAppend`。
+{
+  const fixture = makeFixture({ appendMissingFlat: 2 });
+  try {
+    const out = runHealth(fixture);
+    const first = out.trim().split('\n')[0];
+    check('持续缺失（无转换标记）仍被计数', out.includes('加固块缺失=2'), first);
+    check('持续缺失仍触发 alert', out.includes('结论=alert'));
+    check('持续缺失的告警不谎称有转换标记', !out.includes('是"丢失转换"'));
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -390,8 +424,8 @@ function runHealth({ mem, agent }, extraEnv = {}) {
   const fixture = makeFixture({ appendLost: 0 });
   try {
     const out = runHealth(fixture);
-    check('无丢失时加固块丢失=0', out.includes('加固块丢失=0'), out.trim().split('\n')[0]);
-    check('无丢失时不产生加固块告警', !out.includes('system 加固块丢失'));
+    check('无缺失时加固块缺失=0', out.includes('加固块缺失=0'), out.trim().split('\n')[0]);
+    check('无缺失时不产生加固块告警', !out.includes('system 加固块缺失'));
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }
