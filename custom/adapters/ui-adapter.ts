@@ -112,6 +112,11 @@ export function sendMessage<T = unknown>(
  * 事件永不触发。判别性实测：`PI_RESTART_RESUME_DELAY_MS=120000` 跑单实例真实 pty 场景 → **2/33**
  * （续跑没发生），默认 600ms 兜底则 33/33——说明一直起作用的是延时，不是 rebind 顺序。
  * 结论：保留延时，并把"新进程里究竟何时才可安全注入"记为**未定位**（见 `DECISIONS.md`）。
+ *
+ * 后续（2026-10-07 无头硬指标实验，见 DECISIONS）：在 `session_start` 用 `triggerTurn` 会被 pi **直接拒绝**
+ * （`Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.`，
+ * 进程 rc=1、什么都没落盘）；`deliverAs:'followUp'` 不报错、消息落盘，但不保证起回合。也就是说这里的
+ * "延时"是在绕开一个**非法时序**，正解可能是"排队优先"（`steer`/空闲态 `followUp` 两组实验待做）。
  */
 export function sendMessageAfterRebind(
   pi: ExtensionAPI,

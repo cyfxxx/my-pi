@@ -2277,3 +2277,14 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   写进 `custom/adapters/ui-adapter.ts` 注释与 `DECISIONS.md`（含认知更正：真正的可安全注入时刻在新进程
   启动路径上，**位置未定位**；过去"读会话替换顺序"得出的 rebind 归因对重启路径不成立）。
 - 唯一保留的副产物：`STRUCTURE.md` 补丁清单补齐此前漏列的 007/008/009。
+
+### 相位实验：`session_start` 触发回合会被 pi 直接拒绝（2026-10-07）
+
+- 搭了一个无头实验台（`--print` + 临时扩展按 `EXP_PHASE/EXP_DELAY_MS/EXP_DELIVER` 在指定相位注入，硬指标=会话文件里
+  assistant 条数；脚本在会话的 `/tmp/my-pi-exp/`，不入库），每次约 45s，比真 pty 场景快且没有抖动。
+- 硬证据：`session_start`+0ms 注入 `triggerTurn` → **rc=1、assistant=0**，stderr 明确报
+  `Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.`；
+  `session_start`+600ms → rc=0、assistant=2；`deliverAs:'followUp'` → 不报错、消息落盘，但不为它起回合。
+- 顺带确认：真 pty 场景在 0ms/600ms 下今天都通过（它的"回复未落盘"只是软警告），所以这条链路**必须用无头硬指标判**，
+  不能拿 pty 场景当判别工具。
+- 未做：`steer` 与"纯空闲载体 + followUp"两组实验（决定 `sendMessageAfterRebind` 是否可以改成排队优先）。

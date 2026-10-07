@@ -2,6 +2,35 @@
 
 ## 格式
 
+### [2026-10-07] 相位实验：在 `session_start` 里触发回合是**非法用法**（pi 直接报错），不只是"时机不好"
+
+**要回答的问题**：新进程启动后，究竟等到什么时候注入"续跑回合"才不会丢回复？（上一轮证伪了"换绑事件"方案，见下条。）
+
+**方法**：无头 `--print` 实验台（临时脚本放在会话的 `/tmp/my-pi-exp/`，**不入库**）：一个临时扩展在指定相位发
+`pi.sendMessage({customType,content},{triggerTurn:true})`，硬指标 = 会话文件里 assistant 条目数（对照组只跑提示词 = 1）。
+每次约 45s，无 pty、无抖动。
+
+**结果**（同一实验台，`print` 模式）：
+| 相位 | rc | assistant | 观察 |
+|---|---|---|---|
+| 无注入（对照） | 0 | 1 | 正常 |
+| `session_start`+0ms ×2 | **1** | **0** | stderr：`Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.` |
+| `resources_discover`+0ms | **1** | 0 | 同上 |
+| `session_start`+600ms | 0 | **2** | 两条回复都落盘 |
+| `deliverAs:'followUp'` @`session_start`+0ms ×2 | 0 | 1 | 不报错了、消息也落盘（custom=1），但**没有为它起回合** |
+
+**结论**：
+1. **在 `session_start` 用 `triggerTurn` 本身是错的用法**——那一刻 agent 可能已在处理中，pi 会**直接报错并结束进程**
+   （不是"悄悄丢回复"）。这解释了过去"延后之后就好了"的一部分原因，也说明**延时不是唯一解，更不是最佳解**。
+2. `deliverAs:'followUp'` 能安全排队（不报错、消息落盘），但在 print 的忙碌生命周期下不保证起回合；
+   **"空闲进程里 followUp 会不会起回合"（=重启后的真实形态）尚未测**，是下一步。
+3. 真 pty 场景今天在 **0ms 与 600ms 下都跑通**（三次）：原有"0ms 必丢"的证据在当前代码里**不能稳定复现**，
+   与"偶发竞态"的既有记录一致。推论：这条链路**不能靠 pty 场景做判别**（它的软检查把丢回复降级成警告），
+   得用无头硬指标实验——本条的结论就是这样拿到的。
+
+**下一步（未做）**：用同一实验台测 `steer`、以及"纯空闲载体 + `followUp`/`triggerTurn`"两种组合，再决定
+`custom/adapters/ui-adapter.ts` 的 `sendMessageAfterRebind()` 是改成"排队优先"还是保留延时。
+
 ### [2026-10-07] 「换绑完成事件」被证伪：重启路径是新进程 + `--session`，不走会话替换
 
 **想做的事**：把 2026-10-06 那版"在 `session_start` 之后延后 600ms 再触发续跑回合"换成**正序事件**
