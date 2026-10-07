@@ -1,16 +1,16 @@
 {
   "device": "localhost",
-  "generatedAt": "2026-10-05T15:51:42.285Z",
+  "generatedAt": "2026-10-07T09:14:49.850Z",
   "windowDays": 30,
-  "totalCalls": 1834,
+  "totalCalls": 1920,
   "tools": {
     "read": {
-      "calls": 238,
+      "calls": 256,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068800068,
-      "lastTs": 1791204610923
+      "lastTs": 1791266641702
     },
     "find": {
       "calls": 1,
@@ -53,28 +53,28 @@
       "lastTs": 1790773513366
     },
     "edit": {
-      "calls": 161,
+      "calls": 164,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810151,
-      "lastTs": 1790774365952
+      "lastTs": 1791266630734
     },
     "bash": {
-      "calls": 1129,
+      "calls": 1190,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068810163,
-      "lastTs": 1791207392729
+      "lastTs": 1791341117251
     },
     "memory_search": {
-      "calls": 4,
+      "calls": 5,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790068815587,
-      "lastTs": 1790510433355
+      "lastTs": 1791255743788
     },
     "memory_store": {
       "calls": 14,
@@ -181,12 +181,12 @@
       "lastTs": 1790510469748
     },
     "admin_restart": {
-      "calls": 10,
+      "calls": 12,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790258998965,
-      "lastTs": 1790772886990
+      "lastTs": 1791266686576
     },
     "autopilot_status": {
       "calls": 2,
@@ -245,12 +245,12 @@
       "lastTs": 1790773487351
     },
     "ctx_note": {
-      "calls": 14,
+      "calls": 15,
       "input": 0,
       "cacheRead": 0,
       "cacheWrite": 0,
       "firstTs": 1790504206289,
-      "lastTs": 1791203895522
+      "lastTs": 1791273616289
     },
     "autopilot_policy": {
       "calls": 1,
