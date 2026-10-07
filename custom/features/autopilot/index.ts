@@ -887,7 +887,11 @@ export function register(pi: ExtensionAPI): void {
           });
           if (plan.channel === 'turn') {
             // 延后触发：避开 pi 会话替换的 rebind 竞态（见 adapters/ui-adapter.ts 的注释）
-            sendMessageAfterRebind(pi, { customType: plan.customType, content: plan.content, display: true });
+            sendMessageAfterRebind(
+              pi,
+              { customType: plan.customType, content: plan.content, display: true },
+              { isIdle: () => ctx.isIdle() },
+            );
           } else {
             sendMessage(pi, { customType: plan.customType, content: plan.content, display: false }, { deliverAs: 'nextTurn' });
           }

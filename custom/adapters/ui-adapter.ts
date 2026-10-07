@@ -115,28 +115,67 @@ export function sendMessage<T = unknown>(
  *
  * 后续（2026-10-07 无头硬指标实验，见 DECISIONS）：在 `session_start` 用 `triggerTurn` 会被 pi **直接拒绝**
  * （`Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.`，
- * 进程 rc=1、什么都没落盘）；`deliverAs:'followUp'` 不报错、消息落盘，但不保证起回合。也就是说这里的
- * "延时"是在绕开一个**非法时序**，正解可能是"排队优先"（`steer`/空闲态 `followUp` 两组实验待做）。
+ * 进程 rc=1、什么都没落盘）；`deliverAs` 三种排队语义（followUp/steer/nextTurn）**都不会起回合**；
+ * 只有"空闲 + triggerTurn"这一种组合能真的起回合（`agent_settled` 那一刻实测可用）。所以这里的
+ * "延时"是在猜"什么时候已经空闲"，而现在有了可观测判据——见下面的空闲门。
  */
 export function sendMessageAfterRebind(
   pi: ExtensionAPI,
   message: { customType: string; content: string; display: boolean },
-  delayMs = 600,
+  opts: { delayMs?: number; isIdle?: () => boolean } = {},
 ): void {
   const raw = Number(process.env.PI_RESTART_RESUME_DELAY_MS);
-  const delay = Number.isFinite(raw) && raw >= 0 ? raw : delayMs;
+  const base = opts.delayMs ?? 600;
+  const delay = Number.isFinite(raw) && raw >= 0 ? raw : base;
+  let sent = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const fire = () => {
+    if (sent) return;
+    sent = true;
+    if (timer) clearTimeout(timer);
     try {
       sendMessage(pi, message, { triggerTurn: true });
     } catch {
       /* 会话可能已关闭：放弃这次唤醒（通知本身已进 restartLog 的上下文） */
     }
   };
+  // 判空闲要防抛（会话正在关闭时 ctx.isIdle() 也可能抛）：抛了就当"忙"——保守，绝不冒"忙碌态
+  // 发 triggerTurn"的风险，那是一条 catch 不住的致命错误（实验见 DECISIONS）。
+  const isIdle = (): boolean => {
+    if (!opts.isIdle) return true;
+    try {
+      return opts.isIdle();
+    } catch {
+      return false;
+    }
+  };
+  // ① agent 忙：**不能发**（忙碌态 triggerTurn = pi 直接报错、进程 rc=1、什么都不落盘、catch 不住），
+  //    挂一次性 `agent_settled`，等它真的静下来再发。事件不可用/一直不静 → 交给下面的定时器兜底。
+  if (!isIdle()) {
+    let attempts = 0;
+    const waitSettle = () => {
+      if (attempts++ > 3) return; // 重订阅上限用完：交给定时器
+      try {
+        const off = pi.on('agent_settled', () => {
+          off?.();
+          if (isIdle()) fire();
+          else waitSettle();
+        });
+      } catch {
+        /* 没有该事件：交给定时器兜底 */
+      }
+    };
+    waitSettle();
+    timer = setTimeout(fire, delay);
+    timer.unref?.();
+    return;
+  }
+  // ② 空闲：保持既有的"延后触发"（重启后宿主接线的经验窗口；持续验证过的那条路径）。
   if (delay === 0) {
     fire();
     return;
   }
-  const timer = setTimeout(fire, delay);
+  timer = setTimeout(fire, delay);
   timer.unref?.();
 }
 

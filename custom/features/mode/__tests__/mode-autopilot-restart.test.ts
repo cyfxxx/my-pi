@@ -247,6 +247,30 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     process.env.PI_RESTART_RESUME_DELAY_MS = '0';
   });
 
+  it('agent 忙时不发 triggerTurn（pi 会致命报错、catch 不住），等 agent_settled 再发', async () => {
+    const { writeRestartRequest } = await import('../../autopilot/logic');
+    process.env.PI_RESTART_RESUME_DELAY_MS = '5000'; // 兜底很长：只有 settled 这条路能让它在测试内送达
+    const pi = await setupBoth();
+    const handlers = pi.hooks.get('session_start') ?? [];
+    writeRestartRequest('restart_hang', { targetSession: SESS, reason: '看门狗恢复', intent: 'continue' });
+    ageStateLog();
+
+    let busyNow = true; // 真实形态：session_start 时 agent 在处理中，settled 之后才空闲
+    const gated = { ...ctx(), isIdle: () => !busyNow };
+    await handlers[1]({}, gated);
+    // 忙：绝不能发（忙碌态 triggerTurn 会让 pi 直接报错退出）
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-resume')).toHaveLength(0);
+    const settled = pi.hooks.get('agent_settled') ?? [];
+    expect(settled.length, '忙时必须挂 agent_settled，否则只能靠猜延时').toBeGreaterThan(0);
+
+    busyNow = false; // agent 静下来
+    // 注意：autopilot 自己也注册 agent_settled，所以要把该事件的所有处理器都跑一遍（我们要找的是
+    // sendMessageAfterRebind 挂的那个一次性订阅）。
+    for (const h of settled) await h({ type: 'agent_settled' }, gated);
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-resume')).toHaveLength(1);
+    process.env.PI_RESTART_RESUME_DELAY_MS = '0';
+  });
+
   it('admin_restart 写盘失败 → 不 shutdown、明确告知（不制造"进程没了、也没重启"）', async () => {
     const pi = await setupBoth();
     const tool = pi.tools.find((t) => t.name === 'admin_restart');

@@ -2295,3 +2295,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - `session_start` + `steer`（忙碌）→ 不报错但也不起回合；`session_start` 先 `triggerTurn` 再 catch 退化 `followUp` → **rc=1，catch 不住**。
 - 结论：`triggerTurn` 只在空闲时合法、忙碌时是"catch 不住的致命错误"；`deliverAs` 三种排队语义都不触发回合。
   → 正解是"先判空闲（`ctx.isIdle()`），忙则等 `agent_settled` 再 `triggerTurn`"，定时器降级为兜底；实施方案与验证范围已写进 `DECISIONS.md`（本轮未动代码）。
+
+### 空闲门落地：忙时不发 triggerTurn，等 agent_settled（2026-10-07）
+
+- `sendMessageAfterRebind()` 增加 `{ isIdle }` 参数：忙（或 `isIdle()` 抛错，保守当忙）→ 不发，挂一次性
+  `agent_settled` 再 `triggerTurn`（重订阅上限 3 次，事件不可用则退回定时器）；空闲 → 维持原"延后触发"。
+  两个消费端都传 `{ isIdle: () => ctx.isIdle() }`。
+- 新增单测"忙时不发、settled 后发"（mode-autopilot-restart 12 例），把"忙碌态不能发 triggerTurn"这条硬证据按在代码上。
+- 验证：tsc / 全量 vitest / 单实例场景（默认延时与 0ms）/ 两实例场景 / golden --fast（见本轮提交说明）。

@@ -46,7 +46,13 @@
 2. `deliverAs` 的三种排队语义（`followUp`/`steer`/`nextTurn`）**都不会起回合** → 不能用"排队优先"替代续跑的唤醒。
 3. 因此正解是：**先判空闲**——空闲就立刻 `triggerTurn`；忙碌则等 **`agent_settled`**（agent 真正静下来的事件，实验证明那一刻 `triggerTurn` 可用）再发；定时器只作最后兜底。
 
-**下一步（实施方案，未写代码）**：把 `custom/adapters/ui-adapter.ts` 的 `sendMessageAfterRebind()` 改成"`ctx.isIdle()` 判空闲 → 忙则挂 `agent_settled` 一次性订阅再发 → 定时器兜底"；验证需要 vitest + 两个真实 pty 场景（0ms 与默认）+ 无头实验台复跑（忙碌/空闲两组）。
+**已实施（同日）**：`sendMessageAfterRebind()` 现在接受 `{ delayMs?, isIdle? }`，逻辑是
+① `ctx.isIdle()` 为假（含 `isIdle()` 抛错，保守当忙）→ **不发**，挂一次性 `agent_settled`（重订阅上限 3 次，
+事件不可用或始终不静则交给定时器）等 agent 真静下来再 `triggerTurn`；② 空闲 → 保持既有"延后触发"
+（持续验证过的路径，`PI_RESTART_RESUME_DELAY_MS` 仍可覆盖）。两个消费端（mode 兜底 + autopilot）都传
+`{ isIdle: () => ctx.isIdle() }`。新增单测"忙时不发、settled 后发"（12 例）。
+这一步的价值是**去掉了唯一一条"致命错误"路径**（忙碌态 triggerTurn → pi 报错退出、什么都不落盘、
+catch 不住），而空闲路径的行为与之前逐字相同，因此对已验证的链路是纯增量。
 
 ### [2026-10-07] 「换绑完成事件」被证伪：重启路径是新进程 + `--session`，不走会话替换
 
