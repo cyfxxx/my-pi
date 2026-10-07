@@ -2240,3 +2240,8 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 修法：`core/restart-intent.ts` 新增 `logWrittenAfterStart()` / `logTargetsOtherSession()` / `processStartedAtMs()`，两个消费端（autopilot 通用通知、mode 兜底与模式通知）先判归属再消费；老请求（无时间戳）照旧消费。
 - 证据：单测 8 → **11 例**（两条判据分别改恒 false → 3 例如期失败，改回即通过）；真链场景 **33/33**（含"round-3 出现 `my-pi-restart-resume`"与"整场只跑一个模型回合"）；台账新增第 12 行。
 - 顺带更正：此前把"round-3 无续跑"归因于场景 SIGTERM 编排抖动，实为产品侧归属错误——判据补上后同样编排稳定通过。
+
+### 角色扮演资产：补两张日常风格图（2026-10-07）
+
+- 用户点名补 `1257px-BLHX_biaoqiang_7.webp`（皮肤「枕头大战」，居家/抱枕）与 `700px-标枪换装8.jpg`（「礼服」黑色小礼服，室内沙发）→ 入库为 `07-皮肤-枕头大战.webp` / `08-皮肤-黑色礼服.jpg`，人设表格与 assets README 清单同步更新（共 8 张 / 3.8 MB）。
+- 格式结论：**webp 不转换**。pi 的 `read` 原生支持 png/jpg/webp/gif（实测返回 `image(image/webp, 426212 b64 chars)`），OpenAI 兼容传输把 `data:<mime>;base64,…` 原样放进 `image_url`、没有 mime 白名单；且该 webp 带透明背景（`VP8X + ALPH`），转 JPEG 会压成实色块、转 PNG 体积数倍。README 新增「格式」一节把这条规则写死。
