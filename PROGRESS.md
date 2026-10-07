@@ -2314,3 +2314,17 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` P1）。同模块的 `saveMainRequestPayload`/`recordFingerprint`
   是活的（929 条指纹、今天仍在写），所以不做"删死代码"。
 - 至此迁移审计的开口项 G1–G7 全部闭环（G3 为"测量后不做 + 触发条件式"）。
+
+### 进程内 system 漂移：定位到字节 + 补分段指纹 + daily-health 告警（2026-10-07）
+
+- 真实会话核对（85 次调用）：累计命中 **96.97%**；但 **4 次调用 = 69.7% 的未命中**，其中两次是 system 翻转
+  （14:11:25 未命中 **147,555 token**、14:25:34 未命中 10,308），合计 157,863 = **60.8%**。
+- 字节级闭合：`7142B 原文 + 95 换行转义 + 2 引号 = 7239`；`772B 加固块 + 9 换行 = 781`；`7239 + 781 = 8020`。
+  ⇒ 翻转 = **my-pi 的 system 加固块整块消失**（pi 的 `forceSystemPrompt` 投影没生效；`runner.ts:1455`
+  会静默吞掉处理器异常），不是工具集/某段被改写。
+- 改动：`prefix-fingerprint.ts` 新增 `systemAppend` / `systemSections` / `systemChangedSections`
+  与 `system:append-lost`/`system:append-back` 标签；`systemTextOf()` 对字符串 content **原样返回**
+  （原来 JSON.stringify 把换行转义、分段解析失效）；丢失时写独立台账 + 有 UI 时告警；
+  `daily-health.mjs` 新增 `加固块丢失=N` 字段并一律 alert（不再混进"疑似整段重算"）。
+- 按用户口径**不做自动重启**：这类"终端层卡死/前缀漂移"的处置是关掉该终端会话（见 `BUG-REPLAYS.md` 第 14/15/16 行）。
+- 验证：指纹单测 28 项、`test-usage-metrics.mjs` 53 项、`check-conventions.sh` 台账 16 行、`tsc -p custom/` 干净。

@@ -8,6 +8,8 @@ import {
   messageSegments,
   firstDivergentSegment,
   systemTextOf,
+  systemSectionSizes,
+  changedSectionNames,
   FINGERPRINT_HEAD_MESSAGES,
 } from '../budget/prefix-fingerprint';
 
@@ -103,12 +105,15 @@ describe('systemTextOf', () => {
     expect(systemTextOf({ system: 'explicit', messages: [{ role: 'system', content: 'x' }] })).toBe('explicit');
   });
 
-  it('回退到首条 role=system 消息', () => {
-    expect(systemTextOf({ messages: [{ role: 'system', content: 'from-msg' }] })).toBe('"from-msg"');
+  it('回退到首条 role=system 消息（字符串原样返回，不 JSON 转义）', () => {
+    // 2026-10-07 改：早先无条件 stable() 会加引号并把换行转义成字面量 \n，
+    // 导致 system 文本的分段字节统计整体失效。
+    expect(systemTextOf({ messages: [{ role: 'system', content: 'from-msg' }] })).toBe('from-msg');
+    expect(systemTextOf({ messages: [{ role: 'system', content: 'a\n<b>\nc' }] })).toBe('a\n<b>\nc');
   });
 
   it('role=developer 也视为 system', () => {
-    expect(systemTextOf({ messages: [{ role: 'developer', content: 'dev' }] })).toBe('"dev"');
+    expect(systemTextOf({ messages: [{ role: 'developer', content: 'dev' }] })).toBe('dev');
   });
 
   it('system 为非字符串（对象/数组）时序列化而非丢弃', () => {
@@ -221,5 +226,120 @@ describe('prefix-fingerprint 盲区回归', () => {
 
   it('formatFingerprint 输出档位', () => {
     expect(formatFingerprint(fingerprintRequest(base(), null, 1, 'high'))).toContain('lvl=high');
+  });
+});
+
+/**
+ * 2026-10-07 实测：同一进程内 system 在 8020B ↔ 7239B 两个变体之间来回翻，两次翻转
+ * = 147,555 + 10,308 token 全价重算（占该会话全部未命中的 60.8%）。原来的指纹只记
+ * system 的总哈希，只能说"system 变了"，说不出"是哪一段变了、以及是不是 my-pi 的
+ * 加固块整块丢了"。下面这组测试钉住新增的两个判据。
+ */
+describe('system 分段与追加块诊断（2026-10-07）', () => {
+  const b = (s: string): number => Buffer.byteLength(s, 'utf-8');
+  // pi 的真实渲染形态：preamble 不打标签，其余段为 <name>\n…\n</name>，段间以 \n\n 连接
+  const PREAMBLE = 'You are an expert coding assistant.';
+  const TOOLS = '<tools>\n- read: Read file contents\n- bash: Execute bash commands\n</tools>';
+  const RULES = '<rules>\n- Use read to examine files instead of cat or sed.\n</rules>';
+  const SKILLS =
+    '<skills>\n<available_skills>\n  <skill>\n    <name>x</name>\n    <description>d</description>\n  </skill>\n</available_skills>\n</skills>';
+  const CWD = '<cwd>\n/root/my-pi\n</cwd>';
+  const SYS = [PREAMBLE, TOOLS, RULES, SKILLS, CWD].join('\n\n');
+  /** my-pi 的加固块（真实取值来自 hard-rules 的 EFFICIENCY_ADVICE，这里是同形替身） */
+  const APPEND = '效率建议：使用更具体的工具调用可以提高响应速度。';
+
+  it('systemSectionSizes 切出每段字节数，嵌套 <skill> 不被误切', () => {
+    const s = systemSectionSizes(SYS);
+    // preamble = 第一个标签之前的全部文本，含它与首个标签之间的 \n\n 连接符
+    expect(s.preamble).toBe(b(PREAMBLE + '\n\n'));
+    expect(s.tools).toBe(b(TOOLS));
+    expect(s.rules).toBe(b(RULES));
+    expect(s.skills).toBe(b(SKILLS));
+    expect(s.cwd).toBe(b(CWD));
+    // 反向引用保证闭合在 </skills>，嵌套的 <skill> 不会被单独计一段
+    expect(s.skill).toBeUndefined();
+    expect(s.available_skills).toBeUndefined();
+  });
+
+  it('systemSectionSizes 空文本返回空表', () => {
+    expect(systemSectionSizes('')).toEqual({});
+  });
+
+  it('changedSectionNames 给出发生变化的段名', () => {
+    expect(changedSectionNames({ a: 1, b: 2 }, { a: 1, b: 3 })).toEqual(['b']);
+    expect(changedSectionNames(undefined, { a: 1 })).toEqual(['a']);
+    expect(changedSectionNames({ a: 1 }, { a: 1 })).toEqual([]);
+    // 消失的段也算变化（用 -1 哨兵，和"变成 0 字节"区分开）
+    expect(changedSectionNames({ a: 1, gone: 5 }, { a: 1 })).toEqual(['gone']);
+  });
+
+  it('加固块丢失 → system:append-lost，且没有任何分段被改写', () => {
+    const a = fingerprintRequest(
+      { messages: [{ role: 'system', content: `${SYS}\n\n${APPEND}` }] },
+      null,
+      1,
+      'high',
+      APPEND,
+    );
+    expect(a.systemAppend).toBe(true);
+
+    const lost = fingerprintRequest({ messages: [{ role: 'system', content: SYS }] }, a, 2, 'high', APPEND);
+    expect(lost.systemAppend).toBe(false);
+    expect(lost.changed).toContain('system');
+    expect(lost.changed).toContain('system:append-lost');
+    // 关键判据：加固块挂在所有分段之外，所以"段字节数全未变、system 却变了"
+    // 只能解释为"末尾那块整块丢了"，而不是"某段被改写"。
+    expect(lost.systemChangedSections).toEqual([]);
+    expect(lost.systemSections).toEqual(a.systemSections);
+    expect(formatFingerprint(lost)).toContain('app=LOST');
+  });
+
+  it('加固块恢复 → system:append-back', () => {
+    const lost = fingerprintRequest({ messages: [{ role: 'system', content: SYS }] }, null, 1, 'high', APPEND);
+    expect(lost.systemAppend).toBe(false);
+    const back = fingerprintRequest(
+      { messages: [{ role: 'system', content: `${SYS}\n\n${APPEND}` }] },
+      lost,
+      2,
+      'high',
+      APPEND,
+    );
+    expect(back.systemAppend).toBe(true);
+    expect(back.changed).toContain('system:append-back');
+  });
+
+  it('某一段被改写 → 能指出是哪一段（区别于加固块丢失）', () => {
+    const a = fingerprintRequest(
+      { messages: [{ role: 'system', content: `${SYS}\n\n${APPEND}` }] },
+      null,
+      1,
+      'high',
+      APPEND,
+    );
+    const bigger = `${RULES}\n`.replace('</rules>', '- 额外一条规则。\n</rules>');
+    const changedSys = [PREAMBLE, TOOLS, bigger, SKILLS, CWD].join('\n\n');
+    const c = fingerprintRequest(
+      { messages: [{ role: 'system', content: `${changedSys}\n\n${APPEND}` }] },
+      a,
+      2,
+      'high',
+      APPEND,
+    );
+    expect(c.systemAppend).toBe(true);
+    expect(c.changed).toContain('system');
+    expect(c.changed).not.toContain('system:append-lost');
+    expect(c.systemChangedSections).toContain('rules');
+    expect(c.systemChangedSections).not.toContain('tools');
+  });
+
+  it('不给判据文本时不产生 systemAppend（老调用方行为不变）', () => {
+    const a = fingerprintRequest({ messages: [{ role: 'system', content: SYS }] }, null, 1);
+    expect(a.systemAppend).toBeUndefined();
+    const bb = fingerprintRequest({ messages: [{ role: 'system', content: `${SYS} more` }] }, a, 2);
+    expect(bb.changed).toContain('system');
+    // 判据缺失时不得把"追加块丢失"误报出来
+    expect(bb.changed).not.toContain('system:append-lost');
+    expect(bb.changed).not.toContain('system:append-back');
+    expect(formatFingerprint(bb)).toContain('app=-');
   });
 });

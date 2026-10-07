@@ -23,6 +23,22 @@
  * 变化时直接给出**首个分叉段**：`messages@0-7` 表示从第 0 条起就分叉（最贵，整段重放），
  * `messages@120-127` 表示中后段改写（只影响其后的少量 token）。判据由此从一个布尔
  * 变成"失效起点"，才能区分"该修"与"可接受"。
+ *
+ * 2026-10-07 补齐第四处盲区（**进程内 system 漂移**）：只记 `system` 的**总哈希**，于是
+ * "同一进程内 system 变了、整段 149K 重放"这件事只能看到 `changed:['system']`，
+ * 归因不到具体是哪一段。实测一次会话里 system 在 8020B ↔ 7239B 两个变体之间来回翻
+ * （14:11:22 翻过去、14:25:27 翻回来），两次翻转 = 147,555 + 10,308 token 全价重算
+ * = 该会话全部未命中的 60.8%。
+ *
+ * 现在补两样：
+ *   1. `systemSections`：把 system 文本按 `<tag>` 切成段，记**每段字节数**（变化时）；
+ *      `systemChangedSections` 直接给出变动的段名。
+ *   2. `systemAppend`：my-pi 追加的 system 加固块**是否还在**本次文本里。
+ *      判据来自 pi 的实现：`before_agent_start` 处理器返回的 `systemPrompt` 会走
+ *      `forceSystemPrompt` 投影（`core/extensions/runner.ts`）；一旦该处理器**抛错**
+ *      （异常被 runner 静默吞掉）或提前 return，投影不生效，请求退回"纯分段渲染"，
+ *      my-pi 那 772 字节加固块就整块消失 → 前缀从第一个 token 起就分叉。
+ *      该字段把这条静默失败变成可观测的 `system:append-lost` / `system:append-back`。
  */
 
 import { createHash } from 'node:crypto';
@@ -62,6 +78,16 @@ export interface PrefixFingerprint {
   systemBytes: number;
   /** 消息条数（压缩/裁剪会改变它） */
   messageCount: number;
+  /**
+   * my-pi 追加的 system 加固块（`buildSystemPrompt` 的追加段）是否出现在本次 system 文本里。
+   * `false` = 该回合走了 pi 的 `forceSystemPrompt` 投影失败路径（处理器抛错/提前 return，
+   * 异常被 runner 静默吞掉）→ 前缀最前处就少了一整块。`undefined` = 未提供判据文本。
+   */
+  systemAppend?: boolean;
+  /** system 文本按 `<tag>` 分段后的**字节数**（每条都记，作为比较基线） */
+  systemSections?: Record<string, number>;
+  /** 与上一条相比，字节数发生变化的段名（排序后；首条指纹没有基线时省略） */
+  systemChangedSections?: string[];
   /** 与上一条指纹相比发生变化的段（首次为空） */
   changed: string[];
 }
@@ -91,7 +117,13 @@ export function systemTextOf(payload: {
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
   for (const m of messages) {
     const msg = m as { role?: string; content?: unknown };
-    if (msg?.role === 'system' || msg?.role === 'developer') return stable(msg.content);
+    if (msg?.role === 'system' || msg?.role === 'developer') {
+      // 字符串**原样返回**：早先无条件走 `stable()`（= JSON.stringify）会给文本加引号、
+      // 并把真实换行转义成字面量 `\n`，于是 `systemSectionSizes` 再也切不开分段
+      // （2026-10-07 查"进程内 system 漂移"时踩到：整段被记成一段 `preamble`）。
+      // 非字符串（结构化 content）仍序列化，保持"宁可序列化也不丢弃"的原意。
+      return typeof msg.content === 'string' ? msg.content : stable(msg.content);
+    }
   }
   return '';
 }
@@ -103,6 +135,43 @@ export function messageSegments(messages: unknown[], size: number = FINGERPRINT_
     out.push(sha(messages.slice(i, i + size).map(messageKey).join('\n')).slice(0, 8));
   }
   return out;
+}
+
+/**
+ * 把 system 文本按 `<tag>…</tag>` 切成段并返回**每段字节数**。
+ *
+ * 与 pi 的渲染对齐（`core/system-prompt.ts` buildSystemPromptSections）：除 `preamble`
+ * 外每段都包成 `<name>\n…\n</name>`，段间以 `\n\n` 连接。因为闭合标签靠反向引用匹配，
+ * 嵌套的 `<skills>`/`<available_skills>`/`<skill>` 不会被截断。
+ * `preamble` 段（未打标签）记为第一个标签之前的全部文本。
+ *
+ * 纯诊断：用于回答"system 变了，是哪一段变了"。
+ */
+export function systemSectionSizes(text: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!text) return out;
+  const re = /<([a-z][a-z0-9_-]*)>\n([\s\S]*?)\n<\/\1>/g;
+  let firstIndex = -1;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (firstIndex < 0) firstIndex = m.index;
+    out[m[1]] = Buffer.byteLength(m[0], 'utf-8');
+  }
+  out.preamble = Buffer.byteLength(firstIndex >= 0 ? text.slice(0, firstIndex) : text, 'utf-8');
+  return out;
+}
+
+/** 两个分段字节表之间发生变化的段名 */
+export function changedSectionNames(
+  prev: Record<string, number> | undefined,
+  next: Record<string, number>,
+): string[] {
+  const keys = new Set([...Object.keys(prev ?? {}), ...Object.keys(next)]);
+  const out: string[] = [];
+  for (const k of keys) {
+    if ((prev?.[k] ?? -1) !== (next[k] ?? -1)) out.push(k);
+  }
+  return out.sort();
 }
 
 /**
@@ -143,12 +212,15 @@ export function firstDivergentSegment(
  * 计算请求分段落指纹；`prev` 存在时给出变化段。
  * 注意 total 基于完整消息序列，用于判断"请求是否逐字节相同"。
  * `level` 为当前 thinking 档位（参与缓存键，切档即整段失效）。
+ * `systemAppendText` 为 my-pi 追加到 system 末尾的加固块文本；给了才判定并记录
+ * `systemAppend`（不传则该字段不出现，保持既有调用方行为不变）。
  */
 export function fingerprintRequest(
-  payload: { messages?: unknown[]; tools?: unknown; system?: unknown },
+  payload: { messages?: unknown[]; tools?: unknown; system?: unknown; systemPrompt?: unknown },
   prev: PrefixFingerprint | null = null,
   now: number = Date.now(),
   level: string = '',
+  systemAppendText?: string,
 ): PrefixFingerprint {
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
   const systemText = systemTextOf(payload);
@@ -158,9 +230,20 @@ export function fingerprintRequest(
   const head = sha(messages.slice(0, FINGERPRINT_HEAD_MESSAGES).map(messageKey).join('\n'));
   const segments = messageSegments(messages);
   const total = sha([system, tools, sha(messages.map(messageKey).join('\n'))].join('|'));
+  // my-pi 加固块是否还在：判据文本由调用方传入（hard-rules 的 EFFICIENCY_ADVICE，追加段末尾）。
+  const systemAppend =
+    typeof systemAppendText === 'string' && systemAppendText.length > 0
+      ? systemText.includes(systemAppendText)
+      : undefined;
   const changed: string[] = [];
   if (prev) {
-    if (prev.system !== system) changed.push('system');
+    if (prev.system !== system) {
+      changed.push('system');
+      // 只在两次都判得出追加块时比较，避免把"未提供判据"误报成丢失。
+      if (prev.systemAppend !== undefined && systemAppend !== undefined && prev.systemAppend !== systemAppend) {
+        changed.push(systemAppend ? 'system:append-back' : 'system:append-lost');
+      }
+    }
     if (prev.tools !== tools) changed.push('tools');
     if (prev.head !== head) changed.push('head');
     if (prev.messageCount !== messages.length) changed.push('messages');
@@ -176,6 +259,10 @@ export function fingerprintRequest(
     // 兜底：以上分段全部未变、但整体指纹不同（理论上不可达，保留为安全网）
     if (changed.length === 0 && prev.total !== total) changed.push('total');
   }
+  // **每一条都记**分段字节表（不是只在变化时记）：否则"本进程第一次 system 变化"没有可比
+  // 基线，`systemChangedSections` 会把全部段名都列成"变了"，等于没定位（2026-10-07 踩到）。
+  // 代价约 90 字节/行，可接受。
+  const sections = systemSectionSizes(systemText);
   return {
     ts: now,
     ...(prev ? { sinceLastMs: Math.max(0, now - prev.ts) } : {}),
@@ -188,6 +275,9 @@ export function fingerprintRequest(
     toolsBytes: Buffer.byteLength(toolsJson, 'utf-8'),
     systemBytes: Buffer.byteLength(systemText, 'utf-8'),
     messageCount: messages.length,
+    ...(systemAppend !== undefined ? { systemAppend } : {}),
+    systemSections: sections,
+    ...(prev?.systemSections ? { systemChangedSections: changedSectionNames(prev.systemSections, sections) } : {}),
     changed,
   };
 }
@@ -196,5 +286,8 @@ export function fingerprintRequest(
 export function formatFingerprint(f: PrefixFingerprint): string {
   const flags = f.changed.length > 0 ? f.changed.join('+') : 'same';
   const idle = f.sinceLastMs != null ? `${Math.round(f.sinceLastMs / 1000)}s` : '-';
-  return `${f.total} sys=${f.system} tools=${f.tools} head=${f.head} lvl=${f.level || '-'} msgs=${f.messageCount} idle=${idle} [${flags}]`;
+  // 追加块是**必须恒在**的：丢了就是整段前缀作废（2026-10-07 实测）。用一个显眼的大写标记。
+  const app = f.systemAppend === undefined ? '-' : f.systemAppend ? 'ok' : 'LOST';
+  const segs = f.systemChangedSections?.length ? ` Δsec=${f.systemChangedSections.join(',')}` : '';
+  return `${f.total} sys=${f.system} app=${app} tools=${f.tools} head=${f.head} lvl=${f.level || '-'} msgs=${f.messageCount} idle=${idle}${segs} [${flags}]`;
 }

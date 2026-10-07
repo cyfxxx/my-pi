@@ -18,7 +18,7 @@ import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
 import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
-import { auditSystemInjection, buildSystemPrompt } from './budget/system-prompt';
+import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
 import { normalizeSessionTitle, MAX_SESSION_TITLE_BYTES } from './budget/session-title';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
@@ -132,14 +132,42 @@ export function register(pi: ExtensionAPI): void {
   const fingerprintFile =
     process.env.PI_PREFIX_FINGERPRINT_FILE || join(getMemoryDir(), 'logs', 'prefix-fingerprints.jsonl');
   let lastFingerprint: PrefixFingerprint | null = null;
+  // 加固块丢失的独立台账（量小、只在实际丢失时写）：这是"整段前缀作废"的直接证据。
+  const appendLostFile = process.env.PI_SYSTEM_APPEND_LOST_FILE || join(getMemoryDir(), 'logs', 'system-append-lost.jsonl');
   // 上一次追加的易变运行时提示内容（仅变化时追加，避免每轮重插导致的消息序列位移）
   let lastVolatileContext: string | null = null;
-  const recordFingerprint = (payload: { messages?: unknown[]; tools?: unknown }): void => {
+  const recordFingerprint = (
+    payload: { messages?: unknown[]; tools?: unknown },
+    ctx?: { hasUI?: boolean; ui?: { notify?: (message: string, level?: string) => void } },
+  ): void => {
     try {
-      const fp = fingerprintRequest(payload, lastFingerprint, Date.now(), getThinkingLevel(pi));
+      // 第 5 参数 = my-pi 追加到 system 末尾的加固块文本：指纹据此记录 `systemAppend`，
+      // 一旦某回合走了 pi 的 forceSystemPrompt 失败路径（加固块整块消失 → 前缀从第 0 个
+      // token 起分叉），日志会直接标出 `system:append-lost`（2026-10-07 实测 147K 全量重放）。
+      const fp = fingerprintRequest(payload, lastFingerprint, Date.now(), getThinkingLevel(pi), EFFICIENCY_ADVICE);
       lastFingerprint = fp;
       ensureDir(dirname(fingerprintFile));
       appendJSONLRotating(fingerprintFile, fp, 1_000_000);
+      // pi 会**静默吞掉** `before_agent_start` 的异常（只发给内存 listener，不落盘），于是
+      // "加固块整块丢失"此前完全不可观测。这里主动喊出来：写独立台账 + 有 UI 时告警。
+      if (fp.changed.includes('system:append-lost')) {
+        try {
+          ensureDir(dirname(appendLostFile));
+          appendJSONLRotating(
+            appendLostFile,
+            { ts: fp.ts, systemBytes: fp.systemBytes, systemSections: fp.systemSections, changed: fp.changed },
+            200_000,
+          );
+        } catch {
+          /* 台账失败不影响请求 */
+        }
+        if (ctx?.hasUI) {
+          ctx.ui?.notify?.(
+            `system 前缀加固块丢失（system ${fp.systemBytes}B，未重启）：该回合整段前缀缓存作废`,
+            'warning',
+          );
+        }
+      }
     } catch {
       /* 诊断失败不影响请求 */
     }
@@ -755,11 +783,11 @@ export function register(pi: ExtensionAPI): void {
       const last = payload.messages[payload.messages.length - 1] as { role?: string; content?: unknown };
       if (isSummarizationMessage(last)) {
         const replayed = buildReplayedPayload(warmState, payload.messages, payload);
-        if (fingerprintEnabled) recordFingerprint(replayed ?? payload);
+        if (fingerprintEnabled) recordFingerprint(replayed ?? payload, ctx as never);
         return replayed ?? undefined;
       }
       saveMainRequestPayload(warmState, modelKey, payload.messages, payload.tools);
-      if (fingerprintEnabled) recordFingerprint(payload);
+      if (fingerprintEnabled) recordFingerprint(payload, ctx as never);
       return undefined;
     },
   });

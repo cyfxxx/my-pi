@@ -35,7 +35,7 @@ function check(name, cond, detail = '') {
 }
 
 /** 造一个临时 memory 目录：每轮用量 + 工具级台账 + 前缀指纹。同时造空的 agent 目录，保证用例自洽 */
-function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null }) {
+function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null, appendLost = 0 }) {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-'));
   const mem = join(root, 'memory');
   const agent = join(root, 'agent');
@@ -97,6 +97,24 @@ function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes
         segChange === 'head' ? 'messages@0-7' : segChange === 'mid' ? 'messages@32-39' : frontChange ? 'tools' : null,
       ),
     },
+    // 加固块丢失（2026-10-07）：进程内 system 漂移，systemAppend 由 true 翻成 false。
+    // 段字节数全未变、system 却变了 —— 只能解释为"末尾那块整块丢了"，而非某段被改写。
+    ...Array.from({ length: appendLost }, (_, i) => ({
+      ts: now - 500 + i,
+      sinceLastMs: 4000,
+      total: `lost${i}`,
+      system: 'sLOST',
+      systemAppend: false,
+      systemBytes: 7239,
+      systemSections: { preamble: 171, tools: 490, rules: 790, docs: 1271, addendum: 1816, skills: 2570, cwd: 24 },
+      systemChangedSections: [],
+      tools: 't2',
+      head: 'h1',
+      segments: seg('s0'),
+      level: 'high',
+      messageCount: 6,
+      changed: ['system', 'system:append-lost'],
+    })),
     // 冷启动：无 sinceLastMs 的记录 = 进程首个请求（fingerprintRequest 在 prev=null 时省略该字段）
     ...Array.from({ length: coldStarts }, (_, i) => ({
       ts: now - 2500 + i, // 必须早于最后一条用量记录，否则配不上对
@@ -347,6 +365,35 @@ function runHealth({ mem, agent }, extraEnv = {}) {
     check('窗口外的压缩不计入压缩重放', out.includes('压缩重放=0'), out.trim().split('\n')[0]);
   } finally {
     rmSync(stale.root, { recursive: true, force: true });
+  }
+}
+
+// ── 用例 2f：system 加固块丢失（2026-10-07 实测：147,555 + 10,308 token 全价重放 = 会话未命中 60.8%）──
+// pi 会静默吞掉 `before_agent_start` 处理器的异常 → my-pi 追加的 system 加固块整块消失 →
+// 前缀从第 0 个 token 起分叉。这是**确定事件**，必须 alert，且不能被"压缩重放"那类免责说明吃掉。
+{
+  const fixture = makeFixture({ appendLost: 1 });
+  try {
+    const out = runHealth(fixture);
+    const first = out.trim().split('\n')[0];
+    check('加固块丢失被计数', out.includes('加固块丢失=1'), first);
+    check('加固块丢失触发 alert', out.includes('结论=alert'));
+    check('告警写明「进程内 system 漂移」而非压缩代价', out.includes('进程内 system 漂移'));
+    check('告警指向独立台账', out.includes('system-append-lost.jsonl'));
+    check('加固块丢失不被计入前端变更', out.includes('前端变更=0'), first);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+{
+  const fixture = makeFixture({ appendLost: 0 });
+  try {
+    const out = runHealth(fixture);
+    check('无丢失时加固块丢失=0', out.includes('加固块丢失=0'), out.trim().split('\n')[0]);
+    check('无丢失时不产生加固块告警', !out.includes('system 加固块丢失'));
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
   }
 }
 
