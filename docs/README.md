@@ -34,7 +34,8 @@
 
 | 文档 | 内容 |
 |------|------|
-| [development/MIGRATION-AUDIT.md](development/MIGRATION-AUDIT.md) | pi-tools → my-pi 迁移完整性审计：逐层对比、9 个确证缺陷（已关闭）、遗留 G3 与证据 |
+| [development/MIGRATION-AUDIT.md](development/MIGRATION-AUDIT.md) | pi-tools → my-pi 迁移完整性审计：逐层对比、9 个确证缺陷（已关闭）；G1–G7 遗留项已全部闭环（G3 = 测量后不做 + 触发条件，见 CONTEXT-MANAGEMENT-COMPARISON 的 P1） |
+| [development/EXPERIMENT-FIRST.md](development/EXPERIMENT-FIRST.md) | **先用实验判别再动代码**：三条原则（判别性指标/掐掉兜底/真实数据）、三档实验台（真实数据→无头 `--print` 假 provider→真实 pty 场景）、无头实验台自包含配方与两个必踩的坑、负结果收尾纪律（含四次真实判断的对照） |
 | [development/CONTEXT-MANAGEMENT-COMPARISON.md](development/CONTEXT-MANAGEMENT-COMPARISON.md) | 上下文管理系统对比（my-pi vs DeepSeek Harness）：机制差异、实测构成、优化项与成本模型。**顶部有 2026-10-01 更正块**（压缩阈值 ≈967K 而非 256K、擦除默认关闭、DSH 实测压缩过 6 次） |
 | [development/DSH-CONTEXT-AUDIT.md](development/DSH-CONTEXT-AUDIT.md) | DeepSeek Harness 上下文管理逐条证据（外部参照，含 `file:line`） |
 | [development/DSH-RUNTIME-AUDIT.md](development/DSH-RUNTIME-AUDIT.md) | DSH 运行时实现审计（系统提示词 21 段、agent 循环步结构、并行/独占策略、重试、收尾纪律），每条带 `file:line` 与真实会话实测 |
