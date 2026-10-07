@@ -380,7 +380,10 @@ while true; do
   [ -n "$RUN_SESSION" ] && LAST_SESSION="$RUN_SESSION"
   ROUND_INDEX=$((ROUND_INDEX + 1))
   ROUND_START_MS="$(now_ms)"
-  CRASH_LOG="$ROUND_LOG_DIR/round-${ROUND_INDEX}.log"
+  # 名字带 supervisor 自己的 pid：多实例共享同一 agent 目录时，两个实例的 ROUND_INDEX 都从 1 开始，
+  # `round-1.log` 会互相覆盖——复盘时恰好丢掉要查的那一轮（2026-10-07 两实例真 pty 场景实测）。
+  # 轮转用的 glob（round-*.log）不受影响；`rounds.jsonl` 的 `crashLog` 字段记的是本名。
+  CRASH_LOG="$ROUND_LOG_DIR/round-${ROUND_INDEX}-$$.log"
   # crash log 必须**按轮保留**：旧实现是 /tmp/my-pi-crash-$$.log，每轮覆盖，
   # 事故复盘时连"上一轮为什么退出"都看不到（2026-10-06 实测）。只留最近 ROUND_LOG_KEEP 轮。
   ls -1t "$ROUND_LOG_DIR"/round-*.log 2>/dev/null | tail -n +$((ROUND_LOG_KEEP + 1)) | xargs -r rm -f 2>/dev/null || true

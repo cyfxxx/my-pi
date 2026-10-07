@@ -113,6 +113,19 @@
 
 ### [2026-10-06] 多实例的下半场：归属判定不能误伤 + 真多进程锁测试 + 实例数可见
 
+> **2026-10-07 续（真 pty 两实例场景落地后）**：
+> 1. **"实例数可见"此前在真机上是空的**——`state-audit` 数实例的判据是 `argv.includes('cli.js')`，
+>    而 pi 启动后把 `process.title` 写成 `pi`，`/proc/<pid>/cmdline` 只剩 `pi`（只有启动早期或假 CLI
+>    才带 cli.js）→ 真 pi 一个都数不到，那条"多实例可见"的承诺从上线起就没兑现过。改为认两种形态
+>    （`cli.js` 或标题 `pi`/`pi-rpc`，且 `exe=node`、排除 `node -e` 助手）；CLI 级测试用
+>    `process.title='pi'` 的假进程锁住，真链由两实例场景断言"实例数 ≥2"。
+> 2. **共享目录下 per-round crash log 同名覆盖**：两个 supervisor 的 `ROUND_INDEX` 都从 1 开始，
+>    `recovery/rounds/round-1.log` 互相覆盖——多实例出问题时恰好丢掉要查的那一轮。改为
+>    `round-<N>-<pid>.log`（轮转 glob 与 `rounds.jsonl` 的 `crashLog` 字段语义不变）。
+> 3. 新的真链场景 `scripts/test-scenario-two-instances.mjs`（两 supervisor + 两真 pi 共享 agent 目录，
+>    33 项）把上面这些与 ownerPid 契约、重启日志归属判据一起按在真 pi 上；opt-in 走
+>    `PI_GOLDEN_SCENARIO=1`（golden 第 20 步，`--smoke` 顺延到第 21 步）。
+
 补上一批并发硬化的三个尾巴（都是"加了隔离之后才发现"的）：
 
 1. **归属判定的误伤**：ownerPid 隔离后，别人的重启日志会在**本实例**退出时被 `detect_lost_restart`
@@ -130,6 +143,13 @@
 
 **验证**：supervisor 104→**111** 项；状态体检 52→**55** 项；新增跨进程锁测试 3 项；`vitest` 75 文件 /
 **841** 用例；`tsc` 干净；`golden --fast` 全绿。
+
+**补充（2026-10-07）**：上面第 3 条的"实例数可见"在真机上其实是空的——pi 启动后 `process.title = 'pi'`
+会把 `/proc/<pid>/cmdline` 覆盖成只剩 "pi"，旧判据 `argv.includes('cli.js')` 永远数不到真 pi（只有假
+CLI 或启动早期才带 cli.js）。已改为两种形态都认（`cli.js` 或标题 `pi`/`pi-rpc`，且排除 supervisor 的
+`node -e` 助手），CLI 级测试改用**真 pi 形态**的假进程锁住。并新增 `scripts/test-scenario-two-instances.mjs`
+在真链上验证多实例隔离：A 的重启不越界到 B（B 的 pid 全程不变、会话零注入），且 B 的 `session_start`
+晚于 A 写的重启日志、又早于该日志被消费——B 真的读到了它却没有消费（`logTargetsOtherSession` 的正面证据）。
 
 ### [2026-10-06] 并发与失败路径硬化：多实例隔离（ownerPid）、跨进程锁与多键防环、写盘失败不退出
 

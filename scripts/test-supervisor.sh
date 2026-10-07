@@ -282,7 +282,7 @@ rounds_field() { node -e 'const l=require("node:fs").readFileSync(process.argv[1
 check "轮次记录：两轮 restart → exit" "restart,exit" "$(rounds_field 'l.map(r=>r.decision).join(",")')"
 check "正常重启不误报 lostRestart" "0" "$(rounds_field 'l.filter(r=>r.lostRestart).length')"
 check "轮次记录含模式与退出码" "full:0" "$(rounds_field 'l[0].mode+":"+l[1].exitCode')"
-check "crash log 按轮保留" "yes" "$([ -f "$LOOP/agent/recovery/rounds/round-1.log" ] && [ -f "$LOOP/agent/recovery/rounds/round-2.log" ] && echo yes || echo no)"
+check "crash log 按轮保留（名字带 supervisor pid：多实例共享目录时同名会互相覆盖）" "yes" "$(ls "$LOOP/agent/recovery/rounds"/round-1-*.log >/dev/null 2>&1 && ls "$LOOP/agent/recovery/rounds"/round-2-*.log >/dev/null 2>&1 && echo yes || echo no)"
 
 echo ""
 echo "=== 丢重启请求：端到端（stub 复刻 2026-10-06 的吞请求时序）==="

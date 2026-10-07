@@ -257,7 +257,7 @@ export function auditState(snap) {
         'error',
         'lost-restart-recent',
         `最近 24h 有 ${lost.length} 轮「重启请求被吞」（进程退出但没重拉；最近一次 run=${String(last.run ?? '?')}）`,
-        '看 recovery/rounds.jsonl 与对应 recovery/rounds/round-N.log：这类重启不会生效，用户会看到模式/配置没换',
+        '看 recovery/rounds.jsonl 与对应 recovery/rounds/round-<N>-<pid>.log：这类重启不会生效，用户会看到模式/配置没换',
       );
     }
 
@@ -288,7 +288,7 @@ export function auditState(snap) {
         'warning',
         'recovery-storm',
         `1 小时内 ${recoveries.length} 轮崩溃恢复（分类 ${classes}）：pi/扩展在反复崩，恢复只是在续命`,
-        '看 recovery/rounds/round-N.log 尾部与 recovery-audit.jsonl；修根因后再清 crash-count',
+        '看 recovery/rounds/round-<N>-<pid>.log 尾部与 recovery-audit.jsonl；修根因后再清 crash-count',
       );
     }
   }

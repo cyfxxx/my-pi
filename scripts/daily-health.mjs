@@ -280,7 +280,7 @@ try {
     if (d === 'restart' || d === 'switch_session' || d === 'set_model') restartCount++;
     else if (d.startsWith('recover') || d === 'circuit_breaker' || d === 'max_recovery_rounds') recoveryCount++;
   }
-  if (recoveryCount > 0) notes.push(`本窗口有 ${recoveryCount} 轮崩溃恢复（看 recovery/rounds.jsonl 与 round-N.log）`);
+  if (recoveryCount > 0) notes.push(`本窗口有 ${recoveryCount} 轮崩溃恢复（看 recovery/rounds.jsonl 与 round-<N>-<pid>.log）`);
 } catch {
   /* rounds.jsonl 缺失/坏行不阻塞 */
 }

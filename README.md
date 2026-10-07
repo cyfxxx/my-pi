@@ -169,7 +169,7 @@ Layer 0 ─ 基础层 ───────────── vendor/pi/ (上游
 | 任务成功率 | `/auto stats`、`/auto metrics` | autopilot telemetry（按模型/任务） |
 | 记忆治理 | `/memory lifecycle`、`scripts/memory-lifecycle.mjs --json` | 只读报告：淘汰/升格/冲突/垃圾/聚合候选（后者供 headless 定时任务消费） |
 | 教训闭环 | `/memory mine [--ingest]` | 从纠正意图挖掘教训并入库（自动去重） |
-| 防退化 | `npm run golden`（`--fast` / `--smoke`） | 16 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包（`--smoke` 追加无头冒烟） |
+| 防退化 | `npm run golden`（`--fast` / `--smoke`） | 20 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围/运行时状态不变量/模式切换场景/两实例隔离场景（`--smoke` 追加无头冒烟） |
 
 ## 上游同步
 
@@ -239,7 +239,7 @@ bash scripts/check-isolation.sh
 # 功能完整性检查
 bash scripts/check-features.sh
 
-# 行为防退化基准（16 步；--fast 仅结构守门，--smoke 追加无头冒烟）
+# 行为防退化基准（20 步；--fast 仅结构守门，--smoke 追加无头冒烟；第 19/20 步真实场景默认跳过）
 npm run golden
 npm run golden -- --fast
 

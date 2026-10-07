@@ -137,8 +137,22 @@ elif [ "${PI_SCENARIO_SKIP:-0}" = "1" ]; then
   skip "模式切换场景（PI_SCENARIO_SKIP=1）"
 elif node scripts/test-scenario-mode-restart.mjs >/tmp/golden-scenario.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario.log)"; else fail "模式切换场景（见 /tmp/golden-scenario.log）"; tail -20 /tmp/golden-scenario.log; fi
 
+step "20. 两实例隔离场景（真 pty×2 + supervisor×2 + 真 pi×2，约 8 分钟）"
+# 多实例是常态（两个 supervisor 共享同一份 state.json / modes-sessions.json / rounds.jsonl）。
+# stub CLI 只测得到 ownerPid 纯逻辑；这一层用**真 pi**证明：A 的 /mode 重启不越界到 B（B 的 pid
+# 不变、B 的会话零注入），且 B 的 session_start 晚于 A 写下的重启日志时**不会**把它消费掉
+# （restart-intent 的 logWrittenAfterStart / logTargetsOtherSession 归属判据的真链验证）。
+# 同样**默认跳过**（PI_GOLDEN_SCENARIO=1 开启），理由与第 19 步一致：会显著拉长 push 期间的连接时间。
+if [ "$FAST" = "1" ]; then
+  skip "两实例隔离场景（--fast 跳过）"
+elif [ "${PI_GOLDEN_SCENARIO:-0}" != "1" ]; then
+  skip "两实例隔离场景（默认跳过；PI_GOLDEN_SCENARIO=1 开启 —— 改 supervisor/归属判定/生命周期 时必须跑）"
+elif [ "${PI_SCENARIO_SKIP:-0}" = "1" ]; then
+  skip "两实例隔离场景（PI_SCENARIO_SKIP=1）"
+elif node scripts/test-scenario-two-instances.mjs >/tmp/golden-scenario-two.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario-two.log)"; else fail "两实例隔离场景（见 /tmp/golden-scenario-two.log）"; tail -20 /tmp/golden-scenario-two.log; fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "20. 无头会话冒烟"
+  step "21. 无头会话冒烟"
   # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
   # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，

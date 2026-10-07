@@ -2245,3 +2245,22 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 
 - 用户点名补 `1257px-BLHX_biaoqiang_7.webp`（皮肤「枕头大战」，居家/抱枕）与 `700px-标枪换装8.jpg`（「礼服」黑色小礼服，室内沙发）→ 入库为 `07-皮肤-枕头大战.webp` / `08-皮肤-黑色礼服.jpg`，人设表格与 assets README 清单同步更新（共 8 张 / 3.8 MB）。
 - 格式结论：**webp 不转换**。pi 的 `read` 原生支持 png/jpg/webp/gif（实测返回 `image(image/webp, 426212 b64 chars)`），OpenAI 兼容传输把 `data:<mime>;base64,…` 原样放进 `image_url`、没有 mime 白名单；且该 webp 带透明背景（`VP8X + ALPH`），转 JPEG 会压成实色块、转 PNG 体积数倍。README 新增「格式」一节把这条规则写死。
+
+### 两实例真 pty 场景 + pty 公共骨架（2026-10-07）
+
+- 多实例此前只有 stub / 假进程证据：`test-supervisor.sh` 用 stub CLI 测 ownerPid 认领两侧，`test-state-audit.mjs` 用假 `cli.js` 进程测"实例数可见"。新增 `scripts/test-scenario-two-instances.mjs`（真 pty×2 + supervisor×2 + 真 pi×2 + 本地假 provider，**一个共享 agent 目录**，**32 项**），把"共享 `state.json` / `rounds.jsonl` / `modes-sessions.json`"的隔离放到真链上考。
+- 覆盖：A 起于 full → 在 A 的 TUI 里 `/mode roleplay` → A 真重拉、新进程 argv/env 是 roleplay；B 起于 full、pid 全程不变、会话零注入（A 的重启不越界到 B）；真 pi 写的重启请求 `ownerPid` = A 的宿主 supervisor pid（且 ≠ B 的），B 的 supervisor 不会认领它；两实例同时在跑时 `state-audit` 报 `multiple-instances`（实例数=2）；B 仍可用（假 provider 收到请求、回复落 B 的会话）且 A/B 会话互不污染；收尾两实例 SIGTERM 干净退出、全程 `lostRestart=false`。
+- **归属判据的真链验证**（`custom/core/restart-intent.ts` 的 `logWrittenAfterStart` / `logTargetsOtherSession`）：构造 B 先启动、A 后写日志，实测 B 的 `session_start` 晚于日志写入 **+44.2s**、又早于日志被消费 **9.5s**——即 B 真的读到了那条日志却**没有**消费它，随后 A 的新进程消费/清空（`restartLog` → 空）。时序用会话元数据（`model_change`）与 `state.json` 的 `restartLog` 清空点观测，两者都是落盘事实。
+- 抽出 `scripts/lib-pty-harness.mjs`（pty spawn / `waitFor` / 按 `/proc/<pid>/exe|environ` 找 pi 与 supervisor（**支持实例环境标记**、排除 supervisor 的 `node -e` 助手）/ `stopPi` / JSONL 与会话读取 / 隔离目录与假 provider 接线）。`test-scenario-mode-restart.mjs` 重构为共用它：**33/33、输出文案不变**。重构中抓到一个 harness 自身的 bug（`for (frag) if(!includes) continue` 是内层 continue，实例标记形同虚设 → `supB()` 返回了 A 的 supervisor pid），已修并用真链复验。
+- 顺带修 `state-audit.mjs` 的实例数探测：pi 启动后 `process.title = 'pi'` 把 `/proc/<pid>/cmdline` 覆盖成只剩 "pi"，旧判据 `argv.includes('cli.js')` **永远数不到真 pi**（"实例数可见"的承诺在真机上是空的）。改为认两种形态（`cli.js` 或标题 `pi`/`pi-rpc`，排除 `node -e` 助手 + 非 node 进程），`test-state-audit.mjs` 的 CLI 用例改用**真 pi 形态**（`process.title='pi'`）与 `cli.js` 形态各造进程；仍然 **55 项全过**。
+- 门禁与文档：golden 新增**第 20 步**"两实例隔离场景"（`PI_GOLDEN_SCENARIO=1` 开启、默认 skip、`--fast` skip），`--smoke` 移到**第 21 步**；`scripts/README.md` / `STRUCTURE.md` / `README.md` / `docs/FAQ.md` / `docs/TROUBLESHOOTING.md` / `docs/design/VISION.md` 的步数与脚本数同步；`bash scripts/check-conventions.sh` 全绿。
+- 实测原始结果：`node scripts/test-scenario-two-instances.mjs` → **32/32 exit 0**；`node scripts/test-scenario-mode-restart.mjs` → **33/33 exit 0**；`node scripts/test-state-audit.mjs` → **55/55**；`bash scripts/check-conventions.sh`、`node scripts/check-doc-links.mjs`、`bash scripts/check-features.sh`、`bash scripts/golden-tasks.sh --fast` 全绿。
+
+### 两实例真实 pty 场景 + 两个多实例缺陷（2026-10-07）
+
+- 新增 `scripts/lib-pty-harness.mjs`（真实 pty 场景公共骨架：pty spawn / 按 `/proc/<pid>/exe|environ` 找 pi 与 supervisor / waitFor / SIGTERM 收尾 / JSONL 与会话读取 / 隔离目录 + 假 provider 接线），并让单实例场景改用它（重构后仍 **33/33**）。
+- 新增 `scripts/test-scenario-two-instances.mjs`：**两个 supervisor + 两个真 pi 共享一个 agent 目录**（各自会话、同一假 provider、测试专用 `PI_SCENARIO_INSTANCE=A|B` 标记沿 supervisor→pi 继承以便认进程），**33 项**检查。核心断言：只在 A 里 `/mode roleplay` → 只有 A 的会话出现 restart、A 的新进程是 roleplay；B 的 pid 全程不变、会话零注入、仍能正常跑一个回合；A 写的请求 `ownerPid == A 的宿主 supervisor pid ≠ B`；`state-audit` 报告 `multiple-instances` 且实例数 ≥2；两实例干净退出、`lostRestart` 全 false。并给出**归属判据的真链正面证据**：B 的 session_start 早于"日志被消费"约 10s（B 有充分机会消费但没消费）。
+- 顺带修两个真缺陷：
+  1. **`state-audit` 的"实例数可见"在真机上恒为空**：pi 启动后 `process.title='pi'` 把 `/proc/<pid>/cmdline` 覆盖成只剩 `pi`，旧判据 `argv.includes('cli.js')` 永远数不到真 pi（只有启动早期/假 CLI 才带 cli.js）。改为认两种形态（`cli.js` 或标题 `pi`/`pi-rpc`，且 `exe=node`、排除 `node -e` 助手），并在 CLI 级测试里用 `process.title='pi'` 的假进程锁住。
+  2. **共享目录下 per-round crash log 同名覆盖**：两个 supervisor 的 `ROUND_INDEX` 都从 1 开始，`round-1.log` 互相覆盖，复盘时恰好丢掉要查的那一轮。改成 `round-<N>-<pid>.log`（轮转 glob 不变），场景里新增一条断言锁死"两实例的 crash log 互不重叠"。
+- 接进 golden：新增**第 20 步**"两实例隔离场景"（与第 19 步同为 `PI_GOLDEN_SCENARIO=1`  opt-in、默认 skip、`--fast` skip），`--smoke` 移到**第 21 步**；README/STRUCTURE/FAQ/TROUBLESHOOTING/VISION 的步数同步。

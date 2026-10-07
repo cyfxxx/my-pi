@@ -184,15 +184,20 @@ console.log('状态体检：多实例探测（CLI 级，真起两个进程）');
   const { spawn } = await import('node:child_process');
   const instDir = makeAgent(healthyFiles());
   dirs.push(instDir);
+  // 两种形态都要能数到：① 真 pi 形态——启动后 `process.title = 'pi'` 把 /proc/<pid>/cmdline
+  // 覆盖成只剩 "pi"（2026-10-07 真 pty 场景实测，只认 cli.js 会**永远数不到真 pi**）；
+  // ② 启动早期/假 CLI 形态——argv 里还是 `node .../cli.js ...`。
+  const fakeTitled = join(instDir, 'pi-titled.js');
   const fakeCli = join(instDir, 'cli.js');
+  writeFileSync(fakeTitled, "process.title = 'pi';\nsetTimeout(() => {}, 30000);\n");
   writeFileSync(fakeCli, 'setTimeout(() => {}, 30000);\n');
-  const kids = [0, 1].map(() =>
-    spawn(process.execPath, [fakeCli], {
+  const spawnKid = (script) =>
+    spawn(process.execPath, [script], {
       env: { ...process.env, PI_CODING_AGENT_DIR: instDir },
       stdio: 'ignore',
       detached: false,
-    }),
-  );
+    });
+  const kids = [spawnKid(fakeTitled), spawnKid(fakeTitled), spawnKid(fakeCli)];
   await new Promise((r) => setTimeout(r, 400)); // 等它们起来（cmdline/environ 可读）
   const out = spawnSync('node', [CLI, '--json'], {
     encoding: 'utf-8',
@@ -205,7 +210,13 @@ console.log('状态体检：多实例探测（CLI 级，真起两个进程）');
     /* 断言会报错 */
   }
   const codes = (parsed?.findings ?? []).map((f) => f.code);
-  check('CLI 能探测到多个实例并给 info 提示', codes.includes('multiple-instances'), JSON.stringify(codes));
+  const instances = (parsed?.findings ?? []).find((f) => f.code === 'multiple-instances');
+  const detected = Number(/检测到 (\d+) 个/.exec(instances?.message ?? '')?.[1] ?? 0);
+  check(
+    'CLI 能探测到多个实例并给 info 提示（真 pi 形态 + cli.js 形态都计入）',
+    codes.includes('multiple-instances') && detected === 3,
+    `${JSON.stringify(codes)} detected=${detected}`,
+  );
   for (const k of kids) {
     try {
       k.kill('SIGKILL');

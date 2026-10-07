@@ -16,7 +16,7 @@
  * shortcuts 的键**（由 gen-registrations.mjs 从代码生成），不在这里硬编码功能清单。
  * 只取 tools 会误判——`mode` / `intervention` 只注册命令或钩子，没有工具（2026-10-06 实测）。
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, readlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditState, buildSnapshot, summarize } from './lib-state-audit.mjs';
@@ -41,6 +41,13 @@ function knownFeatures() {
  * 数一下**同时在跑**的 my-pi 实例（node 进程且 environ 里带本 agent 目录）。
  * 只做诊断提示（info）：多实例共享状态文件，是"会话莫名跳走/模式被改"的常见来源。
  * 非 Linux（没有 /proc）或读不到时返回 undefined，静默跳过。
+ *
+ * 2026-10-07（真 pty 两实例场景实测）：pi 启动后会把 `process.title` 写成 APP_NAME
+ * （vendor/pi `cli/setup.ts`；coding-agent 的 package.json 的 piConfig 只给 configDir、没给 name
+ * → APP_NAME = "pi"），于是 `/proc/<pid>/cmdline` **只剩 "pi"**，`cli.js` 不见了。旧判据
+ * `argv.includes('cli.js')` 因此永远数不到真 pi（只有"启动早期"或假 CLI 才带 cli.js）——
+ * "实例数可见"这条承诺在真机上是空的。现在两种形态都认：启动早期 `node .../cli.js ...`、
+ * 启动后 `pi`（`pi-rpc` 同形）。
  */
 function countRunningInstances(dir) {
   try {
@@ -49,8 +56,20 @@ function countRunningInstances(dir) {
       if (!/^\d+$/.test(pid)) continue;
       try {
         const env = readFileSync(`/proc/${pid}/environ`, 'utf-8');
-        const argv = readFileSync(`/proc/${pid}/cmdline`, 'utf-8');
-        if (env.includes(`PI_CODING_AGENT_DIR=${dir}`) && argv.includes('cli.js')) n++;
+        if (!env.includes(`PI_CODING_AGENT_DIR=${dir}`)) continue;
+        const argv = readFileSync(`/proc/${pid}/cmdline`, 'utf-8').split('\0').join(' ').trim();
+        // supervisor 的 `node -e` 助手（read_admin_action / mode_resolve / mark_recovery_restart_log）
+        // 同样带这个 env，但它们不是实例。
+        if (/^node\s+-e\b/.test(argv)) continue;
+        // 只认 node 进程（script/bash/supervisor 不算实例）；进程刚退出时 exe 读不到 → 跳过。
+        let exe = '';
+        try {
+          exe = readlinkSync(`/proc/${pid}/exe`);
+        } catch {
+          continue;
+        }
+        if (!/(^|\/)node$/.test(exe)) continue;
+        if (argv.includes('cli.js') || /^pi(-rpc)?$/.test(argv)) n++;
       } catch {
         /* 进程刚退出 */
       }

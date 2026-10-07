@@ -10,10 +10,10 @@
  * 本场景用**真 pty + 真 supervisor + 真 pi + 真 bootstrap 扩展**跑一遍那条用户路径：
  *   1. 在隔离的 agent/memory 目录里以 full 启动，`--session <新会话文件>`；
  *   2. 在 TUI 里输入 `/mode roleplay`（人设 + 记忆命名空间 + 功能集都要换档）；
- *   3. 等 round-1 记录 decision=restart，并等 round-2 的 pi 进程真的起来（看 `ps`，
+ *   3. 等 round-1 记录 decision=restart，并等 round-2 的 pi 进程真的起来（看 `/proc`，
  *      **不是**盲发输入——实测盲发 `/quit` 会排队成一条用户消息、反而触发一个回合，
  *      把"零回合"这条断言污染掉）；
- *   4. 发一次 `/quit`（必要时重试/SIGTERM）收尾。
+ *   4. 发一次 SIGTERM 收尾。
  * 断言（全部来自真实落盘产物，不看单测）：
  *   - round-1 是 full（persona=false / ns 空），decision=restart，**lostRestart=false**；
  *   - round-2 是 roleplay：mode=roleplay、namespace=roleplay、persona=true（=真的换了档，
@@ -26,6 +26,9 @@
  * 切模式后 `completions.length === 0`（连请求都没有），续跑那次则能断言"请求体里确实带上了
  * 续跑指令"，并让固定回复落进会话文件。因此**不依赖网络与真实 provider、也不依赖模型抖动**。
  *
+ * 进程发现 / pty / 等待 / JSONL 读取等**与实例数无关**的机制都抽到
+ * `scripts/lib-pty-harness.mjs`（多实例场景 scripts/test-scenario-two-instances.mjs 共用）。
+ *
  * 用法：
  *   node scripts/test-scenario-mode-restart.mjs                 # 约 3 分钟（两轮真实启动）
  *   PI_SCENARIO_SKIP=1 node ...                                # 显式跳过（离线/无 pty 时）
@@ -33,16 +36,26 @@
  * 缺 util-linux 的 script/stty、或 vendor/pi dist 未构建时**显式跳过**（exit 0），与
  * test-web-terminal.mjs 的处理一致。
  */
-import { spawn, spawnSync } from 'node:child_process';
 import { startFakeProvider } from './lib-fake-provider.mjs';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  SCENARIO_TIMEOUT_MS,
+  configureFakeProvider,
+  findPiProcess,
+  lastInputText,
+  prepareAgentDir,
+  ptyUnavailableReason,
+  readJsonl,
+  readText,
+  sessionRoles,
+  startSupervisorPty,
+  stopPi,
+  waitFor,
+  writeRestartRequest,
+  writeSessionHeader,
+} from './lib-pty-harness.mjs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CLI = join(ROOT, 'vendor/pi/packages/coding-agent/dist/cli.js');
-const TIMEOUT_MS = Number(process.env.PI_SCENARIO_TIMEOUT_MS || 300_000);
 process.stdout.write('模式切换场景启动（真 pty + 真 supervisor + 真 pi）\n');
 const results = [];
 let failed = 0;
@@ -62,256 +75,81 @@ function skip(reason) {
 }
 
 if (process.env.PI_SCENARIO_SKIP === '1') skip('PI_SCENARIO_SKIP=1');
-if (!existsSync(CLI)) skip(`未构建 vendor/pi dist（先 bash scripts/build.sh）：${CLI}`);
-if (!spawnSync('script', ['--version'], { stdio: 'ignore' }).status && spawnSync('script', ['--version'], { encoding: 'utf8' }).error) {
-  skip('缺少 util-linux 的 script（无法分配 pty）');
-}
-if (spawnSync('sh', ['-c', 'command -v stty'], { encoding: 'utf8' }).status !== 0) skip('缺少 stty');
+const unavailable = ptyUnavailableReason();
+if (unavailable) skip(unavailable);
 
 // ── 隔离环境：agent 目录（配置 + 人设 + 会话）与 memory 目录都在临时目录里 ──
-const T = mkdtempSync(join(tmpdir(), 'my-pi-scenario-'));
-const AGENT = join(T, 'agent');
-const MEM = join(T, 'memory');
-const SESS_DIR = join(AGENT, 'sessions', '--root-my-pi--');
-const SESS = join(SESS_DIR, 'scenario.jsonl');
-const ROUNDS = join(AGENT, 'recovery', 'rounds.jsonl');
-mkdirSync(SESS_DIR, { recursive: true });
-mkdirSync(join(AGENT, 'modes'), { recursive: true });
-mkdirSync(MEM, { recursive: true });
-for (const f of ['settings.json', 'auth.json', 'keybindings.json', 'trust.json', 'modes.json', 'APPEND_SYSTEM.md', 'AGENTS.md']) {
-  const src = join(ROOT, 'portable/agent', f);
-  if (existsSync(src)) copyFileSync(src, join(AGENT, f));
-}
-const persona = join(ROOT, 'portable/agent/modes/roleplay.md');
-if (existsSync(persona)) copyFileSync(persona, join(AGENT, 'modes/roleplay.md'));
+const scene = prepareAgentDir();
+const T = scene.root;
+const AGENT = scene.agentDir;
+const MEM = scene.memoryDir;
+const SESS = scene.sessionFile('scenario.jsonl');
+const ROUNDS = scene.roundsFile;
+
 // 假 provider：模型请求变成可断言的事实（切模式后应为 0 次；续跑那次应带上续跑指令）。
-// 配置只覆盖 defaultProvider/defaultModel，其余 settings 原样继承（行为差异最小）。
-const REPLY_TEXT = 'SCENARIO-REPLY-OK';
 // 3s 延迟：贴近真实 provider（本仓库实测同一提示词 4.6s–145s），也避开 pi 在 session_start
 // 立即触发回合时的初始化竞态（0/0.4s 延迟实测偶发丢回复，属 pi 侧竞态，真实延迟下不触发）。
+const REPLY_TEXT = 'SCENARIO-REPLY-OK';
 const provider = await startFakeProvider({ replyText: REPLY_TEXT, delayMs: 3000 });
-const realModels = existsSync(join(ROOT, 'portable/agent/models.json'))
-  ? JSON.parse(readFileSync(join(ROOT, 'portable/agent/models.json'), 'utf8'))
-  : { providers: {} };
-writeFileSync(
-  join(AGENT, 'models.json'),
-  JSON.stringify({
-    providers: {
-      ...(realModels.providers ?? {}),
-      scenario: {
-        baseUrl: `http://127.0.0.1:${provider.port}/v1`,
-        api: 'openai-completions',
-        apiKey: 'scenario-not-needed',
-        models: [
-          {
-            id: 'scenario-model',
-            name: 'Scenario Model',
-            contextWindow: 131072,
-            maxTokens: 8192,
-            // reasoning: false → pi 会把思考档位设为 off（会话里会出现 thinking_level_change:off）。
-            // 这是"非推理模型"的正常表现，**不是档位错乱**；排查场景失败时别误判。
-            reasoning: false,
-            compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
-          },
-        ],
-      },
-    },
-  }),
-);
-const settingsPath = join(AGENT, 'settings.json');
-const realSettings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
-writeFileSync(settingsPath, JSON.stringify({ ...realSettings, defaultProvider: 'scenario', defaultModel: 'scenario-model' }));
+configureFakeProvider({ agentDir: AGENT, provider });
 
 // 预置一个最小会话头（pi 以 --session 载入它 = 续接）
-writeFileSync(SESS, JSON.stringify({ type: 'session', version: 3, id: '01a1ffff-0000-7000-9000-000000000001', timestamp: new Date().toISOString(), cwd: ROOT }) + '\n');
+writeSessionHeader(SESS, { id: '01a1ffff-0000-7000-9000-000000000001' });
 
-const env = {
-  ...process.env,
-  PI_CODING_AGENT_DIR: AGENT,
-  MY_PI_AGENT_DIR: AGENT,
-  PI_MEMORY_DIR: MEM,
-  TERM: process.env.TERM && process.env.TERM !== 'dumb' ? process.env.TERM : 'xterm-256color',
-};
-// 场景里不允许有任何"外部硬覆盖"，否则按会话解析会被跳过
-delete env.PI_AGENT_MODE;
-delete env.PI_AGENT_MODE_SOURCE;
-delete env.PI_SESSION_MODE;
-delete env.PI_SCENARIO_SKIP;
+const child = startSupervisorPty({ agentDir: AGENT, memoryDir: MEM, session: SESS });
 
-const shellCmd = `exec bash ${JSON.stringify(join(ROOT, 'scripts/pi-supervisor.sh'))} --session ${JSON.stringify(SESS)}`;
-const child = spawn('script', ['-q', '-e', '-f', '-E', 'never', '-c', shellCmd, '/dev/null'], {
-  cwd: ROOT,
-  env,
-  stdio: ['pipe', 'pipe', 'pipe'],
-});
-let output = '';
-child.stdout.on('data', (d) => (output += d.toString('utf8')));
-child.stderr.on('data', (d) => (output += d.toString('utf8')));
-let exited = false;
-child.on('exit', () => (exited = true));
+const rows = () => readJsonl(ROUNDS);
+const sessionText = () => readText(SESS);
+const findLocalPi = () => findPiProcess({ agentDir: AGENT });
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const rows = () => {
-  try {
-    return readFileSync(ROUNDS, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
-  } catch {
-    return [];
-  }
-};
-/** 找到本次场景的 pi 进程。**不能靠 argv**：pi 启动后把 process.title 写成 `pi`（实测
- *  /proc/<pid>/cmdline 只剩 "pi"），第一次回合前后 argv 完全不同。判据：**exe=node +
- *  environ 里带本场景的隔离 agent 目录**，并排除 supervisor 自己的 `node -e` 助手
- *  （mode_resolve / read_admin_action / mark_recovery_restart_log 都是这么起的，且同样带该 env）。
- *  返回 {pid, args, env}；args 可能只是 "pi"。 */
-function findPiProcess(diagnose = false) {
-  let pids = [];
-  try {
-    pids = readdirSync('/proc').filter((d) => /^\d+$/.test(d));
-  } catch {
-    return null;
-  }
-  const candidates = [];
-  for (const pid of pids) {
-    let exe = '';
-    let args = '';
-    let env = '';
-    try {
-      exe = readlinkSync(`/proc/${pid}/exe`);
-    } catch {
-      continue;
-    }
-    if (!/(^|\/)node$/.test(exe)) continue; // 只认 node 进程（排除 script/bash）
-    try {
-      args = readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').join(' ').trim();
-      env = readFileSync(`/proc/${pid}/environ`, 'utf8');
-    } catch {
-      continue;
-    }
-    if (!env.includes(`PI_CODING_AGENT_DIR=${AGENT}`)) continue; // 本场景专属的隔离目录
-    candidates.push({ pid, args, env });
-    // 排除 supervisor 自己的 helper：`node -e '...'`（mode_resolve / read_admin_action /
-    // mark_recovery_restart_log 都是这么起的）。实测它们同样满足"node + 本 agent 目录"，
-    // 会把进程发现指到助手身上（argv/env 断言因此失败，phase 3 还会去杀一个无关进程）。
-    if (/^node\s+-e\b/.test(args)) continue;
-    if (args.includes('pi-supervisor.sh') || args.includes('--no-extensions')) continue; // supervisor / 健康检查
-    // 不能靠 argv 认 pi：pi 启动后会把 **process.title 写成 `pi`**（实测 /proc/<pid>/cmdline
-    // 只剩这两个字符），cli.js/--extension 全没了。所以判据是"node + 本场景 agent 目录 +
-    // 不是 supervisor 的 node -e 助手"；scenario 里没有崩溃恢复，因此不存在 fixer/健康检查进程。
-    return { pid, args, env };
-  }
-  if (diagnose) console.log(`  （pid 候选 ${candidates.length} 个：${candidates.map((c) => `${c.pid}:${c.args.slice(0, 80)}`).join(' | ')}）`);
-  return null;
+/** 找到本次场景的 pi 进程（diagnose=true 时打印候选，供失败定位） */
+function findLocalPiOrDiagnose(diagnose = false) {
+  return findPiProcess({ agentDir: AGENT, diagnose });
 }
 
-/** 请求体里最后一条"模型可见的输入"（custom/user）——用它断言"这次请求就是那次续跑"，
- *  避免被历史里上一次的续跑指令误判（phase 2 的指令会留在 history 里）。 */
-function lastInputText(body) {
-  const messages = Array.isArray(body?.messages) ? body.messages : [];
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m?.role === 'user' || m?.role === 'custom') {
-      const c = m.content;
-      return typeof c === 'string' ? c : JSON.stringify(c ?? '');
-    }
-  }
-  return '';
-}
+/** 让当前 pi 进程退出（SIGTERM + 重试），直到 pred 为真 */
+const stopLocalPi = (done, { timeout = 150_000, label = '进程退出' } = {}) =>
+  stopPi({ find: findLocalPi, done, timeout, label });
 
-const sessionText = () => {
-  try {
-    return readFileSync(SESS, 'utf8');
-  } catch {
-    return '';
-  }
-};
-
-/** 等到 cond() 为真；超时返回 false（quiet=false 时打印超时原因，供最后定位） */
-async function waitFor(cond, { timeout = TIMEOUT_MS, poll = 500, label = '', quiet = true } = {}) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeout) {
-    if (cond()) return true;
-    await sleep(poll);
-  }
-  if (!quiet) console.log(`  （等待超时：${label}，已等 ${Math.round((Date.now() - t0) / 1000)}s）`);
-  return false;
-}
+/** 会话文件里每个条目的类型/角色 */
+const readRoles = () => sessionRoles(sessionText());
 
 try {
   console.log(`场景：真实 pty + supervisor + pi（隔离目录 ${T}）`);
   // 就绪判定不靠"输出稳定"（TUI 会周期性重绘/刷新，实测会一直不安静），而是**重试到有效果**：
   // 只要 pty 有输出就发 /mode，每 10s 再试，直到 rounds.jsonl 出现 restart。真实的 pi 会把它
   // 当普通输入排队；切换成功后重复的 /mode roleplay 是无副作用的空操作（同模式不重启）。
-  const booted = await waitFor(() => output.length > 0, { label: 'pty 有输出' });
-  check('TUI 在 pty 里启动并产生输出', booted, `${output.length} 字节`);
+  const booted = await waitFor(() => child.output.length > 0, { label: 'pty 有输出' });
+  check('TUI 在 pty 里启动并产生输出', booted, `${child.output.length} 字节`);
   let attempts = 0;
   let restarted = false;
-  const modeDeadline = Date.now() + TIMEOUT_MS;
+  const modeDeadline = Date.now() + SCENARIO_TIMEOUT_MS;
   while (!restarted && Date.now() < modeDeadline) {
-    child.stdin.write('/mode roleplay\r');
+    child.send('/mode roleplay\r');
     attempts++;
     restarted = await waitFor(() => rows().some((r) => r.decision === 'restart'), { timeout: 10_000, label: 'restart' });
   }
   check('发送 /mode roleplay 后进程被真的重拉（decision=restart）', restarted, `尝试 ${attempts} 次；${JSON.stringify(rows())}`);
 
-  // 就绪判定必须**两件事都成立**再看输入：① round-2 的 pi 进程在 ps 里；② TUI 已画出首帧。
+  // 就绪判定必须**两件事都成立**再看输入：① round-2 的 pi 进程在 /proc 里；② TUI 已画出首帧。
   // 实测教训：在 TUI 就绪前往 pty 里写 `/quit`，多行会被合并成一条用户消息提交 —— 既触发了
   // 一个回合（污染"切模式零回合"的断言），又因为文本不是精确的 `/quit` 而退不出去。
-  const proc = await waitFor(() => findPiProcess(), { timeout: 150_000, label: 'round-2 pi 进程' })
-    ? findPiProcess()
-    : null;
-  check('round-2 的 pi 进程真的起来了（ps 观测）', Boolean(proc), '未在 ps 里看到带 --extension 的 pi 进程');
-  const restartMark = output.length; // 此刻之后的新输出都属于 round-2
-  const tuiReady = await waitFor(() => output.slice(restartMark).includes('π - my-pi') || output.slice(restartMark).includes('~/my-pi'), {
-    timeout: 150_000,
-    label: 'round-2 TUI 首帧',
-    quiet: false,
-  });
+  const proc = (await waitFor(() => findLocalPi(), { timeout: 150_000, label: 'round-2 pi 进程' })) ? findLocalPi() : null;
+  check('round-2 的 pi 进程真的起来了（ps 观测）', Boolean(proc), '未在 /proc 里看到本场景的 pi 进程');
+  const restartMark = child.output.length; // 此刻之后的新输出都属于 round-2
+  const tuiReady = await waitFor(
+    () => child.output.slice(restartMark).includes('π - my-pi') || child.output.slice(restartMark).includes('~/my-pi'),
+    {
+      timeout: 150_000,
+      label: 'round-2 TUI 首帧',
+      quiet: false,
+    },
+  );
   check('round-2 的 TUI 画出首帧（可以安全输入）', tuiReady);
 
   // 直接观测新进程的档位：argv 里应带 roleplay 人设，env 里应有记忆命名空间
   check('round-2 进程 argv 带 roleplay 人设（--append-system-prompt）', Boolean(proc?.args.includes('roleplay.md')), proc?.args);
   check('round-2 进程 env 里 PI_MEMORY_NAMESPACE=roleplay', Boolean(proc?.env.includes('PI_MEMORY_NAMESPACE=roleplay')), proc?.env?.slice(0, 200));
-
-  /** 让当前 pi 进程退出：**用 SIGTERM 而不是往 TUI 里发 `/quit`**。
-   *  实测 TUI 输入在"回合进行中/刚起来"时会失效或被当成消息（曾导致场景假失败），
-   *  而 SIGTERM 走 pi 自己的优雅关闭路径（exit 0），supervisor 照常读 admin action 重拉。 */
-  const stopPi = async (pred, { timeout = 150_000, label = '进程退出' } = {}) => {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      const p = findPiProcess();
-      if (p) {
-        try {
-          process.kill(Number(p.pid), 'SIGTERM');
-        } catch {
-          /* 已退出 */
-        }
-      }
-      if (await waitFor(pred, { timeout: 10_000 })) return true;
-    }
-    console.log(`  （等待超时：${label}）`);
-    return pred();
-  };
-
-  const send = (text) => {
-    try {
-      if (child.stdin.writable) child.stdin.write(text);
-    } catch {
-      /* pty 已关 */
-    }
-  };
-  const readRoles = () =>
-    sessionText()
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => {
-        try {
-          return JSON.parse(l);
-        } catch {
-          return {};
-        }
-      })
-      .map((e) => (e?.type === 'message' ? e.message?.role : e?.type));
 
   // ① 切模式**零回合**：此刻 round-2 还活着，会话文件里不该有 user/assistant/custom_message。
   // （旧行为无条件 sendUserMessage，会在这里留下 user(通知) + assistant 回复。）
@@ -323,23 +161,19 @@ try {
   check('切模式没有产生任何模型请求（假 provider 计数=0，零回合的强证据）', provider.completions.length === 0, `completions=${provider.completions.length}`);
 
   // ② 续跑通道（端到端）：写一条 intent=continue 的重启请求（语义等价于看门狗/自动 failover
-  //    ——"工作在途被中断"），再 /quit 让 supervisor 重拉；新进程应当**真的起一个回合**接上。
+  //    ——"工作在途被中断"），再 SIGTERM 让 supervisor 重拉；新进程应当**真的起一个回合**接上。
   //    这条通道此前只有单测/接线测试覆盖，这里证明它在真实生命周期里也成立。
   const restartsBefore = rows().filter((r) => r.decision === 'restart').length;
   const pendingReason = '场景：模拟被中断的任务';
-  mkdirSync(join(AGENT, 'autopilot'), { recursive: true });
-  writeFileSync(
-    join(AGENT, 'autopilot', 'state.json'),
-    JSON.stringify({
-      action: 'restart',
-      timestamp: Date.now(),
-      targetSession: SESS,
-      reason: pendingReason,
-      intent: 'continue',
-      restartLog: { action: 'restart', reason: pendingReason, intent: 'continue', targetSession: SESS, timestamp: Date.now() },
-    }),
-  );
-  const restartedAgain = await stopPi(() => rows().filter((r) => r.decision === 'restart').length > restartsBefore, {
+  writeRestartRequest(scene.stateFile, {
+    action: 'restart',
+    timestamp: Date.now(),
+    targetSession: SESS,
+    reason: pendingReason,
+    intent: 'continue',
+    restartLog: { action: 'restart', reason: pendingReason, intent: 'continue', targetSession: SESS, timestamp: Date.now() },
+  });
+  const restartedAgain = await stopLocalPi(() => rows().filter((r) => r.decision === 'restart').length > restartsBefore, {
     label: '第二次 restart',
   });
   check('intent=continue 的重启请求被真的执行（第二次重拉）', restartedAgain, JSON.stringify(rows()));
@@ -367,7 +201,7 @@ try {
   const completionsBeforePhase3 = provider.completions.length;
   provider.hangNext(1); // 下一次模型请求挂住 = 回合进行中
   provider.setReply('SCENARIO-REPLY-PHASE3');
-  send('请把刚才的结论再列一次\r'); // 真实输入 → 真的起一个回合（会卡在模型调用上）
+  child.send('请把刚才的结论再列一次\r'); // 真实输入 → 真的起一个回合（会卡在模型调用上）
   const stuckTurn = await waitFor(() => provider.completions.length > completionsBeforePhase3, { timeout: 90_000, label: '被中断的那次请求', quiet: false });
   check('构造出"回合进行中"（模型请求已发出并挂住）', stuckTurn, `completions=${provider.completions.length}`);
   const tailInFlight = await waitFor(() => {
@@ -378,19 +212,16 @@ try {
 
   // 写一条**不带 intent** 的重启请求（= 生产者的缺省写法）→ 半途 SIGTERM → supervisor 重拉
   const restartsBeforePhase3 = rows().filter((r) => r.decision === 'restart').length;
-  writeFileSync(
-    join(AGENT, 'autopilot', 'state.json'),
-    JSON.stringify({
-      action: 'restart',
-      timestamp: Date.now(),
-      targetSession: SESS,
-      reason: '场景：回合进行中被重启',
-      restartLog: { action: 'restart', reason: '场景：回合进行中被重启', targetSession: SESS, timestamp: Date.now() },
-    }),
-  );
+  writeRestartRequest(scene.stateFile, {
+    action: 'restart',
+    timestamp: Date.now(),
+    targetSession: SESS,
+    reason: '场景：回合进行中被重启',
+    restartLog: { action: 'restart', reason: '场景：回合进行中被重启', targetSession: SESS, timestamp: Date.now() },
+  });
   // 带重试：进程发现是单点，失败会让整段 phase 3 塌掉（实测偶发一次）
-  const p3 = (await waitFor(() => findPiProcess(), { timeout: 20_000, label: '待杀的 pi 进程' })) ? findPiProcess() : null;
-  if (!p3) findPiProcess(true); // 打候选诊断，避免下次还要猜
+  const p3 = (await waitFor(() => findLocalPi(), { timeout: 20_000, label: '待杀的 pi 进程' })) ? findLocalPi() : null;
+  if (!p3) findLocalPiOrDiagnose(true); // 打候选诊断，避免下次还要猜
   check('找到正在跑的 pi 进程（准备半途杀掉）', Boolean(p3), `未找到 pi 进程；args=${p3?.args ?? '(none)'}`);
   if (p3) process.kill(Number(p3.pid), 'SIGTERM');
   const restartedByAuto = await waitFor(() => rows().filter((r) => r.decision === 'restart').length > restartsBeforePhase3, {
@@ -407,12 +238,12 @@ try {
 
   // 确定性证据：空闲状态下由**用户输入**触发的回合必然跑完（不经过 session_start 竞态）
   provider.setReply('SCENARIO-REPLY-IDLE');
-  send('确认一下：请只回复固定串\r');
+  child.send('确认一下：请只回复固定串\r');
   const idleReply = await waitFor(() => sessionText().includes('SCENARIO-REPLY-IDLE'), { timeout: 120_000, label: '空闲回合回复', quiet: false });
   check('空闲状态下的用户回合能正常跑完（plumbing 端到端可用）', idleReply, `completions=${provider.completions.length}`);
 
   // 收尾：SIGTERM（确定性）等 exit 轮次记录落盘
-  await stopPi(() => rows().some((r) => r.decision === 'exit'), { label: '最终退出' });
+  await stopLocalPi(() => rows().some((r) => r.decision === 'exit'), { label: '最终退出' });
 
   // ③ 轮次记录：三行，档位与续接都对
   const roundRows = rows();
@@ -436,14 +267,9 @@ try {
   check('会话记录落到 modes-sessions.json（roleplay）', sessions[SESS]?.mode === 'roleplay', JSON.stringify(sessions));
   check('原会话文件仍是同一路径（未被新建替身顶掉）', existsSync(SESS));
 } finally {
-  try {
-    child.kill('SIGKILL');
-  } catch {
-    /* 已退出 */
-  }
+  child.kill('SIGKILL');
   await provider.close().catch(() => {});
-  if (!process.env.PI_SCENARIO_KEEP) rmSync(T, { recursive: true, force: true });
-  else console.log(`保留现场：${T}`);
+  scene.cleanup();
 }
 
 console.log('');

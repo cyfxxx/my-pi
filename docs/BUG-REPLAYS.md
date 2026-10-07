@@ -14,7 +14,7 @@
 | 入口 | 命令 | 看什么 |
 |------|------|--------|
 | 状态体检 | `node scripts/state-audit.mjs`（或 `bash scripts/doctor.sh`，第 [12] 节） | 配置与运行时状态自相矛盾：人设文件丢失、功能名拼错、会话记录指向不存在的会话、重启请求没落地、通知没被消费、env 硬覆盖按会话模式 |
-| 轮次记录 | `portable/agent/recovery/rounds.jsonl`（每轮一行）+ `portable/agent/recovery/rounds/round-N.log` | 上一次/上几次进程为什么退出、读到什么 admin action、用什么参数重启、是否 `lostRestart` |
+| 轮次记录 | `portable/agent/recovery/rounds.jsonl`（每轮一行）+ `portable/agent/recovery/rounds/round-<N>-<pid>.log` | 上一次/上几次进程为什么退出、读到什么 admin action、用什么参数重启、是否 `lostRestart` |
 | 每日体检 | `node scripts/daily-health.mjs --print` | 成本退化与状态异常（每天由 autopilot 种子自动跑；`结论=alert` 说明有 error 级状态问题） |
 
 ## 台账
@@ -33,6 +33,7 @@
 | 10 | **写盘失败静默退出**：`admin_restart`/`admin_set_model`/`admin_switch_session` 请求写不下去仍 `shutdown` → 进程没了、配置/会话也没变 | 无 state.json 变化却退出了；下一次启动配置未生效 | `npx vitest run custom/features/autopilot/__tests__/admin-tools.test.ts -t '写盘失败'`；`npx vitest run custom/features/mode/__tests__/mode-autopilot-restart.test.ts -t '写盘失败'` | 三个工具 + mode 的 `requestModeRestart` 一律"写失败就不退出 + 明确文案" |
 | 11 | **归属判定的误伤**：加了 ownerPid 隔离后，别人的重启日志在本实例退出时被记成 `lost_restart`（"请求被吞"）→ 每日体检假告警 | `rounds.jsonl` 里 `lostRestart:true` 而 `adminAction` 为空、且会话属于别的实例 | `bash scripts/test-supervisor.sh`（"别人的日志 → 不算丢"三例） | `detect_lost_restart` 增加第 5 个判据"日志的 ownerPid 必须是本实例"；`read_admin_action` 多输出一个 `LOWNER` 字段 |
 | 12 | **续跑静默丢失 / 重启请求被抹掉**：外部写入端（看门狗、故障转移、另一实例、测试）在进程**启动过程中**写下重启请求时，那个即将被重启的进程先把 `restartLog` 吃掉并注入到自己（马上要死的）会话里 → 重拉起来的新进程无续跑可注入；同源形态更糟——消费端的"整文件读-改-写"把刚写下的 `action` 一并抹掉 → supervisor 读到空 action 直接退出，连重启都没发生 | 真 pty 场景 round-3 的会话文件里没有 `my-pi-restart-resume`；`rounds.jsonl` 里该轮 `decision=exit` 且 `adminAction` 为空（但请求确实写过）；`state.json` 的 `action` 在写入后很快变 `none` | `npx vitest run custom/features/mode/__tests__/mode-autopilot-restart.test.ts -t '启动之后'`；`PI_SCENARIO_KEEP=1 node scripts/test-scenario-mode-restart.mjs`（round-3 必须出现 `my-pi-restart-resume`） | `core/restart-intent.ts` 的归属判据 `logWrittenAfterStart()`（只消费"写于我启动之前"的日志）+ `logTargetsOtherSession()`（多实例不串扰）；两个消费端（autopilot 与 mode 兜底）都先判归属再消费 |
+| 13 | **多实例不可见（静默失效）**：`state-audit` 数实例的判据是 `argv` 里含 `cli.js`，而真 pi 启动后 `process.title='pi'` 把 `/proc/<pid>/cmdline` 覆盖成只剩 `pi` → 真机上实例数恒为 0/1（只有假 CLI 或启动早期才数得到），"多实例可见"这条承诺从上线起就没兑现 | 两个 my-pi 明明同时在跑，`node scripts/state-audit.mjs` 却没有 `multiple-instances` 发现（或实例数不对） | `node scripts/test-state-audit.mjs`（`process.title='pi'` 的假进程 + `cli.js` 形态各进程，断言 detected=3）；`node scripts/test-scenario-two-instances.mjs`（真链：断言实例数 ≥2） | `scripts/state-audit.mjs` 的 `countRunningInstances()`：认 `cli.js` **或**标题 `pi`/`pi-rpc` 两种形态，且要求 `exe=node`、排除 `node -e` 助手 |
 
 ## 相关
 

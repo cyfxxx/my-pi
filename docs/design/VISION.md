@@ -75,7 +75,7 @@ my-pi 现有硬约束：`custom/features/context/budget/budget.ts` 的预算与�
 ### 3.3 防退化第一
 进化的最大风险不是慢，是退化：一条错误教训入库后会自我强化污染后续行为。
 一切结构性改动以回归测试为安全网；记忆写操作走"报告→确认→快照→执行→验证"。
-my-pi 当前安全网 = `npm run golden`（19 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围/**运行时状态不变量**/**模式切换场景**（第 19 步默认跳过，`PI_GOLDEN_SCENARIO=1` 开启），共 840+ 用例（精确计数以 `npx vitest run` 的汇总为准）+ `.githooks/`（pre-commit 快检；pre-push 默认全量，仅纯运行数据推送降级快检；本地无 CI）。前 17 步判"实现对不对"，后两步判"使用层面会不会静默失效/用户路径能不能走通"。
+my-pi 当前安全网 = `npm run golden`（20 步：隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围/**运行时状态不变量**/**模式切换场景**/**两实例隔离场景**（第 19/20 步两个真实场景默认跳过，`PI_GOLDEN_SCENARIO=1` 开启），共 840+ 用例（精确计数以 `npx vitest run` 的汇总为准）+ `.githooks/`（pre-commit 快检；pre-push 默认全量，仅纯运行数据推送降级快检；本地无 CI）。前 17 步判"实现对不对"，后三步判"使用层面会不会静默失效/用户路径能不能走通/多实例下会不会互相越界"。
 
 ### 3.4 执行-知识分离（2026-08-31 加入，源自 WikiSkill 论文消融实证）
 生产执行路径不直接消费记忆库/教训/干预记录等 wiki 式知识解题：知识只经"沉淀→升格通道"间接影响行为。回顾与训练回路中允许访问知识库，但生产任务会话若直接从知识库取答案，会令执行轨迹失去信息量，长期看降低技能质量（论文实测：训练期开放 wiki 访问使最终技能降质 63.7%→60.9%）。
@@ -88,7 +88,7 @@ my-pi 当前安全网 = `npm run golden`（19 步：隔离/注册面/死导出/�
 | 缓存 | 命中率 / 断裂归因 | usage-stats + cache-guard | **已有（口径已升级）**：成本/缓存度量以**每轮用量** `portable/memory/context/.usage-diag.jsonl` 为准（`usage.jsonl` 是工具级台账、没有缓存字段，**不要用它算命中率**），前缀断裂归因用 `portable/memory/logs/prefix-fingerprints.jsonl`（system/tools/head/thinking 档位变更）；`scripts/daily-health.mjs` 产出**加权命中率 / 未命中每轮 / 输出占比 / 前缀前端变更次数**（阈值 `PI_HEALTH_HIT_FLOOR`=0.97、`PI_HEALTH_UNCACHED_CEIL`=3000），`scripts/check-injection-surface.sh` 守注入面前缀指纹，`scripts/test-usage-metrics.mjs` 守度量口径本身 |
 | 干预 | abort 快照留存率 / corrective 关联率 | pi-intervention → `memory/interventions.jsonl` | **已有**：`custom/features/intervention/` 落盘 `portable/memory/interventions.jsonl`，`/intervention stats` 产出关联率/近 7 天 |
 | 任务 | 成功率代理 / 干预次数 / token 成本 | task-metrics.mjs | **已有**：autopilot telemetry（按模型/任务成功率 + 预算）`/auto stats`；任务执行情况另有 `/daily`（每日任务视图：今日完成/待跑/失败、上次结果、启停） |
-| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh` **16 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包）+ 死导出与补丁行为守门 + `.githooks/`；**732 单测用例 / 66 文件**（`--smoke` 追加无头冒烟） |
+| 回归 | golden tasks（行为防退化基准） | golden-tasks.sh | **已有**：`scripts/golden-tasks.sh` **20 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围/运行时状态不变量/模式切换场景/两实例隔离场景）+ 死导出与补丁行为守门 + `.githooks/`；**840+ 用例 / 75 文件**（`--smoke` 追加无头冒烟） |
 | 上游 | 变更代价（补丁失配 / API 面 / churn / 破坏性默认值） | — | **已有**：`scripts/check-upstream.sh` 只读体检（各包 churn、新增包、changelog 新增版本段与破坏性关键词、逐个补丁的目标文件是否被上游改过、adapters 依赖的 API 面逐符号核对），结论=已最新/可同步/需先改补丁；流程与"不想要的变更"四档手段见 `docs/operations/UPSTREAM-UPDATE.md` |
 | 记忆 | 规模 / 陈旧度 / 升格候选 / 冲突嫌疑 / 垃圾与聚合 | memory-lifecycle.mjs（只读报告） | **已有**：`memory/store/storage.ts` 治理字段就绪；`memory/mine/lifecycle.ts` + `/memory lifecycle` 出六类候选，`scripts/memory-lifecycle.mjs --json` 供 headless 定时任务消费 |
 
