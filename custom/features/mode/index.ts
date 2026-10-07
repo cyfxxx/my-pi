@@ -39,7 +39,15 @@ import {
 import { writeRestartRequest, readState, consumeRestartLog } from '../autopilot/logic';
 // 兜底：roleplay/lean/minimal 里没注册 autopilot，通用重启日志否则**没人消费**（崩溃恢复后既没有
 // 通知也不会续跑，且完全静默）。mode 是唯一恒注册的功能，所以由它代劳。文案/通道选择在 core 里共用。
-import { formatRestartLine, isModeOwnedNoticeLog, planRestartNotice, tailKindFromSessionFile } from '../../core/restart-intent';
+import {
+  formatRestartLine,
+  isModeOwnedNoticeLog,
+  logTargetsOtherSession,
+  logWrittenAfterStart,
+  planRestartNotice,
+  processStartedAtMs,
+  tailKindFromSessionFile,
+} from '../../core/restart-intent';
 
 const MODE_HELP = `用法:
   /mode              显示当前模式
@@ -252,7 +260,16 @@ export function register(pi: ExtensionAPI): void {
       // 只在不一致校验通过之后（上面已 return）、且只消费一次（consume 即清）。
       if (!isFeatureEnabled('autopilot', activeConfig)) {
         const log = readState().restartLog;
-        if (log && log.action && log.action !== 'none' && !isModeOwnedNoticeLog(log)) {
+        // 只消费"写给我这个新进程、且目标就是本会话"的日志：写在**本进程启动之后**的日志属于
+        // 下一个进程（本进程正是即将被重启的那一个），吃掉它会让重拉起来的新进程无续跑可注入。
+        if (
+          log &&
+          log.action &&
+          log.action !== 'none' &&
+          !isModeOwnedNoticeLog(log) &&
+          !logWrittenAfterStart(log, processStartedAtMs()) &&
+          !logTargetsOtherSession(log, sessionFile)
+        ) {
           const consumed = consumeRestartLog();
           if (consumed) {
             ctx.ui.notify(formatRestartLine(consumed), 'info');
@@ -285,6 +302,8 @@ export function register(pi: ExtensionAPI): void {
  *
  * 写入端是 `requestModeRestart`（旧进程，带 `notice:'mode'`），消费端在这里：
  *   - 只认自己写的标记（`notice === 'mode'`），autopilot 的通用通知也据此让位；
+ *   - 只认**写在本进程启动之前**的日志：写在启动之后的属于下一个进程（本进程即将被重启），
+ *     吃掉它会让新进程看不到（2026-10-07 真 pty 场景实测：续跑静默丢失）；
  *   - 只认本会话（`targetSession` 对得上），别的会话的通知留给它自己的进程；
  *   - 超期的通知直接丢弃（那次重启没落成，注入只会说假话）；
  *   - 消费只清 `restartLog`，**不碰 `action`**：action 的消费者是 supervisor。
@@ -293,13 +312,13 @@ function takePendingModeNotice(sessionFile: string | undefined): { from: string;
   try {
     const log = readState().restartLog;
     if (!log || log.notice !== 'mode') return null;
+    if (logWrittenAfterStart(log, processStartedAtMs())) return null; // 给下一个进程的，别吃
+    if (logTargetsOtherSession(log, sessionFile)) return null; // 别的会话/实例的重启，留给它
     const ts = typeof log.timestamp === 'number' ? log.timestamp : 0;
     if (!ts || Date.now() - ts > MODE_NOTICE_TTL_MS) {
       consumeRestartLog(); // 过期：清掉，免得下次再撞上
       return null;
     }
-    const target = typeof log.targetSession === 'string' ? log.targetSession : '';
-    if (target && target !== sessionFile) return null; // 别的会话的重启，留给它
     const from = typeof log.from === 'string' ? log.from : '';
     const to = typeof log.mode === 'string' ? log.mode : '';
     consumeRestartLog();

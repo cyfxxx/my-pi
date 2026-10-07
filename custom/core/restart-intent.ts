@@ -169,6 +169,50 @@ export function isModeOwnedNoticeLog(log: Record<string, unknown> | null | undef
   return Boolean(log) && log?.notice === 'mode';
 }
 
+/**
+ * 本进程的启动时刻（毫秒）。用于区分"写给我这个新进程的日志"与"写给下一个进程的日志"。
+ *
+ * `process.uptime()` 是内核给的进程存活秒数，比"模块加载时刻"更接近真实的 exec 时刻。
+ */
+export function processStartedAtMs(now = Date.now(), uptimeMs = process.uptime() * 1000): number {
+  return now - Math.round(uptimeMs);
+}
+
+/**
+ * 这条重启日志是不是**写在本进程启动之后**的（→ 不属于本进程，留给下一个进程消费）。
+ *
+ * 语义：`restartLog` 的生命周期是「写入端请求重启 → supervisor 用 --session 重拉 → **新进程**在
+ * session_start 消费它并注入续跑/通知」。所以合法的消费者一定**启动得比日志晚**（日志写于旧进程，
+ * 新进程随后启动）。反过来，一个"启动早于日志"的进程是**即将被重启的那一个**，日志不是给它看的。
+ *
+ * 为什么必须显式判：2026-10-07 真 pty 场景实测（本机 pi 启动要 35–45s，窗口很宽）——
+ * 外部写入端（看门狗/故障转移/另一实例/测试）在进程**启动过程中**写下日志时，那个即将被重启的
+ * 进程会先把日志吃掉并注入到自己（马上要死的）会话里；重拉起来的新进程什么都看不到 →
+ * **续跑静默丢失**（场景里表现为 round-3 没有 `my-pi-restart-resume`）。更糟的是消费端做的是
+ * "整文件读-改-写"，读早于写入、写晚于写入时还会顺手把刚写下的 `action` 一起抹掉 →
+ * supervisor 读到空 action 直接退出，连重启都不发生（同一次全量门禁里 17/33 的那次）。
+ *
+ * 没有时间戳的日志（老请求/手工写的）按旧行为照常消费——否则会让这类请求永远没人管。
+ */
+export function logWrittenAfterStart(log: Record<string, unknown> | null | undefined, startedAtMs: number): boolean {
+  const ts = typeof log?.timestamp === 'number' ? log.timestamp : 0;
+  if (!ts) return false;
+  return ts > startedAtMs;
+}
+
+/**
+ * 这条重启日志的目标会话是不是**别的**会话（→ 多实例/多会话下不该由本进程消费）。
+ *
+ * 写入端（admin 工具、看门狗、模式自愈、崩溃恢复）都会带 `targetSession`；只有老请求可能没有，
+ * 那种情况按旧行为消费。没有这条判据时，实例 A 的日志可能被实例 B（或 B 的另一个会话）注入到
+ * B 自己的会话里——续跑内容会落到错误的会话，A 的新进程则永远等不到它。
+ */
+export function logTargetsOtherSession(log: Record<string, unknown> | null | undefined, sessionFile: string | undefined): boolean {
+  const target = typeof log?.targetSession === 'string' ? log.targetSession : '';
+  if (!target) return false;
+  return !sessionFile || target !== sessionFile;
+}
+
 /** 重启通知的文案行（消费者共用；含操作/原因/目标模型/会话路径） */
 export function formatRestartLine(log: Record<string, unknown>): string {
   const reason = typeof log.reason === 'string' && log.reason ? log.reason : '(未指定原因)';

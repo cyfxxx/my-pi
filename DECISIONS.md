@@ -2,6 +2,26 @@
 
 ## 格式
 
+### [2026-10-07] 重启日志的归属判据：只消费「写于我启动之前」的日志（修续跑静默丢失 + 请求被抹掉）
+
+**怎么发现的**：全量门禁（`PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh --smoke`）第 19 步真实 pty 场景 **17/33**：phase 1（切模式零回合）全绿，phase 2（写 `intent=continue` 的重启请求 → SIGTERM → 期待重拉 + 续跑）整段塌掉——`rounds.jsonl` 只有 2 轮，round-2 是 `decision=exit` 且 `adminAction=""`，`completions=0`。重跑一次 phase 2 过了，但**续跑没注入**（round-3 的会话里没有 `my-pi-restart-resume`）。用 80ms 轮询 `state.json` 抓到现场：场景写入（`action=restart` + `restartLog`）后 **<80ms** 内 `restartLog` 就被清成 null，而那一刻只有 round-2 的 pi 活着。
+
+**根因**：`restartLog` 的语义是「旧进程写 → supervisor 重拉 → **新进程**在 session_start 消费并注入续跑」。两个消费端都只判了"是不是 mode 归属"，**没判这条日志是不是写给我的**。本机 pi 启动要 35–45s（窗口很宽），于是外部写入端（看门狗/故障转移/另一实例/测试）很容易在**当前进程还在启动**时写下请求——那个即将被重启的进程（它的 session_start 恰好在此时跑）把"给下一个进程的"日志吃掉，并把续跑注入到自己那个马上要死的会话里；新进程醒来时 `restartLog` 已是 null → **续跑静默丢失**。同一根因还有一个更凶的形态：消费端是"整文件读-改-写"，若它的读发生在这个写入之前、写发生在之后，写回的快照里 `action` 还是空 → **刚写下的重启请求被抹掉**，supervisor 读到空 action 直接退出——17/33 那次连重启都没发生。
+
+**决策**：`custom/core/restart-intent.ts` 新增两条纯判据，两个消费端（autopilot 的通用通知、mode 的兜底消费与模式通知）**先判归属再消费**：
+1. `logWrittenAfterStart(log, startedAt)`——日志时间戳晚于本进程启动 → 不属于本进程，**原样留给下一个进程**（不消费、不注入）；
+2. `logTargetsOtherSession(log, sessionFile)`——`targetSession` 指向别的会话 → 不消费（**补上 autopilot 侧此前缺的这条**，多实例/多会话不再串扰）。
+`processStartedAtMs()` 用 `process.uptime()` 反推启动时刻（内核给的存活秒数，比"模块加载时刻"更接近 exec 时刻）。没有时间戳的老请求（手工写的）照旧消费，否则它们会永远没人管。
+
+**为什么不改成"给 state.json 加锁"**：锁只能串行化 pi-vs-pi，而这次的写入端一个是 pi、一个是外部（另一实例/看门狗/测试），既锁不住也没必要——问题不是"同时写"，而是**归属错了**：这条日志本来就不该由它消费。判据是纯函数、可单测、与锁无关。`state.json` 的"整文件读-改-写"仍是唯一没锁的跨进程共享状态（mode store 早有 `withModeStoreLock`）；判据让它不再触发，若将来出现第三个写入端或更复杂的并发，再考虑上锁。
+
+**证据**：
+- 单测：`mode-autopilot-restart.test.ts` 8 → **11 例**（"写在启动之后的通用日志不吃、且 `action` 完好""写在启动之后的模式日志不吃""`targetSession` 指向别的会话不吃"）。把两条判据分别改成恒 false（=回到修复前）→ **3 例如期失败**，改回即通过。
+- 真链：`PI_SCENARIO_KEEP=1 node scripts/test-scenario-mode-restart.mjs` → **33/33 通过**，其中三条正是此前塌掉/失败的点：`intent=continue` 的重启被真的执行、round-3 出现 `my-pi-restart-resume`、整场只跑了那一个模型回合。
+- 台账：`docs/BUG-REPLAYS.md` 第 12 行（含可执行的复现命令）。
+
+**顺带**：这条也修正了此前对场景失败的一句判断——当时把"round-3 无续跑"归因于 SIGTERM 催停编排的时序抖动；实际是产品侧归属错误，判据补上后同样的编排稳定 33/33。
+
 ### [2026-10-07] 角色扮演模式：精选 6 张形象参考图入库 + 按需 `read` 通路
 
 **背景**：要求从外部资料包（`标枪-图片/`，54 张）里挑代表图"加入角色扮演模式，给模型更丰富的扮演信息"。而此前记忆条目与本文档写的是"语音与图片**不入库**"（版权 + 体积）——所以要先说清改了什么、没改什么。

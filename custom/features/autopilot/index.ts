@@ -13,7 +13,15 @@ import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
 import { sendMessage, sendMessageAfterRebind } from '../../adapters/ui-adapter';
 
-import { formatRestartLine, normalizeResumeIntent, planRestartNotice, tailKindFromSessionFile } from '../../core/restart-intent';
+import {
+  formatRestartLine,
+  logTargetsOtherSession,
+  logWrittenAfterStart,
+  normalizeResumeIntent,
+  planRestartNotice,
+  processStartedAtMs,
+  tailKindFromSessionFile,
+} from '../../core/restart-intent';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { listSessions, resolveSession } from '../../adapters/session-adapter';
 import { formatSessionList } from './store/sessions';
@@ -859,7 +867,14 @@ export function register(pi: ExtensionAPI): void {
       // 旧行为是无条件 sendUserMessage（无条件触发一个回合），切模式/换模型这类没有在途任务的
       // 重启也白烧一次"重启后首轮全量重放"（仓库既有实测 ≈80k），还可能让模型凭空编任务。
       const pendingLog = ctx.hasUI && !restartNoticeShown ? readState().restartLog : null;
-      if (ctx.hasUI && !restartNoticeShown && !isModeOwnedNotice(pendingLog)) {
+      // 归属判据（与 features/mode 的兜底消费同一套，见 core/restart-intent.ts）：
+      //   ① 写在**本进程启动之后**的日志属于下一个进程——本进程正是即将被重启的那一个，
+      //      吃掉它会让重拉起来的新进程无续跑可注入（2026-10-07 真 pty 场景实测的静默丢续跑）；
+      //   ② `targetSession` 指向别的会话/实例的日志不该注入到本会话里（多实例串扰）。
+      const belongsToMe =
+        !logWrittenAfterStart(pendingLog, processStartedAtMs()) &&
+        !logTargetsOtherSession(pendingLog, ctx.sessionManager?.getSessionFile?.());
+      if (ctx.hasUI && !restartNoticeShown && !isModeOwnedNotice(pendingLog) && belongsToMe) {
         const log = consumeRestartLog();
         if (log && log.action && log.action !== 'none') {
           restartNoticeShown = true;

@@ -101,11 +101,19 @@ const sentOf = (pi: FakePi): string[] => pi.sent as string[];
 const customOf = (pi: FakePi): { customType: string; content: string; options?: Record<string, unknown> }[] =>
   pi.custom as { customType: string; content: string; options?: Record<string, unknown> }[];
 
-/** 复刻 pi-supervisor.sh 的 clear_admin_action：只清 action/timestamp，保留 restartLog */
+/**
+ * 复刻 pi-supervisor.sh 的 clear_admin_action：只清 action/timestamp，保留 restartLog。
+ *
+ * 顺带把 `restartLog.timestamp` 调成"本进程启动之前"：真实世界里 supervisor 清 action 之后才拉起
+ * 新一轮，而重启日志是**旧进程**写的——新进程一定启动得比日志晚（归属判据 `logWrittenAfterStart()`
+ * 只让这种日志被消费）。测试在同一个进程里扮演"旧进程 → 新进程"，不调时间戳的话日志就成了
+ * "写在本进程启动之后"，按判据属于下一个进程、不该被消费。
+ */
 function clearAction(): void {
   const s = JSON.parse(readFileSync(statePath(), 'utf-8'));
   s.action = 'none';
   s.timestamp = 0;
+  if (s.restartLog) s.restartLog.timestamp = Date.now() - 60_000;
   writeFileSync(statePath(), JSON.stringify(s));
 }
 

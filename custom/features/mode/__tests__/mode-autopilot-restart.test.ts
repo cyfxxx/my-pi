@@ -159,6 +159,28 @@ function ctx() {
   };
 }
 
+/**
+ * 把 state.json 里的时间戳改成"本进程启动之前"。
+ *
+ * 真实世界里重启日志必然由**上一个进程**写下，而消费它的新进程启动得更晚——所以"本进程照常消费"
+ * 这一类用例必须先把日志做旧。若直接用 `writeRestartRequest` 的 `Date.now()`，日志就成了"写在本
+ * 进程启动之后"，按归属判据那属于下一个进程、本进程不该消费（这正是 2026-10-07 修掉的 bug 形态：
+ * 即将被重启的进程把日志吃掉 → 重拉起来的新进程无续跑可注入）。
+ */
+function ageStateLog(msAgo = 60_000): void {
+  const p = join(dir, 'state.json');
+  const s = JSON.parse(readFileSync(p, 'utf-8')) as { timestamp?: number; restartLog?: { timestamp?: number } | null };
+  const old = Date.now() - msAgo;
+  s.timestamp = old;
+  if (s.restartLog) s.restartLog.timestamp = old;
+  writeFileSync(p, JSON.stringify(s, null, 2));
+}
+
+/** 直接写一份 state.json（模拟"另一个写入端"的请求；时间戳显式给定，便于表达归属） */
+function writeStateFile(state: Record<string, unknown>): void {
+  writeFileSync(join(dir, 'state.json'), JSON.stringify(state, null, 2));
+}
+
 describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）', () => {
   it('autopilot 让位：请求仍是 restart、通知未被消费、通用通知不注入', async () => {
     setSessionMode(SESS, 'roleplay'); // 本会话应为 roleplay
@@ -185,6 +207,7 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     const handlers = pi.hooks.get('session_start') ?? [];
 
     writeRestartRequest('restart', { targetSession: SESS, reason: '手动重启', intent: 'none' });
+    ageStateLog();
     await handlers[1]({}, ctx()); // 只跑 autopilot 的消费端
 
     expect(pi.custom.some((c) => c.content.includes('系统已重启'))).toBe(true);
@@ -196,6 +219,7 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     const handlers = pi.hooks.get('session_start') ?? [];
 
     writeRestartRequest('set_model', { targetSession: SESS, reason: '切换模型', intent: 'none' });
+    ageStateLog();
     await handlers[1]({}, ctx());
 
     const note = pi.custom.find((c) => c.customType === 'my-pi-restart-note');
@@ -213,6 +237,7 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     const handlers = pi.hooks.get('session_start') ?? [];
 
     writeRestartRequest('restart_hang', { targetSession: SESS, reason: '看门狗恢复', intent: 'continue' });
+    ageStateLog();
     await handlers[1]({}, ctx());
 
     // 同步阶段：还没发（否则会撞上 rebind）
@@ -251,6 +276,7 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     const handlers = pi.hooks.get('session_start') ?? [];
 
     writeRestartRequest('restart_hang', { targetSession: SESS, reason: '崩溃恢复（external）', intent: 'continue' });
+    ageStateLog();
     await handlers[0]({}, ctx()); // mode 的 session_start（本进程 activeMode=roleplay）
 
     const resume = pi.custom.find((c) => c.customType === 'my-pi-restart-resume');
@@ -277,6 +303,7 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     const handlers = pi.hooks.get('session_start') ?? [];
 
     writeRestartRequest('restart', { targetSession: SESS, reason: '看门狗恢复', intent: 'auto' });
+    ageStateLog();
     await handlers[1]({}, ctx());
 
     const resume = pi.custom.find((c) => c.customType === 'my-pi-restart-resume');
@@ -300,11 +327,77 @@ describe('mode 自愈 + autopilot 通知消费（同一 session_start 相位）'
     const handlers = pi.hooks.get('session_start') ?? [];
 
     writeRestartRequest('restart', { targetSession: SESS, reason: '模型自己请求的重启', intent: 'auto' });
+    ageStateLog();
     await handlers[1]({}, ctx());
 
     const note = pi.custom.find((c) => c.customType === 'my-pi-restart-note');
     expect(note?.options?.deliverAs).toBe('nextTurn');
     expect(note?.content).toContain('tail-assistant-text');
     expect(pi.custom.some((c) => c.options?.triggerTurn === true)).toBe(false);
+  });
+
+  // ── 归属判据：日志是写给**下一个进程**的，本进程（即将被重启的那一个）不能吃 ──
+  // 2026-10-07 真 pty 场景实测：本机 pi 启动要 35–45s，外部写入端（看门狗/故障转移/另一实例/测试）
+  // 正好在进程**启动过程中**写日志时，那个进程会先把日志消费掉并注入到自己（马上要死的）会话里，
+  // 重拉起来的新进程什么都看不到 → 续跑静默丢失；同一次全量门禁里还出现过更糟的形态：
+  // 消费端的"整文件读-改-写"读早于写入、写晚于写入，把刚写下的 `action` 一起抹掉 → supervisor
+  // 读到空 action 直接退出（连重启都没发生，17/33 那次）。
+
+  it('写在本进程启动之后的日志属于下一个进程：不消费、不注入，且 action 完好', async () => {
+    const { writeRestartRequest } = await import('../../autopilot/logic');
+    const pi = await setupBoth();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    // 不做旧 = 时间戳晚于本进程启动（真实形态：外部写入端在启动过程中写请求）
+    writeRestartRequest('restart', { targetSession: SESS, reason: '外部写入端（下一进程的续跑）', intent: 'continue' });
+    await handlers[1]({}, ctx()); // autopilot 的消费端
+
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-resume')).toHaveLength(0);
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-note')).toHaveLength(0);
+    expect(pi.sent).toHaveLength(0);
+    const state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf-8'));
+    expect(state.action).toBe('restart'); // supervisor 仍会重拉
+    expect(state.restartLog).toMatchObject({ intent: 'continue' }); // 留给下一个进程消费
+  });
+
+  it('模式归属的日志同理：写在启动之后不吃（mode 的通知与兜底消费都让位）', async () => {
+    setSessionMode(SESS, 'roleplay');
+    process.env.PI_SESSION_MODE = 'roleplay';
+    const pi = await setupModeOnly();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    writeStateFile({
+      action: 'restart',
+      timestamp: Date.now() + 1000, // 明确晚于本进程启动
+      targetSession: SESS,
+      restartLog: { action: 'restart', notice: 'mode', from: 'full', mode: 'roleplay', targetSession: SESS, timestamp: Date.now() + 1000 },
+    });
+    await handlers[0]({}, ctx());
+
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-mode-switch')).toHaveLength(0);
+    const state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf-8'));
+    expect(state.action).toBe('restart');
+    expect(state.restartLog).toMatchObject({ notice: 'mode' });
+  });
+
+  it('targetSession 指向别的会话 → 不消费（多实例/多会话不串扰）', async () => {
+    setSessionMode(SESS, 'roleplay');
+    process.env.PI_SESSION_MODE = 'roleplay';
+    const pi = await setupModeOnly();
+    const handlers = pi.hooks.get('session_start') ?? [];
+
+    // 日志是旧的（能过"写在启动之前"那一关），只有目标会话对不上 → 必须留给它自己的进程
+    writeStateFile({
+      action: 'restart',
+      timestamp: Date.now() - 60_000,
+      targetSession: '/tmp/my-pi-some-other-session.jsonl',
+      restartLog: { action: 'restart', intent: 'continue', targetSession: '/tmp/my-pi-some-other-session.jsonl', timestamp: Date.now() - 60_000 },
+    });
+    await handlers[0]({}, ctx());
+
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-resume')).toHaveLength(0);
+    expect(pi.custom.filter((c) => c.customType === 'my-pi-restart-note')).toHaveLength(0);
+    const state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf-8'));
+    expect(state.restartLog).toMatchObject({ targetSession: '/tmp/my-pi-some-other-session.jsonl' });
   });
 });

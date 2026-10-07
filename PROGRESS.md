@@ -2232,3 +2232,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 人设新增《形象参考图》一节：把每张图的**视觉常量写成文字**（黑蝴蝶结 + 金色小王冠、蓝紫水手领、紫格纹百褶裙、枪身 `F61` 徽记、四联装鱼雷 + 单装炮、婚纱蓝紫玫瑰花结…），并说明"需要细节时先 `find` 再 `read` 那一两张"。**纯文本模型因此立刻拿到更细的形象信息**；人设另有一句兜底（模型不支持图片时会拿到一行提示，退回文字）。
 - 真实代码路径验证（直接调 vendor 构建产物里的 `read` 工具）：图片模型得到 `text: "Read image file [image/png]"` + `image(mimeType=image/png, base64=1 212 940 chars)`；纯文本模型得到那行 `Current model does not support images` 提示——与人设里的兜底写法一致。**诚实边界**：当前默认 provider 未声明图片输入，读图收益要换视觉模型才兑现（切换无需改配置）。
 - 新增守门 `check-conventions.sh` **E 节**：模式资产必须"引用成对"——悬空引用（点名了不存在的图）、孤儿资产（加了图没人引用）、目录 8 MB 上限三类静默漂移；三种都实测拦得住（改名 / 加图 / 灌 9 MB 各自失败，还原即通过）。`check-features.sh` 的分发资源清单同步加入 `assets/roleplay/README.md`。
+
+### 全量门禁暴露的真缺陷：重启日志归属判据（2026-10-07）
+
+- 触发：`PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh --smoke` 第 19 步真实 pty 场景 **17/33**（phase 1 全绿，phase 2 整段塌掉：`rounds.jsonl` 只有 2 轮、round-2 `decision=exit` 且 `adminAction` 为空、`completions=0`）。重跑 phase 2 过了但**续跑没注入**；80ms 轮询 `state.json` 抓到现场——场景写入后 <80ms `restartLog` 被清空，此刻只有 round-2 的 pi 活着。
+- 根因：消费端只判"是不是 mode 归属"，**没判这条日志是不是写给我的**。本机 pi 启动 35–45s，外部写入端在进程**启动过程中**写请求时，即将被重启的那个进程会把"给下一个进程的"日志吃掉并注入到自己（马上要死的）会话里 → 新进程无续跑可注入；同根因的另一形态：消费端"整文件读-改-写"读早于写入、写晚于写入，把刚写下的 `action` 一起抹掉 → supervisor 读空 action 直接退出（连重启都没发生）。
+- 修法：`core/restart-intent.ts` 新增 `logWrittenAfterStart()` / `logTargetsOtherSession()` / `processStartedAtMs()`，两个消费端（autopilot 通用通知、mode 兜底与模式通知）先判归属再消费；老请求（无时间戳）照旧消费。
+- 证据：单测 8 → **11 例**（两条判据分别改恒 false → 3 例如期失败，改回即通过）；真链场景 **33/33**（含"round-3 出现 `my-pi-restart-resume`"与"整场只跑一个模型回合"）；台账新增第 12 行。
+- 顺带更正：此前把"round-3 无续跑"归因于场景 SIGTERM 编排抖动，实为产品侧归属错误——判据补上后同样编排稳定通过。

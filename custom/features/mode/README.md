@@ -136,11 +136,19 @@ pi 的新会话文件**在首条 user/assistant 消息之前不落盘**（`Sessi
 
 归属用 `restartLog.notice = 'mode'` 标记：autopilot 见到它就**不注入也不消费**自己的通用
 「系统已重启」通知（`isModeOwnedNotice`），把这条日志原样留给 mode 的 `session_start`。
-`targetSession` 对不上的通知也不消费（别的会话的重启，留给它自己的进程）。
 
-> 这条链路曾有一个真实故障（2026-10-06）：旧进程写请求后，autopilot 的通知消费顺手把
-> `action` 清成 `none`，supervisor 便**不重启而是直接退出**——用户看到的是"注入了一条系统已重启、
-> 进程却退出、模式也没换"。根因与修法记在 [`DECISIONS.md`](../../../DECISIONS.md)。
+**归属判据**（两个消费端共用 `custom/core/restart-intent.ts`）：
+1. `logWrittenAfterStart()` —— 只消费**写在本进程启动之前**的日志。日志的合法消费者必然启动得比它晚
+   （旧进程写、supervisor 重拉、新进程消费）；写在启动之后的日志属于**下一个**进程。少了这条时，
+   外部写入端（看门狗/故障转移/另一实例/测试）在进程启动过程中写下的请求会被"即将被重启的那个进程"
+   吃掉并注入到它自己（马上要死的）会话里 → 新进程无续跑可注入；同源形态还会抹掉刚写下的 `action`
+   （消费端是整文件读-改-写）→ supervisor 读空 action 直接退出（2026-10-07 实修，见 `DECISIONS.md`）。
+2. `logTargetsOtherSession()` —— `targetSession` 对不上的通知不消费（别的会话/实例的重启，留给它自己的
+   进程）；这条此前只写在 mode 侧，现已补到两个消费端。
+
+> 这条链路有过两个真实故障：2026-10-06「旧进程写请求后，autopilot 的通知消费顺手把 `action` 清成
+> `none`，supervisor 不重启而是直接退出」；2026-10-07「启动过程中写入的日志被即将重启的进程消费，
+> 重拉起来的新进程续跑静默丢失」。根因与修法都记在 [`DECISIONS.md`](../../../DECISIONS.md)。
 
 ## 启动一致性校验与自愈（防"静默不生效"）
 
