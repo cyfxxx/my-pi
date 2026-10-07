@@ -1,0 +1,78 @@
+diff --git a/packages/coding-agent/src/core/slash-commands.ts b/packages/coding-agent/src/core/slash-commands.ts
+index 934de40a6..a331c5c16 100644
+--- a/packages/coding-agent/src/core/slash-commands.ts
++++ b/packages/coding-agent/src/core/slash-commands.ts
+@@ -24,8 +24,9 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
+ 	{ name: "scoped-models", description: "Enable/disable models for Ctrl+P cycling" },
+ 	{ name: "export", description: "Export session (HTML default, or specify path: .html/.jsonl)" },
+ 	{ name: "import", description: "Import and resume a session from a JSONL file" },
+-	{ name: "share", description: "Share session as a secret GitHub gist" },
+-	{ name: "bug", description: "Report a bug to the Pi developers", argumentHint: "<description>" },
++	// Patch (010-disable-share-bug): my-pi 是私人助手，不提供会话外发通道。
++	// /share 会把整个会话（含 system prompt 与工具 schema）先发 Radius 网关、失败回退 GitHub gist；
++	// /bug 会把诊断与会话内容上传给上游开发者。命令表与分发点同步移除。
+ 	{ name: "copy", description: "Copy last agent message to clipboard" },
+ 	{ name: "name", description: "Set session display name" },
+ 	{ name: "session", description: "Show session info and stats" },
+diff --git a/packages/coding-agent/src/modes/interactive/interactive-mode.ts b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+index 18d6d95dd..287151787 100644
+--- a/packages/coding-agent/src/modes/interactive/interactive-mode.ts
++++ b/packages/coding-agent/src/modes/interactive/interactive-mode.ts
+@@ -1213,7 +1213,7 @@ export class InteractiveMode {
+ 		if (crash) {
+ 			const when = new Date(crash.timestamp).toLocaleString();
+ 			this.showWarning(
+-				`${APP_NAME} crashed on ${when} (${crash.message}). Run /bug to report it; the crash details are attached automatically.`,
++				`${APP_NAME} crashed on ${when} (${crash.message}). Crash details were written to the local debug log.`,
+ 			);
+ 		}
+ 
+@@ -2135,7 +2135,7 @@ export class InteractiveMode {
+ 		}
+ 	}
+ 
+-	/** Persist a crash so the next start can point the user at `/bug`. Returns false when nothing was written. */
++	/** Persist a crash so the next start can surface it. Returns false when nothing was written. */
+ 	private recordCrash(kind: "uncaught_exception" | "fatal_error", error: unknown): boolean {
+ 		try {
+ 			return (
+@@ -2152,8 +2152,8 @@ export class InteractiveMode {
+ 	}
+ 
+ 	private crashReportInstructions(): string {
+-		const resume = this.session.sessionFile ? `run \`${APP_NAME} -r\` to resume the session, then` : "start pi and";
+-		return `To report this crash: ${resume} run /bug. The crash details are attached automatically.`;
++		// Patch (010-disable-share-bug): /bug 已禁用，只指向本地调试日志。
++		return "See the local debug log for crash details.";
+ 	}
+ 
+ 	private suggestBugReport(): void {
+@@ -2161,7 +2161,7 @@ export class InteractiveMode {
+ 		this.bugReportHintShown = true;
+ 		this.chatContainer.addChild(
+ 			new ThemedText(
+-				() => theme.fg("muted", `If this looks like a ${APP_NAME} bug, /bug sends a report to the developers.`),
++				() => theme.fg("muted", `If this looks like a bug, see the local debug log for details.`),
+ 				this.outputPad,
+ 				0,
+ 			),
+@@ -6572,6 +6572,9 @@ export class InteractiveMode {
+ 	}
+ 
+ 	private async handleShareCommand(): Promise<void> {
++		// Patch (010-disable-share-bug): 私人助手不允许把会话内容发往外部（Radius / GitHub gist）。
++		this.showWarning("此命令在 my-pi 中已禁用：会话内容不外发");
++		return;
+ 		await shareSession({
+ 			session: this.session,
+ 			ui: this.ui,
+@@ -6583,6 +6586,9 @@ export class InteractiveMode {
+ 	}
+ 
+ 	private async handleBugCommand(hint: string | undefined): Promise<void> {
++		// Patch (010-disable-share-bug): 私人助手不向外部上报诊断/会话内容，崩溃信息只落本地日志。
++		this.showWarning("此命令在 my-pi 中已禁用：不向外部上报会话内容");
++		return;
+ 		await reportBug(
+ 			{
+ 				session: this.session,

@@ -191,8 +191,11 @@ PI_SKIP_ROOT_INSTALL=1 bash scripts/build.sh
   会影响 selector、虚拟模型与 `models-store.json`，同步后要跑一次真实会话确认。
 - **构建工具链跳版风险最大**：上游换 TS 大版本 / target ES 版本 / 删 `tsx` 时，
   本地脚本（`patch-playwright-core.mjs`、`vendor-bundle.sh`、自愈缓存）都要复验。
-- **遥测要每次确认**：上次区间**没有新增遥测**，但 `enableInstallTelemetry` 默认 `true` 且会发
-  provider attribution headers。每次同步都在 settings/telemetry 相关 diff 里确认一遍默认值没变。
+- **遥测要每次确认**：`enableInstallTelemetry` 上游默认 `true` 且会发 provider attribution headers。
+  my-pi 已在两处硬关闭：`portable/agent/settings.json` 的 `enableInstallTelemetry:false`
+  与 `scripts/pi-supervisor.sh` / `scripts/dev.sh` 的 `PI_TELEMETRY=0`（env 优先级最高）。
+  每次同步仍在 settings/telemetry 相关 diff 里确认默认值与开关语义没变，并确认没有新增
+  **绕过该开关**的上报路径（例如独立 fetch 或新 provider 的 attribution header）。
 - **不要依赖 `vendor/pi/node_modules` 里的任何东西**：上游删依赖时，本地 `node_modules` 不会立刻
   反映（`npm ci` 只在 `deps_ok` 判定需要时跑），于是"看起来还能用"。实测：v0.99.0 删除了 `tsx`
   （改用 Node 内置类型剥离），而 `scripts/run-ts.sh` 当时正是从 `vendor/pi/node_modules/.bin/tsx` 取的，

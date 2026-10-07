@@ -30,6 +30,8 @@ import {
   applyModeRuntime,
   modeFeaturesLabel,
   isFeatureEnabled,
+  applyRoleplayIdentity,
+  ROLEPLAY_MODE_NAME,
   formatModeSwitchNotice,
   MODE_NOTICE_TTL_MS,
 } from './logic';
@@ -299,6 +301,21 @@ export function register(pi: ExtensionAPI): void {
       ctx.ui.notify(`[模式] ${activeMode}: ${activeConfig.description}`, 'info');
     },
   });
+
+  // roleplay：把 pi 默认 preamble（"expert coding assistant…"）定点替换为角色身份句。
+  // 只在 roleplay 模式注册；锚点与替换规则在 logic.ts（纯函数）。
+  if (activeMode === ROLEPLAY_MODE_NAME) {
+    registerHook(pi, {
+      event: 'before_agent_start',
+      handler: (event) => {
+        const e = event as { systemPrompt?: string };
+        if (typeof e.systemPrompt !== 'string') return;
+        const replaced = applyRoleplayIdentity(e.systemPrompt, activeMode);
+        if (replaced === e.systemPrompt) return;
+        return { systemPrompt: replaced };
+      },
+    });
+  }
 }
 
 /**

@@ -14,6 +14,7 @@
   "hideThinkingBlock": false,
   "collapseChangelog": true,
   "defaultProjectTrust": "ask",
+  "enableInstallTelemetry": false,
   "transport": "auto",
   "modelThinkingLevels": {},
   "compaction": {

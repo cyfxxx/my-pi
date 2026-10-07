@@ -9,6 +9,8 @@ cd "$ROOT"
 # pi 只识别 PI_CODING_AGENT_DIR；PI_MEMORY_DIR 由 custom/core/config.ts 解析
 export PI_CODING_AGENT_DIR="$ROOT/portable/agent"
 export PI_MEMORY_DIR="${PI_MEMORY_DIR:-$ROOT/portable/memory}"
+# 私人助手：关闭上游 install telemetry 与 provider attribution（与 supervisor 一致）。
+export PI_TELEMETRY=0
 
 CLI_SRC="$ROOT/vendor/pi/packages/coding-agent/src/cli.ts"
 [ -f "$CLI_SRC" ] || { echo "❌ 未找到 $CLI_SRC，请先运行：bash scripts/build.sh" >&2; exit 1; }

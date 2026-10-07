@@ -16,6 +16,7 @@ patches/
 ├── 007-footer-reorder.patch   # stats 行重排 + 去掉 ↑未命中 + CH 收敛为会话累计单值
 ├── 008-footer-cache-var-cleanup.patch  # 清理 007 遗留的 latestCacheHitRate 引用（修复 tsc 编译）
 └── 009-footer-badge.patch     # footer 第一行 badge：`badge:` 前缀状态渲染到 pwd/branch 旁
+└── 010-disable-share-bug.patch    # 禁用 `/share` 与 `/bug`（私人助手不外发会话内容）
 ```
 
 ## 补丁命名规范
@@ -29,7 +30,7 @@ patches/
 | 补丁 | 作用 | 目标 |
 |------|------|------|
 | `001-branding.patch` | 将上游 monorepo 名称改为 `my-pi` 并写入 `piConfig` | `vendor/pi/package.json` |
-| `002-local-pi-mods.patch` | 本地 pi 源码改动：项目级 `.pi` 发现、secrets 脱敏、离线跳过 model-data 校验、tsconfig 排除 `src/custom`、`packages/README.md` | `vendor/pi/packages/**` |
+| `002-local-pi-mods.patch` | 本地 pi 源码改动：secrets 脱敏、离线跳过 model-data 校验、tsconfig 排除 `src/custom`、`packages/README.md` | `vendor/pi/packages/**` |
 | `003-tab-completion-fix.patch` | `handleTabCompletion` 斜杠命令上下文统一走 `handleSlashCommandCompletion()`，使 `/voice`、`/plan` 等子命令参数补全在 Tab 时可见（对应 pi-tools `patch-tab-arg-completion.mjs`） | `vendor/pi/packages/tui/src/components/editor.ts` |
 | `004-footer-tweaks.patch` | footer 增强（合并 pi-tools 四个 dist 补丁）：实时上下文 token 显示+双指标着色（黄=压缩参考线 `PI_CONTEXT_ABSOLUTE_TOKENS` 默认 256K，红=超窗口 80%）；CH 实时/会话双命中率；`Σ/↑/↓` 字段与人民币成本；>40% 窗口追加 `⚠` 重启提示 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `005-footer-speed-and-scrollback.patch` | ① 输出速度（status key `tps`）并入 footer stats 行并沿用 dim 风格（此前为独立未着色行），其余扩展状态行统一 dim；② regular 模式 `fullRender(true)` 去掉 `ESC[3J`，宽度变化/内容收缩不再清空 scrollback（解决工作过程中无法向上滚动查看历史） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts`、`vendor/pi/packages/tui/src/tui-main-screen.ts` |
@@ -37,6 +38,7 @@ patches/
 | `007-footer-reorder.patch` | footer stats 行顺序定为 `Σ总输入 → ↓输出 → CH会话累计 → ¥费用 → 上下文 → ⇅速度`（速度移末位并自带 dim，抵消上下文色码 reset）；移除与 Σ 重复的 `↑` 未命中；CH 由「最近一轮/20 轮窗口」双值收敛为单一会话累计命中率 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `008-footer-cache-var-cleanup.patch` | 007 删除了 `latestCacheHitRate` 的声明与赋值，但漏删 `SessionStats` 接口字段、stats 对象属性与 render 解构三处引用，导致 `tsc` 报 TS18004；本补丁补齐删除 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `009-footer-badge.patch` | **footer 第一行的常驻模式标识**：扩展状态 key 以 `badge:` 前缀注册时，剥离前缀后用 `warning` 色渲染在 `~/my-pi (main)` 之后（其余 key 仍走第三行状态行）。动机：计划模式是强只读约束，此前进入后仅一次性 `notify`（提示一滚走就无从判断），`/plan status` 又要主动查询；模式标识与「当前目录/分支」同属会话级状态，应常驻在 pwd 行。用前缀而非白名单，后续模式（roleplay 等）可零改动复用。当前消费方：`custom/features/plan-mode`（`badge:plan`） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
+| `010-disable-share-bug.patch` | 禁用 `/share`（会话上传 Radius 网关/GitHub gist）与 `/bug`（诊断上传 Earendil）：命令表删除两项，两个 handler 早退并提示已禁用，崩溃提示改为只指向本地调试日志。动机：私人助手不允许把会话内容发往外部 | `vendor/pi/packages/coding-agent/src/core/slash-commands.ts`、`vendor/pi/packages/coding-agent/src/modes/interactive/interactive-mode.ts` |
 
 ## 验证补丁
 

@@ -29,7 +29,6 @@ if (!existsSync(VENDOR)) {
 const EXPLICIT = {
   '001-branding.patch': [{ file: 'package.json', contains: ['"name": "my-pi"', 'piConfig'] }],
   '002-local-pi-mods.patch': [
-    { file: 'packages/coding-agent/src/config.ts', contains: ['projectPiDir'] },
     { file: 'packages/coding-agent/src/core/secrets.ts', contains: ['REDACTED'] },
   ],
   '003-tab-completion-fix.patch': [

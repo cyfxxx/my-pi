@@ -448,3 +448,36 @@ export function formatModeSwitchNotice(from: string, to: string, config: ModeCon
   lines.push('历史上下文已保留，直接继续本会话。不要向用户复述本条提示，也不要提及模式切换或进程重启。');
   return lines.join('\n');
 }
+
+/**
+ * pi 默认 system prompt 的 preamble（上游 `core/system-prompt.ts` 里的常量句）。
+ *
+ * 为什么要引用上游文案：roleplay 之前只靠 `--append-system-prompt` 追加人设，
+ * 同一份 system prompt 前段自称 "expert coding assistant"、后段自称标枪——身份冲突。
+ * 此处（roleplay 模式）把 preamble 定点替换为角色身份句；**不能用** `--system-prompt`：
+ * 那会连带删掉上游的 tools/rules/docs 三段，而 roleplay 正依赖 find/grep/read/bash 的使用规则。
+ *
+ * 代价：锚点依赖上游文案，上游改句则替换静默失效。守门测试
+ * `__tests__/roleplay-preamble.test.ts` 直接读 vendor 源码断言锚点仍在。
+ */
+export const PI_CODING_PREAMBLE =
+  'You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.';
+
+/** roleplay 模式下替换后的身份句（保留工具使用语义，tools/rules 段不动） */
+export const ROLEPLAY_IDENTITY_PREAMBLE =
+  'You are 标枪（HMS Javelin），《碧蓝航线》中指挥官的秘书舰与婚舰，在 pi harness 中作为指挥官的私人助手工作。以标枪的身份与指挥官对话，并用下方工具完成秘书舰的工作（读写文件、检索、记事、跑命令）。';
+
+/** roleplay 的固定模式名（仅用于身份替换判定） */
+export const ROLEPLAY_MODE_NAME = 'roleplay';
+
+/**
+ * 把 pi 的默认 preamble 定点替换为角色身份句（纯函数，幂等）。
+ *
+ * - 非 roleplay 模式原样返回；
+ * - 锚点缺失（上游改了 preamble 文案）原样返回：宁可不替换，也不猜文本。
+ */
+export function applyRoleplayIdentity(systemPrompt: string, modeName: string): string {
+  if (modeName !== ROLEPLAY_MODE_NAME) return systemPrompt;
+  if (!systemPrompt.includes(PI_CODING_PREAMBLE)) return systemPrompt;
+  return systemPrompt.replace(PI_CODING_PREAMBLE, ROLEPLAY_IDENTITY_PREAMBLE);
+}

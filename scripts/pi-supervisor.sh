@@ -53,6 +53,10 @@ export PI_CODING_AGENT_DIR="$AGENT_DIR"
 # PI_MEMORY_DIR 可被外部显式覆盖：真实生命周期场景（scripts/test-scenario-mode-restart.mjs）
 # 要在隔离目录里跑整套 supervisor + pi，不能让场景读写真记忆库。未设置时行为与以前完全一致。
 export PI_MEMORY_DIR="${PI_MEMORY_DIR:-$ROOT/portable/memory}"
+# 私人助手：关闭上游 install telemetry 与 provider attribution（上游默认 true）。
+# settings.json 也写了 enableInstallTelemetry:false；env 优先级最高（core/telemetry.ts:8），
+# 防 settings 被覆盖/重置后静默恢复上报。
+export PI_TELEMETRY=0
 
 # ── 包管理子命令直通（install/remove/uninstall/list/update）──
 # pi 的包管理分发要求 argv[0] 就是子命令本身（package-manager-cli.ts 的
