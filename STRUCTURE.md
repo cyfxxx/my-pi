@@ -93,6 +93,9 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `004-footer-tweaks.patch`：TUI footer 四项调整（实时上下文 token、双指标着色、CH 实时/会话命中率、`Σ/↑/↓` 字段与 `¥` 成本、>40% `⚠` 重启提示）
 - `005-footer-speed-and-scrollback.patch`：输出速度并入 footer stats 行；regular 模式不再清空 scrollback
 - `006-footer-cost-and-cache-window.patch`：成本汇率与缓存命中率窗口调整（20 轮）
+- `007-footer-reorder.patch`：footer stats 行重排（Σ 总输入 → ↓输出 → CH → ¥ → 上下文 → 速度）+ 去掉重复的 `↑未命中` + CH 收敛为会话累计单值
+- `008-footer-cache-var-cleanup.patch`：清理 007 遗留的 `latestCacheHitRate` 引用（修复 tsc TS18004）
+- `009-footer-badge.patch`：footer 第一行常驻 badge（扩展状态 key 加 `badge:` 前缀即渲染到 pwd/branch 旁；消费方 `plan-mode`）
 
 ### `scripts/`
 共 51 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：

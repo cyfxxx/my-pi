@@ -102,9 +102,16 @@ export function sendMessage<T = unknown>(
  * 续接）顺序是 `teardownCurrent` → `createRuntime`（**这里发出 session_start**）→
  * `finishSessionReplacement` → `rebindSession`（把新会话绑回 TUI/扩展宿主）。在 session_start 里
  * 立刻触发回合，回复可能落在"换绑前的会话"上被丢弃——实测：请求与响应都发生了、也没有任何报错，
- * 但 assistant 条目偶发不落盘（重启后"自动续跑"看起来毫无反应）。延后触发让换绑先完成。
+ * 但 assistant 条目偶发不落盘（重启后"自动续跑"看起来毫无反应）。延后触发让宿主接线先完成。
  *
  * 延迟可用 `PI_RESTART_RESUME_DELAY_MS` 覆盖（测试里设 0）。
+ *
+ * 2026-10-07 否掉过一版"正序事件"替代方案（用 vendor 事件换掉延时）：给 pi 加 `session_rebound`
+ * 事件（在 `finishSessionReplacement` 末尾发）只覆盖**进程内**会话替换，而我们的重启路径是
+ * **新进程 + `--session`**——那条路不走会话替换（`main.ts` 不调用 `finishSessionReplacement`），
+ * 事件永不触发。判别性实测：`PI_RESTART_RESUME_DELAY_MS=120000` 跑单实例真实 pty 场景 → **2/33**
+ * （续跑没发生），默认 600ms 兜底则 33/33——说明一直起作用的是延时，不是 rebind 顺序。
+ * 结论：保留延时，并把"新进程里究竟何时才可安全注入"记为**未定位**（见 `DECISIONS.md`）。
  */
 export function sendMessageAfterRebind(
   pi: ExtensionAPI,

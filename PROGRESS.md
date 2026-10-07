@@ -2264,3 +2264,16 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   1. **`state-audit` 的"实例数可见"在真机上恒为空**：pi 启动后 `process.title='pi'` 把 `/proc/<pid>/cmdline` 覆盖成只剩 `pi`，旧判据 `argv.includes('cli.js')` 永远数不到真 pi（只有启动早期/假 CLI 才带 cli.js）。改为认两种形态（`cli.js` 或标题 `pi`/`pi-rpc`，且 `exe=node`、排除 `node -e` 助手），并在 CLI 级测试里用 `process.title='pi'` 的假进程锁住。
   2. **共享目录下 per-round crash log 同名覆盖**：两个 supervisor 的 `ROUND_INDEX` 都从 1 开始，`round-1.log` 互相覆盖，复盘时恰好丢掉要查的那一轮。改成 `round-<N>-<pid>.log`（轮转 glob 不变），场景里新增一条断言锁死"两实例的 crash log 互不重叠"。
 - 接进 golden：新增**第 20 步**"两实例隔离场景"（与第 19 步同为 `PI_GOLDEN_SCENARIO=1`  opt-in、默认 skip、`--fast` skip），`--smoke` 移到**第 21 步**；README/STRUCTURE/FAQ/TROUBLESHOOTING/VISION 的步数同步。
+
+### 一次被证伪的修法：vendor「换绑完成事件」替代重启延时（2026-10-07）
+
+- 初衷：把"`session_start` 后延后 600ms 再触发续跑"换成正序事件。写了补丁 010（`session_rebound`
+  事件 + `AgentSession.sessionStartEvent` getter，3 文件 / +42 行），`sendMessageAfterRebind()` 改成
+  "事件优先、定时器兜底"；单测 12 例通过，默认延时下真实 pty 场景也 33/33。
+- 判别性实验把它证伪：兜底延时设 `PI_RESTART_RESUME_DELAY_MS=120000` 再跑同一个真实 pty 场景 →
+  **2/33**（续跑没发生）。原因：`finishSessionReplacement` 只被**进程内**替换调用，而 my-pi 的重启是
+  **新进程 + `--session`**（`main.ts` 不调用它）→ 事件永不触发。
+- 处置：**补丁与消费端改动全部回退**（无消费者的事件=死代码），保留 600ms 延时；把负结果与判别命令
+  写进 `custom/adapters/ui-adapter.ts` 注释与 `DECISIONS.md`（含认知更正：真正的可安全注入时刻在新进程
+  启动路径上，**位置未定位**；过去"读会话替换顺序"得出的 rebind 归因对重启路径不成立）。
+- 唯一保留的副产物：`STRUCTURE.md` 补丁清单补齐此前漏列的 007/008/009。

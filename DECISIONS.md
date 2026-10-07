@@ -2,25 +2,31 @@
 
 ## 格式
 
-### [2026-10-07] 重启日志的归属判据：只消费「写于我启动之前」的日志（修续跑静默丢失 + 请求被抹掉）
+### [2026-10-07] 「换绑完成事件」被证伪：重启路径是新进程 + `--session`，不走会话替换
 
-**怎么发现的**：全量门禁（`PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh --smoke`）第 19 步真实 pty 场景 **17/33**：phase 1（切模式零回合）全绿，phase 2（写 `intent=continue` 的重启请求 → SIGTERM → 期待重拉 + 续跑）整段塌掉——`rounds.jsonl` 只有 2 轮，round-2 是 `decision=exit` 且 `adminAction=""`，`completions=0`。重跑一次 phase 2 过了，但**续跑没注入**（round-3 的会话里没有 `my-pi-restart-resume`）。用 80ms 轮询 `state.json` 抓到现场：场景写入（`action=restart` + `restartLog`）后 **<80ms** 内 `restartLog` 就被清成 null，而那一刻只有 round-2 的 pi 活着。
+**想做的事**：把 2026-10-06 那版"在 `session_start` 之后延后 600ms 再触发续跑回合"换成**正序事件**
+（不再拿延时常数赌时机）：给 pi 加一个"换绑完成"事件，在 `finishSessionReplacement` 末尾
+（`rebindSession` 与 replaced-session 回调都跑完之后）发出来，我们订阅到就立刻注入。
 
-**根因**：`restartLog` 的语义是「旧进程写 → supervisor 重拉 → **新进程**在 session_start 消费并注入续跑」。两个消费端都只判了"是不是 mode 归属"，**没判这条日志是不是写给我的**。本机 pi 启动要 35–45s（窗口很宽），于是外部写入端（看门狗/故障转移/另一实例/测试）很容易在**当前进程还在启动**时写下请求——那个即将被重启的进程（它的 session_start 恰好在此时跑）把"给下一个进程的"日志吃掉，并把续跑注入到自己那个马上要死的会话里；新进程醒来时 `restartLog` 已是 null → **续跑静默丢失**。同一根因还有一个更凶的形态：消费端是"整文件读-改-写"，若它的读发生在这个写入之前、写发生在之后，写回的快照里 `action` 还是空 → **刚写下的重启请求被抹掉**，supervisor 读到空 action 直接退出——17/33 那次连重启都没发生。
+**做了什么（已回退，但值得记）**：写了 `patches/010-session-rebound-event.patch`（3 文件 / +42 行：
+`session_rebound` 事件 + `on()` 重载 + `AgentSession.sessionStartEvent` getter），
+`sendMessageAfterRebind()` 改为"事件优先、定时器兜底"，单测通过（12 例），默认延时下真实 pty 场景
+也 33/33。
 
-**决策**：`custom/core/restart-intent.ts` 新增两条纯判据，两个消费端（autopilot 的通用通知、mode 的兜底消费与模式通知）**先判归属再消费**：
-1. `logWrittenAfterStart(log, startedAt)`——日志时间戳晚于本进程启动 → 不属于本进程，**原样留给下一个进程**（不消费、不注入）；
-2. `logTargetsOtherSession(log, sessionFile)`——`targetSession` 指向别的会话 → 不消费（**补上 autopilot 侧此前缺的这条**，多实例/多会话不再串扰）。
-`processStartedAtMs()` 用 `process.uptime()` 反推启动时刻（内核给的存活秒数，比"模块加载时刻"更接近 exec 时刻）。没有时间戳的老请求（手工写的）照旧消费，否则它们会永远没人管。
+**怎么被证伪的（判别性实验）**：把兜底延时设成 `PI_RESTART_RESUME_DELAY_MS=120000` 再跑同一个
+真实 pty 场景——如果起作用的是事件，续跑检查（60s/30s 窗口）应当照常通过；实测 **2/33，续跑根本没
+发生**。查 vendor 确认原因：`finishSessionReplacement` 只被**进程内**替换路径调用
+（`switchSession` / `newSession` / 3 处 fork / resume），而 my-pi 的重启路径是
+**新进程 `node cli.js --session <path>`**（`main.ts` 压根不调用它）——事件永不触发。
 
-**为什么不改成"给 state.json 加锁"**：锁只能串行化 pi-vs-pi，而这次的写入端一个是 pi、一个是外部（另一实例/看门狗/测试），既锁不住也没必要——问题不是"同时写"，而是**归属错了**：这条日志本来就不该由它消费。判据是纯函数、可单测、与锁无关。`state.json` 的"整文件读-改-写"仍是唯一没锁的跨进程共享状态（mode store 早有 `withModeStoreLock`）；判据让它不再触发，若将来出现第三个写入端或更复杂的并发，再考虑上锁。
+**结论**：**不引入这个补丁**（无消费者的事件等于死代码，还要随上游同步维护），保留 600ms 延时。
+更重要的是更正一条认知：之前把"在 session_start 里同步触发会丢回复"归因为"跑在 rebind 之前的会话上"，
+但重启路径根本没有 rebind——**真正的"可安全注入"时刻在新进程启动路径上，具体位置未定位**（宿主
+接线完成点候选：`main.ts` 创建 runtime 之后的各处接线、交互模式挂载完成；没有找到既有的扩展事件
+能对应它）。判别延时的正确做法是实验（换延时看场景结果），不是读会话替换的代码顺序。
 
-**证据**：
-- 单测：`mode-autopilot-restart.test.ts` 8 → **11 例**（"写在启动之后的通用日志不吃、且 `action` 完好""写在启动之后的模式日志不吃""`targetSession` 指向别的会话不吃"）。把两条判据分别改成恒 false（=回到修复前）→ **3 例如期失败**，改回即通过。
-- 真链：`PI_SCENARIO_KEEP=1 node scripts/test-scenario-mode-restart.mjs` → **33/33 通过**，其中三条正是此前塌掉/失败的点：`intent=continue` 的重启被真的执行、round-3 出现 `my-pi-restart-resume`、整场只跑了那一个模型回合。
-- 台账：`docs/BUG-REPLAYS.md` 第 12 行（含可执行的复现命令）。
-
-**顺带**：这条也修正了此前对场景失败的一句判断——当时把"round-3 无续跑"归因于 SIGTERM 催停编排的时序抖动；实际是产品侧归属错误，判据补上后同样的编排稳定 33/33。
+**保留的副产物**：`custom/adapters/ui-adapter.ts` 的注释里写下这条负结果与判别实验命令；
+`STRUCTURE.md` 的补丁清单顺带补齐了此前漏列的 007/008/009（与本条无关的既有漂移）。
 
 ### [2026-10-07] 角色扮演模式：精选 6 张形象参考图入库 + 按需 `read` 通路
 
@@ -44,6 +50,8 @@
 **追加（同日，用户点名）**：再补两张**日常风格**——皮肤「枕头大战」（`07-皮肤-枕头大战.webp`）与「黑色礼服」（`08-皮肤-黑色礼服.jpg`）→ 共 **8 张 / 3.8 MB**。**格式不转换**：pi 的 `read` 原生支持 png/jpg/webp/gif（实测该 webp 返回 `image(image/webp, 426212 b64 chars)`），OpenAI 兼容传输只是把 `data:<mime>;base64,…` 原样放进 `image_url`（无 mime 白名单）；而这个 webp 带透明背景（`VP8X + ALPH`），转 JPEG 会把背景压成实色块、转 PNG 则体积数倍——两种转换都只有坏处。规则定为：**pi 支持的格式直接放，不为"格式统一"付转换代价**。
 
 ### [2026-10-06] 续跑回合与 pi 会话替换的竞态：根因定位 + 延后触发（含证据边界）
+
+> **2026-10-07 更正（重要）**：这条把"`session_start` 里同步触发回合会丢回复"归因为"跑在 rebind 之前的会话上"。该归因**对重启路径不成立**——my-pi 的重启是**新进程 + `--session`**，根本不走会话替换（`main.ts` 不调用 `finishSessionReplacement`），也就没有 rebind。判别实验：用正序事件（补丁 010）替代延时后，把兜底延时设成 120s 再跑真实 pty 场景 → 2/33（续跑没发生），说明一直起作用的是**延时**而不是事件/顺序。修法（600ms 延后）**保留**，但机制写明为"未定位"：真正的可安全注入时刻在新进程启动路径上。详见下方 2026-10-07 那条。
 
 上一批把"session_start 触发的回合偶发丢回复"记为软提示。这次去 vendor 里定位了根因：
 
