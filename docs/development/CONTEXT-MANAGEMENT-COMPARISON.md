@@ -134,17 +134,33 @@ O7 另把"整段缓存失效"的风险面从 system prompt 收窄到消息尾部
 
 ## 四、仍可优化项（按收益排序）
 
-### P1 — 压缩摘要的暖前缀重放仍是死代码（需上游补丁）
+### P1 — 压缩摘要的暖前缀重放仍是死代码（**2026-10-07 实测：收益≈0，定案不打补丁**）
 
-- DSH 的摘要调用**逐字重放 system+tools+region**，让辅助调用命中 KV 缓存；my-pi 的
-  `budget/warm-prefix.ts` 想做同一件事，但挂在 `before_provider_request` 上，而 pi 的压缩路径
-  （`agent-session._runDefaultCompaction` → `completeSummarization` → `agent.streamFunction`）
-  **不经过 Agent 的 `onPayload`** → `isSummarizationMessage` 分支永不执行。
-- 已确认补丁点很小：`core/sdk.ts` 的 `buildRequestOptions` 返回值加 `onPayload: transformProviderPayload`
-  （压缩与主循环共用同一个 `streamFn`）。但需要新增 `patches/007-*` 并重建 dist，且改的是关键路径。
-- 收益已下降：擦除生效后压缩很少触发；按修正价目，一次 256K 压缩自身开销约 `$0.038`，
-  而它省下的命中 token 约 `$0.0007/请求` → **回本约 55 个后续请求**（详见第六节）。
-- 建议：暂不动 vendor；若后续压缩频繁，再打该补丁，或删除死代码并明确标注。
+- **现状（逐行核对过）**：主循环通过 `core/sdk.ts:414` 的 `onPayload: transformProviderPayload` 把 payload
+  交给扩展事件 `before_provider_request`（`transformProviderPayload` 就是 `runner.emitBeforeProviderRequest`）；
+  而压缩走 `agent-session.ts:2722` 的 `this.agent.streamFunction` **直连**，绕过 `createLoopConfig()`
+  （`packages/agent/src/agent.ts:473` 才把 `onPayload` 传给 agent loop），而 `buildRequestOptions`
+  （`core/sdk.ts:322`）的返回值里**没有** `onPayload` → 我们的回放分支（`context/index.ts:756` 的
+  `isSummarizationMessage` 分支）**不可达**。补丁点就一行：给 `buildRequestOptions` 的返回值加
+  `onPayload: transformProviderPayload`。
+- **模块不是整体死代码**：同一个 `before_provider_request` 钩子的另一半（`saveMainRequestPayload` +
+  `recordFingerprint`）在真实会话里一直在跑——`portable/memory/logs/prefix-fingerprints.jsonl` 现有
+  **929 条**、最近更新就在今天。所以"删掉死代码"不是合适选项（会把活的那半一起删掉）。
+- **为什么不打这个补丁（实测，不是估计）**：压缩在本项目里**几乎不发生**——全量
+  `portable/memory/context/.usage-diag.jsonl` 里 `auto-compact` 事件只有 **2 次**（都在 2026-09-24，
+  且是 1200 tokens / 1000 阈值的早期小样本），`prefix-fingerprints.jsonl` 里压缩归因 **0 次**；而按修正价目
+  一次 256K 压缩自身约 `$0.038`、回放省下的命中 token 约 `$0.0007/请求` → **回本约 55 个后续请求**。
+  触发概率≈0 × 回本 55 → 期望收益≈0，为它引入一个改动关键路径、且要随上游同步维护的补丁不划算。
+- **复核命令（一条命令重测）**：
+  ```bash
+  grep -c '"type":"auto-compact"' portable/memory/context/.usage-diag.jsonl   # 压缩次数
+  grep -c compact portable/memory/logs/prefix-fingerprints.jsonl                # 前缀断裂里的压缩归因
+  ```
+- **触发条件（满足即动手）**：一周内 `auto-compact` 事件 ≥1 次（≥2 次更明确），或把压缩阈值下调到会经常
+  触发。届时按顺序做：① 先写判别实验（把阈值调到很低强制压缩，用假 provider 看摘要请求的 payload 里
+  有没有重放的 system+tools——**补丁前应当是"没有"**）；② 再打一行补丁 `011-*`；③ 复跑同一实验确认
+  重放出现，并确认没有把主循环的 payload 变换搞坏（`test-usage-metrics` / 指纹守门）。
+
 
 ### P2 — 子代理缺 fork 模式
 

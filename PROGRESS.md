@@ -2303,3 +2303,14 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   两个消费端都传 `{ isIdle: () => ctx.isIdle() }`。
 - 新增单测"忙时不发、settled 后发"（mode-autopilot-restart 12 例），把"忙碌态不能发 triggerTurn"这条硬证据按在代码上。
 - 验证：tsc / 全量 vitest / 单实例场景（默认延时与 0ms）/ 两实例场景 / golden --fast（见本轮提交说明）。
+
+### G3 定案：压缩暖前缀不补 vendor（2026-10-07）
+
+- 逐行核对：回放分支确实不可达（主循环的 `onPayload` 在 `core/sdk.ts:414`，压缩走 `agent-session.ts:2722`
+  直连 `agent.streamFunction`，`buildRequestOptions` 没带 `onPayload`）；补丁点确实只有一行。
+- 但实测压缩**几乎不发生**：`auto-compact` 事件全量 2 次（均 2026-09-24 早期小样本）、指纹日志压缩归因 0 次；
+  一次 256K 压缩自身 ≈`$0.038`、回放省 ≈`$0.0007/请求` → 回本 ≈55 个请求 → 期望收益≈0。
+- 结论：不补；写清一行复核命令 + 触发条件 + 届时三步走（见 `DECISIONS.md` 与
+  `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` P1）。同模块的 `saveMainRequestPayload`/`recordFingerprint`
+  是活的（929 条指纹、今天仍在写），所以不做"删死代码"。
+- 至此迁移审计的开口项 G1–G7 全部闭环（G3 为"测量后不做 + 触发条件式"）。
