@@ -124,7 +124,8 @@ for f in custom/features/voice/scripts/pi-whisper.sh custom/features/voice/scrip
          custom/features/voice/scripts/pi-sherpa.sh custom/features/voice/scripts/pi-sherpa-server.py \
          portable/agent/recovery/rescue-prompt.md \
          portable/agent/scheduled-seeds.json portable/agent/injection-baseline.json \
-         portable/agent/modes/roleplay.md portable/agent/agents/*.md; do
+         portable/agent/modes/roleplay.md portable/agent/modes/assets/roleplay/README.md \
+         portable/agent/agents/*.md; do
   if [ ! -f "$f" ]; then
     echo "  ❌ $f 缺失（随仓库分发的资源，功能会退化）"
     MISSING=$((MISSING + 1))

@@ -70,7 +70,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
   - `extensions/`：第三方扩展目录（`agentDir/extensions` 自动发现，放 `<name>/index.ts` 即生效）
   - `npm/`、`git/`：`./my-pi.sh install` 安装的 npm / git 扩展包（来源记入 `settings.json` 的 `packages`）
   - `auth.json`、`models.json`、`models-store.json`、`trust.json`、`pi-link-*.json`：每环境独立、不入库
-  - **入库白名单**（配置类）：`modes.json`、`scheduled-seeds.json`、`settings.json`、`AGENTS.md`、`injection-baseline.json`
+  - **入库白名单**（配置类）：`modes.json`、`scheduled-seeds.json`、`settings.json`、`AGENTS.md`、`injection-baseline.json`、`modes/`（模式人设 `modes/<name>.md` 及其图片资产 `modes/assets/<name>/`，随模式分发，见 `custom/features/mode/README.md`）
   - **运行时状态**（刻意不入库）：`modes-sessions.json`（会话→模式：`/mode` 写入，随会话生效；混进入库文件会被 git 操作静默回退，见 `custom/features/mode/README.md`）、`mode-restart-guard.json`（自愈重启防环标记）、`autopilot/state.json`、`recovery/`、`sessions/`
 - `memory/`：my-pi 自定义功能的数据（memory 功能的 `notes.json`、`checkpoints/`，以及工具输出归档 `tool-outputs/`）
 
@@ -117,7 +117,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `prepush-scope.sh` / `test-prepush-scope.sh`：pre-push 门禁范围判定与其守门（拿不准一律回退全量）
 - `vendor-bundle.sh`：vendor/pi 离线归档 `create|restore|status`（bundle 不入库，`doctor` 会提示缺失）
 - `check-injection-surface.sh`：system prompt 注入面前缀指纹基线守门（`--update` 更新基线）
-- `check-conventions.sh`：约定守门——运行时状态不入库（`settings.json` 的 `deviceId`、`modes.json` 的 `current`）/ 敏感文件与运行时数据不入库（含暂存区）/ 生产代码禁 `any` 与动态 `import(`
+- `check-conventions.sh`：约定守门——运行时状态不入库（`settings.json` 的 `deviceId`、`modes.json` 的 `current`）/ 敏感文件与运行时数据不入库（含暂存区）/ 生产代码禁 `any` 与动态 `import(` / 文档结构计数与事故台账一致 / 模式人设的图片资产引用成对（悬空引用、孤儿资产、目录 8 MB 上限）
 - `check-doc-links.mjs`：文档内部相对链接一致性校验
 - `web-terminal.sh`：浏览器终端启动器（在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务；只绑回环），见 [custom/web-terminal/README.md](custom/web-terminal/README.md)
 - `test-web-terminal.mjs`：web-terminal 的进程级守门（鉴权/栅栏/穿越/WS 双向/resize/孤儿会话回收），零 LLM 消耗；缺 `script`/`stty` 时显式 SKIP

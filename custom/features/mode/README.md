@@ -50,6 +50,7 @@
 | `portable/agent/modes-sessions.json` | `{ "<会话文件绝对路径>": { mode, updatedAt } }`（会话的运行时选择） | 否（被 `portable/agent/*` 忽略） |
 | `portable/agent/mode-restart-guard.json` | 自愈重启的防环标记：`{ "<会话>::<模式>": ts }`（多键；同一键在窗口内只自动重启一次） | 否 |
 | `portable/agent/modes/<name>.md` | 人设文件（`appendPrompt`，经 `pi --append-system-prompt` 注入） | 是 |
+| `portable/agent/modes/assets/<name>/` | 人设配套的图片资产（目前只有 roleplay：6 张形象参考图 + `README.md` 清单，人设里按需 `read`） | 是（`!portable/agent/modes/**` 放行；引用/孤儿/体积由 `check-conventions.sh` E 节守门） |
 | 环境变量 | `PI_AGENT_MODE`+`PI_AGENT_MODE_SOURCE`（外部硬覆盖）、`PI_SESSION_MODE`（启动器按会话解析的**软**来源）、`PI_MEMORY_NAMESPACE`（记忆命名空间，由启动器注入） | — |
 
 **为什么配置与会话记录要分开**（这不是洁癖，是一次实测故障的根因）：`current` 曾经写在入库的 `modes.json` 里。

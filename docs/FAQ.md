@@ -129,7 +129,7 @@ pi-backup restore --backup <路径>   # 从本地归档恢复到仓库根
 `portable/agent/modes.json` 的 `default`，续接会话自动回到它自己上次的模式（对应关系存在
 `portable/agent/modes-sessions.json`，不入库）。可用档位：`full`（默认，全部功能）、`minimal`
 （仅内置工具，无自定义功能；测试/修复用）、`roleplay`（标枪人设，秘书舰·已誓约：web-search +
-隔离记忆）或 `lean`（去掉 browser/voice/link/autopilot，成本敏感会话）。功能集/人设变更需要重启，
+隔离记忆 + 6 张形象参考图）或 `lean`（去掉 browser/voice/link/autopilot，成本敏感会话）。功能集/人设变更需要重启，
 `/mode` 会自动重启并续接当前会话；也可以用环境变量 `PI_AGENT_MODE=<名称>` 强制覆盖整次运行
 （跳过按会话解析与一致性校验，供测试/临时使用）。
 
@@ -146,6 +146,14 @@ pi-backup restore --backup <路径>   # 从本地归档恢复到仓库根
 `=always` 一律继续（默认 `auto`）。
 如果你遇到"切了模式但进程直接退出、模式没换"，那是 2026-10-06 修掉的一个 bug（重启请求被
 重启通知的消费顺手取消，见 `DECISIONS.md`）；现在应表现为自动重启一次并注入上述通知。
+
+### Q: 角色扮演模式的形象参考图在哪？怎么加图？
+
+在 `portable/agent/modes/assets/roleplay/`（6 张精选代表图 + `README.md` 清单，含来源与识别提示）。
+人设 `portable/agent/modes/roleplay.md` 的《形象参考图》一节把每张图的视觉常量写成了文字，
+所以**纯文本模型也能用**；模型支持图片输入时，它可以按需 `read` 某一张看细节（`read` 支持 png/jpg/webp/gif）。
+加图/换图要同时改人设清单和 `assets/roleplay/README.md`，否则 `bash scripts/check-conventions.sh`
+的 E 节会拦下（悬空引用 / 孤儿资产 / 目录超 8 MB 三类都在守门范围内）。
 
 ### Q: 如何压缩上下文？
 

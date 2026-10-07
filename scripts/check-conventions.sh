@@ -1,7 +1,7 @@
 #!/bin/bash
 # check-conventions.sh — 约定守门（P4 升格通道第一批，2026-10-01）
 #
-# 把三条此前只写在 `portable/agent/AGENTS.md` 里的软约定变成确定性检查
+# 把此前只写在 `portable/agent/AGENTS.md` 里的软约定变成确定性检查
 # （VISION §3.1：反复有效的软引导必须硬化；§3.2：数据完整性不依赖模型自觉）：
 #
 #   A 运行时/每环境状态不入库 —— 已踩过两次：`modes.json` 的 `current` 被 git 静默回退；
@@ -9,6 +9,8 @@
 #   B 敏感文件与运行时数据不入库 —— 凭据/私钥/环境文件/会话/扩展安装位。
 #   C 生产代码规范 —— `custom/` 非测试代码禁止 `any`、禁止动态（内联）import。
 #     两条都在 AGENTS.md「开发规范」里，靠人自觉；现状为 0 违规，故可直接守门。
+#   D 文档里的"结构计数"与代码一致 —— 脚本数/golden 步数/事故台账每行可重跑。
+#   E 模式人设的图片资产引用成对 —— 无悬空引用、无孤儿资产、目录有体积上限。
 #
 # 用法：bash scripts/check-conventions.sh
 set -u
@@ -21,7 +23,7 @@ ok()   { echo "  ✓ $1"; }
 bad()  { echo "  ❌ $1"; FAIL=$((FAIL + 1)); }
 note() { echo "     $1"; }
 
-echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范） ==="
+echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对） ==="
 
 # ── A. 运行时/每环境状态不入库 ──
 # 判定：入库的 JSON 里出现这些键即失败（应改写入 gitignored 的 *-state.json）。
@@ -137,6 +139,42 @@ if [ -n "$DOC_STEPS" ] && [ "$DOC_STEPS" != "$GOLDEN_STEPS" ]; then
   bad "scripts/README.md 写的是 golden $DOC_STEPS 步，实际 $GOLDEN_STEPS 步"
 else
   ok "scripts/README.md 的 golden 步数与实际一致（$GOLDEN_STEPS）"
+fi
+
+# ── E. 模式人设的图片资产：引用与文件必须成对 ──
+# 人设（`portable/agent/modes/*.md`）在 system 前缀里点名资产文件名，模型据此 `read`。
+# 这类引用此前只靠人自觉，而两种漂移都是**静默**的：
+#   - 悬空引用：改了/删了图却忘了改人设 → 模型去 read 一个不存在的文件，只会回一句"找不到"；
+#   - 孤儿资产：加了图却没写进人设 → 白占体积（这套目录随仓库分发，便携是硬目标），模型永远不知道它存在。
+# 约定：资产文件名一律 `<两位序号>-<内容>.<ext>`，人设与 assets/README.md 都用反引号点它。
+MODE_ASSETS_DIR="portable/agent/modes/assets"
+MODE_ASSETS_MAX_BYTES=$((8 * 1024 * 1024))
+if [ -d "$MODE_ASSETS_DIR" ]; then
+  ASSET_FILES="$(find "$MODE_ASSETS_DIR" -type f ! -name 'README.md' -printf '%f\n' 2>/dev/null | sort)"
+  ASSET_REFS="$(grep -rhoE '[0-9]{2}-[^ `"'"'"'()（）,，]+\.(png|jpe?g|webp|gif)' portable/agent/modes --include='*.md' 2>/dev/null | sort -u || true)"
+  MISSING_REFS=""
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    [ -n "$(find "$MODE_ASSETS_DIR" -name "$ref" -print -quit 2>/dev/null)" ] || MISSING_REFS="$MISSING_REFS
+       $ref"
+  done <<< "$ASSET_REFS"
+  ORPHANS="$(printf '%s\n' "$ASSET_FILES" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    printf '%s\n' "$ASSET_REFS" | grep -qxF "$f" || echo "       $f"
+  done)"
+  ASSET_BYTES="$(find "$MODE_ASSETS_DIR" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END{print s+0}')"
+  if [ -n "$MISSING_REFS" ]; then
+    bad "人设/清单点名了不存在的资产文件（悬空引用）：$MISSING_REFS"
+  elif [ -n "$ORPHANS" ]; then
+    bad "资产目录里有文件没被任何 modes/*.md 引用（孤儿资产；要么写进人设，要么删掉）："
+    printf '%s\n' "$ORPHANS"
+  elif [ "$ASSET_BYTES" -gt "$MODE_ASSETS_MAX_BYTES" ]; then
+    bad "模式资产 $(( ASSET_BYTES / 1048576 ))MB 超过上限 $(( MODE_ASSETS_MAX_BYTES / 1048576 ))MB（整套立绘/语音不入库；只放精选代表图）"
+  else
+    ok "模式资产引用成对（$(printf '%s\n' "$ASSET_FILES" | grep -c . ) 个文件，$(( ASSET_BYTES / 1024 ))KB，无悬空引用/孤儿）"
+  fi
+else
+  note "尚无模式图片资产（$MODE_ASSETS_DIR 不存在）"
 fi
 
 echo ""

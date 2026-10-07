@@ -2225,3 +2225,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 修法：`adapters/ui-adapter.ts` 新增 `sendMessageAfterRebind()`（默认延后 600ms，`PI_RESTART_RESUME_DELAY_MS` 可覆盖），两个消费者（autopilot + mode 兜底）改用它；单测验证"延后而非同步发"，接线测试 8 项通过。
 - 证据边界：场景仍偶发失败。**更正**：一度以为的"重启后档位错乱"实为假模型 `reasoning:false` 导致 pi 把思考档位设为 `off`，不是档位问题；失败归因于场景的 SIGTERM 催停编排时序。故场景对该条保持软提示；要彻底解决需 vendor 侧"换绑完成"事件。
 - 新增守门：`docs/BUG-REPLAYS.md` 每行必须带可执行命令（`scripts/check-conventions.sh` D 节；故意改成"注意检查…"立即失败，改回即通过）。
+
+### 角色扮演模式：6 张形象参考图入库 + 按需 `read`（2026-10-07）
+
+- 从外部资料包的 54 张图里挑 6 张代表图，**按内容改名**后入库 `portable/agent/modes/assets/roleplay/`（3.3 MB）：常态立绘、官方画集三视图与舰装、誓约婚纱「幸福纯白」、改造后【强袭模式·EX】、料理便当换装、国际服官宣档案卡；配套 `README.md` 写明每张的判别依据与来源。整套立绘/语音仍不入库。
+- 人设新增《形象参考图》一节：把每张图的**视觉常量写成文字**（黑蝴蝶结 + 金色小王冠、蓝紫水手领、紫格纹百褶裙、枪身 `F61` 徽记、四联装鱼雷 + 单装炮、婚纱蓝紫玫瑰花结…），并说明"需要细节时先 `find` 再 `read` 那一两张"。**纯文本模型因此立刻拿到更细的形象信息**；人设另有一句兜底（模型不支持图片时会拿到一行提示，退回文字）。
+- 真实代码路径验证（直接调 vendor 构建产物里的 `read` 工具）：图片模型得到 `text: "Read image file [image/png]"` + `image(mimeType=image/png, base64=1 212 940 chars)`；纯文本模型得到那行 `Current model does not support images` 提示——与人设里的兜底写法一致。**诚实边界**：当前默认 provider 未声明图片输入，读图收益要换视觉模型才兑现（切换无需改配置）。
+- 新增守门 `check-conventions.sh` **E 节**：模式资产必须"引用成对"——悬空引用（点名了不存在的图）、孤儿资产（加了图没人引用）、目录 8 MB 上限三类静默漂移；三种都实测拦得住（改名 / 加图 / 灌 9 MB 各自失败，还原即通过）。`check-features.sh` 的分发资源清单同步加入 `assets/roleplay/README.md`。
