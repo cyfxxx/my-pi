@@ -44,11 +44,11 @@ function read(rel) {
   }
 }
 
-/** 在 vendor 的 packages 下递归查找自标记注释 */
-function findSelfMarker(marker) {
+/** 在 vendor 的 packages 下递归查找自标记注释（**单次遍历**，不逐补丁重扫）。 */
+function buildSelfMarkers(markers) {
   const base = join(VENDOR, 'packages');
-  if (!existsSync(base)) return [];
-  const hits = [];
+  const hits = Object.fromEntries(markers.map((m) => [m, []]));
+  if (!existsSync(base)) return hits;
   // 目录项类型以 statSync 为准：d_type 在 overlayfs/沙箱下不可靠（实测把普通文件报成 DT_LNK），
   // 漏扫会让"补丁行为标记"假绿。
   const kindOf = (full) => {
@@ -72,10 +72,15 @@ function findSelfMarker(marker) {
       const kind = kindOf(full);
       if (kind === 'dir') walk(full);
       else if (kind === 'file' && /\.(ts|tsx)$/.test(e.name)) {
+        let text;
         try {
-          if (readFileSync(full, 'utf-8').includes(marker)) hits.push(full.slice(VENDOR.length + 1));
+          text = readFileSync(full, 'utf-8');
         } catch {
           /* ignore */
+        }
+        if (!text) continue;
+        for (const m of markers) {
+          if (text.includes(m)) hits[m].push(full.slice(VENDOR.length + 1));
         }
       }
     }
@@ -88,6 +93,9 @@ const patches = readdirSync(join(ROOT, 'patches'))
   .filter((f) => f.endsWith('.patch'))
   .sort();
 
+// 单次遍历拿到所有补丁的自标记命中（逐补丁重扫在 11 个补丁时要 31s，会卡死 pre-commit）。
+const selfMarkers = buildSelfMarkers(patches.map((p) => `Patch (${p.replace(/\.patch$/, '')})`));
+
 let failed = 0;
 for (const patch of patches) {
   const name = patch.replace(/\.patch$/, '');
@@ -95,7 +103,7 @@ for (const patch of patches) {
 
   // 1) 自标记注释
   const marker = `Patch (${name})`;
-  const markerHits = findSelfMarker(marker);
+  const markerHits = selfMarkers[marker] ?? [];
   const explicit = EXPLICIT[patch] ?? [];
 
   if (markerHits.length === 0 && explicit.length === 0) {
