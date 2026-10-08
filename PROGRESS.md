@@ -2506,9 +2506,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **端到端验证通过**（`pool-e2e.test.ts`，`PI_SUBAGENT_POOL_E2E=1`，16.8s）：两次同 profile 任务
   **只起一个进程**（注入计数工厂 + 走真实调用链 + 假 provider），且复用时隔离成立（第二次请求不含
   第一次的暗号）。S1–S3 目标达成。
-- S4 未实施：`--no-extensions` 是 `check-seeds-headless` 整套守门的前提（`schedule_task` 有 useSubagent），
-  所以只能逐次 opt-in、且要决定定时任务派生的子代理是否带扩展（建议不允许）。代价已不在体积（有
-  deferred）而在风险面（子代理将能改状态）。
+### 子代理优化收尾（2026-10-07）
+
+- **S4 已完成**：`extensions` 逐次 opt-in、默认关闭；`pooledProfileKey` 纳入该旗标；定时任务派生的子代理
+  天然不带扩展（`check-seeds-headless` 的前提不被破坏）。
+- **fork 池化实测不成立**（负结果）：`new_session {parentSession}` 返回 `success:true` 但**分叉没发生**
+  （请求里只有 `[system,user]`、无父会话暗号）。按预定退化方案：fork 继续走 spawn 路径，池化分支保留
+  `!forkSession`，证据写进 `docs/design/SUBAGENT-POOL.md` 第十三节。
+- 至此子代理优化（S1–S4）全部收口：S1 隔离与冷启动实测、S2 池实现、S3 键/租借/回收修正 + 端到端验证、
+  S4 逐次 opt-in 扩展、fork 负结果归档。
 
 ### 目标级自动续跑 goal（2026-10-07，编排优化第 4 项）
 

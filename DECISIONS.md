@@ -2,6 +2,31 @@
 
 ## 格式
 
+### [2026-10-07] fork 池化实测不成立：`new_session {parentSession}` 会"收下但不分叉"
+
+**要验证的假设**：把 `context: 'fork'` 也纳入常驻池——用 `new_session {parentSession}` 在每个任务前分叉，
+worker 保持 fork-agnostic（复用键不必含父会话）。
+
+**实测（探针见 `docs/design/SUBAGENT-POOL.md` 第十三节）**：先用真实 pi 造一个带唯一暗号的父会话，
+再在 `--no-session` 起的 rpc 进程里发 `new_session {parentSession}`，然后发带任务标记的 prompt，
+在 provider 侧按标记归属请求检查内容：
+
+```
+new_session 响应: {"success":true,"data":{"cancelled":false}}
+请求1: 消息数=2 roles=[system,user] 含父暗号=false
+```
+
+**结论：分叉未生效**，而且是以"协议返回 `success: true`、语义完全没做"的方式失败的。
+这意味着"删掉 `!forkSession` 条件"**一定会**让 `context: 'fork'` 静默降级成空上下文——语义变了却不报错，
+正是本份设计文档反复强调要避免的那类问题。
+
+**决策**：按设计文档预定的**退化方案**处理——fork 继续走已验证的 spawn 路径（`--fork` 在启动期生效），
+池化分支保留 `!forkSession`，限制写进代码注释与文档。**未探索的变体**（worker 以 `--fork` 启动后再
+`new_session {parentSession}`）需要各自验证，且复用键得带上父会话路径，本轮不做。
+
+**方法论收获**：这次能挡住，靠的是"先写探针拿到确定性判据再放行"。如果按"代码只有一行、看起来无害"
+直接改，问题会以最难查的形式存在——fork 出来的子代理**看起来正常工作**，只是不知道父会话发生过什么。
+
 ### [2026-10-07] 子代理池端到端验证通过：两次任务只起一个进程（S1–S3 收口）
 
 **为什么这一步不能省**：S2 的缺陷（复用键写成每次新建的临时文件路径 ⇒ **池从未复用**）能溜过 14 项

@@ -321,9 +321,11 @@ export async function runSubprocessAgent(
   // ── 常驻池路径（S2，见 docs/design/SUBAGENT-POOL.md）────────────────────────────
   // 省掉每次都 `spawn` 一个新 pi 进程的纯启动开销（本机实测 19.1s）。
   // 只覆盖**非 fork** 路径：fork 的隔离语义（继承父会话）尚未在池上验证，留在原路径。
-  // fork **暂不放行**：池化路径还没验证 `new_session {parentSession}`（从 `--no-session` 起的进程里
-  // 分叉是否真能带上父会话的 messages）。若此刻放行，fork 会被静默降级成空上下文——语义变了却不报错，
-  // 正是本设计文档反复强调要避免的那类问题。fork 仍走已验证的 spawn 路径，验证通过后再开。
+  // fork **不放行**（已实测，不是"待验证"）：从 `--no-session` 起的 rpc 进程里发
+  // `new_session {parentSession}`，**响应是 `success:true`，但随后请求的 messages 只有
+  // `[system, user]`、不含父会话的任何内容**——即"接口收下了、分叉没发生"。
+  // 若此刻放行，`context: 'fork'` 会静默降级成空上下文（语义变了却不报错）。
+  // 实测见 docs/design/SUBAGENT-POOL.md 第十三节。fork 因此仍走已验证的 spawn 路径。
   if (poolEnabled() && !forkSession) {
     try {
       return await runPooledAgent(

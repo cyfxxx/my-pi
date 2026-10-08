@@ -295,3 +295,32 @@ idle 上限回收 / shutdown 全回收）。租借测试用**注入的假 worker
 并且要同步决定"定时任务派生的子代理是否允许带扩展"（建议不允许）。
 配合本会话的 `exposure: 'deferred'`，加载扩展的**前缀代价**已经很小（重型工具只在 `tool_search`
 时才进声明），所以 S4 的代价主要不在体积，而在**风险面**：子代理将能改状态（memory/todo/tmux）。
+
+## 十三、fork 池化：**实测不成立**（2026-10-07，负结果）
+
+原计划：让池化路径用 `new_session {parentSession}` 承担 `context: 'fork'`，从而把 fork 也纳入复用。
+**实测否掉了它**，而且否掉的方式正是最危险的那种——**接口收下、行为没发生**。
+
+探针 `/tmp/fork-probe.mjs`（临时件，不入库）三步：
+1. 先用**真实 pi** （`--session <路径>` + 假 provider）造一个父会话，父会话里带唯一暗号 `FORKMARK-7Q`
+   ——这样不必手写 jsonl 猜格式（已核对真实会话首行是 `{type:'session',version:3,...}`）；
+2. 起 rpc 进程（`--mode rpc --no-extensions --no-session`），发 `new_session {parentSession: <父会话>}`；
+3. 发一个带任务标记 `TASKFORK-9Z` 的 prompt，然后**在 provider 侧按任务标记归属请求**再看内容。
+
+原始输出：
+
+```
+2) new_session{parentSession} 响应: {"success":true,"data":{"cancelled":false}}
+3) 分叉后请求数=1，含任务标记的=1
+   请求1: 消息数=2 roles=[system,user] 含父暗号=false
+```
+
+**判定：分叉未生效。** 关键细节是 `success: true` ——**协议层答应了，语义层没做**。所以
+"把 `!forkSession` 那个条件删掉"不是"可能有问题"，而是**一定会让 `context: 'fork'` 静默变成空上下文**。
+
+**处置（即设计文档第一节写的退化方案）**：fork 继续走已验证的 spawn 路径（`--fork <父会话>` 在启动期
+生效），池化分支保留 `!forkSession`；限制已写进代码注释与本文档。
+
+**尚未探索的变体**（留给以后，需各自验证）：让 worker 以 `--fork <父会话>` 启动（而不是 `--no-session`），
+再验证 `new_session {parentSession}` 在这种进程里是否生效。代价是 worker 会绑定到具体父会话
+（复用键得带上父会话路径），收益不确定，故本轮不做。
