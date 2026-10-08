@@ -58,21 +58,21 @@ describe('tool-groups: 摘要缓存友好', () => {
   });
 
   it('groupsWithTools 过滤未迁移功能的分组', () => {
-    const present = new Set(['browser_navigate', 'memory_stats', 'web_fetch', 'read']);
+    const present = new Set(['browser_navigate', 'memory_stats', 'link_send', 'read']);
     const names = groupsWithTools(present).map((g) => g.name);
     expect(names).toContain('browser-core');
     expect(names).toContain('memory-advanced');
-    expect(names).toContain('web-fallback');
+    expect(names).toContain('link');
     expect(names).not.toContain('admin');
     expect(names).not.toContain('verify');
     expect(names).not.toContain('plan');
   });
 
   it('buildSleepingSummary(present) 只列已注册工具所在的组', () => {
-    const present = new Set(['browser_navigate', 'web_fetch']);
+    const present = new Set(['browser_navigate', 'link_send']);
     const s = buildSleepingSummary(present);
     expect(s).toContain('- browser-core:');
-    expect(s).toContain('- web-fallback:');
+    expect(s).toContain('- link:');
     expect(s).not.toContain('- admin:');
     expect(s).not.toContain('- plan:');
     expect(s).toContain('browser_navigate');

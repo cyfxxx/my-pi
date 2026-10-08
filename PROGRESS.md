@@ -2333,3 +2333,23 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 按用户口径**不做自动重启**：这类"终端层卡死/前缀漂移"的处置是关掉该终端会话（见 `BUG-REPLAYS.md` 第 14/15/16 行）。
 - 验证：指纹单测 28 项、新增 `system-prompt-total.test.ts` **7 项**（抛错下 systemPrompt 逐字节不变 +
   次序锁）、`test-usage-metrics.mjs` **56 项**、注入面基线未变、`check-conventions.sh` 台账 16 行、`tsc` 干净。
+
+### 体验优化：默认关闭重功能 + 工具面去误导 + 提示词重排 + tmux 通知空闲门（2026-10-07）
+
+- **默认关闭 voice/link**：新增 `DEFAULT_OFF_FEATURES`，`'*'` 不再包含它们（显式列出即可启用）；
+  修掉 `modeFeaturesLabel` 对 `'*'` 谎报"全部（12）"的问题。
+- **删 `web_fetch`（工具 64 → 63）**：它名字像"抓 URL"却执行 `searchDirect(query)`，与 `fetch_url`
+  撞语义、又与 `web_search` 的降级分支重复；连带清掉只剩它一个工具的 `web-fallback` 休眠组。
+- **提示词重排**：`hard-rules.ts` 拆成 `HARD_RULES`（不变量）→ `WORK_PROTOCOL`（工作方式）→
+  `DELIVERY_ADVICE`（交付与展示）→ `EFFICIENCY_ADVICE`（末尾哨兵）；`APPEND_SYSTEM.md` 回到用户偏好本位
+  （1793 → 1426B）。"少打断"与"不盲开工"调和为：**开工前先复述理解（一两句），然后直接开工**——
+  复述是纠偏窗口而非等批准；并删掉"同意后才能执行"、加"不问两遍/一次交付"。展示对齐 DSH：
+  主结果写在回复里、按任务形状组织不套模板、文件引用用相对路径 + 行号、不重复已贴内容。
+- **tmux 通知加严格空闲门**（前置修复）：原通知是无空闲门的 `triggerTurn`，此前靠"启动后台立即结束
+  回合"侥幸避开忙碌态致命错误；抽纯函数 `createIdleGate`（忙入队、`agent_settled` 合并发），
+  5 项单测锁"忙时一条都不发"。
+- **放宽后台任务规则**：由"启动后立即结束回合"改为"不要空转等待，但等待期间有独立步骤就继续做"——
+  这是"碎回合"（被中断会话 4 条用户消息 / 85 次调用）的直接来源。`AGENTS.md` 同步。
+- 明确不做：改 `defaultProjectTrust`（当前无触发条件，属无操作）、拆 `admin_set_config` 的敏感键确认（真安全闸）。
+- 验证：tsc 干净；vitest **77 文件 873 例**（+8）；check-features 通过（63 工具/12 命令/2 快捷键/48 钩子）；
+  conventions 通过；注入面基线 `ebfa65e5…` → `8493be6d…`；supervisor 111 / state-audit 55 / usage-metrics 56。

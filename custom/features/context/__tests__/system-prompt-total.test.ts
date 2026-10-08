@@ -14,14 +14,17 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { EFFICIENCY_ADVICE, HARD_RULES } from '../budget/system-prompt';
+import { appendedSystemParts, EFFICIENCY_ADVICE } from '../budget/system-prompt';
 
 type Handler = (event: unknown, ctx?: unknown) => unknown;
 type Result = { systemPrompt?: string; message?: { customType: string; content: string } };
 
 const BASE = 'You are an expert coding assistant operating inside pi.';
-/** my-pi 追加块：`buildSystemPrompt` = base + "\n\n" + HARD_RULES + "\n\n" + EFFICIENCY_ADVICE */
-const APPEND = `\n\n${HARD_RULES}\n\n${EFFICIENCY_ADVICE}`;
+/**
+ * my-pi 追加块 = `appendedSystemParts()` 以 `\n\n` 连接（**从装配点取**，不要手抄各段常量：
+ * 2026-10-07 加入 WORK_PROTOCOL/DELIVERY_ADVICE 时手抄的那份就漂移了，测试报错但指向错误原因）。
+ */
+const APPEND = `\n\n${appendedSystemParts().join('\n\n')}`;
 
 interface FakePiOpts {
   getActiveToolsThrows?: boolean;
@@ -115,8 +118,11 @@ describe('before_agent_start 前缀关键路径（total）', () => {
   it('正常路径：返回 base + 加固块（逐字节为 base 加固定追加块）', async () => {
     const { probe } = await load();
     expect(probe.systemPrompt).toBe(BASE + APPEND);
-    // 追加块必须**完整**在场，而不只是"多了一段文本"
-    expect(probe.systemPrompt).toContain(HARD_RULES);
+    // 追加块必须**完整**在场（逐段核对），而不只是"多了一段文本"
+    for (const part of appendedSystemParts()) {
+      expect(probe.systemPrompt).toContain(part);
+    }
+    // 哨兵在最后：前缀指纹靠它判定加固块是否还在（见 hard-rules.ts）
     expect(probe.systemPrompt?.endsWith(EFFICIENCY_ADVICE)).toBe(true);
   });
 

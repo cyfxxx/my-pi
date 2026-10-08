@@ -4,7 +4,11 @@
 
 ## 注册面
 
-工具：`web_search`、`fetch_url`、`web_fetch`。无命令 / 钩子。
+工具：`web_search`、`fetch_url`。无命令 / 钩子。
+
+> 2026-10-07：原 `web_fetch` 已删除。它名字像"抓取 URL"（与 `fetch_url` 撞语义），实际执行的是
+> `searchDirect(query)`——与 `web_search` 的自动降级分支同一件事，只会误导模型。免 SearXNG 的
+> HTTP 搜索能力完整保留在 `web_search` 里（SearXNG 不可达/无结果时自动降级）。
 
 ## 文件
 

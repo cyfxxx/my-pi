@@ -11,6 +11,7 @@ import {
   isLockedMode,
   modeFeaturesLabel,
   ALL_FEATURES,
+  DEFAULT_OFF_FEATURES,
   FIXED_MODES,
 } from '../logic';
 import type { ModeConfig } from '../logic';
@@ -70,8 +71,34 @@ describe('固定模式', () => {
     expect(isFeatureEnabled('web-search', { ...cfg(), features: ['web-search'] })).toBe(true);
   });
 
-  it('modeFeaturesLabel 覆盖全量/空/白名单', () => {
-    expect(modeFeaturesLabel({ ...cfg(), features: ['*'] })).toContain(`全部（${ALL_FEATURES.length}）`);
+  it('默认关闭的功能不在 * 里，显式列出才启用', () => {
+    // 2026-10-07：voice（语言输入）/ link（远程连接）默认关闭——重功能且极少用
+    expect(DEFAULT_OFF_FEATURES.has('voice')).toBe(true);
+    expect(DEFAULT_OFF_FEATURES.has('link')).toBe(true);
+    const star = { ...cfg(), features: ['*'] };
+    expect(isFeatureEnabled('voice', star)).toBe(false);
+    expect(isFeatureEnabled('link', star)).toBe(false);
+    // 其余功能不受影响
+    for (const f of ALL_FEATURES) {
+      if (DEFAULT_OFF_FEATURES.has(f)) continue;
+      expect(isFeatureEnabled(f, star)).toBe(true);
+    }
+    // 显式列出即可启用（`['*', 'voice']` 也成立）
+    expect(isFeatureEnabled('voice', { ...cfg(), features: ['voice'] })).toBe(true);
+    expect(isFeatureEnabled('link', { ...cfg(), features: ['*', 'link'] })).toBe(true);
+    // 不在 * 里、又没显式列出 → 关闭
+    expect(isFeatureEnabled('voice', { ...cfg(), features: ['memory'] })).toBe(false);
+  });
+
+  it('modeFeaturesLabel 对 * 说出真实的启用数（不含默认关闭项）', () => {
+    const label = modeFeaturesLabel({ ...cfg(), features: ['*'] });
+    const on = ALL_FEATURES.length - DEFAULT_OFF_FEATURES.size;
+    expect(label).toContain(`全部（${on}）`);
+    expect(label).toContain('默认关闭');
+    expect(label).toContain('voice');
+  });
+
+  it('modeFeaturesLabel 覆盖空/白名单', () => {
     expect(modeFeaturesLabel(cfg())).toContain('无');
     expect(modeFeaturesLabel({ ...cfg(), features: ['memory'] })).toContain('memory');
   });

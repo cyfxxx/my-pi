@@ -1,12 +1,13 @@
 /**
  * HTTP 抓取与 Bing 直搜（免 SearXNG 的 fallback）。
- * 迁移自 pi-tools `pi-web-search/fetch.ts` + `index.ts` 的 fetch_url/web_fetch 实现。
+ * 迁移自 pi-tools `pi-web-search/fetch.ts` + `index.ts` 的 fetch_url/web_fetch 实现；
+ * 2026-10-07 起 `web_fetch` 工具已删除，`searchDirect` 只作为 `web_search` 的自动降级路径。
  */
 
 import { isUrlAllowed } from '../../core/net-guard';
 import { HTTP_TIMEOUT_MS } from './config';
 
-// ── Bing 直搜（web_fetch） ─────────────────────────────────────
+// ── Bing 直搜（web_search 的降级路径，无独立工具） ─────────────
 
 export async function searchDirect(
   query: string,

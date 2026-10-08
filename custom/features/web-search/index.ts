@@ -49,18 +49,8 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
-  // web_fetch：轻量 HTTP 搜索（不依赖 SearXNG，作为搜索不可用时的 fallback）
-  registerTool(pi, {
-    name: 'web_fetch',
-    description: '使用 HTTP GET 从搜索引擎获取结果。不依赖 SearXNG，适合搜索不可用时的 fallback。',
-    parameters: {
-      query: { type: 'string', description: '搜索关键词' },
-      max_results: { type: 'number', description: '最大返回结果数，默认 5', optional: true },
-    },
-    execute: async (args) => {
-      const query = args.query as string;
-      const maxResults = (args.max_results as number) ?? 5;
-      return searchDirect(query, maxResults);
-    },
-  });
+  // 曾经还有一个 `web_fetch` 工具，但它的名字与 `fetch_url` 撞语义（听起来是"抓取 URL"），
+  // 实际执行的是 `searchDirect(query)`——与 `web_search` 上面那条自动降级分支**完全同一件事**。
+  // 模型很容易 `web_fetch(url)` 想抓页面却拿到一串搜索结果，白烧一个回合。
+  // 2026-10-07：删除该工具；免 SearXNG 的 HTTP 搜索能力由 `web_search` 的自动降级保留。
 }

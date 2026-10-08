@@ -81,7 +81,6 @@
     ],
     "web-search": [
       "fetch_url",
-      "web_fetch",
       "web_search"
     ]
   },

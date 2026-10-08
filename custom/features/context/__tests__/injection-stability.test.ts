@@ -14,10 +14,12 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
+  DELIVERY_ADVICE,
   EFFICIENCY_ADVICE,
   SYSTEM_APPEND_MAX_BYTES,
   SYSTEM_INJECTION_MAX_BYTES,
   VOLATILE_PATTERNS,
+  WORK_PROTOCOL,
   appendedSystemParts,
   auditSystemInjection,
   buildSystemPrompt,
@@ -36,9 +38,20 @@ describe('system 前缀注入装配', () => {
     expect(out.slice(0, base.length)).toBe(base);
   });
 
-  it('追加内容 = HARD_RULES + EFFICIENCY_ADVICE，且不含其它段', () => {
-    expect(appendedSystemParts()).toEqual([HARD_RULES, EFFICIENCY_ADVICE]);
-    expect(buildSystemPrompt('B')).toBe(`B\n\n${HARD_RULES}\n\n${EFFICIENCY_ADVICE}`);
+  it('追加内容 = 不变量 + 工作方式 + 交付展示 + 效率哨兵，且不含其它段', () => {
+    expect(appendedSystemParts()).toEqual([HARD_RULES, WORK_PROTOCOL, DELIVERY_ADVICE, EFFICIENCY_ADVICE]);
+    expect(buildSystemPrompt('B')).toBe(
+      `B\n\n${HARD_RULES}\n\n${WORK_PROTOCOL}\n\n${DELIVERY_ADVICE}\n\n${EFFICIENCY_ADVICE}`,
+    );
+  });
+
+  it('效率哨兵必须在追加块**最后**（前缀指纹靠它判定加固块是否还在）', () => {
+    const parts = appendedSystemParts();
+    expect(parts[parts.length - 1]).toBe(EFFICIENCY_ADVICE);
+    // 哨兵文本不允许出现在更靠前的位置，否则 includes() 判定会在"只丢后半段"时假阳性
+    for (const p of parts.slice(0, -1)) {
+      expect(p.includes(EFFICIENCY_ADVICE)).toBe(false);
+    }
   });
 
   it('逐字节确定（同输入必同输出，防未来引入时间/随机）', () => {

@@ -23,7 +23,7 @@ const ALL = [
   'memory_store',
   'browser_navigate',
   'browser_evaluate',
-  'web_fetch',
+  'link_send',
   'some_future_tool',
 ];
 

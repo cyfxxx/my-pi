@@ -130,12 +130,6 @@ export const SLEEPING_GROUPS: ToolGroup[] = [
     description: '多设备互联：跨设备委派/查询（2 工具）',
     tools: ['link_send', 'link_status'],
   },
-  // web-fallback：降级备选搜索（1 工具），SearXNG 不可用时启用
-  {
-    name: 'web-fallback',
-    description: '降级搜索：无 SearXNG 时的 HTTP 搜索备选（1 工具）',
-    tools: ['web_fetch'],
-  },
   // voice：语音扩展（2 工具），本机听写为核心，朗读/录音按需
   {
     name: 'voice',

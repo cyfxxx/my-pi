@@ -48,6 +48,53 @@ export const MERGE_WINDOW_MS = 5000;
 /** 通知消息的 customType（供 UI 区分来源） */
 export const NOTIFY_CUSTOM_TYPE = 'pi-tmux-notify';
 
+/**
+ * **空闲门**：把"随时可能发生的完成通知"整形成"只在 agent 空闲时才 triggerTurn"。
+ *
+ * 为什么必须有（2026-10-07 无头实验结论）：pi 在 agent **忙碌**时收到 `triggerTurn` 会直接
+ * 致命报错（`Agent is already processing...`），扩展 catch 不住、进程 rc=1、什么都不落盘。
+ * tmux 会话随时可能结束，此前没炸只是因为项目约定"启动后台后立即结束回合"让 agent 恰好空闲；
+ * 一旦允许"等待期间继续做独立步骤"，忙碌态通知就会变成随机崩溃。
+ *
+ * 语义：`setBusy(false)`（= `agent_settled` 那一刻，实测唯一可靠的"可安全 triggerTurn"时刻）
+ * 时把队列合并成一条发出；忙时只入队。**宁可晚，不可炸**——一直不静就一直留着。
+ *
+ * 纯逻辑：发送动作由调用方注入，可在 vitest 里直接驱动。
+ */
+export interface IdleGate {
+	/** agent 是否忙碌（由 turn_start / agent_settled 驱动） */
+	setBusy(busy: boolean): void;
+	/** 投递一条通知：空闲则立即发，忙则入队 */
+	notify(text: string): void;
+	/** 待发条数（诊断/测试用） */
+	pendingCount(): number;
+}
+
+export function createIdleGate(send: (text: string) => void): IdleGate {
+	let busy = false;
+	let pending: string[] = [];
+	const flush = (): void => {
+		if (busy || pending.length === 0) return;
+		const text = pending.join('\n\n');
+		pending = [];
+		send(text);
+	};
+	return {
+		setBusy(next: boolean): void {
+			busy = next;
+			if (!busy) flush();
+		},
+		notify(text: string): void {
+			if (busy) {
+				pending.push(text);
+				return;
+			}
+			send(text);
+		},
+		pendingCount: () => pending.length,
+	};
+}
+
 interface PendingItem {
 	name: string;
 	logPath: string;

@@ -14,18 +14,26 @@
  * 只写常量，不写时间戳/路径/版本号。
  */
 
-import { HARD_RULES, EFFICIENCY_ADVICE } from './hard-rules';
+import { HARD_RULES, WORK_PROTOCOL, DELIVERY_ADVICE, EFFICIENCY_ADVICE } from './hard-rules';
 
 // 注入文本常量住在 `hard-rules.ts`（注入面基线对象），这里只装配与守门；对外重导出保持导入路径。
 // `HARD_RULES` 也一并重导出：本文件是 system 注入面的**唯一装配点**，调用方（含守门测试）
 // 应当只从这里取"实际会被追加的文本"，避免"测试从别处取常量、与真实装配漂移"造成的假绿。
-export { HARD_RULES, EFFICIENCY_ADVICE, LOW_PRESSURE_DELEGATION, FULL_DELEGATION_ADVICE } from './hard-rules';
+export {
+  HARD_RULES,
+  WORK_PROTOCOL,
+  DELIVERY_ADVICE,
+  EFFICIENCY_ADVICE,
+  LOW_PRESSURE_DELEGATION,
+  FULL_DELEGATION_ADVICE,
+} from './hard-rules';
 
 /**
  * system 层注入预算上限（字节）。
  *
- * 含义是"预算"而不是"现状"：当前占用约 0.7KB。软层条目增长到这里就必须走 VISION §3.1
- * 的升格通道（要么硬化、要么降权删除），不得直接抬高上限。
+ * 含义是"预算"而不是"现状"：2026-10-07 重排后占用约 1.7KB（此前约 0.7KB——把散在
+ * `APPEND_SYSTEM.md` 里的"工作方式/交付展示"收回来，那里顶着 2048B 的独立预算已无余量）。
+ * 软层条目增长到这里就必须走 VISION §3.1 的升格通道（要么硬化、要么降权删除），不得直接抬高上限。
  */
 export const SYSTEM_INJECTION_MAX_BYTES = 4096;
 /** `portable/agent/APPEND_SYSTEM.md`（pi 原生注入 system prompt）的字节上限 */
@@ -44,9 +52,15 @@ export const VOLATILE_PATTERNS: ReadonlyArray<{ readonly name: string; readonly 
   { name: '语义化版本号', re: /\bv?\d+\.\d+\.\d+\b/ },
 ];
 
-/** 系统层真正追加的部分（`APPEND_SYSTEM.md` 由 pi 注入，不在此处） */
+/**
+ * 系统层真正追加的部分（`APPEND_SYSTEM.md` 由 pi 注入，不在此处）。
+ *
+ * 顺序 = 刚性递减：工程不变量 → 工作方式 → 交付展示 → 效率哨兵。
+ * `EFFICIENCY_ADVICE` **必须在最后**：它同时是前缀指纹判定"加固块是否还在"的哨兵
+ * （见 `context/index.ts` 的 recordFingerprint 与 hard-rules.ts 的注释）。
+ */
 export function appendedSystemParts(): readonly string[] {
-  return [HARD_RULES, EFFICIENCY_ADVICE];
+  return [HARD_RULES, WORK_PROTOCOL, DELIVERY_ADVICE, EFFICIENCY_ADVICE];
 }
 
 /**

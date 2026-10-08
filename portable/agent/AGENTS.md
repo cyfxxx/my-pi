@@ -57,8 +57,8 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存�
 ## 网络搜索（三级通路）
 
 - `web_search`：走可配置的 SearXNG 端点（`SEARXNG_URL`/`PI_WEB_TOOLKIT_SEARXNG_URL` > `settings.json` 的 `pi-web-search.searxng_url` > 本地 `http://127.0.0.1:8889`）；不可达/无结果时自动降级 `searchDirect`（Bing）。
-- `web_fetch`：免 SearXNG 的 Bing 直搜（属休眠组 `web-fallback`；工具已默认全部常驻，直接调用即可）。
 - `fetch_url`：轻量 HTTP GET（仅公网 http/https，拒绝内网/回环）。
+- 2026-10-07 起**没有** `web_fetch` 工具了：它名字像"抓 URL"却实际执行 Bing 直搜（与 `fetch_url` 撞语义），已删除；免 SearXNG 的直搜能力仍由 `web_search` 的自动降级提供。
 - **SearXNG 引擎配置是常见坑**：默认启用 google/duckduckgo/brave/wikipedia 等被封锁引擎会全部 timeout 并拖垮整次搜索。用 `bash scripts/searxng-config.sh --force` 生成只启可达引擎（baidu/bing/sogou/360search/bilibili/yandex/stackoverflow/github）且 bing 指向 `cn.bing.com` 的配置。
 - 超时默认 30s（`pi-web-search.search_timeout`），因本地多引擎聚合常需 10s+。
 
@@ -68,7 +68,7 @@ export PI_MEMORY_DIR="$MY_PI_ROOT/portable/memory"         # custom/ 记忆存�
 - **前缀缓存是第一成本杠杆**（DeepSeek 命中价仅为未命中价的 1/50）：**任何改写已发送历史的动作**（删注入、擦除旧消息、压缩）或**改变请求前部的动作**（切 thinking 档位、改工具数组、改 system prompt）都会让其后整段上下文按全价重算。新增功能若需插入历史信息，一律 **append-only（追加到尾部）**，不得移除旧项。成本自查：`node scripts/daily-health.mjs --print`（加权命中率 / 未命中每次 / 前缀前端变更次数 / **首段分叉 `messages@0-7`** / **冷启动次数**——后两项分别是「整段重放」与「自改/重启代价」的先行指标）。
 - **不要在会话中途改工具集**：pi 0.99 起 `/reload` 会**启用**新加入 `defaultTools` 的工具（移除的不会自动关，会话里手动关掉的也不会被它打开），而**任何工具数组变化都会让整段前缀按全价重算**。模式/工具面的变更走 `/mode` 的自动重启（或下次启动），不要在会话里热改 `defaultTools`。
 - **运行时状态不入库**：每环境状态写进被 gitignore 的 `*-state.json`，不写进入库文件——踩过两次：`modes.json` 的 `current`、上游 `deviceId` 落在入库的 `settings.json`。守门：`scripts/check-conventions.sh`（背景见 `custom/features/mode/README.md`）。
-- **后台任务（禁止阻塞前台）**：长任务用 `tmux_run` 启动，**启动后立即结束回合**，不同轮内不等待，同轮内禁止 `tmux_wait`；会话结束由 `features/tmux/watcher.ts` 自动注入通知并触发新回合（不必等用户下一条消息）。前台 `bash` 有 **240s 默认上限**（`PI_BASH_TIMEOUT_CEIL`），`tmux_wait` 有 **60s 硬上限**（`PI_TMUX_WAIT_CEIL_SEC`），两者都是代码约束；命令需要更久就**改用后台**并在后续轮取结果。子代理（`subagent`）同步阻塞，只适合必须立即拿到结果的短任务。
+- **后台任务（禁止空转等待，但允许继续干活）**：长任务用 `tmux_run` 启动，**不要在同一轮里等它的结果**（同轮内禁止 `tmux_wait`）；等待期间**有能独立完成的步骤就继续做**，确实无事可做才结束回合。会话结束时由 `features/tmux/watcher.ts` 自动注入通知并触发新回合（不必等用户下一条消息）。**注意：完成通知走空闲门**（`watcher.ts` 的 `createIdleGate`）——agent 忙碌时通知入队、等 `agent_settled` 再发；因为 pi 在忙碌时收到 `triggerTurn` 是**致命错误**（进程 rc=1）。前台 `bash` 有 **240s 默认上限**（`PI_BASH_TIMEOUT_CEIL`），`tmux_wait` 有 **60s 硬上限**（`PI_TMUX_WAIT_CEIL_SEC`），两者都是代码约束；命令需要更久就**改用后台**并在后续轮取结果。子代理（`subagent`）同步阻塞，只适合必须立即拿到结果的短任务。
 
 ## 验证与命令
 

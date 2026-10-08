@@ -370,9 +370,25 @@ export function getEffectiveModeConfig(): ModeConfig {
   return getModeConfig(resolveEffectiveMode()) ?? FIXED_MODES.full;
 }
 
+/**
+ * **默认关闭**的功能：`'*'`（"全部功能"模式）**不**包含它们。
+ *
+ * 为什么需要这一档：`full` 模式用的是 `features: ['*']`。而 voice（语言输入）与 link（远程连接）
+ * 属于"装好了但极少用"的重功能——voice 启动时会拉起 whisper 服务，link 会打开入站远控通道。
+ * 把它们留在 `'*'` 里等于每次启动都付固定成本（5 个工具、约 1.8KB 工具声明、2 个命令、1 个快捷键），
+ * 却几乎不会被调用。
+ *
+ * 启用方式：**显式列进某个模式的 `features`**（`['*', 'voice']` 也成立）。
+ * 2026-10-07：按用户口径"语言输入与远程连接默认关闭"。
+ */
+export const DEFAULT_OFF_FEATURES: ReadonlySet<string> = new Set(['voice', 'link']);
+
 /** 该功能是否在当前模式启用 */
 export function isFeatureEnabled(featureName: string, config: ModeConfig): boolean {
-  return config.features.includes('*') || config.features.includes(featureName);
+  // 显式列出 > `'*'`：显式是"我要它"，`'*'` 只是"默认全开，但除了 DEFAULT_OFF_FEATURES"。
+  if (config.features.includes(featureName)) return true;
+  if (!config.features.includes('*')) return false;
+  return !DEFAULT_OFF_FEATURES.has(featureName);
 }
 
 function featuresEqual(a: string[], b: string[]): boolean {
@@ -412,7 +428,13 @@ export function applyModeRuntime(
 }
 
 export function modeFeaturesLabel(config: ModeConfig): string {
-  if (config.features.includes('*')) return `启用功能: 全部（${ALL_FEATURES.length}）`;
+  if (config.features.includes('*')) {
+    // `'*'` 不再等于 ALL_FEATURES：DEFAULT_OFF_FEATURES 不在其中。标签必须说真话，
+    // 否则 `/mode` 的报告会宣称"全部（12）"而实际少两个（2026-10-07）。
+    const off = ALL_FEATURES.filter((f) => DEFAULT_OFF_FEATURES.has(f));
+    const on = ALL_FEATURES.length - off.length;
+    return off.length > 0 ? `启用功能: 全部（${on}）· 默认关闭 ${off.join('、')}` : `启用功能: 全部（${on}）`;
+  }
   if (config.features.length === 0) return '启用功能: 无（仅内置工具）';
   return `启用功能: ${config.features.join('、')}`;
 }

@@ -9,7 +9,7 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { sendMessage } from '../../adapters/ui-adapter';
-import { createCompletionWatcher, NOTIFY_CUSTOM_TYPE } from './watcher';
+import { createCompletionWatcher, createIdleGate, NOTIFY_CUSTOM_TYPE } from './watcher';
 import type { WatcherHandle } from './watcher';
 import {
   loadTmuxConfig,
@@ -34,12 +34,41 @@ import type { TmuxConfig } from './logic';
 
 export function register(pi: ExtensionAPI): void {
   const cfg: TmuxConfig = loadTmuxConfig();
-  // 完成自动唤醒：tmux 会话结束后注入通知并触发新回合（实现见 ./watcher）
   const handles = new Map<string, WatcherHandle>();
+
+  // ── 空闲门：完成通知必须"**空闲**才 triggerTurn" ──────────────────────────────
+  //
+  // 为什么必须门（2026-10-07 无头实验结论，见 DECISIONS 的"空闲门"条）：pi 在 agent 忙碌时
+  // 收到 `triggerTurn` 会**直接致命报错**（`Agent is already processing...`），扩展 catch 不住、
+  // 进程 rc=1、什么都不落盘。而 tmux 会话**随时**可能结束——此前之所以没炸，是因为项目约定
+  // "启动后台后立即结束回合"，通知到达时 agent 恰好空闲。一旦允许"等待期间继续做独立步骤"
+  // （这正是"减少中断"要的那条改动），忙碌态通知就会变成随机崩溃。
+  //
+  // 纯逻辑在 `watcher.ts` 的 createIdleGate（可单测）；这里只把它接到 pi 的生命周期事件上。
+  const idleGate = createIdleGate((text) => {
+    try {
+      sendMessage(pi, { customType: NOTIFY_CUSTOM_TYPE, content: text, display: true }, { triggerTurn: true });
+    } catch {
+      /* 会话可能已关闭：放弃这次唤醒（日志已落盘，用户下次看得到） */
+    }
+  });
+  registerHook(pi, {
+    event: 'turn_start',
+    handler: async () => {
+      idleGate.setBusy(true);
+    },
+  });
+  registerHook(pi, {
+    event: 'agent_settled',
+    handler: async () => {
+      idleGate.setBusy(false);
+    },
+  });
+
   const watcher = createCompletionWatcher({
     hasSession: (name) => hasSession(cfg, name),
     notify: async (text) => {
-      sendMessage(pi, { customType: NOTIFY_CUSTOM_TYPE, content: text, display: true }, { triggerTurn: true });
+      idleGate.notify(text);
     },
     onDone: (name) => {
       handles.delete(name);

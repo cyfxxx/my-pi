@@ -3,7 +3,7 @@
  * 重点：去重、ack 消费、合并窗口、同名重注册、stop/stopAll 清理、异常静默
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createCompletionWatcher, POLL_INTERVAL_MS, MERGE_WINDOW_MS } from '../watcher';
+import { createCompletionWatcher, createIdleGate, POLL_INTERVAL_MS, MERGE_WINDOW_MS } from '../watcher';
 
 type HasSession = (name: string) => Promise<boolean>;
 
@@ -144,5 +144,64 @@ describe('createCompletionWatcher', () => {
 		watcher.stopAll();
 		await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3 + MERGE_WINDOW_MS);
 		expect(notify).not.toHaveBeenCalled();
+	});
+});
+
+/**
+ * 空闲门（2026-10-07）：pi 在 agent 忙碌时收到 `triggerTurn` 会**直接致命报错**、
+ * 进程 rc=1、catch 不住。tmux 会话随时可能结束，所以完成通知必须过门：
+ * 忙则入队，只在 `agent_settled`（可安全 triggerTurn 的时刻）合并发出。
+ * 这组测试钉住"**宁可晚，不可炸**"——忙的时候一条都不能发。
+ */
+describe('createIdleGate', () => {
+	function setup() {
+		const sent: string[] = [];
+		const gate = createIdleGate((t) => sent.push(t));
+		return { gate, sent };
+	}
+
+	it('空闲时立即发送', () => {
+		const { gate, sent } = setup();
+		gate.notify('done');
+		expect(sent).toEqual(['done']);
+		expect(gate.pendingCount()).toBe(0);
+	});
+
+	it('忙碌时只入队，绝不发送（这是防 rc=1 的关键）', () => {
+		const { gate, sent } = setup();
+		gate.setBusy(true);
+		gate.notify('done-a');
+		gate.notify('done-b');
+		expect(sent).toEqual([]);
+		expect(gate.pendingCount()).toBe(2);
+	});
+
+	it('转为空闲时把队列合并成一条发出', () => {
+		const { gate, sent } = setup();
+		gate.setBusy(true);
+		gate.notify('done-a');
+		gate.notify('done-b');
+		gate.setBusy(false);
+		expect(sent).toEqual(['done-a\n\ndone-b']);
+		expect(gate.pendingCount()).toBe(0);
+	});
+
+	it('再次 setBusy(false) 不重发已清空的队列', () => {
+		const { gate, sent } = setup();
+		gate.setBusy(true);
+		gate.notify('x');
+		gate.setBusy(false);
+		gate.setBusy(false);
+		expect(sent).toEqual(['x']);
+	});
+
+	it('空闲→忙→空闲 期间到达的通知落在正确的一侧', () => {
+		const { gate, sent } = setup();
+		gate.notify('first'); // 空闲：立即发
+		gate.setBusy(true);
+		gate.notify('queued'); // 忙：入队
+		gate.setBusy(false); // 空闲：发出队列
+		gate.notify('second'); // 空闲：立即发
+		expect(sent).toEqual(['first', 'queued', 'second']);
 	});
 });
