@@ -2481,6 +2481,18 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   `promoteSessionName` / `promoteNotice`），守门 `__tests__/promote.test.ts` **9 项**。
 - 验证：tsc 干净；check-features / conventions 全绿；vitest 见提交说明。
 
+### 子代理常驻 RPC 池 S2（2026-10-07）
+
+- 前提已在 S1 用**确定性判据**验证：`new_session` 真隔离 + 纯冷启动 **19.1s**（池每次省掉的部分）。
+- 新增 `subagent/core/rpc-pool.ts`（协议 + worker 生命周期）；`runner.ts` 抽出共享的
+  `applyAgentEvent`（依据：rpc-mode 用 `toJsonEvent`，与 `--mode json` 同一个序列化器）与
+  `filteredSubagentEnv`（安全过滤不复制），新增 `buildPooledSpawnArgs` / `runPooledAgent`，
+  并在 `runSubprocessAgent` 顶部加池化分支（`PI_SUBAGENT_POOL=off` 回退、失败开放且**留痕**）。
+- 语义保持：`--append-system-prompt`/`--model` 是 worker 级参数 ⇒ 人设仍是 system prompt。
+- S2 只覆盖非 fork（`new_session {parentSession}` 未验证的内容不混入）。
+- 守门：`__tests__/rpc-pool.test.ts` **14 项**（含"池化参数绝不带任务文本/不含 --fork"的契约测试）。
+- 验证：tsc 干净；subagent 测试 50 项全绿；其余见提交说明。
+
 ### 目标级自动续跑 goal（2026-10-07，编排优化第 4 项）
 
 - 差距：my-pi 只有"tmux 完成通知"与"定时任务"，**没有朝一个目标连续推进**；DSH 有 `goal`（256 轮、

@@ -90,7 +90,7 @@ subagent(parallel) ─┤ 1. new_session (fresh)          或 new_session {paren
 | 期 | 内容 | 验收 |
 |---|---|---|
 | ~~**S1**~~ ✅ | **协议探针（已完成，见第七节）**（不改产品代码）：写一个临时脚本起 `pi --mode rpc`，跑 `new_session`→`prompt`→收到 `agent_settled`，两次任务，**断言第二次没有前一次的上下文残留**、并测出"第二个任务的墙钟" | 拿到冷启动 vs 热复用**实测对比数字**；隔离结论有证据 |
-| **S2** | 池的最小实现：单 worker 复用 + 崩溃重建；`PI_SUBAGENT_POOL=off` 回退 | 现有 subagent 测试全绿；新增池的纯逻辑测试（framing/状态机） |
+| ~~**S2**~~ ✅ | 池的最小实现（已完成，见第九节）：单 worker 复用 + 崩溃重建；`PI_SUBAGENT_POOL=off` 回退 | 现有 subagent 测试全绿；新增池的纯逻辑测试（framing/状态机） |
 | **S3** | 池铺到 `parallel`（池大小 = 并发上限）+ `abort` 取消 + 日志 | 端到端：3 个并行任务只起 ≤1 次冷启动 |
 | **S4** | 可选：子代理加载扩展（`deferred` 配合）+ 文档/守门 | 前缀体积不退化；风险面有文档与开关 |
 
@@ -177,3 +177,35 @@ subagent(parallel) ─┤ 1. new_session (fresh)          或 new_session {paren
 3. 崩溃/协议错乱 → 重建该 worker，不让整个 `subagent` 调用失败；
 4. `PI_SUBAGENT_POOL=off` 回退到今天的 spawn 路径；
 5. 计时用"provider 侧按暗号归属"的口径，避免上面那种取错样本的错。
+
+## 九、S2 已落地（2026-10-07）
+
+**实现**（两个文件 + 一处重构）：
+
+- `custom/features/subagent/core/rpc-pool.ts`（新，纯协议 + worker 生命周期）：
+  `encodeRequest` / `createLineFramer`（半行、多行、跨片 JSON、flush 都有测试）/
+  `isTurnSettled`（完成判定 = `agent_settled`）/ `isResponseFor`（响应必须 id 对得上）/
+  `poolEnabled`（`PI_SUBAGENT_POOL=off` 回退）/ `RpcWorker`（单飞、崩溃 reject 在途请求、`abort`）/
+  `RpcPool`（按 profileKey 复用；崩溃只重建该 worker）/ `getRpcPool`。
+- `custom/features/subagent/core/runner.ts`：
+  · **抽出 `applyAgentEvent`**——两条路径共用同一份"事件 → SingleResult"映射
+    （依据：`modes/rpc/rpc-mode.ts:356` 用 `output(toJsonEvent(event))`，与 `--mode json` 是同一个
+    序列化器，所以池化路径的事件形状与原来一致；共用就不必维护第二份、也不会悄悄漂移）；
+  · **抽出 `filteredSubagentEnv`**——敏感凭据过滤不该有第二份实现；
+  · 新增 `buildPooledSpawnArgs`（`--mode rpc`，**不带任务文本**、**不带 `--fork`**）与 `runPooledAgent`；
+  · `runSubprocessAgent` 顶部加池化分支：`poolEnabled() && !forkSession` 时走池，
+    **失败开放**——池层任何异常都回退到已验证的 spawn 路径，并往 stderr 留一行痕迹
+    （静默回退会让"池没生效"永远查不出来）。
+- 语义保持：`--append-system-prompt` 与 `--model` 是 **worker 级**固定参数 ⇒ **人设仍是 system prompt**，
+  与现在完全一致；复杂度代价是"每个 agent profile 一个常驻进程"（`scout/worker/reviewer` 是固定小集合）。
+- 隔离：复用 worker 前必发 `new_session`（新建的 worker 会话本身就是空的，故跳过，省一次往返）。
+
+**为什么 S2 只覆盖非 fork**：`new_session {parentSession}` 的分叉语义**尚未在池上验证**，
+所以 fork 仍走原路径（设计文档第一节的分期原则：每期都要能独立验证）。
+
+**测试**：`__tests__/rpc-pool.test.ts` **14 项**（协议分帧 4 / 编码 2 / 完成与关联 2 / poolEnabled 1 /
+池化参数契约 2 / 共享映射 3）。其中"池化参数**绝不带任务文本**、且不含 `--fork`"是一条**契约测试**——
+错了会让任务文本跑到命令行上、池化路径静默跑错东西。
+
+**下一步 S3**：池大小铺到 `parallel`（池大小 = `helpers.ts:184` 的并发上限）；`abort` 取消已有；
+再补一次**端到端**验证（真实子代理调用 + 假 provider，计时用"provider 侧按暗号归属请求"的口径）。
