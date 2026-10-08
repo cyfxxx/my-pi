@@ -193,7 +193,7 @@ describe('pooledProfileKey：必须按内容，不能按临时文件路径（S2 
     const k = pooledProfileKey({ model: 'scout', agentName: 'worker', systemPromptText: '你是 worker' });
     expect(k).not.toContain('/');
     expect(k).not.toContain('tmp');
-    expect(k.split('|')).toHaveLength(3); // model | agentName | 内容哈希
+    expect(k.split('|')).toHaveLength(4); // model | agentName | ext 旗标 | 内容哈希
   });
 });
 
@@ -275,5 +275,18 @@ describe('RpcPool 租借语义（用注入的假 worker，不真起进程）', (
     expect(pool.size()).toBe(0);
     expect(pool.idleCount()).toBe(0);
     expect(a.worker.alive).toBe(false);
+  });
+});
+
+describe('extensions 逐次 opt-in（默认关闭）', () => {
+  it('pooledProfileKey 必须区分 extensions —— 否则裸 worker 会被拿去跑"要扩展"的任务', () => {
+    const base = { model: 'm', agentName: 'worker', systemPromptText: 'x' };
+    expect(pooledProfileKey(base)).not.toBe(pooledProfileKey({ ...base, allowExtensions: true }));
+  });
+
+  it('池化启动参数：默认带 --no-extensions；显式 opt-in 才去掉', () => {
+    expect(buildPooledSpawnArgs({})).toContain('--no-extensions');
+    expect(buildPooledSpawnArgs({ allowExtensions: false })).toContain('--no-extensions');
+    expect(buildPooledSpawnArgs({ allowExtensions: true })).not.toContain('--no-extensions');
   });
 });

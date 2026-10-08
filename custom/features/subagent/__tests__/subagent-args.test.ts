@@ -52,4 +52,12 @@ describe('buildSubagentArgs', () => {
     const args = buildSubagentArgs({ ...base, tools: [] });
     expect(args).not.toContain('--tools');
   });
+
+  it('默认不带扩展（--no-extensions）；逐次 opt-in 才加载 my-pi 扩展', () => {
+    const base = { task: 't' };
+    expect(buildSubagentArgs(base)).toContain('--no-extensions');
+    expect(buildSubagentArgs({ ...base, allowExtensions: false })).toContain('--no-extensions');
+    // 去掉的是"禁用扩展"这个旗标 —— 不出现即等于允许扩展
+    expect(buildSubagentArgs({ ...base, allowExtensions: true })).not.toContain('--no-extensions');
+  });
 });

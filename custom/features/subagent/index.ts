@@ -68,6 +68,12 @@ export function register(pi: ExtensionAPI): void {
         optional: true,
       },
       agentScope: { type: 'string', enum: ['user', 'project', 'both'], description: 'agent 目录范围，默认 user', optional: true },
+      extensions: {
+        type: 'boolean',
+        description:
+          '本次调用是否让子代理加载 my-pi 扩展（memory/todo/tmux 等）。**默认关闭**；开启后子代理能改状态，请只在确实需要时开启。定时任务派生的子代理始终不加载扩展。',
+        optional: true,
+      },
       model: {
         type: 'string',
         description: '本次调用的默认模型（provider/model 或 provider/id）；单个 task/chain 项的 model 优先于此',
@@ -86,6 +92,8 @@ export function register(pi: ExtensionAPI): void {
       const currentModel = ctx?.model;
       // fork 需要父会话文件；拿不到（headless/无会话）时静默退回 spawn（不报错，只是没有父上下文）
       const forkSession = params.context === 'fork' ? ctx?.sessionFile : undefined;
+      // 逐次 opt-in、默认关闭（见 runner.ts 的 buildPooledSpawnArgs 注释）
+      const allowExtensions = params.extensions === true;
       const cwd = ctx?.cwd ?? process.cwd();
       const agentScope: AgentScope = params.agentScope ?? 'user';
       const discovery = discoverAgents(cwd, agentScope);
@@ -113,7 +121,7 @@ export function register(pi: ExtensionAPI): void {
         for (let i = 0; i < params.chain.length; i++) {
           const step = params.chain[i];
           const taskWithContext = applyPreviousPlaceholder(step.task ?? '', previousOutput);
-          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'), currentModel, step.model ?? params.model, forkSession);
+          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'), currentModel, step.model ?? params.model, forkSession, allowExtensions);
           results.push(result);
           if (isFailedResult(result)) {
             return `Chain stopped at step ${i + 1} (${step.agent ?? 'default'}): ${getResultOutput(result)}`;
@@ -128,7 +136,7 @@ export function register(pi: ExtensionAPI): void {
           return `Too many parallel tasks (${params.tasks.length}). Max is ${getMaxParallelTasks()}${isTermuxEnv() ? ' (Termux 环境限制)' : ''}.`;
         }
         const results = await mapWithConcurrencyLimit(params.tasks, getMaxConcurrency(currentProviderIsLocal(currentModel?.provider)), async (t, _index, internalSignal) =>
-          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel'), currentModel, t.model ?? params.model, forkSession),
+          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel'), currentModel, t.model ?? params.model, forkSession, allowExtensions),
         );
         const successCount = results.filter((r) => !isFailedResult(r)).length;
         const summaries = results.map((r) => {
@@ -142,7 +150,7 @@ export function register(pi: ExtensionAPI): void {
       if (params.task) {
         const riskLevel = classifyTaskRisk(params.task);
         const riskHint = riskLevel !== '1σ' ? ` [risk=${riskLevel}]` : '';
-        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'), currentModel, params.model, forkSession);
+        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'), currentModel, params.model, forkSession, allowExtensions);
         if (isFailedResult(result)) {
           return `Agent ${result.stopReason || 'failed'}${riskHint}: ${getResultOutput(result)}`;
         }

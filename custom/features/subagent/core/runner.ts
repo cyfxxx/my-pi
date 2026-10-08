@@ -131,8 +131,16 @@ export function applyAgentEvent(
  * `--append-system-prompt` 与 `--model` 是 **worker 级**的固定参数（按 profile 复用），
  * 这样"agent 人设仍是 system prompt"这一语义与现在完全一致。
  */
-export function buildPooledSpawnArgs(opts: { model?: string; promptPath?: string | null }): string[] {
-  const args: string[] = ['--mode', 'rpc', '--no-extensions', '--no-session'];
+export function buildPooledSpawnArgs(opts: {
+  model?: string;
+  promptPath?: string | null;
+  allowExtensions?: boolean;
+}): string[] {
+  const args: string[] = ['--mode', 'rpc'];
+  // 默认**不加载扩展**（`--no-extensions`）。逐次 opt-in 才带扩展——这既保住了 `check-seeds-headless`
+  // 的前提（定时任务派生的子代理默认仍是裸 pi），也把"子代理能改状态"的风险留在显式请求里。
+  if (!opts.allowExtensions) args.push('--no-extensions');
+  args.push('--no-session');
   if (opts.model) args.push('--model', opts.model);
   if (opts.promptPath) args.push('--append-system-prompt', opts.promptPath);
   return args;
@@ -172,6 +180,7 @@ async function runPooledAgent(
   onUpdate: OnUpdateCallback | undefined,
   makeDetails: (results: SingleResult[]) => SubagentDetails,
   resolvedModel: string | undefined,
+  allowExtensions?: boolean,
 ): Promise<SingleResult> {
   let tmpPromptDir: string | null = null;
   let tmpPromptPath: string | null = null;
@@ -205,12 +214,15 @@ async function runPooledAgent(
       tmpPromptPath = tmp.filePath;
     }
 
-    const invocation = getPiInvocation(buildPooledSpawnArgs({ model: resolvedModel, promptPath: tmpPromptPath }));
+    const invocation = getPiInvocation(
+      buildPooledSpawnArgs({ model: resolvedModel, promptPath: tmpPromptPath, allowExtensions }),
+    );
     // 键按**内容**：用临时文件路径会让每个任务都是新 profile，池就永远不复用（踩过，见 rpc-pool.ts）
     const profileKey = pooledProfileKey({
       model: resolvedModel,
       agentName: agent.name,
       systemPromptText: agent.systemPrompt,
+      allowExtensions,
     });
     // 租借：一个 worker 同一时刻只属于一个任务（rpc 协议是单会话，并发复用会互相踩）
     const lease = getRpcPool().lease({
@@ -276,9 +288,11 @@ export function buildSubagentArgs(opts: {
   tools?: readonly string[] | null;
   promptPath?: string | null;
   forkSession?: string | null;
+  allowExtensions?: boolean;
 }): string[] {
   const fork = typeof opts.forkSession === 'string' && opts.forkSession.length > 0 ? opts.forkSession : null;
-  const args: string[] = ['--mode', 'json', '-p', '--no-extensions'];
+  const args: string[] = ['--mode', 'json', '-p'];
+  if (!opts.allowExtensions) args.push('--no-extensions');
   if (fork) args.push('--fork', fork);
   else args.push('--no-session');
   if (opts.model) args.push('--model', opts.model);
@@ -300,12 +314,16 @@ export async function runSubprocessAgent(
   currentModel?: { id?: string; provider?: string },
   overrideModel?: string,
   forkSession?: string,
+  allowExtensions?: boolean,
 ): Promise<SingleResult> {
   const resolvedModel = resolveModelId(agent.model, overrideModel, currentModel);
 
   // ── 常驻池路径（S2，见 docs/design/SUBAGENT-POOL.md）────────────────────────────
   // 省掉每次都 `spawn` 一个新 pi 进程的纯启动开销（本机实测 19.1s）。
   // 只覆盖**非 fork** 路径：fork 的隔离语义（继承父会话）尚未在池上验证，留在原路径。
+  // fork **暂不放行**：池化路径还没验证 `new_session {parentSession}`（从 `--no-session` 起的进程里
+  // 分叉是否真能带上父会话的 messages）。若此刻放行，fork 会被静默降级成空上下文——语义变了却不报错，
+  // 正是本设计文档反复强调要避免的那类问题。fork 仍走已验证的 spawn 路径，验证通过后再开。
   if (poolEnabled() && !forkSession) {
     try {
       return await runPooledAgent(
@@ -370,6 +388,7 @@ export async function runSubprocessAgent(
       tools: effectiveTools,
       promptPath: tmpPromptPath,
       forkSession,
+      allowExtensions,
     });
     let wasAborted = false;
 
@@ -470,6 +489,7 @@ export async function runSingleAgent(
   currentModel?: { id?: string; provider?: string },
   overrideModel?: string,
   forkSession?: string,
+  allowExtensions?: boolean,
 ): Promise<SingleResult> {
   const agent = agents.find((a) => a.name === agentName);
   if (!agent) {
@@ -491,7 +511,8 @@ export async function runSingleAgent(
       currentModel,
       overrideModel,
       forkSession,
+      allowExtensions,
     );
   }
-  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel, forkSession);
+  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel, forkSession, allowExtensions);
 }

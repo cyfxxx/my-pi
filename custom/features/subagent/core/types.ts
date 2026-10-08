@@ -63,4 +63,12 @@ export interface SubagentToolParams {
    *   `fork`  = `--fork <父会话>`，继承父会话历史——紧接父会话请求时前缀是暖的，按 cacheRead 计价。
    */
   context?: 'spawn' | 'fork';
+  /**
+   * 是否让子代理加载 my-pi 扩展（memory/todo/tmux 等）。**逐次 opt-in，默认关闭**。
+   *
+   * 默认关闭不是"省事"：`scripts/check-seeds-headless.mjs` 整套守门建立在"定时任务以
+   * `--no-extensions` 运行"这个前提上，而 `schedule_task` 有 `useSubagent` 选项。默认关闭让
+   * "定时任务派生的子代理"天然仍是裸 pi，前提不被破坏；开启后子代理**能改状态**，属于显式承担风险。
+   */
+  extensions?: boolean;
 }

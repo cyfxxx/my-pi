@@ -257,8 +257,10 @@ export function pooledProfileKey(opts: {
   model?: string | null;
   agentName: string;
   systemPromptText: string;
+  /** 是否加载扩展（影响**启动参数**）——凡影响进程启动方式的参数都必须进键，否则会串用错进程 */
+  allowExtensions?: boolean;
 }): string {
-  return `${opts.model ?? ''}|${opts.agentName}|${djb2(opts.systemPromptText)}`;
+  return `${opts.model ?? ''}|${opts.agentName}|${opts.allowExtensions ? 'ext' : 'noext'}|${djb2(opts.systemPromptText)}`;
 }
 
 export type WorkerFactory = (opts: RpcWorkerOptions) => RpcWorker;
