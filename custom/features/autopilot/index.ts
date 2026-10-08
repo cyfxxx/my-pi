@@ -177,6 +177,8 @@ export function register(pi: ExtensionAPI): void {
 
   registerTool(pi, {
     name: 'admin_switch_session',
+    // 共享状态（重启/配置/待办）必须与其它工具调用一个一个来：并发会得到错误结果（后写覆盖/语义竞态）。
+    executionMode: 'sequential',
     description: '切换到指定会话文件（按 sessionId 前缀或路径）。将写入重启请求并由 supervisor 以 --session 重新启动。',
     parameters: {
       target: { type: 'string', description: '会话 ID（支持前缀匹配）或 .jsonl 文件路径' },
@@ -211,6 +213,8 @@ export function register(pi: ExtensionAPI): void {
 
   registerTool(pi, {
     name: 'admin_restart',
+    // 共享状态（重启/配置/待办）必须与其它工具调用一个一个来：并发会得到错误结果（后写覆盖/语义竞态）。
+    executionMode: 'sequential',
     description:
       '重启 Agent 程序（写重启请求，由 supervisor 重新拉起；当前会话会自动保存）。如不需要重启请拒绝调用。' +
       '重启后默认由会话盘面判断要不要继续执行任务：若你还有下一步要做，传 resume=continue；' +

@@ -2448,3 +2448,21 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 守门：新增 `custom/adapters/__tests__/tool-exposure.test.ts` **7 项**，驱动 pi 的真实实现
   （补丁被上游冲掉即红）；`roleplay-surface.test.ts` 的 `defaultTools` 精确断言已同步。
 - 验证：tsc 干净；vitest **79 文件 892 例**；check-features / conventions / check-patches-behavior（11 补丁）全绿。
+
+### 接线 executionMode：工具并发语义（2026-10-07，编排优化第 1 项）
+
+- 与 DSH 对比发现两边**默认相反**：DSH 默认独占（`isConcurrencySafe` 才进并发池），
+  pi/my-pi 默认**并行**（`agent.ts`：`runtimeOptions.toolExecution ?? "parallel"`）。
+- 问题是**两边都没用这个开关**：pi 自己的工具一个都没声明 `executionMode`；my-pi 的适配器连字段都
+  没转发 → 61 个工具全被当作并行安全。实证：被中断那次会话 **115 轮里 52 轮有 ≥2 个工具调用**。
+- 排除一个误报：`edit+edit` 不是风险——pi 有 `file-mutation-queue.ts` 按 realpath 排文件变更。
+  危险的只有 my-pi 的**非文件共享状态**（browser 的同一个 page、autopilot 重启/配置状态、todo 列表），
+  三处都无互斥（已核实无 queue/mutex/lock）。
+- 改动：适配器透传 `executionMode`；browser 18 个 + `admin_restart`/`admin_set_model`/
+  `admin_switch_session`/`admin_set_config` + `todo` 标 `sequential`。**不给 browser 留例外清单**
+  （pi 按整批降级，例外收益为零且会漂移）。
+- 刻意不标：`memory_*`/`ctx_*`/`link_*`/`voice_*`/`tmux_*`/`schedule_task` 的 mutator（部分有 file-lock /
+  原子写保护，只剩顺序语义问题），**列为下一步审计项**。
+- 守门：`custom/adapters/__tests__/tool-execution-mode.test.ts` **4 项**，含**反向断言**
+  （独立只读工具不得标 sequential，防"一刀切"把并行整体关掉）。
+- 验证：tsc 干净；vitest **80 文件 898 例**；check-features / conventions 全绿。

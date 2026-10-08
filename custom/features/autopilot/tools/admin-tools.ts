@@ -291,6 +291,8 @@ export function registerAdminTools(pi: PiApi): void {
 
   registerTool(pi, {
     name: 'admin_set_model',
+    // 共享状态（重启/配置/待办）必须与其它工具调用一个一个来：并发会得到错误结果（后写覆盖/语义竞态）。
+    executionMode: 'sequential',
     description: '写入默认 Provider/模型并重启 Agent（自动恢复当前会话）。',
     parameters: {
       provider: { type: 'string', description: 'Provider 名称，如 "deepseek"' },
@@ -340,6 +342,8 @@ export function registerAdminTools(pi: PiApi): void {
 
   registerTool(pi, {
     name: 'admin_set_config',
+    // 共享状态（重启/配置/待办）必须与其它工具调用一个一个来：并发会得到错误结果（后写覆盖/语义竞态）。
+    executionMode: 'sequential',
     description: '**写** settings.json 的配置项（敏感字段如含 key/token/secret 需用户确认；立即生效）。',
     parameters: {
       key: { type: 'string', description: '配置键名' },

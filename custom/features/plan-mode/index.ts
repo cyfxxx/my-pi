@@ -188,6 +188,8 @@ export function register(pi: ExtensionAPI): void {
   // ── todo 工具 ──
   registerTool(pi, {
     name: 'todo',
+    // 待办列表是同一份共享状态（读-改-写），并发两个调用会丢更新。
+    executionMode: 'sequential',
     description:
       '管理任务列表以跟踪多步骤进度。操作: create/update/list/get/delete/clear。状态: pending → in_progress → completed；blocked 表示阻塞；delete 归档。',
     parameters: {

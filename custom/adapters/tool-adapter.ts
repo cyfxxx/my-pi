@@ -77,6 +77,22 @@ export interface ToolDefinition {
    * 中文 query 会得到 0 token（见 `patches/011-tool-search-cjk.patch`）。
    */
   exposure?: 'direct' | 'model-only' | 'codemode' | 'deferred' | 'hidden';
+  /**
+   * 可选：**并发语义**（透传给 Pi）。默认 `parallel`。
+   *
+   * pi 的默认是**并行执行同一轮的多个工具调用**（`packages/agent/src/agent.ts`：
+   * `runtimeOptions.toolExecution ?? "parallel"`），并且提供了逐个工具退出并行的开关：
+   * `executionMode: 'sequential'` = "本工具必须与其它工具调用**一个一个来**"。
+   * 注意 pi 的判定粒度是**整批**——同一批里**只要有一个** `sequential`，整批转串行
+   * （`packages/agent/src/agent-loop.ts`），所以这个标记要**克制**：只标"并发会得到错误结果"的工具。
+   *
+   * 为什么 my-pi 必须显式标：pi 自己的工具（bash/edit/write）一个都没声明，而**文件类并发 pi 另有
+   * 保护**（`core/tools/file-mutation-queue.ts` 按 realpath 排队）——但 my-pi 的工具持有的是
+   * **非文件的共享可变状态**（同一个 Playwright page、同名 tmux 会话、同一份重启状态、同一份待办列表），
+   * 这些**没有任何互斥**，不标就等于声明"并行安全"。
+   * 守门：`custom/adapters/__tests__/tool-execution-mode.test.ts`。
+   */
+  executionMode?: 'sequential' | 'parallel';
   /** 可选：TUI 渲染回调（透传给 Pi；theme/context 不透明） */
   renderCall?: (args: Record<string, unknown>, theme: unknown, context: unknown) => unknown;
   renderResult?: (
@@ -167,6 +183,8 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
     // 暴露方式必须转发：`deferred` 的工具不会在注册时被激活，因此不进请求声明（省前缀字节），
     // 只由 `tool_search` 命中后激活。漏转发会让"deferred"静默退化成"默认声明"。
     ...(def.exposure ? { exposure: def.exposure } : {}),
+    // 并发语义同理必须转发：pi 默认并行，漏转发 = 静默声明"并行安全"。
+    ...(def.executionMode ? { executionMode: def.executionMode } : {}),
     execute: async (
       _toolCallId: string,
       params: Record<string, unknown>,

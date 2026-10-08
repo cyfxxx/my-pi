@@ -2,6 +2,56 @@
 
 ## 格式
 
+### [2026-10-07] 接线 `executionMode`：pi 默认并行执行工具调用，而 my-pi 的共享状态工具没有互斥
+
+**背景（与 DSH 对比时发现）**：两边的并发默认值**相反**——
+
+| | 默认 | 显式声明才切换 |
+|---|---|---|
+| DSH | **独占** | `isConcurrencySafe` → 进并发池（上限 10） |
+| pi / my-pi | **并行**（`packages/agent/src/agent.ts`：`runtimeOptions.toolExecution ?? "parallel"`） | 逐个工具 `executionMode: 'sequential'` |
+
+pi 的并行语义（`packages/agent/src/types.ts:42-46`）："preflight 串行，然后允许的工具**并发执行**；
+tool-result 消息按 assistant 源顺序提交"。判定粒度是**整批**——`agent-loop.ts:516-522`：一批里
+**只要有一个** `sequential`，整批转串行。
+
+**问题不在"缺机制"，而在两边都没用这个开关**：
+- pi 自己的工具（bash/edit/write）**一个都没声明** `executionMode`（全仓库只有类型定义与胶水代码）；
+- my-pi 的适配器**连字段都没转发**（只拷贝 name/label/description/parameters/execute）→
+  **my-pi 的 61 个工具全部被当作并行安全**，等于一次静默的全局声明。
+
+**这不是理论问题**：被中断那次会话 **115 个工具轮里 52 轮有 ≥2 个调用**（`bash+bash` 25 次、
+`bash+read` 10 次、`edit+edit` 3 次、`bash+subagent` 2 次、`bash+edit` 2 次）。
+
+**一个必须先排除的误报**：`edit+edit` **不是**风险——pi 有 `core/tools/file-mutation-queue.ts`，
+按 `realpath` 对所有文件变更排队。**文件类并发 pi 已经保护**（这也是它的工具不必声明的理由）。
+
+**真正危险的是 my-pi 持有的"非文件共享可变状态"，它们没有任何互斥**（已核实 `browser/impl.ts`、
+`browser/logic.ts`、`tmux/logic.ts` 里没有 queue/mutex/lock）。本次先标三组判据最硬的：
+
+1. **browser 全部 18 个**：共享同一个 `BrowserManager`/page。一批里同时出现 `browser_navigate` 与
+   `browser_click` 会交错到同一页面（点到错页、或报"尚未打开任何页面"）。
+2. **autopilot 的重启/配置族**（`admin_restart` / `admin_set_model` / `admin_switch_session` /
+   `admin_set_config`）：写同一份重启/配置状态，"同时做两个"本身语义不明。
+3. **`todo`**：同一份待办列表的读-改-写，并发两个调用会丢更新。
+
+**为什么整组都标（browser 连读数也标）**：判定粒度在 pi 侧是整批，所以"给这一组留例外清单"的收益很小
+（例外不会让批次变并行，因为同批里只要还有别的 browser 工具就退化了），而例外清单本身会随工具增减漂移。
+页面是唯一共享资源——读数也要在稳定的页面上读。**没有例外清单。**
+
+**刻意不标的**（理由记下来，表明这是决定而非疏漏）：`memory_*` / `ctx_*` / `link_*` / `voice_*` /
+`tmux_*` / `schedule_task` 的 mutator 也属于"共享状态读-改-写"，但改动面更大、且部分已有
+`custom/core/file-lock.ts` 与 `atomic-write.ts` 保护（数据完整性安全，只剩批内**顺序语义**问题，
+风险低于上面三组）。**列为下一步审计项**——判据同本次：并发是否会得到**错误结果**（而非仅仅更慢）。
+
+**守门**：新增 `custom/adapters/__tests__/tool-execution-mode.test.ts`（**4 项**）：
+① 适配器必须透传 `executionMode`；② browser 全部 18 个必须 `sequential`；③ 上列共享状态工具必须
+`sequential`；④ **反向断言**——独立/只读工具（`memory_search`/`memory_stats`/`admin_get_config`/
+`admin_list_models`/`ask_user`）**不得**标 `sequential`。第④条防的是"一刀切全都标上"：由于整批降级，
+滥用会把并行能力整体关掉，而那比漏标更难发现（只是变慢，不会报错）。
+
+**验证**：tsc 干净；vitest **80 文件 898 例**（+4）；`check-features` / `check-conventions` 见同批提交。
+
 ### [2026-10-07] 私人助手：上游外发通道与角色身份裁剪
 
 **背景**：本仓库硬分叉 pi 为"自主进化的全能型私人助手"，但此前采取"只叠加、不裁剪"的追加式分叉策略，上游面向公众产品的三条默认通道原样保留。
