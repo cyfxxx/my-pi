@@ -303,7 +303,8 @@ npm run check                 # 隔离边界验证
 npx tsc --noEmit -p custom/   # 类型检查
 npx vitest run                # 单元测试
 npm run golden                # 行为防退化基准（20 步；--fast 仅结构守门，--smoke 加无头冒烟；
-                              # 第 19/20 步两个真实场景（模式切换 / 两实例隔离）默认跳过，PI_GOLDEN_SCENARIO=1 开启）
+                              # 第 19/20 步两个真实场景（模式切换 / 两实例隔离）默认跳过，PI_GOLDEN_SCENARIO=1 开启；
+                              # 这两步是**验收留出集**：开发期间不看其结果，只在验收时跑（纪律见 scripts/README.md））
 bash scripts/install-hooks.sh # 启用 git 钩子（提交前自动跑上述快检）
 ```
 

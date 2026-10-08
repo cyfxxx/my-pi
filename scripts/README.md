@@ -50,6 +50,20 @@
 | `test-prepush-scope.sh` | 上者的守门（7 项，临时仓库造真实提交）：纯数据→fast、含代码→full、数据+代码混合→full、远端未知/新分支/空 diff/删 ref→full；接入 golden 第 17 步 |
 | `vendor-bundle.sh` | vendor/pi 离线归档（`create`/`restore`/`status`）；`status` 会标注每个归档**是否含当前 PINNED_COMMIT**（只报"存在"会假安全）；bundle 不入库 |
 
+### 留出集（held-out）：第 19/20 步**开发期间不看**
+
+这两个真实场景（模式切换 / 两实例隔离）是**验收留出集**。纪律借鉴 SoL-Pi 的做法
+（原文：*"Held-out trajectories never enter subsequent analysis, and no agent inside the auto-research loop
+sees the held-out results."*），理由是**如果我们按它调参，验收就退化成"再跑一次已经看过的检查"**。
+
+- **开发期间不看它们的结果**；只在**验收**时用 `PI_GOLDEN_SCENARIO=1` 跑（脚本在真正开跑那一刻会打印提醒）。
+- **绝不为了让它们通过而修改留出集本身**（改场景脚本或改断言）。它们因真实缺陷失败 → **修实现**；
+  若确有理由要改它们，须在 `DECISIONS.md` 留档并说明**为什么这不算作弊**。
+- 本地开发用：`bash scripts/golden-tasks.sh --fast` + 针对改动点的定向
+  `npx vitest run <相关测试文件>`。**`--fast` 与默认门禁都不会跑到留出集**，所以常规开发天然看不见它们。
+- 它们**默认跳过**本来是出于连接时长约束（见上面两行的说明），但那恰好给了我们"开发时看不见"的性质——
+  **这是要保持的性质，不是要顺手跑掉的东西**。
+
 ## 对外服务
 
 | 脚本 | 用途 |

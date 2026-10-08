@@ -2,6 +2,27 @@
 
 ## 格式
 
+### [2026-10-08] golden 留出集纪律（P5）：第 19/20 步是验收留出集，开发期间不看
+
+**来自 SoL-Pi 的做法**：held-out 验证——"Held-out trajectories never enter subsequent analysis, and no
+agent inside the auto-research loop sees the held-out results."（他们的留出集是 EdgeBench 51 个任务。）
+
+**我们的真实缺口**：`golden-tasks.sh` 的 20 步**既是设计依据又是验收依据**——按它调就会通过它。
+幸运的是第 19/20 步**本来就默认跳过**（`PI_GOLDEN_SCENARIO=1` 才跑，原本理由是连接时长），
+所以"留出"的性质已经存在；缺的是**命名与纪律**。
+
+**决策：把它命名为留出集，并把纪律写进四处**（权威定义在 `scripts/README.md`，另两处给指针，
+再让脚本在真正开跑时打印提醒）：
+1. 开发期间不看它们的结果；只在验收时跑；
+2. **绝不为了让它们通过而修改留出集本身**——因真实缺陷失败就**修实现**；确有正当理由要改，
+   须在本文件留档并说明为何不算作弊；
+3. 本地开发用 `--fast` + 定向 vitest（常规门禁路径天然跑不到留出集）；
+4. 提醒用 `echo` 而非新增 `step`——`check-conventions.sh` 第 D 节会拿 `golden-tasks.sh` 的最大 step
+   编号与 `scripts/README.md` 的"**N 步**"对账，新增 step 会让它对账失败。
+
+**可核对的性质（本项的证据）**：`bash scripts/golden-tasks.sh --fast` 下第 19/20 步均为 `skip`、
+**留出集提醒出现 0 次** ⇒ "开发期间看不见留出集"不依赖人的自觉，工具链本身保证了它。
+
 ### [2026-10-08] 压缩"回本"估算（P2）：只建立测量，不接管阈值
 
 **来自 SoL-Pi 的发现**：压缩是**一次前缀重写**，触发时钟不该只是"上下文压力"，还要看**预期未来节省能否

@@ -135,7 +135,12 @@ elif [ "${PI_GOLDEN_SCENARIO:-0}" != "1" ]; then
   skip "模式切换场景（默认跳过；PI_GOLDEN_SCENARIO=1 开启 —— 改 mode/supervisor/生命周期 时必须跑）"
 elif [ "${PI_SCENARIO_SKIP:-0}" = "1" ]; then
   skip "模式切换场景（PI_SCENARIO_SKIP=1）"
-elif node scripts/test-scenario-mode-restart.mjs >/tmp/golden-scenario.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario.log)"; else fail "模式切换场景（见 /tmp/golden-scenario.log）"; tail -20 /tmp/golden-scenario.log; fi
+else
+  # 留出集纪律（P5，见 scripts/README.md）：本步是**验收留出集**，开发期间不要看它的结果——
+  # 按它调参会把"验收"退化成"再跑一次已经看过的检查"。
+  echo "  ⚠ 留出集：开发期间不应查看本步结果，只在验收时跑（纪律见 scripts/README.md）"
+  if node scripts/test-scenario-mode-restart.mjs >/tmp/golden-scenario.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario.log)"; else fail "模式切换场景（见 /tmp/golden-scenario.log）"; tail -20 /tmp/golden-scenario.log; fi
+fi
 
 step "20. 两实例隔离场景（真 pty×2 + supervisor×2 + 真 pi×2，约 8 分钟）"
 # 多实例是常态（两个 supervisor 共享同一份 state.json / modes-sessions.json / rounds.jsonl）。
@@ -149,7 +154,12 @@ elif [ "${PI_GOLDEN_SCENARIO:-0}" != "1" ]; then
   skip "两实例隔离场景（默认跳过；PI_GOLDEN_SCENARIO=1 开启 —— 改 supervisor/归属判定/生命周期 时必须跑）"
 elif [ "${PI_SCENARIO_SKIP:-0}" = "1" ]; then
   skip "两实例隔离场景（PI_SCENARIO_SKIP=1）"
-elif node scripts/test-scenario-two-instances.mjs >/tmp/golden-scenario-two.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario-two.log)"; else fail "两实例隔离场景（见 /tmp/golden-scenario-two.log）"; tail -20 /tmp/golden-scenario-two.log; fi
+else
+  # 留出集纪律（P5，见 scripts/README.md）：本步是**验收留出集**，开发期间不要看它的结果——
+  # 按它调参会把"验收"退化成"再跑一次已经看过的检查"。
+  echo "  ⚠ 留出集：开发期间不应查看本步结果，只在验收时跑（纪律见 scripts/README.md）"
+  if node scripts/test-scenario-two-instances.mjs >/tmp/golden-scenario-two.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario-two.log)"; else fail "两实例隔离场景（见 /tmp/golden-scenario-two.log）"; tail -20 /tmp/golden-scenario-two.log; fi
+fi
 
 if [ "$SMOKE" = "1" ]; then
   step "21. 无头会话冒烟"

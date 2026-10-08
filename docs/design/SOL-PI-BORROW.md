@@ -116,7 +116,7 @@ expected lifetime value"、M24 "Gate V2 candidates on consumption, dormant behav
 
 **产出**：决策清单（**删除动作留给用户**）。**能力地板**：纯文档 + 可能的 `check-features` 基线说明。
 
-## P5 golden 留出集：让"我按 golden 调好的"不再自动通过 golden ✅ 待做
+## P5 golden 留出集：让"我按 golden 调好的"不再自动通过 golden ✅ **已完成（2026-10-08）**
 
 **SoL-Pi 依据**：held-out 验证——"Held-out trajectories never enter subsequent analysis, and no agent
 inside the auto-research loop sees the held-out results."。留出集是 EdgeBench（51 任务）。
@@ -267,3 +267,27 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 
 **下一步（需要用户点头）**：积累几天 `压缩回本` 数据后，若 p50 回本轮数明显大于实际剩余轮次，
 再考虑让回本判定参与压缩阈值。**在那之前不动默认阈值。**
+
+### P5 实施结果（2026-10-08）
+
+**先说一个有利前提**：第 19/20 步**本来就默认跳过**（`PI_GOLDEN_SCENARIO=1` 才跑，理由原本是连接时长
+约束）。也就是说"留出集"这个性质**已经存在**，P5 要做的是**给它命名、把纪律写死、并让它在最需要被看见的
+那一刻可见**——而不是新造一套机制。
+
+**四处改动**：
+1. `scripts/README.md`：新增 `### 留出集（held-out）：第 19/20 步开发期间不看`（**权威定义**）——
+   含四条纪律：开发期间不看结果；只在验收时用 `PI_GOLDEN_SCENARIO=1` 跑；**绝不为了让它们通过而修改
+   留出集本身**（有正当理由须在 DECISIONS 留档并说明为何不算作弊）；本地开发用 `--fast` + 定向 vitest。
+2. `STRUCTURE.md` 与 `docs/FAQ.md`：在 golden 说明处各加一句指针（**保持 "20 步" 字样不变**，
+   因为 `check-conventions.sh` 第 D 节会拿它与 `golden-tasks.sh` 的实际步数对账）。
+3. `scripts/golden-tasks.sh`：在第 19/20 步**真正开跑的那一刻**打印
+   `⚠ 留出集：开发期间不应查看本步结果，只在验收时跑`。用 `echo` 而不是 `step` ——
+   **不能新增 step，否则第 D 节的步数对账会红**。
+4. 交付说明（本文件 + DECISIONS + PROGRESS）。
+
+**能力地板**：`tsc` / `vitest` / `check-features`（含文档链接扫描与步数对账）/ `check-conventions`
+（第 D 节：脚本数、步数、台账行数）/ `check-dead-exports` / `golden --fast`。
+
+**"效率指标"在本项是"可验证的性质"**（本项买的是证据强度，方案里已写明不追效率）：实测常规开发路径
+`bash scripts/golden-tasks.sh --fast` —— 第 19/20 步都落在 `skip`，**留出集提醒出现 0 次** ⇒
+"开发期间看不见留出集"这条性质在当前工具链下**成立且可核对**，不依赖人的自觉。
