@@ -89,7 +89,7 @@ subagent(parallel) ─┤ 1. new_session (fresh)          或 new_session {paren
 
 | 期 | 内容 | 验收 |
 |---|---|---|
-| **S1** | **协议探针**（不改产品代码）：写一个临时脚本起 `pi --mode rpc`，跑 `new_session`→`prompt`→收到 `agent_settled`，两次任务，**断言第二次没有前一次的上下文残留**、并测出"第二个任务的墙钟" | 拿到冷启动 vs 热复用**实测对比数字**；隔离结论有证据 |
+| ~~**S1**~~ ✅ | **协议探针（已完成，见第七节）**（不改产品代码）：写一个临时脚本起 `pi --mode rpc`，跑 `new_session`→`prompt`→收到 `agent_settled`，两次任务，**断言第二次没有前一次的上下文残留**、并测出"第二个任务的墙钟" | 拿到冷启动 vs 热复用**实测对比数字**；隔离结论有证据 |
 | **S2** | 池的最小实现：单 worker 复用 + 崩溃重建；`PI_SUBAGENT_POOL=off` 回退 | 现有 subagent 测试全绿；新增池的纯逻辑测试（framing/状态机） |
 | **S3** | 池铺到 `parallel`（池大小 = 并发上限）+ `abort` 取消 + 日志 | 端到端：3 个并行任务只起 ≤1 次冷启动 |
 | **S4** | 可选：子代理加载扩展（`deferred` 配合）+ 文档/守门 | 前缀体积不退化；风险面有文档与开关 |
@@ -140,3 +140,40 @@ subagent(parallel) ─┤ 1. new_session (fresh)          或 new_session {paren
 **下一步（S1 v2）**：改用**确定性**判据——把 rpc 进程指向 `scripts/lib-fake-provider.mjs`
 （它会记录每个请求的 body），直接断言**第二次任务的 `messages` 里只有任务 2、不含任务 1**。
 不依赖模型自述。在这一步通过之前，**S2 不启动**（整个池方案押在"`new_session` 真隔离"上）。
+
+## 八、S1 v2 结果：隔离**确定性验证通过**（2026-10-07）
+
+改用确定性判据（不依赖模型自述）：把 rpc 进程指向 `scripts/lib-fake-provider.mjs`（记录每个请求 body），
+两次任务各带一个唯一暗号，直接断言**第二次请求的 `messages` 里不含第一次的暗号**。
+
+探针 `/tmp/rpc-isolation.mjs`（临时件，不入库）输出：
+
+```
+/chat/completions 请求数: 2
+  请求1: roles=[system,user] 含暗号A=true 含暗号B=false 消息数=2
+  请求2: roles=[system,user] 含暗号A=false 含暗号B=true 消息数=2
+
+冷启动（spawn → 首个模型请求）: 19.1s
+热任务（prompt2 → 首个模型请求）: （见下方口径说明）
+热任务（prompt2 → agent_settled）: 0.25s
+```
+
+**结论：`new_session` 真正隔离** —— 同一进程内，第二次任务的请求是干净的 `[system, user]`（2 条消息），
+**不含任何第一次任务的痕迹**。池方案的核心假设**成立**，S2 可以启动。
+
+**省下的成本就是那个 19.1s**：这是 pi 进程的纯启动开销（假 provider、无模型抖动、无网络），
+也就是池**每次任务**替掉的部分。对照真实 provider 的端到端测量（28.5s 冷 → 10.4s 热，省 63%）：
+两者的差主要是真实模型延迟，与启动开销无关。
+
+**口径说明（方法论）**：上面"热任务 → 首个模型请求"那一行**我测错了**——我在 `prompt` 响应返回的
+**同一 tick** 就去读 provider 已记录的最后一个请求，而此时新请求还没到，于是读到的是**上一次**的
+时间戳（算出负数）。**该行数据作废，不作为结论**。可信的是两个端点值：冷启动 19.1s、
+热任务整轮（prompt → `agent_settled`）0.25s。S2 要测"每个任务的平均墙钟"时，应当**在 provider 侧
+按暗号归属请求**再计时，而不是取"最后一个请求"。
+
+**S2 开工前的清单**（由本次结果收紧）：
+1. 池大小 = 现有并发上限（`helpers.ts:184` 的 `limit`），每个 worker 独占一个进程（协议是单会话）；
+2. 每任务前 `new_session`（本验证已证明其隔离性）；`context: 'fork'` 时改用 `new_session {parentSession}`；
+3. 崩溃/协议错乱 → 重建该 worker，不让整个 `subagent` 调用失败；
+4. `PI_SUBAGENT_POOL=off` 回退到今天的 spawn 路径；
+5. 计时用"provider 侧按暗号归属"的口径，避免上面那种取错样本的错。
