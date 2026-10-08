@@ -170,7 +170,7 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 **能力地板**：`repeat-reminder.test.ts` 现有 8 项全绿 + 新增指纹归一化用例（含"路径/行号不同不应改变指纹"
 与"不同错误不应合并"两个方向）。**效率指标**：指纹触发次数记录进日志，供后续比较。
 
-## P8（提案）编辑类子代理的 verifier 契约
+## P8（提案）编辑类子代理的 verifier 契约 ✅ **已完成（2026-10-08，纯提案）**
 
 **SoL-Pi 依据**：D6 "Avoid generative edit delegates without a verifier contract"。
 
@@ -508,3 +508,22 @@ WORLD
 **效率指标（诚实说明）**：收益是"省一次模型往返"，**上线前无法实测**。可量化的先验是**邻接率 6.4%**
 （⇒ 上限约 6% 的回合数）。**采纳率由既有 30 天工具计数自动记录**，因此**上线后可复核**；
 若采纳率与效果都接近 0，按 P4 引用的 SoL-Pi C24/M24 应**降级为 deferred 或删除**，不留在前缀里占位。
+
+### P8 实施结果（2026-10-08）
+
+**产出**：[docs/design/SUBAGENT-VERIFIER-CONTRACT.md](SUBAGENT-VERIFIER-CONTRACT.md)。**纯提案，不改任何默认行为。**
+
+**证据（决定了提案形态）**：真实会话里 `subagent` 共 **9 次**调用，agent **只用过 `scout`（只读）5 次**，
+**从未派过编辑代理**；而 `usage.jsonl` 的字段里**没有"改了哪些文件"**（字段：agent/agentSource/model/
+exitCode/turns/tokens/cost/task/ts）⇒ **我们既没有"编辑代理被派出"的事实，也没有观测它的口径**。
+
+**所以结论是"先测量，再决定"**（P3 的同一教训）：现在做"强制 verifier"是**给尚未出现的风险加摩擦**。
+好消息是数据已在手边——`SingleResult.messages` 保存子代理的全部消息（含 toolCall 块），提取"它调用了哪些
+写类工具"几乎免费。
+
+**四条提案**：**P8-A** 给 `usage.jsonl` 加 `writeTools` 字段（属新增测量、可自行实施，**建议先做**，
+再补"父级是否在 N 轮内又改同一批文件"作为返工代理指标）；**P8-B** opt-in `verify: {command}`——
+**由 harness 在父级实际执行**（复用 P1 的 `runCheckCommand`），**不采信子代理自述**（与 P1 的结构约束同源）；
+**P8-C** 对写类子代理在缺验收条件时**提醒不阻塞**；**P8-D 不推荐**默认强制（证据不足 + 会诱使模型
+写 `verify: {command: 'true'}` 这种形式满足、实质失效的东西）。
+风险与约束（cwd 错位、并行成本 ×N、把"验收失败"误读成"子代理失败"）已列表写清。

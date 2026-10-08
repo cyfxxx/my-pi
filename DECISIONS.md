@@ -2,6 +2,30 @@
 
 ## 格式
 
+### [2026-10-08] 编辑类子代理的 verifier 契约（P8）：风险尚未发生 ⇒ 先测量，不强制
+
+**来自 SoL-Pi 的 D6**："Avoid generative edit delegates without a verifier contract"。
+
+**证据（本项的关键）**：真实会话里 `subagent` 共 **9 次**调用，agent **只用过 `scout`（只读）**，
+**从未派过编辑代理**；`usage.jsonl` 的字段（agent/agentSource/model/exitCode/turns/tokens/cost/task/ts）
+里**没有"改了哪些文件"** ⇒ 我们**既没有事实、也没有口径**。
+
+**决策：先测量，再决定（不实施强制）。** D6 的前提在我们这里**尚未发生**——此时加"强制 verifier"是给
+一个还没出现的风险加摩擦，属于凭想象做设计（P3 的同一教训）。
+
+**提案（均在 `docs/design/SUBAGENT-VERIFIER-CONTRACT.md`，未实施）**：
+- **P8-A**（新增测量，可自行实施，**建议先做**）：`usage.jsonl` 加 `writeTools`（从 `SingleResult.messages`
+  的 toolCall 块提取写类工具名）⇒ 先能回答"子代理到底改没改文件"；再补"父级 N 轮内是否又改同一批文件"
+  作为**返工代理指标**。两个指标合起来才是 D6 的证据。
+- **P8-B**（需点头）：opt-in `verify: {command}` —— **由 harness 在父级实际执行**（复用 P1 的
+  `runCheckCommand`），**不采信子代理自述**。与 P1 的三态是同一个结构约束。
+- **P8-C**（需点头）：写类子代理缺验收条件时**提醒不阻塞**（与 P4/P7 风格一致）。
+- **P8-D 不推荐**：默认强制会**改变委派语义**（削减能力）且证据不足；更糟的是它会诱使模型写
+  `verify: {command: 'true'}`——**形式满足、实质失效**，比不做更糟。
+
+**风险约束已写明**：验收命令必须只读/幂等；必须在**子代理的 cwd** 下执行（否则判据错位）；
+并行 `tasks` 下成本 ×N；"验收失败"与"子代理失败"要分开表述。
+
 ### [2026-10-08] `edit_and_run`（P6）：嵌套调用绕过 `prepareArguments`；工具面预算不许事后放宽
 
 **来自 SoL-Pi 的 Action Fusion**（编辑→命令 占跨轮转场 12.3%，bash 占后继 85.1%，融合后 −10.8% 轮次）。
