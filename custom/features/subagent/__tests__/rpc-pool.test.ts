@@ -6,12 +6,15 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  RpcPool,
   createLineFramer,
   encodeRequest,
   isResponseFor,
   isTurnSettled,
   poolEnabled,
+  pooledProfileKey,
 } from '../core/rpc-pool';
+import type { RpcWorker, RpcWorkerOptions } from '../core/rpc-pool';
 import { applyAgentEvent, buildPooledSpawnArgs } from '../core/runner';
 
 describe('encodeRequest', () => {
@@ -168,5 +171,109 @@ describe('applyAgentEvent（两条路径共用的事件映射）', () => {
     expect(n).toBe(1);
     applyAgentEvent(r as never, { type: 'unknown' }, () => n++);
     expect(n).toBe(1);
+  });
+});
+
+describe('pooledProfileKey：必须按内容，不能按临时文件路径（S2 的坑）', () => {
+  it('同 agent 同 model ⇒ 同键（否则池永远不复用、每次都新起进程）', () => {
+    const a = pooledProfileKey({ model: 'p/m', agentName: 'worker', systemPromptText: '你是 worker' });
+    const b = pooledProfileKey({ model: 'p/m', agentName: 'worker', systemPromptText: '你是 worker' });
+    expect(a).toBe(b);
+  });
+
+  it('人设/agent/model 任一不同 ⇒ 不同键（不同 profile 不能共用同一个已烘焙 system prompt 的进程）', () => {
+    const base = { model: 'p/m', agentName: 'worker', systemPromptText: 'A' };
+    expect(pooledProfileKey(base)).not.toBe(pooledProfileKey({ ...base, systemPromptText: 'B' }));
+    expect(pooledProfileKey(base)).not.toBe(pooledProfileKey({ ...base, agentName: 'scout' }));
+    expect(pooledProfileKey(base)).not.toBe(pooledProfileKey({ ...base, model: 'p/n' }));
+  });
+
+  it('键里不含路径形状的东西（回归：曾把 --append-system-prompt 的临时路径拼进键）', () => {
+    // 用不带斜杠的 model，这样"含 / 或 tmp"就只可能来自被误拼进去的路径
+    const k = pooledProfileKey({ model: 'scout', agentName: 'worker', systemPromptText: '你是 worker' });
+    expect(k).not.toContain('/');
+    expect(k).not.toContain('tmp');
+    expect(k.split('|')).toHaveLength(3); // model | agentName | 内容哈希
+  });
+});
+
+describe('RpcPool 租借语义（用注入的假 worker，不真起进程）', () => {
+  function fakeWorker(opts: RpcWorkerOptions): RpcWorker & { disposed: boolean } {
+    const w = {
+      profileKey: opts.profileKey,
+      alive: true,
+      disposed: false,
+      lastError: '',
+      dispose(): void {
+        w.alive = false;
+        w.disposed = true;
+      },
+      onEvent: () => () => {},
+      send: async () => ({}),
+      waitSettled: async () => {},
+    };
+    return w as unknown as RpcWorker & { disposed: boolean };
+  }
+
+  const opts = (profileKey: string): RpcWorkerOptions => ({
+    args: ['--mode', 'rpc'],
+    command: 'node',
+    cwd: '/tmp',
+    env: {},
+    profileKey,
+  });
+
+  it('同一 profile 的**并发**租借必须拿到不同 worker（rpc 是单会话，共用会互相踩）', () => {
+    const pool = new RpcPool((o) => fakeWorker(o));
+    const a = pool.lease(opts('k'));
+    const b = pool.lease(opts('k'));
+    expect(a.worker).not.toBe(b.worker);
+    expect(pool.size()).toBe(2);
+  });
+
+  it('release 后回到 idle，下一次租借**复用同一个**（这才是省 19.1s 的地方）', () => {
+    const pool = new RpcPool((o) => fakeWorker(o));
+    const a = pool.lease(opts('k'));
+    a.release();
+    expect(pool.idleCount()).toBe(1);
+    const b = pool.lease(opts('k'));
+    expect(b.worker).toBe(a.worker);
+    expect(pool.size()).toBe(1);
+  });
+
+  it('不同 profile 不互相复用', () => {
+    const pool = new RpcPool((o) => fakeWorker(o));
+    const a = pool.lease(opts('k1'));
+    a.release();
+    const b = pool.lease(opts('k2'));
+    expect(b.worker).not.toBe(a.worker);
+  });
+
+  it('已死的 worker 不回 idle、不被复用', () => {
+    const pool = new RpcPool((o) => fakeWorker(o));
+    const a = pool.lease(opts('k'));
+    a.worker.dispose(); // 模拟崩溃
+    a.release();
+    expect(pool.idleCount()).toBe(0);
+    const b = pool.lease(opts('k'));
+    expect(b.worker).not.toBe(a.worker);
+  });
+
+  it('idle 池有上限：超出的空闲 worker 被回收（防 profile 多/峰值高时进程堆积）', () => {
+    const pool = new RpcPool((o) => fakeWorker(o), 2);
+    const leases = ['a', 'b', 'c'].map((k) => pool.lease(opts(k)));
+    for (const l of leases) l.release();
+    expect(pool.idleCount()).toBe(2);
+  });
+
+  it('shutdown 回收空闲与在租的全部 worker', () => {
+    const pool = new RpcPool((o) => fakeWorker(o));
+    const a = pool.lease(opts('k1'));
+    const b = pool.lease(opts('k2'));
+    b.release();
+    pool.shutdown();
+    expect(pool.size()).toBe(0);
+    expect(pool.idleCount()).toBe(0);
+    expect(a.worker.alive).toBe(false);
   });
 });

@@ -2493,6 +2493,18 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 守门：`__tests__/rpc-pool.test.ts` **14 项**（含"池化参数绝不带任务文本/不含 --fork"的契约测试）。
 - 验证：tsc 干净；subagent 测试 50 项全绿；其余见提交说明。
 
+### 子代理池 S3（2026-10-07）：修"从未复用" + 租借语义 + 进程回收
+
+- **修掉一个严重缺陷**：S2 的复用键用了每次新建的临时 prompt 文件路径 ⇒ **每个任务都是新 profile、
+  池从未复用**（14 项纯协议测试全都抓不到"键选错了"）。改为 `pooledProfileKey` **按内容**寻址，
+  补"同 agent 同 model ⇒ 同键"与"键里不得含路径"两条回归测试。
+- **修掉一个正确性缺陷**：按 profileKey 取 worker ⇒ `parallel` 下同 profile 的并发任务会共用**同一个**
+  worker，而 rpc 是单会话协议、并发发两个 prompt 必然互踩。改为**租借**（lease/release）。
+  并发上限不在池里重复实现（上层 runWithConcurrency 已限流）。idle 池有上限，超出回收。
+- **补进程回收**：`subagent/index.ts` 的 `session_shutdown` → `getRpcPool().shutdown()`（S2 漏了会泄漏）。
+- 守门：`rpc-pool.test.ts` **23 项**（键稳定性 3 + 租借语义 6，用注入的假 worker 工厂）。
+- 未完成：**端到端**确认池在真实调用链上真的复用（断言两次同 profile 只发生一次进程启动）。
+
 ### 目标级自动续跑 goal（2026-10-07，编排优化第 4 项）
 
 - 差距：my-pi 只有"tmux 完成通知"与"定时任务"，**没有朝一个目标连续推进**；DSH 有 `goal`（256 轮、

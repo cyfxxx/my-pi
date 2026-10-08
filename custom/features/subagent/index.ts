@@ -8,6 +8,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
+import { getRpcPool } from './core/rpc-pool';
 import { registerTool } from '../../adapters/tool-adapter';
 import {
   discoverAgents,
@@ -188,6 +189,14 @@ export function register(pi: ExtensionAPI): void {
   });
 
   // 会话开始提示可用 agent
+  // 常驻池的进程必须在会话结束时回收，否则会泄漏（S3）
+  registerHook(pi, {
+    event: 'session_shutdown',
+    handler: async () => {
+      getRpcPool().shutdown();
+    },
+  });
+
   registerHook(pi, {
     event: 'session_start',
     handler: async (_event, ctx) => {

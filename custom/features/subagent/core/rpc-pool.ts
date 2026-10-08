@@ -226,40 +226,123 @@ export class RpcWorker {
   }
 }
 
-/** 池：按 profileKey 复用 worker（单 worker per profile；并发上限由上层 `helpers.ts` 的 limit 决定） */
+/**
+ * 池：**租借语义**（lease/release），不是一个 profile 一个 worker。
+ *
+ * 为什么必须租借：rpc 协议是**单会话**——同一个进程上并发跑两个 `prompt` 会互相踩。
+ * S2 的第一版按 `profileKey` 取 worker，于是 `parallel` 模式下同一 profile 的多个任务会拿到
+ * **同一个** worker，等于在一个会话里并发发两个 prompt。租借语义保证"一个 worker 同一时刻只属于
+ * 一个任务"；空闲的才回到 idle 池里等下一个任务复用。
+ *
+ * 并发上限不在这里重新实现：上层 `helpers.ts` 的 `runWithConcurrency` 已经限制了并发任务数，
+ * 所以 `lease` 可以同步地"没空闲就新建"（不需要在这里阻塞排队，避免两处限流各说各话）。
+ * idle 池有上限（`maxIdle`），超出的空闲 worker 被回收，避免 profile 多/峰值高时进程堆积。
+ */
+/** djb2：只用于"同一 profile 归到同一 worker"，不是安全哈希 */
+function djb2(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * worker 复用键：**按内容**（model + agent 名 + system prompt 正文），**不能按临时文件路径**。
+ *
+ * 这一条是踩过的坑：S2 第一版用 `--append-system-prompt` 的**临时路径**做键，而该路径每次调用都新建
+ * （`writePromptToTempFile` → mkdtemp），于是**每个任务都落到不同 profile ⇒ 池从不复用、每次都新起进程**，
+ * 池的存在意义归零；而纯协议层测试**抓不到**这种"接线错了"——只有键稳定性测试或端到端能抓到。
+ * 所以这里单独导出并单测"同 agent 同 model ⇒ 同键"。
+ */
+export function pooledProfileKey(opts: {
+  model?: string | null;
+  agentName: string;
+  systemPromptText: string;
+}): string {
+  return `${opts.model ?? ''}|${opts.agentName}|${djb2(opts.systemPromptText)}`;
+}
+
+export type WorkerFactory = (opts: RpcWorkerOptions) => RpcWorker;
+
+export interface WorkerLease {
+  worker: RpcWorker;
+  /** 交还：存活则回 idle 池（超上限则回收），已死则直接丢弃 */
+  release(): void;
+}
+
 export class RpcPool {
-  private readonly workers = new Map<string, RpcWorker>();
+  private readonly idle = new Map<string, RpcWorker>();
+  private readonly leased = new Set<RpcWorker>();
 
-  /** 取一个可用的 worker：存活则复用，否则新建（旧的先 dispose） */
-  acquire(opts: RpcWorkerOptions): RpcWorker {
-    const existing = this.workers.get(opts.profileKey);
-    if (existing?.alive) return existing;
-    if (existing) existing.dispose();
-    const w = new RpcWorker(opts);
-    this.workers.set(opts.profileKey, w);
-    return w;
+  private readonly createWorker: WorkerFactory;
+  private readonly maxIdle: number;
+
+  constructor(createWorker: WorkerFactory = (opts) => new RpcWorker(opts), maxIdle = 4) {
+    this.createWorker = createWorker;
+    this.maxIdle = maxIdle;
   }
 
-  /** 丢掉某个 profile 的 worker（崩溃后强制重建） */
+  /** 租一个空闲 worker（同 profile 优先复用），没有就新建 */
+  lease(opts: RpcWorkerOptions): WorkerLease {
+    const cached = this.idle.get(opts.profileKey);
+    if (cached) {
+      this.idle.delete(opts.profileKey);
+      if (cached.alive) {
+        this.leased.add(cached);
+        return { worker: cached, release: () => this.release(cached) };
+      }
+      cached.dispose(); // 已死：丢掉，往下新建
+    }
+    const w = this.createWorker(opts);
+    this.leased.add(w);
+    return { worker: w, release: () => this.release(w) };
+  }
+
+  private release(w: RpcWorker): void {
+    this.leased.delete(w);
+    if (!w.alive) {
+      w.dispose();
+      return;
+    }
+    // 空闲池上限：超出就回收最老的（Map 保持插入序）
+    const existing = this.idle.get(w.profileKey);
+    if (existing && existing !== w) existing.dispose();
+    this.idle.set(w.profileKey, w);
+    while (this.idle.size > this.maxIdle) {
+      const oldestKey = this.idle.keys().next().value as string | undefined;
+      if (oldestKey === undefined) break;
+      this.idle.get(oldestKey)?.dispose();
+      this.idle.delete(oldestKey);
+    }
+  }
+
+  /** 丢掉某个 profile 的空闲 worker（崩溃后强制重建） */
   drop(profileKey: string): void {
-    const w = this.workers.get(profileKey);
-    if (w) w.dispose();
-    this.workers.delete(profileKey);
+    this.idle.get(profileKey)?.dispose();
+    this.idle.delete(profileKey);
   }
 
+  /** 当前存活的 worker 数（空闲 + 在租） */
   size(): number {
-    return [...this.workers.values()].filter((w) => w.alive).length;
+    const alive = (w: RpcWorker): boolean => w.alive;
+    return [...this.idle.values()].filter(alive).length + [...this.leased].filter(alive).length;
+  }
+
+  /** 空闲数（测试与诊断用） */
+  idleCount(): number {
+    return this.idle.size;
   }
 
   shutdown(): void {
-    for (const [, w] of this.workers) w.dispose();
-    this.workers.clear();
+    for (const [, w] of this.idle) w.dispose();
+    for (const w of this.leased) w.dispose();
+    this.idle.clear();
+    this.leased.clear();
   }
 }
 
 let singleton: RpcPool | null = null;
 
-/** 进程级单例（跨任务复用；`session_shutdown` 时由调用方 shutdown） */
+/** 进程级单例（跨任务复用；`session_shutdown` 时由调用方 `shutdown()`，否则常驻进程会泄漏） */
 export function getRpcPool(): RpcPool {
   if (!singleton) singleton = new RpcPool();
   return singleton;

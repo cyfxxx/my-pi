@@ -91,7 +91,7 @@ subagent(parallel) ─┤ 1. new_session (fresh)          或 new_session {paren
 |---|---|---|
 | ~~**S1**~~ ✅ | **协议探针（已完成，见第七节）**（不改产品代码）：写一个临时脚本起 `pi --mode rpc`，跑 `new_session`→`prompt`→收到 `agent_settled`，两次任务，**断言第二次没有前一次的上下文残留**、并测出"第二个任务的墙钟" | 拿到冷启动 vs 热复用**实测对比数字**；隔离结论有证据 |
 | ~~**S2**~~ ✅ | 池的最小实现（已完成，见第九节）：单 worker 复用 + 崩溃重建；`PI_SUBAGENT_POOL=off` 回退 | 现有 subagent 测试全绿；新增池的纯逻辑测试（framing/状态机） |
-| **S3** | 池铺到 `parallel`（池大小 = 并发上限）+ `abort` 取消 + 日志 | 端到端：3 个并行任务只起 ≤1 次冷启动 |
+| ~~**S3**~~ ✅ | 池铺到 `parallel`（已完成，见第十节）（池大小 = 并发上限）+ `abort` 取消 + 日志 | 端到端：3 个并行任务只起 ≤1 次冷启动 |
 | **S4** | 可选：子代理加载扩展（`deferred` 配合）+ 文档/守门 | 前缀体积不退化；风险面有文档与开关 |
 
 **S1 之前不要动产品代码**——因为整个方案押在"`new_session` 真的隔离"这一个假设上。
@@ -209,3 +209,45 @@ subagent(parallel) ─┤ 1. new_session (fresh)          或 new_session {paren
 
 **下一步 S3**：池大小铺到 `parallel`（池大小 = `helpers.ts:184` 的并发上限）；`abort` 取消已有；
 再补一次**端到端**验证（真实子代理调用 + 假 provider，计时用"provider 侧按暗号归属请求"的口径）。
+
+## 十、S3 已落地（2026-10-07）—— 含一个**严重缺陷的修正**
+
+### 10.1 必须先说：S2 的池**从未真正复用**（已修）
+
+S2 第一版把复用键写成 `${model}|${tmpPromptPath}`，而那条路径是**每次调用新建的临时文件**
+（`writePromptToTempFile` → mkdtemp）。后果：**每个任务都落到不同 profile ⇒ 池从不复用、每次都新起进程**
+——池的存在意义**归零**，而 S2 的 14 项纯协议测试**全都通不了这一条**（它们测的是分帧/关联/参数契约，
+测不到"键选错了"）。
+
+**修正**：新增 `pooledProfileKey({ model, agentName, systemPromptText })`——**按内容**寻址（djb2 哈希
+人设正文），并补两条回归测试：
+① 同 agent 同 model ⇒ **同键**；② 键里不得含路径形状的东西。
+**教训**：这类"接线选错了键"的缺陷只有**键稳定性测试**或**端到端**能抓到；纯协议测试给不了这个保证。
+
+### 10.2 租借语义（`parallel` 的正确性前提）
+
+原来按 `profileKey` 取 worker，于是 `parallel` 下**同一 profile 的多个任务会拿到同一个 worker**
+——而 rpc 协议是**单会话**，等于在一个会话里并发发两个 `prompt`，必然互相踩。
+改为**租借（lease/release）**：一个 worker 同一时刻只属于一个任务；`release` 后回到 idle 池等复用。
+
+- 并发上限**不在这里重新实现**：上层 `helpers.ts` 的 `runWithConcurrency` 已经限制了并发任务数，
+  所以 `lease` 同步地"没空闲就新建"（两处限流各说各话比没有限流更危险）。
+- idle 池有上限（默认 4，构造参数可调），超出的空闲 worker 被回收，避免 profile 多/峰值高时进程堆积。
+- 已死的 worker 不回 idle、不被复用（崩溃后自然重建）。
+
+### 10.3 进程回收
+
+`subagent/index.ts` 新增 `session_shutdown` → `getRpcPool().shutdown()`。**没有这一步会泄漏常驻进程**
+（S2 漏了，S3 补上）。
+
+### 10.4 守门
+
+`__tests__/rpc-pool.test.ts` 从 14 项增到 **23 项**：新增键稳定性 3 项 + 租借语义 6 项
+（并发不复用同一 worker / release 后复用的是同一个 / 不同 profile 不复用 / 死 worker 不复用 /
+idle 上限回收 / shutdown 全回收）。租借测试用**注入的假 worker 工厂**，不真起进程。
+
+### 10.5 S3 仍未做完的一项（留给下一轮）
+
+**端到端确认"池真的复用了"**：现在只有单元级证据（键稳定 + 租借正确）。还需要一次真实子代理调用
+（假 provider），断言"两次同 profile 的任务只发生一次进程启动"，计时口径用**provider 侧按暗号归属请求**。
+在这一步通过之前，不能宣称池在真实调用链上生效。

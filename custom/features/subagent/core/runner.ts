@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
-import { getRpcPool, poolEnabled } from './rpc-pool';
+import { getRpcPool, poolEnabled, pooledProfileKey } from './rpc-pool';
 import type { RpcWorker } from './rpc-pool';
 import type { AgentConfig } from './agents';
 import type { SingleResult, SubagentDetails, OnUpdateCallback } from './types';
@@ -206,14 +206,21 @@ async function runPooledAgent(
     }
 
     const invocation = getPiInvocation(buildPooledSpawnArgs({ model: resolvedModel, promptPath: tmpPromptPath }));
-    const profileKey = `${resolvedModel ?? ''}|${tmpPromptPath ?? ''}`;
-    const worker = getRpcPool().acquire({
+    // 键按**内容**：用临时文件路径会让每个任务都是新 profile，池就永远不复用（踩过，见 rpc-pool.ts）
+    const profileKey = pooledProfileKey({
+      model: resolvedModel,
+      agentName: agent.name,
+      systemPromptText: agent.systemPrompt,
+    });
+    // 租借：一个 worker 同一时刻只属于一个任务（rpc 协议是单会话，并发复用会互相踩）
+    const lease = getRpcPool().lease({
       args: invocation.args,
       command: invocation.command,
       cwd: cwd ?? defaultCwd,
       env: filteredSubagentEnv(),
       profileKey,
     });
+    const worker = lease.worker;
 
     const off = worker.onEvent((msg) => applyAgentEvent(currentResult, msg as { type?: string; message?: unknown }, emitUpdate));
     const settled = worker.waitSettled();
@@ -234,6 +241,7 @@ async function runPooledAgent(
       await settled;
     } finally {
       off();
+      lease.release();
     }
 
     if (!worker.alive) throw new Error(`worker 在任务执行中退出：${worker.lastError}`);
