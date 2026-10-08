@@ -97,12 +97,56 @@ export function register(pi: ExtensionAPI): void {
   registerScheduleTool(pi);
   registerVerifyTools(pi);
 
-  // ── 工具：状态/统计/失败转移 ──
+  // ── 工具：状态（只读诊断，合并为一个带 section 的工具）──────────────────────────
+  //
+  // 2026-10-07 合并：原 `autopilot_status` / `autopilot_stats` / `autopilot_failover` 三个工具
+  // 的回答都是"现在什么状态"，30 天实测各只有 1–2 次调用，却让模型在三个近义名字之间猜。
+  // 合并后一个入口 + `section` 参数，工具数 −2、声明体积 −约 0.8KB，且"该问哪个"不再需要判断。
+  // 未被合并的兄弟工具（保持各自清晰动词，但描述里点明边界）：
+  //   · `autopilot_policy`  → 自主运行**策略配置**的只读视图（不是运行态）
+  //   · `admin_status`      → 当前 **Agent 运行时**（模型/会话文件/运行模式/待重启操作）
+  //   · `schedule_task`     → 定时任务的增删改查
+  const STATUS_SECTIONS = ['summary', 'stats', 'failover'] as const;
   registerTool(pi, {
     name: 'autopilot_status',
-    description: '查看自动驾驶/调度器状态与预算使用',
-    parameters: {},
-    execute: async () => {
+    description:
+      '查看自主运行状态。section: summary(默认：调度器任务数/预算/当前模型)、stats(按模型与任务的运行统计)、failover(模型故障转移预览；execute=true 才真的写入切换请求)。策略配置看 autopilot_policy，Agent 运行时看 admin_status，定时任务用 schedule_task。',
+    parameters: {
+      section: {
+        type: 'string',
+        enum: [...STATUS_SECTIONS],
+        description: '要看哪一块（默认 summary）',
+        optional: true,
+      },
+      execute: {
+        type: 'boolean',
+        description: '仅 section=failover 有意义：true 实际写入切换请求（默认 false 仅预览）',
+        optional: true,
+      },
+    },
+    execute: async (args, ctx) => {
+      const section = (args.section as string) ?? 'summary';
+      if (section === 'stats') {
+        const runs = readTelemetry();
+        const models = statsByModel(runs).slice(0, 5);
+        const tasks = statsByTask(runs).slice(0, 5);
+        const fmtR = (n: number): string => `${(n * 100).toFixed(0)}%`;
+        return [
+          '按模型:',
+          ...(models.length
+            ? models.map((m) => `  ${m.provider}/${m.model}: ${m.runs} 次, 成功率 ${fmtR(m.successRate)}, $${m.totalCost.toFixed(4)}`)
+            : ['  (无)']),
+          '按任务:',
+          ...(tasks.length ? tasks.map((t) => `  ${t.taskName}: ${t.runs} 次, 成功率 ${fmtR(t.successRate)}`) : ['  (无)']),
+        ].join('\n');
+      }
+      if (section === 'failover') {
+        const c = readAutopilotConfig();
+        const cm = currentModel();
+        const plan = planFailover(c.fallbackModels, cm.provider, cm.model);
+        if (!plan.target) return `无法转移: ${plan.reason}`;
+        return executeFailover(plan.target, plan.reason, !(args.execute === true), ctx?.sessionFile);
+      }
       const ov = schedulerOverview();
       const runs = readTelemetry();
       const cm = currentModel();
@@ -112,39 +156,6 @@ export function register(pi: ExtensionAPI): void {
         `当前模型: ${cm.provider}/${cm.model}${isLocalModel() ? '（本地）' : ''}`,
         formatBudgetUsage(runs),
       ].join('\n');
-    },
-  });
-
-  registerTool(pi, {
-    name: 'autopilot_stats',
-    description: '查看按模型/任务的运行统计',
-    parameters: {},
-    execute: async () => {
-      const runs = readTelemetry();
-      const models = statsByModel(runs).slice(0, 5);
-      const tasks = statsByTask(runs).slice(0, 5);
-      const fmtR = (n: number): string => `${(n * 100).toFixed(0)}%`;
-      return [
-        '按模型:',
-        ...(models.length ? models.map((m) => `  ${m.provider}/${m.model}: ${m.runs} 次, 成功率 ${fmtR(m.successRate)}, $${m.totalCost.toFixed(4)}`) : ['  (无)']),
-        '按任务:',
-        ...(tasks.length ? tasks.map((t) => `  ${t.taskName}: ${t.runs} 次, 成功率 ${fmtR(t.successRate)}`) : ['  (无)']),
-      ].join('\n');
-    },
-  });
-
-  registerTool(pi, {
-    name: 'autopilot_failover',
-    description: '查看/触发模型故障转移（默认 dry-run 预览）',
-    parameters: {
-      execute: { type: 'boolean', description: 'true 时实际写入切换请求（默认 false 仅预览）', optional: true },
-    },
-    execute: async (args, ctx) => {
-      const c = readAutopilotConfig();
-      const cm = currentModel();
-      const plan = planFailover(c.fallbackModels, cm.provider, cm.model);
-      if (!plan.target) return `无法转移: ${plan.reason}`;
-      return executeFailover(plan.target, plan.reason, !(args.execute === true), ctx?.sessionFile);
     },
   });
 

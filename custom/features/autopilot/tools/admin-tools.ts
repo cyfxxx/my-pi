@@ -247,7 +247,10 @@ export function writeConfigField(key: string, value: unknown): WriteConfigResult
 export function registerAdminTools(pi: PiApi): void {
   registerTool(pi, {
     name: 'autopilot_policy',
-    description: '查看当前 failover 链、失败阈值、挂死检测、预算等自主运行策略配置。策略修改请使用 /auto policy 命令。',
+    // 2026-10-07：点明与相邻工具的边界——只读诊断工具曾有三个近义名字（status/stats/failover），
+    // 已合并进 `autopilot_status` 的 section 参数；本工具专管**策略配置**，与"运行态"不是一回事。
+    description:
+      '查看自主运行**策略配置**（failover 链、失败阈值、挂死检测、预算）。运行态/统计/故障转移预览请看 autopilot_status（用它的 section 参数），Agent 运行时请看 admin_status。策略修改请使用 /auto policy 命令。',
     parameters: {},
     execute: async () => formatPolicyText(readAutopilotConfig()),
   });

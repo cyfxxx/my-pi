@@ -109,14 +109,11 @@ export const SLEEPING_GROUPS: ToolGroup[] = [
       'admin_set_config', 'admin_list_sessions', 'admin_switch_session',
     ],
   },
-  // autopilot：自主运行（5 工具），开发/运维时启用
+  // autopilot：自主运行（3 工具），开发/运维时启用
   {
     name: 'autopilot',
-    description: '自主运行：状态/遥测/策略/failover/定时任务（5 工具）',
-    tools: [
-      'autopilot_status', 'autopilot_stats', 'autopilot_policy', 'autopilot_failover',
-      'schedule_task',
-    ],
+    description: '自主运行：状态（含统计/故障转移，靠 section 选）/策略/定时任务（3 工具）',
+    tools: ['autopilot_status', 'autopilot_policy', 'schedule_task'],
   },
   // verify：LLM 验证器开发工具（3 工具），仅开发/调优时启用
   {

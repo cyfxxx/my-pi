@@ -4,7 +4,11 @@
 
 ## 注册面
 
-- 工具：`autopilot_status`、`autopilot_stats`、`autopilot_failover`、`autopilot_policy`、`schedule_task`、`verify_report`、`verify_config`、`verify_test`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model`（16 个，见 [tools/README.md](tools/README.md)）
+- 工具：`autopilot_status`、`autopilot_policy`、`schedule_task`、`verify_report`、`verify_config`、`verify_test`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model`（14 个，见 [tools/README.md](tools/README.md)）
+  - 2026-10-07 合并：原 `autopilot_stats` / `autopilot_failover` 收进 `autopilot_status` 的 `section` 参数
+    （`summary` 默认 / `stats` / `failover`）——三个近义名字收敛为一个入口，工具数 −2、声明体积 −约 0.8KB。
+    保留的 `autopilot_policy` 专管**策略配置**，描述里已点明它与 `autopilot_status`、`admin_status` 的边界
+    （30 天实测这三类"看状态"的工具各只有 1–3 次调用，模型却要在近义名字间猜）。
 - 命令：`/auto <status|stats|metrics|policy|failover|pause|resume|help>`、`/schedule <list|run|loop|remind|cron|edit|delete|enable|disable|preview|history|help>`、`/daily <list|run|show|on|off|help>`（默认概览）
 - 钩子：`session_start`、`session_shutdown`、`turn_start`、`turn_end`、`input`、`agent_settled`
 

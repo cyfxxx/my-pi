@@ -2382,3 +2382,17 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 连带修一处"指向不存在工具"的描述：`fetch_url` 原来让人"用 `browser_navigate`"，已改写。
 - `mode/README.md` 新增"默认关闭的功能"一节，固化判据表与"关功能要扫描述引用"的教训。
 - 验证：mode 单测扩展；vitest 全量 / check-features / conventions 见提交说明。
+
+### autopilot 工具面合并（2026-10-07）
+
+- autopilot 是默认面里最大的单组（16 工具 / 约 6.8KB），但**真日常**（27 次跨 11.7 天）→ 不能关，只能合并。
+- 三个测量改变了方案：① `schedule_task` 1.7KB 是"12 个操作的结构成本"、字段描述已很精简，**不动**；
+  ② 真冗余在只读诊断（10 个工具 ≤1 次调用）；③ `check-seeds-headless.mjs` 是不可用工具的 denylist，
+  **不需要**改（删名字才是风险）。
+- 决策：`autopilot_stats` + `autopilot_failover` 收进 `autopilot_status` 的 `section`（summary/stats/failover）
+  → 16 → **14** 工具，−约 0.8KB。`autopilot_policy` 保留但**描述里点明**与 `autopilot_status`/`admin_status`
+  的边界（描述是模型唯一的路由信号，这一句就消除了"猜哪个"）。
+- 0 次的 `admin_set_model`/`admin_switch_session` **不删**——那是模型侧切换模型/会话的既定通道，删是砍能力。
+- 注册面棘轮正确拦下变更（`tools/autopilot 已消失: …`），基线按流程刷新为 **61 工具**；
+  休眠组 `autopilot` 5 → 3。
+- 验证：tsc 干净；vitest 78 文件 883 例；check-features（61 工具）/ conventions / seeds-headless 全绿。

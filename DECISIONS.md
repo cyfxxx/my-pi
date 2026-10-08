@@ -2,6 +2,48 @@
 
 ## 格式
 
+### [2026-10-07] autopilot 工具面合并：三个"看状态"的近义工具收进 `autopilot_status` 的 `section`
+
+**背景**：上一批按 30 天实测数据把 voice/link/browser 默认关闭后，`autopilot` 成了默认面里**最大的单组**
+（16 工具 / 约 6.8KB 声明）。但它是**真日常**（27 次调用跨 11.7 天，`admin_restart` 12 次是自愈主路径），
+所以**不能**像 browser 那样关掉，只能**合并**。
+
+**先量后动**（三个测量，都改变了方案）：
+
+1. **`schedule_task` 1.7KB 是"结构成本"不是"虚胖"**：它 11 个字段的描述已经很精简（每个 6–20 字），
+   体积来自"一个工具承载 12 个操作"。要缩小只能拆工具（反而增加数量）或砍操作（丢能力）——都不划算，
+   **不动**。这条推翻了"先削最大的那个"的直觉。
+2. **真正的冗余在只读诊断**：16 个工具里，10 个 30 天内只有 ≤1 次调用，其中 `autopilot_status`(2)、
+   `autopilot_stats`(1)、`autopilot_failover`(1)、`autopilot_policy`(1) 四者的回答都是"现在什么状态"，
+   却让模型在近义名字之间猜。而 `admin_set_model` / `admin_switch_session` 是 0 次——但它们是**模型侧
+   切换模型/会话的既定通道**，0 次只说明用户没这么用过，删掉是砍能力，**不删**。
+3. **`check-seeds-headless.mjs` 不需要改**：它的清单是"headless 下不可用的工具"**denylist**，
+   多列名字只会让检查更严、不会漏报；删掉名字才是风险。所以合并后**不**从清单里移除旧名——
+   万一有定时任务提示词还写着 `autopilot_stats`，反而会被正确地报出来。
+
+**决策**：把 `autopilot_stats` 与 `autopilot_failover` 收进 `autopilot_status`，新增 `section`
+（`summary` 默认 / `stats` / `failover`）；`failover` 原有的 `execute` 参数保留为同一工具的第二个参数。
+16 → **14** 个工具，声明体积 −约 0.8KB。
+
+**为什么只并这两个、不动 `autopilot_policy` 与 `admin_*`**：合并的代价是"一个工具承载多义"，
+收益是"少一个近义名字"。`autopilot_policy`（策略配置）与 `admin_status`（Agent 运行时）、
+`admin_get_config`/`admin_list_models`/`admin_list_sessions`（配置/模型/会话）各自动词清晰、
+不构成"猜哪个"的负担；把它们也并进来会把两个**文件**（`index.ts` 与 `tools/admin-tools.ts`）
+的注册面搅在一起，还要改 `admin-tools.test.ts` 的既有断言——收益不抵风险。
+**改用更低成本的处置**：在 `autopilot_policy` 的描述里点明它与 `autopilot_status`、`admin_status` 的边界
+（描述是模型的唯一路由信号，这一句就消除了"猜"）。
+
+**代价与约束**：
+- 这是**破坏性**的工具名变更：`autopilot_stats` / `autopilot_failover` 不再存在。
+  已核对**没有**定时任务提示词引用它们（`scheduled-seeds.json` 与 `scheduler/tasks.json` 都不含），
+  所以没有静默失效的种子任务。
+- 注册面棘轮正确拦下了这次变更（`tools/autopilot 已消失: autopilot_failover, autopilot_stats`），
+  基线已按流程 `--update` 刷新（61 工具）。
+- 休眠组 `autopilot` 由 5 工具改列为 3（`autopilot_status`/`autopilot_policy`/`schedule_task`）。
+
+**验证**：tsc 干净；vitest 全量 / `check-features`（注册面 61 工具）/ `check-conventions` /
+`check-seeds-headless` 见同批提交说明。
+
 ### [2026-10-07] 按实测调用分布把 browser 也归入默认关闭（不是印象，是数据）
 
 **背景**：上一批按用户口径默认关闭了 voice/link，并留了一句"browser 是最大的一块极少用声明，但要不要关是产品决策"。
