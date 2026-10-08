@@ -180,7 +180,7 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 让"派出去改代码"的子代理必须带一个可判定的验收条件；默认保持现状。
 **产出**：决策提案 + 证据（子代理改动导致返工的真实案例计数，若拿得到）。
 
-## P9 父级复用度量（池化后可得）
+## P9 父级复用度量（池化后可得）✅ **已完成（2026-10-08）**
 
 **SoL-Pi 依据**：D4 "Bound child work and measure parent reuse"。
 
