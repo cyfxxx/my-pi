@@ -79,12 +79,39 @@ const MUST_BE_SEQUENTIAL = [
   'admin_set_model',
   'admin_switch_session',
   'admin_set_config',
-  // 计划模式：同一份待办列表（读-改-写）
+  // 计划模式：同一份待办列表（读-改-写）+ 模式状态
   'todo',
+  'plan_enter',
+  'plan_exit',
+  // tmux：同名会话的按键/命令交错会让日志无法归因
+  'tmux_send',
+  'tmux_run',
+  'tmux_stop',
+  // voice：单一音频设备，并发录制/转写互相踩
+  'voice_record',
+  'voice_transcribe',
+  'voice_speak',
+  // link：出站消息顺序
+  'link_send',
+  // schedule_task：未加锁的共享 RMW（tasks.json）
+  'schedule_task',
 ];
 
 /** 明确**不得**串行的工具（独立/快速只读；标了会把整批拖成串行） */
-const MUST_STAY_PARALLEL = ['memory_search', 'memory_stats', 'admin_get_config', 'admin_list_models', 'ask_user'];
+const MUST_STAY_PARALLEL = [
+  'memory_search',
+  'memory_stats',
+  'admin_get_config',
+  'admin_list_models',
+  'ask_user',
+  // 审计结论：memory/ctx 的读-改-写**整体在 withFileLock 内**（memory/store/io.ts），
+  // 数据完整性有保护，只剩批内顺序语义 → 保持并行（它们是热路径，串行化要付整批降级的代价）。
+  // 注意 io.ts 的已知取舍：拿不到锁时告警后按无锁继续（防死锁）。这是既有决定，不是本次疏漏。
+  'memory_store',
+  'memory_forget',
+  'ctx_note',
+  'ctx_snap',
+];
 
 describe('① 适配器必须透传 executionMode', () => {
   it('declared 的 sequential 会传给 pi；未声明的保持不传（让 pi 用默认 parallel）', () => {
@@ -122,7 +149,11 @@ describe('③ 共享状态工具必须 sequential，独立只读工具不得 seq
     const auto = await captureFeature('../../features/autopilot/index');
     const admin = await captureFeature('../../features/autopilot/tools/admin-tools', 'registerAdminTools');
     const plan = await captureFeature('../../features/plan-mode/index');
-    const all = new Map([...auto, ...admin, ...plan]);
+    const tmux = await captureFeature('../../features/tmux/index');
+    const voice = await captureFeature('../../features/voice/index');
+    const link = await captureFeature('../../features/link/index');
+    const sched = await captureFeature('../../features/autopilot/tools/schedule-tool', 'registerScheduleTool');
+    const all = new Map([...auto, ...admin, ...plan, ...tmux, ...voice, ...link, ...sched]);
     const missing = MUST_BE_SEQUENTIAL.filter((n) => all.get(n)?.executionMode !== 'sequential');
     expect(missing, `这些共享状态工具漏标 sequential：${missing.join(', ')}`).toEqual([]);
   });

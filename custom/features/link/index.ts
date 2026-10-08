@@ -61,6 +61,8 @@ export function register(pi: ExtensionAPI): void {
   // ── link_send ──
   registerTool(pi, {
     name: 'link_send',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description:
       '向其他设备（局域网/Tailscale）上的 pi 发送消息并等待处理完成。用于跨设备委派/查询。设备清单在 portable/agent/pi-link.json，/link help 查看用法。',
     parameters: {

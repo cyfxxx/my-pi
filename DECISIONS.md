@@ -2,6 +2,55 @@
 
 ## 格式
 
+### [2026-10-07] 完全相同重复调用的提醒（第 3 项）：判据必须是"名字 + 参数都相同"
+
+**动机**：模型卡在"重试同一个动作"上是真实浪费（对照 DSH 的 `repeat-tool-reminder`，阈值 3/5/8）。
+
+**判据选择（本项的关键决定）**：只按**工具名**计数在 my-pi 的使用形态下是**纯噪音**——本仓库实测
+`bash` 曾被**连续调用 1190 次**（几乎一次接一次，见被中断那次会话的工具分布）。所以判据定为
+**"工具名 + 参数（键序无关）都相同"**：只有参数也完全一样，才说明它在原地打转。
+
+诚实标注：**DSH 的具体判据未在本仓库核实**（其 bundle 里找不到该字符串），所以这里按**可辩护的语义**
+实现并把理由写进代码与测试，而不是猜一个"看起来一样"的行为。
+
+**实现**：
+- 纯逻辑落 `custom/features/context/budget/repeat-reminder.ts`：`stableKey`（键名排序后序列化，
+  循环引用退回 `String()` 而不抛错）、`observeRepeat`（原地更新连续计数）、`REPEAT_REMIND_AT = {3,5,8}`、
+  `repeatReminderText`。
+- 接在 `context` 的 `tool_call` 钩子里（那里已经在做"工具生命周期"记账）。**只在恰好第 3/5/8 次提醒**
+  （不是"第 3 次之后每次都提醒"），`display: false`，且**不 triggerTurn**——这是给当前这一轮的一句提示，
+  不是新回合（忙碌态 triggerTurn 会致命报错，见空闲门那条）。
+- 整段包在 try/catch 里：提醒只是增强，任何异常都不得影响工具调用本身。
+
+**守门**：`custom/features/context/__tests__/repeat-reminder.test.ts`（**8 项**）：键序无关性、
+参数真的不同则键不同、数组顺序敏感、循环引用不抛错；完全相同才递增/参数一变归 1、不同工具不算连续、
+**只在 3/5/8 提醒**（第 4/6/7/9 次都不提醒，逐个断言）、提醒后计数继续涨；文案含工具名/次数/"读报错原文"。
+
+### [2026-10-07] 并发语义审计（第 1 项的延续）：哪些 mutator 该 `sequential`，哪些明确不标
+
+第 1 项只标了三组判据最硬的（browser / autopilot 重启配置族 / todo）并把其余记为"下一步审计项"。
+本次按同一条判据审完——**并发是否会得到错误结果（而非仅仅更慢）**：
+
+**新增标记（判据硬的）**：
+- `tmux_send` / `tmux_run` / `tmux_stop`：同名会话的按键与命令交错 → 日志无法归因；
+- `voice_record` / `voice_transcribe` / `voice_speak`：**单一音频设备**，并发互踩；
+- `link_send`：出站消息顺序；
+- `schedule_task`：`tasks.json` 的读-改-写**未加锁**（`autopilot/store/` 下无 `withFileLock`/原子写）；
+- `plan_enter` / `plan_exit`：模式状态。
+
+**明确不标（并记录理由，表明是决定而非疏漏）**：
+`memory_store` / `memory_forget` / `ctx_note` / `ctx_snap` —— 已核实它们的读-改-写**整体在
+`withFileLock` 内**（`memory/store/io.ts:79` `return withFileLock(memoryLockPath(file), fn, ...)`），
+数据完整性已有保护，只剩批内**顺序语义**问题；而它们是**热路径**（30 天 `ctx_exec` 16 / `ctx_note` 15 /
+`memory_store` 14 次），标 `sequential` 会让任何含它们的批次整批降级，代价大于收益。
+同时记录 `io.ts` 的既有取舍：**拿不到锁时告警后按无锁继续**（防死锁）——这是既有决定，不是本次疏漏；
+若将来要更严，应改 `io.ts` 的锁策略，而不是靠 `executionMode` 兜。
+
+**守门扩展**：`custom/adapters/__tests__/tool-execution-mode.test.ts` 的"必须 sequential"清单加了上列 10 个工具，
+"必须保持并行"清单加了上列 4 个（附审计理由注释）——**两个方向都锁**，避免将来有人"顺手全标上"或"顺手删掉"。
+
+**验证**：tsc 干净；vitest 见同批提交说明；`check-features` / `check-conventions` 全绿。
+
 ### [2026-10-07] bash 超时不再"杀掉丢工作"：转后台 + 完成唤醒（且转后台必须保留硬上限）
 
 **背景（编排优化第 2 项）**：my-pi 在 `features/context/index.ts` 给**没写 `timeout` 的 bash** 注入

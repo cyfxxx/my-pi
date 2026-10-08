@@ -85,6 +85,8 @@ export function register(pi: ExtensionAPI): void {
   // ── 工具：转写 ──
   registerTool(pi, {
     name: 'voice_transcribe',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description: '将 Base64 编码的 WAV 音频转写为文字（调用 whisper/sherpa 本地服务）。',
     parameters: {
       audio: { type: 'string', description: 'WAV 音频数据的 Base64 编码' },
@@ -111,6 +113,8 @@ export function register(pi: ExtensionAPI): void {
   // ── 工具：朗读 ──
   registerTool(pi, {
     name: 'voice_speak',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description: '将文本通过本地 TTS 朗读。',
     parameters: { text: { type: 'string', description: '要朗读的文本' } },
     execute: async (args) => {
@@ -125,6 +129,8 @@ export function register(pi: ExtensionAPI): void {
   // ── 工具：录音会话 ──
   registerTool(pi, {
     name: 'voice_record',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description: '录音会话控制：start 开始录音，stop 结束并转码为 16k mono wav 返回路径，status 查询状态。',
     parameters: {
       action: { type: 'string', enum: ['start', 'stop', 'status'], description: '操作' },

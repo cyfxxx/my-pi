@@ -20,6 +20,7 @@ import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
 import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
 import { buildSkillsCatalog, skillsCatalogKey, SKILLS_CATALOG_TAG, type SkillLike } from './budget/skills-catalog';
+import { createRepeatState, observeRepeat, repeatReminderText } from './budget/repeat-reminder';
 import { normalizeSessionTitle, MAX_SESSION_TITLE_BYTES } from './budget/session-title';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
@@ -139,6 +140,8 @@ export function register(pi: ExtensionAPI): void {
   let lastVolatileContext: string | null = null;
   // 上一次注入的技能目录内容键（同上：仅变化时追加一份完整替换）
   let lastSkillsCatalogKey: string | null = null;
+  // 完全相同的连续重复调用计数（编排优化第 3 项；判定与文案见 budget/repeat-reminder.ts）
+  const repeatState = createRepeatState();
   const recordFingerprint = (
     payload: { messages?: unknown[]; tools?: unknown },
     ctx?: { hasUI?: boolean; ui?: { notify?: (message: string, level?: string) => void } },
@@ -609,6 +612,23 @@ export function register(pi: ExtensionAPI): void {
       const callKey = toolEvent.toolCallId ?? toolEvent.toolName;
       if (callKey) {
         toolState.toolCallStarts.set(callKey, Date.now());
+      }
+      // ── 完全相同的重复调用提醒（2026-10-07，编排优化第 3 项）────────────────────
+      // 判定与文案在 budget/repeat-reminder.ts（纯逻辑、有测试）。理由简述：判据必须是
+      // "名字 + **参数**都相同"——本仓库实测 `bash` 被连续调用过 1190 次，只按名字计数会变成
+      // 每轮刷屏的噪音；参数也完全一样才说明它在原地打转。只在这几档**恰好**提醒（3/5/8），
+      // 且不 triggerTurn：这是给当前这一轮的一句提示，不是新的回合。
+      try {
+        const hit = observeRepeat(repeatState, toolEvent.toolName, toolEvent.input);
+        if (hit.remind) {
+          sendMessage(pi, {
+            customType: 'my-pi-repeat-reminder',
+            content: repeatReminderText(toolEvent.toolName ?? '工具', hit.count),
+            display: false,
+          });
+        }
+      } catch {
+        /* 提醒只是增强：不影响工具调用本身 */
       }
       // ── bash 前台默认上限（硬约束，2026-10-01）──
       // 按工具拆解 1101 个可归属步：工具执行占墙钟 63.6%，其中 `bash` 一家占工具时间 63%

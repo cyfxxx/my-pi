@@ -153,6 +153,8 @@ export function register(pi: ExtensionAPI): void {
 
   registerTool(pi, {
     name: 'tmux_run',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description:
       '在后台 tmux 会话中运行 shell 命令（长任务/dev server/交互程序）。会话持久，输出落日志；用 tmux_read 查看、tmux_wait 等待完成。',
     parameters: {
@@ -234,6 +236,8 @@ export function register(pi: ExtensionAPI): void {
 
   registerTool(pi, {
     name: 'tmux_send',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description: '向 tmux 会话发送文本/按键：文本默认回车执行，或发送 Ctrl 组合键（如 c=Ctrl+C 中断）。',
     parameters: {
       name: { type: 'string', description: '会话名' },
@@ -256,6 +260,8 @@ export function register(pi: ExtensionAPI): void {
 
   registerTool(pi, {
     name: 'tmux_stop',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description: '结束 tmux 会话（kill-session）。可选删除日志文件。',
     parameters: {
       name: { type: 'string', description: '会话名' },

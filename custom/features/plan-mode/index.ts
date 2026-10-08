@@ -152,6 +152,8 @@ export function register(pi: ExtensionAPI): void {
   // ── plan_enter / plan_exit（模型侧计划模式切换，与 /plan enter|exit 等价）──
   registerTool(pi, {
     name: 'plan_enter',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description:
       '进入计划模式（只读探索）：禁用 edit/write/bash，可安全调研后制定计划。已在计划模式时无操作。',
     parameters: {},
@@ -166,6 +168,8 @@ export function register(pi: ExtensionAPI): void {
 
   registerTool(pi, {
     name: 'plan_exit',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description:
       '请求退出计划模式，恢复执行权限。退出需用户确认：弹选择器后确认生效，取消则保持计划模式。不在计划模式时无操作。',
     parameters: {},

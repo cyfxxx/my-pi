@@ -200,6 +200,8 @@ export async function executeScheduleAction(args: Record<string, unknown>): Prom
 export function registerScheduleTool(pi: PiApi): void {
   registerTool(pi, {
     name: 'schedule_task',
+    // 共享状态/顺序敏感：并发会得到错误结果（同会话交错、单设备互踩、出站乱序、RMW 丢更新）。
+    executionMode: 'sequential',
     description:
       '创建/列出/更新/删除/启用/禁用定时任务。type: interval(如 "5m")/cron(5字段 POSIX，如 "0 9 * * 1-5")/once("+30m" 或 ISO，执行后自动移除)。prompt 支持模板变量 {{date}}/{{time}}/{{datetime}}/{{cwd}}；retries 为失败重试次数（退避间隔 30s 起）。',
     parameters: {

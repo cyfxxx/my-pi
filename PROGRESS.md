@@ -2480,3 +2480,17 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 纯逻辑落 `custom/features/tmux/promote.ts`（`parseTimeoutSeconds` / `wrapWithCeiling` /
   `promoteSessionName` / `promoteNotice`），守门 `__tests__/promote.test.ts` **9 项**。
 - 验证：tsc 干净；check-features / conventions 全绿；vitest 见提交说明。
+
+### 重复调用提醒 + 并发语义审计（2026-10-07，编排优化第 3 项）
+
+- 判据定为**"工具名 + 参数（键序无关）都相同"**：只按名字计数在 my-pi 里是纯噪音——实测 `bash` 曾
+  被**连续调用 1190 次**。（DSH 的具体判据未能核实，已在文档里诚实标注，按可辩护语义实现。）
+- 纯逻辑 `budget/repeat-reminder.ts`：`stableKey`（键排序、循环引用不抛）/ `observeRepeat` /
+  阈值 `{3,5,8}`；接在 `context` 的 `tool_call` 钩子，只在**恰好** 3/5/8 次提醒、`display:false`、
+  **不 triggerTurn**，整段 try/catch 包裹（不得影响工具调用）。
+- 并发审计（第 1 项遗留）：新增标 `sequential` 的有 tmux 3 个 / voice 3 个 / link_send /
+  schedule_task（tasks.json 未加锁）/ plan_enter+plan_exit；**明确不标** memory/ctx 的 4 个
+  （读-改-写整体在 `withFileLock` 内，且是热路径，标了代价大于收益——理由写进守门注释）。
+- 守门：`repeat-reminder.test.ts` **8 项**；`tool-execution-mode.test.ts` 的两张清单同时扩展
+  （必须标 + 必须不标，两个方向都锁）。
+- 验证：tsc 干净；check-features / conventions 全绿；vitest 见提交说明。
