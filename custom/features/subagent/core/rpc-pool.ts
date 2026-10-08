@@ -341,9 +341,21 @@ export class RpcPool {
 }
 
 let singleton: RpcPool | null = null;
+let testFactory: WorkerFactory | null = null;
 
 /** 进程级单例（跨任务复用；`session_shutdown` 时由调用方 `shutdown()`，否则常驻进程会泄漏） */
 export function getRpcPool(): RpcPool {
-  if (!singleton) singleton = new RpcPool();
+  if (!singleton) singleton = new RpcPool(testFactory ?? undefined);
   return singleton;
+}
+
+/**
+ * **仅测试用**：注入 worker 工厂，用来在端到端测试里**数进程启动次数**
+ * （"两次同 profile 的任务只起一个进程"是池唯一真正有价值的行为，只有数得出来才算验证过）。
+ * 传 `null` 复位。已在 `scripts/dead-exports-allowlist.txt` 的 B 类（测试辅助）登记。
+ */
+export function __setPoolFactoryForTest(factory: WorkerFactory | null): void {
+  testFactory = factory;
+  singleton?.shutdown();
+  singleton = null;
 }

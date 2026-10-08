@@ -251,3 +251,47 @@ idle 上限回收 / shutdown 全回收）。租借测试用**注入的假 worker
 **端到端确认"池真的复用了"**：现在只有单元级证据（键稳定 + 租借正确）。还需要一次真实子代理调用
 （假 provider），断言"两次同 profile 的任务只发生一次进程启动"，计时口径用**provider 侧按暗号归属请求**。
 在这一步通过之前，不能宣称池在真实调用链上生效。
+
+## 十一、S3 收尾：端到端验证通过（2026-10-07）
+
+**这一步是"池到底有没有生效"的唯一硬证据**——S2 的缺陷（键写成临时路径 ⇒ 从不复用）能溜过 14 项
+纯协议测试，就是因为缺少它。
+
+测试：`custom/features/subagent/__tests__/pool-e2e.test.ts`（**默认跳过**，`PI_SUBAGENT_POOL_E2E=1` 打开；
+每次要真起 rpc 子进程）。做法是**数进程启动次数**：给池注入一个计数工厂，然后走**真实调用链**
+（`runSubprocessAgent` → 池 → 真 rpc 子进程 → 假 provider）跑两次同 profile 的任务。
+
+结果：
+
+```
+✓ 池端到端：两次同 profile 的任务只起一个进程 (1) 16833ms
+  ✓ 两次任务共用同一个常驻进程，且第二次是干净上下文
+```
+
+断言三项，都通过：
+1. **`spawnCount === 1`**：两次任务只起一个进程 ⇒ 池真的复用了（这是核心）；
+2. `getRpcPool().size() === 1`；
+3. **复用时隔离成立**：第二次请求的 `messages` 里不含第一次的暗号（端到端复验了 S1 的结论）。
+
+16.8s 跑完**两轮**（含一次 19.1s 量级的进程启动）⇒ 第二轮几乎免费。
+
+### 测试环境踩到的两个坑（都记下来，免得下次再花时间）
+
+1. **动态 import 必须用绝对路径**。用相对 specifier（如 `'../../../../scripts/x.mjs'`）会被打包器按
+   自己的基准解析，报成 `Cannot find module '/custom/..scripts/...'`。改成
+   `resolve(dirname(fileURLToPath(import.meta.url)), '../../../../scripts')` + `/* @vite-ignore */`。
+2. **`getPiInvocation()` 用 `process.argv[1]` 判断"是不是直接跑 cli.js"**，而在 vitest 里 `argv[1]` 是
+   vitest 自己 ⇒ 子进程会变成 `vitest --mode rpc`，两条路径都在 3s 内失败（`exitCode=1`）。
+   这是**测试环境产物、不是产品缺陷**（生产里 `argv[1]` 就是 pi 的 cli.js）。测试里定向把它指向真正的
+   `dist/cli.js` 即可。
+
+## 十二、S4 的边界（未实施，需产品决策）
+
+`--no-extensions` **不只是"省事"**：`scripts/check-seeds-headless.mjs` 整套守门建立在
+"定时任务以 `--no-extensions` 运行"这个前提上。而 `schedule_task` 有 `useSubagent` 选项
+——**一旦子代理统一加载扩展，定时任务通过子代理执行时就会拥有扩展工具，那个前提随之破掉**。
+
+所以 S4 只能是**逐次 opt-in**（`subagent` 的参数或 agent 预设字段），**不能全局打开**；
+并且要同步决定"定时任务派生的子代理是否允许带扩展"（建议不允许）。
+配合本会话的 `exposure: 'deferred'`，加载扩展的**前缀代价**已经很小（重型工具只在 `tool_search`
+时才进声明），所以 S4 的代价主要不在体积，而在**风险面**：子代理将能改状态（memory/todo/tmux）。

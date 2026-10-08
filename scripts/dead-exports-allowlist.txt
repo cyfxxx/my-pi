@@ -38,3 +38,4 @@ resetWhisperHealthCache 测试专用重置钩子（whisper 健康探测缓存）
 #
 # ── C. 待清理存量（逐条"接线或删除"，处理完即从清单移除；下列历史条目暂缺理由，
 #      清理时补齐或直接删除该行） ──
+__setPoolFactoryForTest  测试辅助：端到端验证池复用（数进程启动次数），生产不该接线

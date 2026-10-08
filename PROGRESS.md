@@ -2503,7 +2503,12 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   并发上限不在池里重复实现（上层 runWithConcurrency 已限流）。idle 池有上限，超出回收。
 - **补进程回收**：`subagent/index.ts` 的 `session_shutdown` → `getRpcPool().shutdown()`（S2 漏了会泄漏）。
 - 守门：`rpc-pool.test.ts` **23 项**（键稳定性 3 + 租借语义 6，用注入的假 worker 工厂）。
-- 未完成：**端到端**确认池在真实调用链上真的复用（断言两次同 profile 只发生一次进程启动）。
+- **端到端验证通过**（`pool-e2e.test.ts`，`PI_SUBAGENT_POOL_E2E=1`，16.8s）：两次同 profile 任务
+  **只起一个进程**（注入计数工厂 + 走真实调用链 + 假 provider），且复用时隔离成立（第二次请求不含
+  第一次的暗号）。S1–S3 目标达成。
+- S4 未实施：`--no-extensions` 是 `check-seeds-headless` 整套守门的前提（`schedule_task` 有 useSubagent），
+  所以只能逐次 opt-in、且要决定定时任务派生的子代理是否带扩展（建议不允许）。代价已不在体积（有
+  deferred）而在风险面（子代理将能改状态）。
 
 ### 目标级自动续跑 goal（2026-10-07，编排优化第 4 项）
 
