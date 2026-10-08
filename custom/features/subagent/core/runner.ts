@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { getRpcPool, poolEnabled, pooledProfileKey } from './rpc-pool';
+import { recordPoolLease } from './pool-metrics';
 import type { RpcWorker } from './rpc-pool';
 import type { AgentConfig } from './agents';
 import type { SingleResult, SubagentDetails, OnUpdateCallback } from './types';
@@ -233,6 +234,8 @@ async function runPooledAgent(
       profileKey,
     });
     const worker = lease.worker;
+    // P9 复用度量：复用率与"实际起进程次数"都靠这一条算出来（fail-open）
+    recordPoolLease({ reused: lease.reused, profileKey, poolSize: getRpcPool().size() });
 
     const off = worker.onEvent((msg) => applyAgentEvent(currentResult, msg as { type?: string; message?: unknown }, emitUpdate));
     const settled = worker.waitSettled();

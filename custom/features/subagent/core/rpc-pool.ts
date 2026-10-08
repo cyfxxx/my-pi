@@ -267,6 +267,8 @@ export type WorkerFactory = (opts: RpcWorkerOptions) => RpcWorker;
 
 export interface WorkerLease {
   worker: RpcWorker;
+  /** true = 复用了 idle 池里的既有 worker；false = **新起了一个进程**（池的复用度量靠它，见 pool-metrics.ts） */
+  reused: boolean;
   /** 交还：存活则回 idle 池（超上限则回收），已死则直接丢弃 */
   release(): void;
 }
@@ -290,13 +292,13 @@ export class RpcPool {
       this.idle.delete(opts.profileKey);
       if (cached.alive) {
         this.leased.add(cached);
-        return { worker: cached, release: () => this.release(cached) };
+        return { worker: cached, reused: true, release: () => this.release(cached) };
       }
       cached.dispose(); // 已死：丢掉，往下新建
     }
     const w = this.createWorker(opts);
     this.leased.add(w);
-    return { worker: w, release: () => this.release(w) };
+    return { worker: w, reused: false, release: () => this.release(w) };
   }
 
   private release(w: RpcWorker): void {

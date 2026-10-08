@@ -35,7 +35,7 @@ function check(name, cond, detail = '') {
 }
 
 /** 造一个临时 memory 目录：每轮用量 + 工具级台账 + 前缀指纹。同时造空的 agent 目录，保证用例自洽 */
-function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null, appendLost = 0, appendMissingFlat = 0 }) {
+function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null, appendLost = 0, appendMissingFlat = 0, poolLeases = null }) {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-'));
   const mem = join(root, 'memory');
   const agent = join(root, 'agent');
@@ -148,6 +148,16 @@ function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes
     })),
   ];
   writeFileSync(join(mem, 'logs', 'prefix-fingerprints.jsonl'), fps.map((r) => JSON.stringify(r)).join('\n') + '\n');
+
+  // 子代理池租借日志（P9）：`{total, reused}` 造出"复用了几次、新起了几次进程"
+  if (poolLeases) {
+    const rows = [];
+    for (let i = 0; i < poolLeases.total; i++) {
+      rows.push({ ts: now - 1000 + i, profileKey: 'p', reused: i < poolLeases.reused, poolSize: 1 });
+    }
+    writeFileSync(join(mem, 'logs', 'subagent-pool.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  }
+
   return { root, mem, agent };
 }
 
@@ -458,4 +468,17 @@ if (failed > 0) {
   console.log(`❌ 用量度量守门失败 ${failed}/${results.length}`);
   process.exit(1);
 }
+
+// ── 用例：子代理池复用率（P9）──
+{
+  const fixture = makeFixture({ frontChange: false, poolLeases: { total: 5, reused: 4 } });
+  try {
+    const out = runHealth(fixture);
+    check('子代理池复用率由租借日志算出（4/5 = 80.0%）', out.includes('子代理池=复用80.0%(4/5)'), out.trim().split('\n')[0]);
+    check('起进程次数 = 未复用次数（1 次）', out.includes('/起1次'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
 console.log(`用量度量守门通过（${results.length} 项）`);

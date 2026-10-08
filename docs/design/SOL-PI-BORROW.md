@@ -327,3 +327,29 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 
 **效率指标**：本项是"打断打转"的**预防**型改动，没有可比较的前后数字。可核对的行为事实是
 **只提醒不阻塞**（总是 `out += hint`，从不阻断工具结果），且既有熔断行为完全未变（既有测试全绿）。
+
+### P9 实施结果（2026-10-08）
+
+**为什么单独立项**：池唯一真正有价值的行为就是**复用**（两次任务只起一个进程）。而"复用"必须**能被数出来**，
+否则我们只能靠"感觉快了"。SoL-Pi 的 D4 正是"Bound child work and **measure parent reuse**"。
+
+**实现**（三处，都很小）：
+- `rpc-pool.ts`：`WorkerLease` 加 **`reused`** 字段——池是**唯一**知道"这次是复用还是新起进程"的地方。
+- 新 `core/pool-metrics.ts`：`recordPoolLease({reused, profileKey, poolSize})` 追加
+  `portable/memory/logs/subagent-pool.jsonl`（`PI_SUBAGENT_POOL_LOG` 可覆盖），**fail-open**
+  （度量写不进去绝不影响子代理执行）。落盘模式与既有 `usage-log.ts` 保持一致。
+- `runner.ts` 在租借后记一条（与既有 `recordSubagentUsage` 同一风格）。
+- `daily-health.mjs` 新增字段 **`子代理池=复用<率>%(<复用>/<总>)/起<N>次`**；无数据显示 `n/a`。
+
+**口径**：复用率 = `reused=true` 的租借数 / 总租借数；**起进程次数 = 未复用次数**（worker 崩溃后重建
+也是 `reused=false`，会被如实计入）。
+
+**能力地板**：`tsc` / `vitest` / `check-features` / `check-conventions` / `check-dead-exports` / `golden`
+/ **`test-usage-metrics`**（日报口径的守门，新增 2 项断言：80.0%(4/5) 与"/起1次"）。
+**效率指标（本项的实测数字）**：跑真实代码路径（子代理池端到端测试，`PI_SUBAGENT_POOL_E2E=1`）后，
+租借日志里是 **2 条租借、1 次复用、1 次起进程**（另见本文件第十一节：16.8s 跑完两轮，而一次纯冷启动 19.1s）。
+这条把"池到底有没有在复用"从**一次性的端到端断言**升级为**持续可观测的日报指标**。
+
+**顺带修掉一处文档失真**：`scripts/README.md` 里 `test-usage-metrics.mjs` 写的是 **46 项**，
+实际早已 56 项（本轮后 58 项）——飘了 12 项没人发现，因为**项数没有被守门钉住**（`check-conventions` 第 D 节
+只钉脚本数/步数/台账行数）。已修正为 58。

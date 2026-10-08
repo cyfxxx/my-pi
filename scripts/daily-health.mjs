@@ -50,6 +50,9 @@ const COMPACT_DIR = process.env.PI_HEALTH_COMPACT_DIR || join(MEM, 'checkpoints'
 // 压缩回本（P2 观察，context/budget/compact-payback.ts 产出）：每次压缩前记一条"按回本算值不值"。
 // 这里只统计**回本轮数**的分布，用来回答"这些压缩是不是压早了"——不改任何压缩行为。
 const COMPACT_PAYBACK = process.env.PI_COMPACT_PAYBACK_FILE || join(MEM, 'logs', 'compact-payback.jsonl');
+// 子代理常驻池的复用度量（P9，features/subagent/core/pool-metrics.ts 产出）：每条记录 = 一次租借。
+// `reused=false` 即**新起了一个进程** ⇒ 复用率与"实际起进程次数"都能从这里数出来。
+const SUBAGENT_POOL = process.env.PI_SUBAGENT_POOL_LOG || join(MEM, 'logs', 'subagent-pool.jsonl');
 /** 缓存安全线：低于此命中率视为退化（日常应在 97% 以上；加权口径） */
 const HIT_FLOOR = Number(process.env.PI_HEALTH_HIT_FLOOR) || 0.97;
 /** 每次调用的未命中输入上限：超过说明存在整段重算 */
@@ -429,6 +432,14 @@ const singleCmdStr = singleCmd
   ? `${(singleRatio * 100).toFixed(1)}%(${singleCmd.single}/${singleCmd.total})`
   : 'n/a(旧记录无字段)';
 // 压缩回本分布：paybackTurns = "还要几轮才回本"（客观数，不依赖剩余轮次估计）
+// 子代理池：复用率 = 复用次数 / 租借次数；起进程次数 = 未复用次数
+const poolRows = loadJSONL(SUBAGENT_POOL).filter(inWindow);
+const poolReused = poolRows.filter((r) => r && r.reused === true).length;
+const poolTotal = poolRows.length;
+const poolStr = poolTotal
+  ? `复用${((poolReused / poolTotal) * 100).toFixed(1)}%(${poolReused}/${poolTotal})/起${poolTotal - poolReused}次`
+  : 'n/a';
+
 const paybackRows = loadJSONL(COMPACT_PAYBACK).filter(inWindow);
 const paybackTurnsArr = paybackRows
   .map((r) => r.paybackTurns)
@@ -438,7 +449,7 @@ const paybackStr = paybackRows.length
   ? `p50=${percentile(paybackTurnsArr, 50) ?? 'n/a'}/n=${paybackRows.length}`
   : 'n/a';
 
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);
