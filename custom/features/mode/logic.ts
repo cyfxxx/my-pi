@@ -37,6 +37,13 @@ export interface ModeConfig {
   appendPrompt: string | null;
   /** 长期记忆命名空间目录名（memory 功能据此隔离） */
   memoryNamespace: string | null;
+  /**
+   * 目标级自动续跑的**轮次上限**（`goal` 工具；编排优化第 4 项）。
+   * 未配置时由 `autopilot/store/goal.ts` 的 `resolveGoalCap` 兜底：full 256、其余 16。
+   * `<=0` = 该模式**禁止**自动续跑。角色扮演这类"不该自己跑很久"的模式应显式配小值。
+   * 可选：省略等价于"未配置"。
+   */
+  goalMaxRounds?: number | null;
 }
 
 export interface ModesFile {
@@ -67,6 +74,7 @@ export const FIXED_MODES: Record<string, ModeConfig> = {
     thinking: null,
     appendPrompt: null,
     memoryNamespace: null,
+    goalMaxRounds: null,
   },
   minimal: {
     description: '极简模式 - 仅内置工具，无自定义功能（测试/修复）',
@@ -74,6 +82,7 @@ export const FIXED_MODES: Record<string, ModeConfig> = {
     thinking: 'off',
     appendPrompt: null,
     memoryNamespace: null,
+    goalMaxRounds: null,
   },
 };
 
@@ -253,6 +262,9 @@ function normalizeModeConfig(raw: unknown): ModeConfig {
     thinking: typeof o.thinking === 'string' ? o.thinking : null,
     appendPrompt: typeof o.appendPrompt === 'string' ? o.appendPrompt : null,
     memoryNamespace: typeof o.memoryNamespace === 'string' ? o.memoryNamespace : null,
+    // 数字才收（NaN/字符串一律按"未配置"处理，交给 resolveGoalCap 兜底）
+    goalMaxRounds:
+      typeof o.goalMaxRounds === 'number' && Number.isFinite(o.goalMaxRounds) ? o.goalMaxRounds : null,
   };
 }
 

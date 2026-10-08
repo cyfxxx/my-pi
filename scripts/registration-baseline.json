@@ -11,6 +11,7 @@
       "admin_switch_session",
       "autopilot_policy",
       "autopilot_status",
+      "goal",
       "schedule_task",
       "verify_config",
       "verify_report",

@@ -12,6 +12,15 @@ import { registerHook } from '../../adapters/hook-adapter';
 import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
 import { sendMessage, sendMessageAfterRebind } from '../../adapters/ui-adapter';
+import { getEffectiveModeConfig, resolveEffectiveMode } from '../mode/logic';
+import {
+  createGoal,
+  continuePrompt,
+  decideContinuation,
+  goalStatusText,
+  resolveGoalCap,
+} from './store/goal';
+import type { GoalState } from './store/goal';
 
 import {
   formatRestartLine,
@@ -915,12 +924,69 @@ export function register(pi: ExtensionAPI): void {
     },
   });
 
+  // ── 目标级自动续跑（编排优化第 4 项）──────────────────────────────────────────
+  //
+  // 为什么放在 autopilot：它本来就在做"自主运行"（调度器/遥测/failover），且已经注册了
+  // `agent_settled` —— 那一刻是**唯一可安全 triggerTurn 的时刻**（忙碌态会致命报错）。
+  // **会话态、不落盘**：DSH 的 goal 在 resume/fork 后也是 disarmed 的，本来就是会话内概念；
+  // 不落盘同时避免引入"运行时状态入库"的风险。停止条件见 store/goal.ts 的文档。
+  let goal: GoalState | null = null;
+  /** 本轮（自 turn_start 起）的工具调用数，**不含 goal 自身**（否则反复查状态会被当成有推进） */
+  let toolCallsThisRound = 0;
+  const GOAL_CUSTOM_TYPE = 'my-pi-goal';
+
+  registerTool(pi, {
+    name: 'goal',
+    description:
+      '声明/查看/结束一个目标；声明后每轮结束会**自动续跑**，直到完成、受阻或达到轮次上限。action: set(objective 必填)/status/complete/blocked/pause/resume。上限按当前模式配置（full 256、其余默认 16、可被模式覆盖）；连续 3 轮无工具调用会自动判定受阻并停止。',
+    parameters: {
+      action: {
+        type: 'string',
+        enum: ['set', 'status', 'complete', 'blocked', 'pause', 'resume'],
+        description: '操作类型',
+      },
+      objective: { type: 'string', description: '目标描述（set 必填）', optional: true },
+      note: { type: 'string', description: '结论或受阻原因（complete/blocked 建议填）', optional: true },
+    },
+    // 目标状态是共享可变的：与其它工具并发会得到错误结果
+    executionMode: 'sequential',
+    execute: async (args) => {
+      const action = String(args.action ?? 'status');
+      if (action === 'set') {
+        const objective = typeof args.objective === 'string' ? args.objective.trim() : '';
+        if (!objective) return 'action=set 需要 objective。';
+        const cap = resolveGoalCap(resolveEffectiveMode(), getEffectiveModeConfig().goalMaxRounds);
+        if (cap <= 0) return '当前模式已禁用自动续跑（goalMaxRounds<=0），未声明目标。';
+        goal = createGoal(objective, cap);
+        return `已声明目标（上限 ${cap} 轮）：${objective}
+每轮结束会自动续跑；完成时用 goal complete，推不动时用 goal blocked。`;
+      }
+      if (!goal) return goalStatusText(null);
+      if (action === 'complete' || action === 'blocked' || action === 'pause') {
+        const status = action === 'complete' ? 'complete' : action === 'blocked' ? 'blocked' : 'paused';
+        goal = { ...goal, status, note: typeof args.note === 'string' && args.note ? args.note : goal.note };
+      } else if (action === 'resume') {
+        goal = { ...goal, status: 'active', note: '' };
+      }
+      return goalStatusText(goal);
+    },
+  });
+
   // ── 看门狗活动信号 ──
   registerHook(pi, {
     event: 'turn_start',
     handler: async () => {
       setTurnBusy(true);
       touchActivity();
+      toolCallsThisRound = 0;
+    },
+  });
+  // 计数本轮工具调用（排除 goal 自身）：判"有没有推进"的唯一依据
+  registerHook(pi, {
+    event: 'tool_call',
+    handler: async (event) => {
+      const name = (event as { toolName?: string }).toolName;
+      if (name && name !== 'goal') toolCallsThisRound++;
     },
   });
   registerHook(pi, {
@@ -935,6 +1001,23 @@ export function register(pi: ExtensionAPI): void {
     handler: async () => {
       setTurnBusy(false);
       touchActivity();
+      if (!goal || goal.status !== 'active') return;
+      const d = decideContinuation(goal, toolCallsThisRound);
+      goal = d.next;
+      try {
+        if (d.action === 'continue') {
+          // agent_settled = 已空闲 → 这是**唯一**可安全 triggerTurn 的时刻
+          sendMessage(pi, { customType: GOAL_CUSTOM_TYPE, content: continuePrompt(goal), display: true }, { triggerTurn: true });
+        } else {
+          sendMessage(pi, {
+            customType: GOAL_CUSTOM_TYPE,
+            content: `[目标结束：${d.reason}]\n${goalStatusText(goal)}`,
+            display: true,
+          });
+        }
+      } catch {
+        /* 会话可能已关闭：目标状态仍在，下次轮次会再判 */
+      }
     },
   });
   registerHook(pi, {

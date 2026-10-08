@@ -23,7 +23,8 @@
       ],
       "thinking": "low",
       "appendPrompt": "modes/roleplay.md",
-      "memoryNamespace": "roleplay"
+      "memoryNamespace": "roleplay",
+      "goalMaxRounds": 12
     }
   }
 }

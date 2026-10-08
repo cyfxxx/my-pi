@@ -2481,6 +2481,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   `promoteSessionName` / `promoteNotice`），守门 `__tests__/promote.test.ts` **9 项**。
 - 验证：tsc 干净；check-features / conventions 全绿；vitest 见提交说明。
 
+### 目标级自动续跑 goal（2026-10-07，编排优化第 4 项）
+
+- 差距：my-pi 只有"tmux 完成通知"与"定时任务"，**没有朝一个目标连续推进**；DSH 有 `goal`（256 轮、
+  连续 3 轮受阻即停、resume/fork 后 disarm）。
+- 落点 **autopilot**（它已注册 `agent_settled` = 唯一可安全 `triggerTurn` 的时刻），**会话态不落盘**
+  （与 DSH 的 disarm 语义一致，也避开运行时状态入库的坑）。
+- **上限按模式配置**：full 256、其余默认 16、`modes.json` 可覆盖（roleplay 已配 12）、`<=0` = 该模式禁用。
+- **停止条件**：显式 complete/blocked/pause；达到上限；**连续 3 轮无工具调用**（计数排除 `goal` 自身，
+  有推进则打断计数）。默认**显式开启**（只有 `goal set` 才生效），避免无人看管时自发生成成本。
+- 守门：`autopilot/__tests__/goal.test.ts` **10 项**（逐个断言第 3 次才 blocked、上限 capped、
+  三种结束状态不再推进、纯函数不改原对象）。
+- 验证：tsc 干净；注册面刷新 **62 工具**；vitest 与其余守门见提交说明。
+
 ### 重复调用提醒 + 并发语义审计（2026-10-07，编排优化第 3 项）
 
 - 判据定为**"工具名 + 参数（键序无关）都相同"**：只按名字计数在 my-pi 里是纯噪音——实测 `bash` 曾
