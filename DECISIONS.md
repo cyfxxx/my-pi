@@ -2,6 +2,46 @@
 
 ## 格式
 
+### [2026-10-07] 按实测调用分布把 browser 也归入默认关闭（不是印象，是数据）
+
+**背景**：上一批按用户口径默认关闭了 voice/link，并留了一句"browser 是最大的一块极少用声明，但要不要关是产品决策"。
+随后拿到 30 天真实调用分布（`portable/memory/stats/tool-count-localhost.json`：窗口 30 天、总调用 1920、71 个工具），
+数据把这个问题从"偏好"变成了"事实"：
+
+| 功能 | 工具数 | 声明体积 | 30 天调用 | **时间分布** |
+|---|---|---|---|---|
+| browser | 18 | ~6.3KB | 28 | **全部挤在 1.0 天内**；其中 **15 个工具是同一分钟（09-27 12:05）被逐个试了一遍**，此后 10 天零调用 |
+| voice | 3 | ~1.0KB | 5 | 跨度 1 天 |
+| link | 2 | ~0.8KB | 3 | 跨度 1 天 |
+| autopilot | 16 | ~6.8KB | 27 | 跨度 **11.7 天**（`admin_restart` 12 次是自愈主路径） |
+| memory | 8 | ~5.5KB | 26 | 跨度 **13.7 天** |
+
+判据因此写死为**两维**：调用数**与时间分布**。只有"少量调用 + 集中在一天内"才算"探索过一次就没再用"；
+`autopilot`/`memory` 调用数相当但**跨十几天**，属真日常，明确**不**放进名单。
+
+**决策**：把 `browser` 加入 `DEFAULT_OFF_FEATURES`（现在 = `{voice, link, browser}`）。
+
+**理由**：18 个工具、约 6.3KB 工具声明，换来 10 天里 0 次调用；而"默认关闭"不等于"删掉"——
+显式列进任一模式的 `features` 即可启用（`['*', 'browser']`），一行的事。保持默认面精简、
+把少见能力放到需要时开启，正是上一批建立的机制要解决的问题。
+
+**合并效果**（`DEFAULT_OFF_FEATURES` = `{voice, link, browser}`，共 23 个工具）：
+默认声明的工具数 **70 → 47**（40 个 my-pi 工具 + 7 个 pi 内置），实测声明体积 37.1KB → 约 29KB；
+叠加同日的"技能目录移出 system prompt"（−2269B），**每次冷启动的前缀少约 10KB**。
+
+**连带修一处"指向不存在工具"的描述**：`fetch_url` 的 description 原来写"需 JavaScript 渲染的页面用
+`browser_navigate`"。browser 关掉后这句话会指向一个不存在的工具、让模型白试一次——已改为
+"需 JavaScript 渲染的页面取不到正文"。**这是一条通用教训**：关功能时要扫一遍"谁在描述里点名了它的工具"。
+
+**代价与约束**：
+- 需要浏览器自动化时，要先把它显式启用（改模式配置或 `/mode`）——这是刻意的：默认面只保留真日常能力。
+- 静态注册面基线**不反映**这个差异（`gen-registrations.mjs` 扫源码，不看模式过滤），
+  所以另加 mode 单测锁"`'*'` 不含名单内三项、且 `autopilot`/`memory` **不在**名单里"。
+- `custom/features/mode/README.md` 新增"默认关闭的功能"一节，把上表的判据与副作用固化下来。
+
+**验证**：`mode.test.ts` 的 `DEFAULT_OFF_FEATURES` 用例扩展（含"真日常功能不得被误关"的反向断言）；
+vitest 全量 / `check-features` / `check-conventions` 见同批提交说明。
+
 ### [2026-10-07] 技能目录移出 system prompt：清空 `systemPromptOptions.skills` + 尾部 append-only 注入（零补丁、零能力损失）
 
 **背景**：pi 原生把 `<skills>` 段渲染进 **system prompt**（每技能一段 XML：name/description/location）。

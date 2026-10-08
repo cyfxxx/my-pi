@@ -37,7 +37,9 @@ export function register(pi: ExtensionAPI): void {
   // fetch_url：轻量 HTTP GET（无需浏览器）
   registerTool(pi, {
     name: 'fetch_url',
-    description: '使用 HTTP GET 获取 URL 内容（纯文本/API/JSON/Markdown）。需 JavaScript 渲染的页面用 browser_navigate。',
+    // 不再点名 `browser_navigate`：browser 功能已默认关闭（2026-10-07），指向一个可能不存在的工具
+    // 只会让模型白试一次。
+    description: '使用 HTTP GET 获取 URL 内容（纯文本/API/JSON/Markdown）。需 JavaScript 渲染的页面取不到正文。',
     parameters: {
       url: { type: 'string', description: '完整 URL（含协议）' },
       max_length: { type: 'number', description: '最大返回字符数，默认 8000', optional: true },

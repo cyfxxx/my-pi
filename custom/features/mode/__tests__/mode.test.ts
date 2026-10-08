@@ -72,20 +72,27 @@ describe('固定模式', () => {
   });
 
   it('默认关闭的功能不在 * 里，显式列出才启用', () => {
-    // 2026-10-07：voice（语言输入）/ link（远程连接）默认关闭——重功能且极少用
+    // 2026-10-07：voice（语言输入）/ link（远程连接）/ browser（浏览器自动化）默认关闭——
+    // 判据是实测调用分布（browser 的 28 次调用全挤在 1 天内，此后 10 天零调用），
+    // 不是印象。真日常的 autopilot/memory 不在此列。
     expect(DEFAULT_OFF_FEATURES.has('voice')).toBe(true);
     expect(DEFAULT_OFF_FEATURES.has('link')).toBe(true);
+    expect(DEFAULT_OFF_FEATURES.has('browser')).toBe(true);
+    expect(DEFAULT_OFF_FEATURES.has('memory')).toBe(false);
+    expect(DEFAULT_OFF_FEATURES.has('autopilot')).toBe(false);
     const star = { ...cfg(), features: ['*'] };
     expect(isFeatureEnabled('voice', star)).toBe(false);
     expect(isFeatureEnabled('link', star)).toBe(false);
+    expect(isFeatureEnabled('browser', star)).toBe(false);
     // 其余功能不受影响
     for (const f of ALL_FEATURES) {
       if (DEFAULT_OFF_FEATURES.has(f)) continue;
       expect(isFeatureEnabled(f, star)).toBe(true);
     }
-    // 显式列出即可启用（`['*', 'voice']` 也成立）
+    // 显式列出即可启用（`['*', 'browser']` 也成立）
     expect(isFeatureEnabled('voice', { ...cfg(), features: ['voice'] })).toBe(true);
     expect(isFeatureEnabled('link', { ...cfg(), features: ['*', 'link'] })).toBe(true);
+    expect(isFeatureEnabled('browser', { ...cfg(), features: ['browser'] })).toBe(true);
     // 不在 * 里、又没显式列出 → 关闭
     expect(isFeatureEnabled('voice', { ...cfg(), features: ['memory'] })).toBe(false);
   });

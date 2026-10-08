@@ -373,15 +373,20 @@ export function getEffectiveModeConfig(): ModeConfig {
 /**
  * **默认关闭**的功能：`'*'`（"全部功能"模式）**不**包含它们。
  *
- * 为什么需要这一档：`full` 模式用的是 `features: ['*']`。而 voice（语言输入）与 link（远程连接）
- * 属于"装好了但极少用"的重功能——voice 启动时会拉起 whisper 服务，link 会打开入站远控通道。
- * 把它们留在 `'*'` 里等于每次启动都付固定成本（5 个工具、约 1.8KB 工具声明、2 个命令、1 个快捷键），
+ * 为什么需要这一档：`full` 模式用的是 `features: ['*']`。而这三个属于"装好了但极少用"的重功能——
+ * voice 启动时会拉起 whisper 服务，link 会打开入站远控通道，browser 要 18 个工具声明。
+ * 把它们留在 `'*'` 里等于每次启动都付固定成本（23 个工具、约 8KB 工具声明、2 个命令、1 个快捷键），
  * 却几乎不会被调用。
  *
- * 启用方式：**显式列进某个模式的 `features`**（`['*', 'voice']` 也成立）。
- * 2026-10-07：按用户口径"语言输入与远程连接默认关闭"。
+ * **判据是实测调用分布，不是印象**（`portable/memory/stats/tool-count-localhost.json`，30 天窗口）：
+ *   · browser  28 次调用**全部挤在 1.0 天内**（其中 15 个工具是同一分钟被逐个试了一遍），此后 10 天零调用；
+ *   · voice     5 次 / link 3 次，跨度同为 1 天 → 同属"探索过一次就没再用"。
+ *   对照：autopilot 27 次跨 11.7 天、memory 26 次跨 13.7 天 → 真日常，**不**放进这一档。
+ *
+ * 启用方式：**显式列进某个模式的 `features`**（`['*', 'browser']` 也成立）。
+ * 2026-10-07：先按用户口径关闭 voice/link，随后按上面的实测数据把 browser 一并归入。
  */
-export const DEFAULT_OFF_FEATURES: ReadonlySet<string> = new Set(['voice', 'link']);
+export const DEFAULT_OFF_FEATURES: ReadonlySet<string> = new Set(['voice', 'link', 'browser']);
 
 /** 该功能是否在当前模式启用 */
 export function isFeatureEnabled(featureName: string, config: ModeConfig): boolean {
