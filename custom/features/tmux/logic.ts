@@ -46,3 +46,12 @@ export {
   shutdownCleanup,
 } from './registry';
 export type { RegistryEntry, Registry } from './registry';
+
+export {
+  DEFAULT_PROMOTE_CEIL_S,
+  parseTimeoutSeconds,
+  resolvePromoteCeil,
+  wrapWithCeiling,
+  promoteSessionName,
+  promoteNotice,
+} from './promote';

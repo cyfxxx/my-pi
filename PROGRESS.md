@@ -2466,3 +2466,17 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 守门：`custom/adapters/__tests__/tool-execution-mode.test.ts` **4 项**，含**反向断言**
   （独立只读工具不得标 sequential，防"一刀切"把并行整体关掉）。
 - 验证：tsc 干净；vitest **80 文件 898 例**；check-features / conventions 全绿。
+
+### bash 超时转后台（2026-10-07，编排优化第 2 项）
+
+- 现状差距：my-pi 给未写 timeout 的 bash 注入 240s 上限，而 pi 超时是**杀掉整个进程树**
+  （`core/tools/bash.ts`：`killProcessTree` + `throw new Error("timeout:<秒>")`）→ **工作直接丢失**。
+  对照 DSH：超时提升为后台 job，结果可事后收。
+- 处置：在 tmux 特性里接住"超时失败"的 bash 结果，把**原命令**用 tmux 重跑并交给完成 watcher
+  （与 `tmux_run` 同一条路径，复用空闲门唤醒）。**不做 triggerTurn**——注入的说明是给当前这一轮看的。
+- 关键约束：转后台**必须再加硬上限**（`timeout -k 10 3600 sh -c '<原命令>'`），否则死循环会从
+  "240s 被杀"变成"永远占着机器"。上限 `PI_BASH_PROMOTE_CEIL_S` 默认 3600s，`<=0` 关闭（且说明里
+  显式标注"未加上限"）；`PI_BASH_PROMOTE=off` 整体关闭。
+- 纯逻辑落 `custom/features/tmux/promote.ts`（`parseTimeoutSeconds` / `wrapWithCeiling` /
+  `promoteSessionName` / `promoteNotice`），守门 `__tests__/promote.test.ts` **9 项**。
+- 验证：tsc 干净；check-features / conventions 全绿；vitest 见提交说明。

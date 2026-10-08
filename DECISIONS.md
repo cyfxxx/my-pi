@@ -2,6 +2,55 @@
 
 ## 格式
 
+### [2026-10-07] bash 超时不再"杀掉丢工作"：转后台 + 完成唤醒（且转后台必须保留硬上限）
+
+**背景（编排优化第 2 项）**：my-pi 在 `features/context/index.ts` 给**没写 `timeout` 的 bash** 注入
+240s 上限（`BASH_TIMEOUT_CEIL_S`）。而 pi 超时时的处置是**杀掉整个进程树**：
+
+```
+core/tools/bash.ts:133-136   timeoutHandle = setTimeout(() => { timedOut = true; killProcessTree(child.pid) }, timeoutMs)
+core/tools/bash.ts:152-154   if (timedOut) throw new Error(`timeout:${timeout}`);
+```
+
+→ **工作直接丢失**，上下文里只剩一段不完整输出。对照 DSH：超时被**提升为后台 job**，结果可以事后收。
+
+**决策：接住"超时失败"的 bash 结果，把原命令用 tmux 重跑并交给完成 watcher。**
+
+- 落点在 **tmux 特性**（`custom/features/tmux/`），不在 context：超时**值**由 context 注入，但"怎么接住、
+  怎么转后台、怎么通知"全归 tmux（它已经拥有 `startSession` / 会话注册表 / 完成 watcher），
+  这样 context 不必反向依赖 tmux。
+- 判定复用 pi 自己的错误文本 `timeout:<秒>`（上面的 `throw`）。**不锚定行首**——工具结果文本可能带
+  `Error: ` 之类前缀；同时用"前一个字符不是 `[a-z0-9_]`"排除 `mytimeout:240` 这类误判。
+  再叠加 `toolName === 'bash' && isError === true` 两道门。
+- 转后台后：`registerSession` + `watcher.watch(..., true)`（与 `tmux_run` 完全同一条路径）→ 会话结束由
+  **空闲门**唤醒（忙碌态不会发 `triggerTurn`，见 `createIdleGate`）。
+- **不做 `triggerTurn`**：注入的说明是给**当前这一轮**看的（模型据此知道命令已在后台、可以继续干别的），
+  真正结束时的唤醒交给 watcher。这一步顺带避免了"在工具结果阶段硬起回合"的时序风险。
+
+**关键设计约束：转后台必须再加一层硬上限。**
+前台被杀的**唯一好处**是"跑飞的命令不会赖着不走"。若把原命令原样丢进 tmux，一个死循环就从
+"240s 后被杀"变成"**永远占着机器**"——那是比丢工作更糟的回归。所以转后台时用
+`timeout -k <宽限> <上限> sh -c '<原命令>'` 包一层（`wrapWithCeiling`）：
+
+- 上限取 `PI_BASH_PROMOTE_CEIL_S`，默认 **3600s**（比前台宽 15 倍，但不无限）；显式 `<=0` 关闭包装
+  （关闭时注入的说明里会**显式标注"未加上限"**，不让人误以为仍有保护）；
+- 用 `sh -c` 包住是必要的：直接 `timeout N cmd && other` 只管得住前半句，管道/`&&`/重定向会漏出去；
+- 命令里的单引号按 `'\''` 转义（有测试）。
+
+**开关**：`PI_BASH_PROMOTE=off` 完全关闭自动转后台（回到"超时即失败"）。
+
+**刻意不做**：不区分"模型显式写的 timeout"与"my-pi 注入的上限"——两者超时都转后台，并在注入的说明里
+给出会话名与 `tmux_stop` 退路。理由：显式 timeout 的语义是"我不想等更久"，而不是"超过就丢弃"；
+把选择权交回给模型（它可以在下一轮 `tmux_stop`）比静默丢弃更符合"减少中断"。
+
+**守门**：新增 `custom/features/tmux/__tests__/promote.test.ts`（**9 项**，纯逻辑层）：
+① 超时判定只认 `timeout:<秒>`，普通失败 / `mytimeout:` / `timeout:0` 都不算（防误转后台）；
+② 上限解析（未配置→3600、非法→3600、`<=0`→关闭）；③ 包装形态（含**管道/`&&`/重定向整体受限**与
+**单引号转义**）；④ 会话名稳定可预测；⑤ 注入说明必须包含会话名/日志路径/"会自动唤醒"/`tmux_stop`，
+关闭上限时必须标注"未加上限"。
+
+**验证**：tsc 干净；`check-features` / `check-conventions` 全绿；vitest 见同批提交说明。
+
 ### [2026-10-07] 接线 `executionMode`：pi 默认并行执行工具调用，而 my-pi 的共享状态工具没有互斥
 
 **背景（与 DSH 对比时发现）**：两边的并发默认值**相反**——

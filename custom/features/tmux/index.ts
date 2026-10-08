@@ -29,6 +29,11 @@ import {
   removeLog,
   shutdownCleanup,
   tmuxMissingError,
+  parseTimeoutSeconds,
+  resolvePromoteCeil,
+  wrapWithCeiling,
+  promoteSessionName,
+  promoteNotice,
 } from './logic';
 import type { TmuxConfig } from './logic';
 
@@ -73,6 +78,71 @@ export function register(pi: ExtensionAPI): void {
     onDone: (name) => {
       handles.delete(name);
       unregisterSession(name);
+    },
+  });
+
+  // ── bash 超时 → 转后台（编排优化第 2 项，2026-10-07）────────────────────────────
+  //
+  // 现状：my-pi 给未写 `timeout` 的 bash 注入 240s 上限，超时后 pi **杀掉整个进程树**
+  // （`core/tools/bash.ts`：`throw new Error("timeout:<秒>")`）→ **工作直接丢失**，只剩一段
+  // 不完整输出。对照 DSH：超时被**提升为后台 job**，结果可以事后收。
+  //
+  // 处置：在这里接住"超时失败"的 bash 结果，把**原命令**用 tmux 重跑并交给完成 watcher
+  // （watcher 走空闲门，所以忙碌态也安全——见上面 createIdleGate 的说明）。
+  //
+  // 关键约束：转后台**必须再加一层硬上限**（`wrapWithCeiling`）。否则一个死循环会从
+  // "240s 后被杀"变成"**永远占着机器**"——那比丢工作更糟。上限取 `PI_BASH_PROMOTE_CEIL_S`
+  // （默认 3600s，<=0 表示不加，风险自负）。
+  //
+  // 不做 triggerTurn：这条消息是给**当前这一轮**看的（模型据此知道命令已在后台），
+  // 会话真正结束时的唤醒由 watcher 负责。
+  const promoteEnabled = process.env.PI_BASH_PROMOTE !== 'off';
+  const promoteCeil = resolvePromoteCeil(process.env.PI_BASH_PROMOTE_CEIL_S);
+  registerHook(pi, {
+    event: 'tool_result',
+    handler: async (event) => {
+      if (!promoteEnabled) return;
+      const e = event as {
+        toolName?: string;
+        input?: { command?: unknown; cwd?: unknown };
+        content?: unknown;
+        isError?: boolean;
+      };
+      if (e.toolName !== 'bash' || e.isError !== true) return;
+      const command = typeof e.input?.command === 'string' ? e.input.command : '';
+      if (!command.trim()) return;
+      let text = '';
+      if (typeof e.content === 'string') text = e.content;
+      else if (Array.isArray(e.content)) {
+        text = (e.content as { type?: string; text?: string }[])
+          .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+          .map((b) => b.text as string)
+          .join('\n');
+      }
+      const timedOutAt = parseTimeoutSeconds(text);
+      if (timedOutAt === null) return;
+      try {
+        const wrapped = wrapWithCeiling(command, promoteCeil);
+        const name = normalizeSessionName(promoteSessionName(Date.now()), cfg.prefix);
+        const res = await startSession(cfg, name, wrapped, typeof e.input?.cwd === 'string' ? e.input.cwd : undefined);
+        if (!res.started) return;
+        registerSession({
+          name: res.name,
+          logPath: res.logPath,
+          command: wrapped,
+          createdAt: new Date().toISOString(),
+          owner: process.env.PI_SESSION_ID || undefined,
+        });
+        handles.get(res.name)?.stop();
+        handles.set(res.name, watcher.watch(res.name, res.logPath, true));
+        sendMessage(pi, {
+          customType: NOTIFY_CUSTOM_TYPE,
+          content: promoteNotice(res.name, res.logPath, promoteCeil, timedOutAt),
+          display: true,
+        });
+      } catch {
+        /* 转后台只是补救手段：tmux 不可用等情况静默放弃（原始超时结果已在上下文里） */
+      }
     },
   });
 
