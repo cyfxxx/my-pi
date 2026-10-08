@@ -2411,3 +2411,22 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 守门：`tools-payload.test.ts` 新增 2 项——每个工具必须含独占名词、**不得含别人的独占名词**、该有指针必须有；
   九个描述两两不同。守门表里写明"指针只在会重叠时加"，避免照抄再犯。
 - 验证：tsc 干净；tools-payload 4 项全过（工具面 60 个 / 29.1KB）；vitest 全量 / check-features / conventions 全绿。
+
+### 调研："重型工具只给子代理"与 `deferred` + `tool_search`（2026-10-07，**暂不采用**）
+
+- 前提纠正：工具声明**存在不会导致未命中**，只有**中途改变工具数组**才会整段重算 →
+  "减少工具"省的是**前缀体积**（browser 18 工具 = 6.3KB），不是命中率。
+- 子代理这条路有硬阻碍：`subagent/core/runner.ts:88` 用 `--no-extensions` 起子代理 →
+  **扩展根本不加载，browser 在子代理里不存在**；且 `env` 继承父进程、每子系统进程冷启 35–45s、
+  `subagent` 同步阻塞、浏览器状态不共享。拆 `--no-extensions` 还会牵动 `check-seeds-headless` 的假设。
+- pi 原生有更省的路子：`registerTool({ exposure: 'deferred' })`（不激活=不进声明=0 字节）+
+  内置 `tool_search`（inactive，用 `+tool_search` 激活，BM25 检索后 `setActiveTools`）；
+  `prepareLoadout` 还能"隐藏声明但保持 callable"，且被投影进 transcript → 静态隐藏=不破坏缓存。
+- **决定性实测（否掉了方案）**：pi 的 `tokenize` 是 `split(/[^a-z0-9]+/)`，**中文全是分隔符** →
+  5 个真实中文 query（截图/点击按钮/打开网页/抓取页面内容/浏览器截图）**全部 0 token、全部"无结果"**；
+  英文 query 正常。而 my-pi 是中文优先环境，模型又不可能知道被隐藏的工具名 → 会得出"没有浏览器工具"的
+  结论，**比现状更差**。
+- 原型验证：给 `tokenize` 叠加 CJK 2 字 bigram（约 10 行）后 `browser_screenshot` 文档 token 6 → 25，
+  7 个中文 query 中 6 个命中正确工具（"填写表单"失败是 `browser_type` 文案问题）。
+- 结论：**保持 browser 走 `DEFAULT_OFF_FEATURES`**；将来先打 CJK 分词补丁、再上 deferred+tool_search
+  （前缀净 −5.65KB，且不再需要重启）。详见 `DECISIONS.md` 同条（含复现命令与三条备选路线的代价）。

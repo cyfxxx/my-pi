@@ -2,6 +2,93 @@
 
 ## 格式
 
+### [2026-10-07] 调研：重型工具"只给子代理"与 `deferred` + `tool_search` 两条路的实测结论（**暂不采用**）
+
+**起因**：提出一个想法——像 browser 这类重型工具能否只给子代理用、主会话默认关闭，以此减少工具数量
+并防止缓存失效。要求先分析可行性。查证过程分四步，最后一步的实测把方案否掉了。
+
+**第一步：纠正前提——省的是"体积"不是"命中率"。**
+工具声明**存在不会导致未命中**：一个进程内声明集稳定，它本身就是缓存正常命中的对象。只有**中途改变
+工具数组**才会让整段前缀按全价重算（这正是 `TOOL_LAYERING` 一直没打开的原因）。所以"减少工具数量"的
+真实收益是"每次冷启动/断链要重发的前缀更小"（browser 实测 18 工具 = 6.3KB）与"模型选工具干扰更少"。
+好的一面：**"只在子代理里给"确实能做到 mid-session 零变更**，这是它唯一真正优于原生方案之处。
+
+**第二步：子代理这条路有硬阻碍。**
+- `custom/features/subagent/core/runner.ts:88`：子代理是 `['--mode','json','-p','--no-extensions']` 起的
+  → **扩展根本不加载** → browser（扩展工具）在子代理里**不存在**。要让它存在必须先改这一行，或另给一个
+  只注册 browser 的 minimal bootstrap（否则子代理会连带加载全部扩展，又多一份约 29KB 声明）。
+- 同文件 `env: filteredEnv` 直接继承父进程（只剥离敏感变量）→ 即便去掉 `--no-extensions`，
+  主会话关掉的特性子代理也会跟着关，除非再注入"子代理专用模式"。
+- 子代理是**独立 pi 进程**，冷启动实测 35–45s（两实例并发 55–73s），外加它自己的冷前缀。
+- my-pi 的 `subagent` **同步阻塞**主会话（AGENTS.md 明确）→ 拿不到并行好处。
+- 浏览器状态（cookies/导航）不共享；"看到页面再决定下一步"的自适应交互做不到。
+- `--no-extensions` 是有意为之：`check-seeds-headless.mjs` 整套守门建立在这个假设上。
+
+**第三步：pi 原生其实有更省的路子**（这部分是**正面**结论，将来仍可用）。
+- `registerTool({ exposure })`，取值 `direct|model-only|codemode|deferred|hidden`；pi 注释：
+  "`direct` 与 `model-only` 注册即激活，其他的不激活" → `deferred` 工具**不进声明 = 0 前缀字节**。
+- `tool_search` 是 pi 内置扩展（`builtin: true`、可替换），**注册为 inactive**，用 `+tool_search` 激活；
+  BM25 检索 deferred 工具元数据，命中后 `setActiveTools([...active, ...matches])`。
+- `prepareLoadout` 钩子可返回 `hiddenDeclarations`：**把声明从请求里拿掉，但工具仍 active/callable，
+  且 transcript 仍声明它们**（active 集因此扛得住 `/tree` 与 resume）→ **静态隐藏 = 永不破坏缓存**。
+- 代价：`tool_search` 命中会改变工具数组 → **一次整段前缀重算**。所以它把动态工具集的代价从
+  "每次扫描都付"改成"真正用到时付一次"。
+
+**第四步（决定性）：实测发现 pi 的 BM25 对中文完全失效。**
+`extensions/tool-search/tool.ts` 的分词是 `toLowerCase().split(/[^a-z0-9]+/)`——**非 a-z0-9 一律当分隔符**，
+于是中文全部被丢掉。用**真实 browser 工具元数据**跑（脚本：`tokenize` + `createToolSearchDocument` +
+`Bm25Ranker`，`limit 3`）：
+
+| query | token 数 | 结果 |
+|---|---|---|
+| 浏览器截图 / 打开网页 / 点击按钮 / 抓取页面内容 / 截图 | **0** | **❌ 全部"无结果"** |
+| screenshot | 1 | ✅ browser_screenshot |
+| navigate | 1 | ✅ browser_navigate |
+| pdf download | 2 | ✅ browser_pdf, browser_download |
+
+`browser_screenshot` 的检索文档只有 **6 个 token**（`browser screenshot browser screenshot full page`）
+——全部来自工具名与 ASCII 参数名，中文描述**贡献 0**。
+
+**这为什么是否决理由**：my-pi 是中文优先环境（系统提示词、技能、AGENTS.md、工具描述全中文），
+模型提出的 query 极可能也是中文。而模型**不可能知道工具名**（声明被隐藏了），只能凭意图搜 →
+搜不到 → 得出"没有浏览器工具"的结论。**这比现状（默认关闭、需要时重启）更差。**
+
+**原型验证"打补丁能不能救"**：在 `tokenize` 上叠加 CJK 连续段 2 字 bigram（约 10 行）后，
+`browser_screenshot` 文档 token 数 **6 → 25**，中文 query 结果：
+
+| query | bigram 后 |
+|---|---|
+| 截图 | ✅ browser_screenshot |
+| 点击按钮 | ✅ browser_click |
+| 下载文件 | ✅ browser_download |
+| 抓取页面内容 | ✅ browser_extract |
+| 打开网页 | ✅ browser_navigate |
+| 浏览器截图 | ✅ 命中（browser_screenshot 在 top-N 内） |
+| 填写表单 | ❌ 仍无（`browser_type` 的描述写的是"输入文本"，属**文案**问题而非机制问题） |
+
+**决策：暂不采用 `deferred` + `tool_search`，保持 browser 走 `DEFAULT_OFF_FEATURES`。**
+理由：原生机制在一个中文优先的环境里不可用，而"先打 vendor 补丁再上机制"是一次更大的承诺
+（补丁 + 重建 dist + 行为标记守门 + 声明面新守门），不该在一次可行性调研里顺手做掉。
+
+**将来若要上，三条路与其代价**（按我的偏好排序）：
+1. **先打 CJK bigram 的 `tokenize` 补丁**（my-pi 的既定手段：改动一律经 `patches/`），验证后再上
+   `exposure: 'deferred'` + `+tool_search`。收益：前缀净 −5.65KB（−6.3KB browser + 约 0.65KB
+   `tool_search`），主会话仍能多步操作浏览器，**且不再需要重启**。
+   需先改 `custom/adapters/tool-adapter.ts:153`——它目前**只显式拷贝** `name/label/description/parameters/execute`，
+   **不转发 `exposure`**。
+2. **`prepareLoadout` 静态隐藏 + 尾部紧凑目录**（复用技能目录那套）：真正的零缓存代价、无需补丁，
+   但模型只拿到名字与一行说明、**没有参数 schema**，容易调错参数 → 只适合参数极简的工具。
+3. **只给子代理**：留给真正需要**副作用隔离**的场景（上传文件、提交表单、点未知站点），
+   而不是用来省工具数量。
+4. **保持现状**（默认关闭）：已知可用，代价是每次要用都得重启。
+
+**一句话**：browser 用来省工具数量是错的用途，用来隔离副作用才是对的用途；
+而"省工具数量"这件事，等 CJK 分词补丁之后再交给 `deferred` + `tool_search` 才是划算的。
+
+**复现命令**（负结果留证）：
+`node_modules/.bin/tsx /tmp/bs-exp/probe.mts`（真实 tokenize/BM25 跑中文 query）、
+`node_modules/.bin/tsx /tmp/bs-exp/bigram.mts`（bigram 原型）。两个脚本都是临时件，未入库。
+
 ### [2026-10-07] 状态类工具描述去重：让每个工具只声明自己的名词，指针只加在会重叠处
 
 **背景**：上一批合并了 `autopilot_status/stats/failover` 之后，我留了一句"`admin_status`/`admin_get_config`/
