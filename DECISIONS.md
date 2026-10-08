@@ -2,6 +2,71 @@
 
 ## 格式
 
+### [2026-10-08] `edit_and_run`（P6）：嵌套调用绕过 `prepareArguments`；工具面预算不许事后放宽
+
+**来自 SoL-Pi 的 Action Fusion**（编辑→命令 占跨轮转场 12.3%，bash 占后继 85.1%，融合后 −10.8% 轮次）。
+**先量自己**：my-pi 真实会话里同一口径是 **6.4%（19/299 跨轮）**、轮内仅 **0.7%（2/303）**
+⇒ 收益上限"约 6% 的回合数"，**预期按自己的数据定**。
+
+**实现**：新工具 `edit_and_run`，`executionMode: 'sequential'`，**声明式**；参数与 pi 的 `edit` 同形；
+两半都走 `ctx.executeTool('edit'|'bash')`（无第二份编辑实现，权限/超时/后台提升语义完全一致）；
+**编辑失败就不跑命令**；输出分 `[edit]`/`[run]`。适配器新增 `executeTool` 透传。
+
+**探针抓到的真实缺陷（本轮最重要的产出）**：用真 pi 跑端到端（自造发 `delta.tool_calls` 的 SSE provider），
+第一次即失败：`Validation failed for tool "edit": - path: must have required properties path, edits`。
+⇒ (a) `ctx.executeTool` **确实通了**；(b) 我把参数写成了 Claude-Code 风格，而 pi 用 `{path, edits:[{oldText,newText}]}`。
+**根因**：**嵌套调用绕过 `prepareArguments`**（那层旧参数名兼容只作用于"模型直呼"的路径）——
+所以 `ctx.executeTool` 的调用方**必须**发规范 schema。改成**逐字转发**后通过；命令输出是 `WORLD` 而非 `HELLO`
+⇒ **因果顺序**也被验证。首次失败那次还顺带在真 pi 上验证了失败保护（`[run] 已跳过`）。
+
+**工具面预算：守门红了，我没有放宽它。** 首版声明 821B ⇒ 总量 32397B（预算 32000）。
+改预算是方案明令禁止的"事后下调地板"，所以改为**把声明精简到预算内**（只压措辞，安全语义保留）；
+也**放弃了**"把 deferred 工具排除出体积统计"这条看似合理的路（它会让某个桶实际变宽）。
+**代价与信号**：声明面现已几乎顶格（≈31979/32000B）⇒ **下一个要进声明面的工具必须先做预算决策**。
+顺带量清守门口径：统计**已注册**工具，**进前缀 43 个/24.5KB + 不进前缀 19 个/7.1KB**；
+即"前缀的真实有效上限"其实是 32000−7.1KB ≈ **24.9KB**。若将来要给 deferred 留空间，
+正确做法是**拆成两个显式预算且都不放宽**，而不是抬高单一阈值——**本轮没做**，只记录。
+
+**后续判据**：采纳率由既有 30 天工具计数自动记录；若接近 0，按 C24/M24 **降级为 deferred 或删除**。
+
+### [2026-10-08] `edit_and_run`（P6）：嵌套调用**绕过** `prepareArguments`，必须用规范 schema
+
+**来自 SoL-Pi 的 Action Fusion**：编辑/写入 → 命令 的相邻转场占跨轮转场 12.3%，bash 占后继动作 85.1%；
+融合后（他们的反事实推算）轮次 −10.8%、token −11.5%。
+
+**先量自己**：我在 my-pi 真实会话里量了同一口径（**跨轮**转场，而不是轮内批次）：
+
+```
+工具轮 303；轮内同时含编辑+运行 2（0.7%）；跨轮 编辑→运行 19/299（6.4%）
+```
+
+⇒ **我们的邻接率约为他们的一半**，收益上限是"约 6% 的回合数"。**预期按自己的数据定**。
+
+**实现**：新工具 `edit_and_run`（`executionMode: 'sequential'`），参数与 pi 的 `edit` 同形
+（`path` + `edits:[{oldText,newText}]`）；两半都走 **pi 自己的工具**（`ctx.executeTool('edit'|'bash')`），
+没有第二份编辑实现。适配器新增 `executeTool` 透传（pi 的结果形状在适配器边界消化）。
+安全性：**编辑失败就不跑命令** + 结果分 `[edit]`/`[run]` 两段 + 无嵌套能力时给可继续操作的说明。
+
+**探针抓到的真实缺陷（本轮最有价值的产出）**：用真 pi 跑端到端（自造发 `delta.tool_calls` 的 SSE provider），
+第一次就失败：
+
+```
+Validation failed for tool "edit": - path: must have required properties path, edits
+```
+
+⇒ (a) **`ctx.executeTool` 确实通了**（pi 校验参数并回错误结果）；(b) 我把 pi 的 edit 参数写成了
+Claude-Code 风格 `{file_path, old_string, new_string}`，而 pi 用的是 `{path, edits:[{oldText,newText}]}`。
+
+**根因（值得记住的一条 pi 内部行为）**：**嵌套调用绕过 `prepareArguments`**——那层"兼容旧参数名"的适配
+只作用于**模型直呼**的路径。所以 `ctx.executeTool` 的调用方**必须**用规范 schema，不能依赖兼容层。
+改成**逐字转发**（一个字段都不映射）后通过，且命令输出是 `WORLD` 而非 `HELLO` ⇒ **因果顺序也被验证**
+（编辑确实先于命令）。
+
+**顺带在真 pi 上验证了失败保护**：第一次那次失败跑里 `[run] 已跳过`，命令确实没执行。
+
+**后续判据（写下来免得以后凭感觉）**：采纳率由既有 30 天工具计数自动记录；若采纳率与效果都接近 0，
+按 P4 审计引用的 SoL-Pi C24/M24，应把它**降级为 `deferred` 或删除**——**不留在默认工具面上占前缀**。
+
 ### [2026-10-08] 休眠机制审计（P4）：56% 的"有意保留"其实是"未决策"；TOOL_LAYERING 必须二选一
 
 **来自 SoL-Pi**：C13 "Disable dormant mechanisms at configuration time"、C24 "Gate ObservationPack by

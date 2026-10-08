@@ -2603,3 +2603,25 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   建议按 SoL-Pi C13 **二选一**（我倾向删；属削减能力，留给用户）。
 - 口径纪律：`tool_search` 的 0 次**不能**当"没用"——它上一轮才启用；拿启用时间与统计窗口对齐是判休眠的前提。
 - 顺带修正上轮我自己的分类错误：`__setPoolFactoryForTest` 从白名单 C 段移到 B 段。
+
+### SoL-Pi 借鉴 P6：`edit_and_run` 融合工具（2026-10-08）
+
+- 先量自己：my-pi 跨轮 编辑→运行 邻接 **6.4%（19/299）**（SoL-Pi 是 12.3%）⇒ 收益上限约 6% 回合数。
+- 新工具 `edit_and_run`：参数与 pi 的 `edit` 同形；两半都走 `ctx.executeTool('edit'|'bash')`（无第二份编辑实现）；
+  **编辑失败不跑命令**；结果分 `[edit]`/`[run]`；适配器新增 `executeTool` 透传；注册面基线 62→63。
+- **探针抓到真实集成缺陷**：pi 的 edit 是 `{path, edits:[{oldText,newText}]}`，且**嵌套调用绕过
+  `prepareArguments`**（旧参数名兼容只作用于模型直呼路径）⇒ 必须逐字转发规范 schema。改后通过。
+- 端到端证据：真 pi + 自造 SSE tool_calls provider ⇒ 第二次请求含 `[edit] 成功`，且命令输出 **WORLD**
+  而非 HELLO（**因果顺序**）；首次失败跑还验证了失败保护（`[run] 已跳过`）。
+
+### SoL-Pi 借鉴 P6：`edit_and_run` 融合工具（2026-10-08）
+
+- 先量自己：my-pi 跨轮 编辑→运行 邻接 **6.4%（19/299）**（SoL-Pi 12.3%）⇒ 收益上限约 6% 回合数。
+- 新工具 `edit_and_run`：参数与 pi 的 `edit` 同形（`path`+`edits`）；两半都走 `ctx.executeTool('edit'|'bash')`；
+  **编辑失败不跑命令**；输出分 `[edit]`/`[run]`；适配器新增 `executeTool` 透传；注册面基线 62→63。
+- **探针抓到真实集成缺陷**：pi 的 edit 是 `{path, edits:[{oldText,newText}]}`，且**嵌套调用绕过
+  `prepareArguments`**（旧参数名兼容只作用于模型直呼路径）⇒ 必须逐字转发规范 schema。改后通过。
+- 端到端证据：真 pi + 自造 SSE tool_calls provider ⇒ 第二次请求含 `[edit] 成功`，命令输出 **WORLD**（非 HELLO，
+  证明**因果顺序**）；首次失败跑验证了失败保护。
+- 工具面预算：**守门红了就没放宽**（改预算 = 事后下调地板），改为精简声明；**声明面现几乎顶格
+  ≈31979/32000B** ⇒ 下一个进声明面的工具必须先做预算决策。顺带量清口径：进前缀 43/24.5KB + 不进前缀 19/7.1KB。

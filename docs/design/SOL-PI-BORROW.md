@@ -133,7 +133,7 @@ inside the auto-research loop sees the held-out results."。留出集是 EdgeBen
 
 **能力地板**：文档链接守门（`check-conventions` 的文档计数段）通过。**效率指标**：无（买的是证据强度）。
 
-## P6 `edit_and_run`：编辑与其验证命令融合（Action Fusion 最小版）✅ 待做
+## P6 `edit_and_run`：编辑与其验证命令融合（Action Fusion 最小版）✅ **已完成（2026-10-08）**
 
 **SoL-Pi 依据**：编辑/写入 → 命令的相邻转场占**跨轮转场 12.3%**，后继动作中 **bash 占 85.1%**；
 融合后反事实推算 **轮次 1386→1237（−10.8%）**、**token 32.38M→28.64M（−11.5%）**（轨迹推算，非重跑）。
@@ -400,3 +400,111 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 
 **明确保留并说明（不是休眠，是有意）**：`filterInjectedMessages`/`isInjectionBlock`（守门反面锚点）、
 `MIN_TAIL_LENGTH`（阻塞在上游事件）、budget/adapters 的公共 API。
+
+### P6 实施结果（2026-10-08）
+
+**先量自己，再照抄数字**。SoL-Pi 的 12.3% / −10.8% 是**他们轨迹上的事实**。我先在 my-pi 的真实会话里量了
+同一件事（口径对齐：他们说的是**跨轮转场**，我早先引用的 `bash+edit` 2 次是**轮内**批次，不是一回事）：
+
+```
+会话文件: 4   工具轮总数: 303
+轮内同时含 编辑+运行 的轮: 2   （占 0.7%）
+跨轮 编辑→运行 邻接: 19 / 299 相邻对（占 6.4%）
+```
+
+⇒ **我们的邻接率约为他们的一半**，因此本工具的收益上限是"**约 6% 的回合数**"，不是 10.8%。
+预期按自己的数据定，理由写进代码注释与文档。
+
+**实现**：新工具 `edit_and_run`（`context/tools/edit-and-run.ts`，从 `context/index.ts` 注册），
+`executionMode: 'sequential'`；参数与 pi 的 `edit` **完全同形**（`path` + `edits:[{oldText,newText}]`）。
+两半都走 **pi 自己的工具**（`ctx.executeTool('edit' | 'bash')`）——因此编辑语义、权限、bash 的超时/后台提升
+与直接调用**完全一致**，我们只是把它们串起来，没有第二份编辑实现。
+适配器新增 **`executeTool`** 透传（pi 的结果形状在适配器边界内消化，features 仍不接触 Pi 类型）。
+
+**两条安全性设计**：① **编辑失败就不跑命令**（避免"锚点没匹配上却照样跑一遍命令"导致误归因）；
+② 结果**显式分段** `[edit]` / `[run]`。另有一条退化路径：无嵌套调用能力时返回可继续操作的说明（不抛错）。
+
+**端到端验证（本项最有价值的部分）**：写了一个真实探针（自造发 `delta.tool_calls` 的 SSE provider →
+真 pi（`--extension custom/bootstrap.ts`）→ 断言**第二次请求的消息里**含工具结果）。
+**第一次跑就抓到一个真实集成缺陷**：
+
+```
+[edit] 失败 — /tmp/…/target.txt
+Validation failed for tool "edit":
+  - path: must have required properties path, edits
+[run] 已跳过：编辑未成功，命令没有执行。
+```
+
+两件事同时被证明：**(a) `ctx.executeTool` 确实通了**（pi 校验了参数并回了错误结果）；
+**(b) 我把 pi 的 edit 参数写成了 Claude-Code 风格** —— pi 用的是 `{path, edits:[{oldText,newText}]}`。
+更关键的根因：**嵌套调用绕过 pi 的 `prepareArguments`**（那层旧参数名兼容只作用于"模型直呼"的路径），
+所以嵌套调用**必须**用规范 schema。改成**逐字转发**（一个字段都不映射）后：
+
+```
+退出码=0  完成了 2 次模型请求
+文件内容="WORLD\n"
+[edit] 成功 — /tmp/…/target.txt
+Successfully replaced 1 block(s) …
+[run] cat /tmp/…/target.txt
+WORLD
+✅ 端到端成立
+```
+
+**注意证据的因果强度**：命令输出是 `WORLD` 而不是 `HELLO` ⇒ **编辑确实发生在命令之前**
+（不是"两半都跑了"这种弱断言）。而第一次那次失败跑还顺带在**真 pi 上**验证了失败保护
+（`[run] 已跳过`，命令没跑）。
+
+**能力地板**：`tsc` / `vitest`（含新增 8 项）/ `check-features`（**注册面基线已更新：工具 62→63**）/
+`check-conventions` / `check-dead-exports` / `golden`。
+**效率指标（诚实说明）**：本项的收益是"省一次模型往返"，**上线前无法实测**。可量化的先验是
+**邻接率 6.4%**（⇒ 上限约 6% 的回合数）；**采纳率**由既有的 30 天工具计数自动记录，
+故**上线后可复核**。若采纳率与效果都接近 0，按 P4 的结论（SoL-Pi C24/M24）应**降级为 deferred 或删除**——
+这条写进 DECISIONS 作为后续判据。
+
+### P6 实施结果（2026-10-08）
+
+**先量自己，再照抄数字**。SoL-Pi 的 12.3% / −10.8% 是**他们轨迹上的事实**；我在 my-pi 真实会话里量了同一口径
+（他们说的是**跨轮转场**，而我早先引用的 `bash+edit` 2 次是**轮内**批次，不是一回事）：
+
+```
+工具轮总数 303；轮内同时含 编辑+运行 2（0.7%）；跨轮 编辑→运行 19/299（6.4%）
+```
+
+⇒ **我们的邻接率约为他们的一半**，所以本工具的收益上限是"**约 6% 的回合数**"，不是 10.8%。
+
+**实现**：新工具 `edit_and_run`（`context/tools/edit-and-run.ts`，从 `context/index.ts` 注册），
+`executionMode: 'sequential'`，**声明式**（不是 deferred——Action Fusion 的价值就在模型自发融合）；
+参数与 pi 的 `edit` **完全同形**（`path` + `edits:[{oldText,newText}]`）。两半都走 **pi 自己的工具**
+（`ctx.executeTool('edit' | 'bash')`），没有第二份编辑实现；适配器新增 `executeTool` 透传。
+两条安全性设计：**编辑失败就不跑命令**、结果显式分段 `[edit]` / `[run]`。
+
+**端到端验证（本项最有价值的部分）**：写了真实探针（自造发 `delta.tool_calls` 的 SSE provider →
+真 pi（`--extension custom/bootstrap.ts`）→ 断言**第二次请求的消息里**含工具结果）。**第一次跑就抓到真实缺陷**：
+
+```
+[edit] 失败 … Validation failed for tool "edit":
+  - path: must have required properties path, edits
+[run] 已跳过：编辑未成功，命令没有执行。
+```
+
+两件事同时被证明：**(a) `ctx.executeTool` 确实通了**（pi 校验参数并回了错误结果）；
+**(b) 我把参数写成了 Claude-Code 风格**，而 pi 用的是 `{path, edits:[{oldText,newText}]}`。
+**根因**：**嵌套调用绕过 pi 的 `prepareArguments`**（旧参数名兼容只作用于"模型直呼"路径），
+所以嵌套调用必须用规范 schema。改成**逐字转发**后通过，且命令输出是 **`WORLD` 而非 `HELLO`**
+⇒ **因果顺序也被验证**（编辑确实先于命令）。首次那次失败跑还顺带在真 pi 上验证了失败保护。
+
+**工具面体积守门（本轮的一个额外发现，值得用户知道）**：本工具首版声明 821B，把工具面顶到 32397B
+（预算 32000，超 397B）。处置过程与结论：
+1. **没有动预算**——那是方案明令禁止的"事后下调地板"；而是把声明**精简到预算内**（只压措辞，
+   安全语义保留）。
+2. 代价：现在**声明的工具面已几乎顶格**（约 31979/32000B）。**下一个要加进声明面的工具必须先做预算决策**
+   （属于"改默认/削减能力"级的问题）——这条与 P4 审计的结论（休眠机制"要么接线要么删除"）指向同一件事。
+3. 顺带量清了守门口径：它统计**已注册**工具，其中 **进前缀 43 个/24.5KB、不进前缀（deferred）19 个/7.1KB**。
+   严格地说这是个**混用口径**（`deferred` 不进前缀、0 字节，browser 的 18 个就靠它），
+   所以"前缀的真实有效上限"其实是 32000 − 7.1KB ≈ **24.9KB**。**我没有改这个口径**（拆预算会让某个桶变宽，
+   属于改地板），只把发现记在这里：若将来要给 deferred 工具留空间，正确做法是**把两个桶拆成两个显式预算、
+   都不放宽**，而不是提高单一阈值。
+
+**效率指标（诚实说明）**：收益是"省一次模型往返"，**上线前无法实测**。可量化的先验是**邻接率 6.4%**
+（⇒ 上限约 6% 的回合数）。**采纳率由既有 30 天工具计数自动记录**，因此**上线后可复核**；
+若采纳率与效果都接近 0，按 P4 引用的 SoL-Pi C24/M24 应**降级为 deferred 或删除**，不留在前缀里占位。

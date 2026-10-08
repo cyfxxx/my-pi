@@ -21,6 +21,7 @@ import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from '.
 import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
 import { buildSkillsCatalog, skillsCatalogKey, SKILLS_CATALOG_TAG, type SkillLike } from './budget/skills-catalog';
 import { createRepeatState, observeRepeat, repeatReminderText, stableKey } from './budget/repeat-reminder';
+import { registerEditAndRunTool } from './tools/edit-and-run';
 import {
   DEFAULT_MISS_PREMIUM,
   DEFAULT_SUMMARY_RATIO,
@@ -287,6 +288,10 @@ export function register(pi: ExtensionAPI): void {
       ctx.ui.notify(`未知子命令: ${subcommand}\n${helpText}`, 'info');
     },
   });
+
+  // P6（SoL-Pi Action Fusion）：edit_and_run —— 编辑 + 立即验证，合成一次调用。
+  // 两半都走 pi 自己的工具（ctx.executeTool('edit'|'bash')），不重写编辑逻辑。
+  registerEditAndRunTool(pi);
 
   // 注册工具：enable_tool —— 仅在按需加载开启时注册
   // 默认（TOOL_LAYERING=false）全部工具 schema 常驻，工具本身无操作，注册只会造成模型空转，故不注册

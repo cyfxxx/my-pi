@@ -48,6 +48,12 @@ export interface ToolExecuteContext {
   /** 本轮工具调用的中止信号（ctx_exec 等长任务用；pi 未提供时为 undefined） */
   signal?: AbortSignal;
   /**
+   * 调用另一个**已注册**的工具（pi 的 `ctx.executeTool`）；仅当该工具确实可调用时存在。
+   * 用途是"融合工具"（如 `edit_and_run`）：**复用 pi 自己的 edit/bash**，而不是重写一份编辑逻辑。
+   * 嵌套调用不可用时 pi 会返回 isError=true 的结果，故这里不做额外判断。
+   */
+  executeTool?: (name: string, args: Record<string, unknown>) => Promise<{ text: string; isError: boolean }>;
+  /**
    * 写 footer 状态（key 以 `badge:` 前缀时进第一行 pwd 旁，否则进第三行状态行；
    * text 传 undefined 清除）。工具侧唯一能改 footer 的通道，非交互时为 undefined。
    */
@@ -150,6 +156,24 @@ function buildExecuteContext(piCtx: unknown, signal?: AbortSignal): ToolExecuteC
       setStatus?: (key: string, text: string | undefined) => void;
     };
   };
+  // pi 的嵌套工具结果形状（{result:{content:[{type:'text',text}]}, isError}）在此消化，
+  // features 只看到 {text, isError}——适配器存在的意义就是不让 features 接触 Pi 类型。
+  const rawExecute = (c as { executeTool?: (name: string, args: unknown) => Promise<unknown> }).executeTool;
+  const executeTool =
+    typeof rawExecute === 'function'
+      ? async (name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }> => {
+          const r = (await rawExecute(name, args)) as { result?: { content?: unknown }; isError?: boolean } | undefined;
+          const content = r?.result?.content;
+          let text = '';
+          if (typeof content === 'string') text = content;
+          else if (Array.isArray(content)) {
+            const first = content.find((x) => (x as { type?: string })?.type === 'text') as { text?: string } | undefined;
+            if (typeof first?.text === 'string') text = first.text;
+          }
+          return { text, isError: Boolean(r?.isError) };
+        }
+      : undefined;
+
   const model =
     c.model && (typeof c.model.id === 'string' || typeof c.model.provider === 'string')
       ? { id: c.model.id, provider: c.model.provider }
@@ -164,6 +188,7 @@ function buildExecuteContext(piCtx: unknown, signal?: AbortSignal): ToolExecuteC
     select: typeof c.ui?.select === 'function' ? (t, o) => c.ui!.select!(t, o) : undefined,
     editor: typeof c.ui?.editor === 'function' ? (t, p) => c.ui!.editor!(t, p) : undefined,
     signal,
+    executeTool,
     setStatus: typeof c.ui?.setStatus === 'function' ? (k, t) => c.ui!.setStatus!(k, t) : undefined,
     cwd: typeof c.cwd === 'string' ? c.cwd : undefined,
   };
