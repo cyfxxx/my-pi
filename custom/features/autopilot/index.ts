@@ -110,7 +110,7 @@ export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
     name: 'autopilot_status',
     description:
-      '查看自主运行状态。section: summary(默认：调度器任务数/预算/当前模型)、stats(按模型与任务的运行统计)、failover(模型故障转移预览；execute=true 才真的写入切换请求)。策略配置看 autopilot_policy，Agent 运行时看 admin_status，定时任务用 schedule_task。',
+      '查看自主运行状态。section: summary(默认：自主运行开关、调度器任务数、预算)、stats(按模型/任务的运行统计)、failover(模型故障转移预览；execute=true 才真的写入切换请求)。策略配置看 autopilot_policy，Agent 运行时看 admin_status，定时任务用 schedule_task。',
     parameters: {
       section: {
         type: 'string',
@@ -162,7 +162,7 @@ export function register(pi: ExtensionAPI): void {
   // ── 工具：会话列表/切换、重启（admin 组）──
   registerTool(pi, {
     name: 'admin_list_sessions',
-    description: '列出会话文件（可按工作目录过滤），按修改时间倒序。',
+    description: '列出历史会话文件（可按工作目录过滤，按修改时间倒序）。',
     parameters: {
       cwd: { type: 'string', description: '工作目录（可选），不传时列出全部会话', optional: true },
     },

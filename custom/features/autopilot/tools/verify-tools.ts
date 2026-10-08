@@ -246,7 +246,7 @@ export function registerVerifyTools(pi: PiApi): void {
 
   registerTool(pi, {
     name: 'verify_config',
-    description: '查看或修改 LLM-as-a-Verifier 验证配置。不传参数时返回当前配置。',
+    description: '查看或修改 LLM-as-a-Verifier 的**配置**（不传参数返回当前配置）。',
     parameters: {
       enabled: { type: 'boolean', description: '启用/禁用验证', optional: true },
       nCandidates: { type: 'number', description: '候选数量（2-5）', optional: true },

@@ -245,12 +245,22 @@ export function writeConfigField(key: string, value: unknown): WriteConfigResult
 // ── 工具注册 ──
 
 export function registerAdminTools(pi: PiApi): void {
+  // ── 状态类工具的描述纪律（2026-10-07）──────────────────────────────────────────
+  //
+  // 事故形态：`admin_status` 曾在描述里**枚举**"模型 / 会话文件 / 配置摘要"，而这三项各自都是
+  // 另一个工具的**主管内容**。同一个关键词出现在多个工具的 description 里，模型只能猜——
+  // 30 天实测这几个"看状态"的工具各只有 1–3 次调用，说明确实没被稳定用起来。
+  //
+  // 修法不是给每个描述加话，而是**让每个工具只声明自己独有的名词**：
+  //   · `admin_status` 只声明"一屏摘要"，并点名四项细节各自该用谁（指针，不是枚举）；
+  //   · 单项工具只声明自己的对象（settings.json / models.json / 历史会话文件）；
+  //   · 读/写成对的工具（get/set_config、list/set_model）用动词区分，不再各自复述对方的职责。
+  // 守门：`context/__tests__/tools-payload.test.ts` 的"状态类工具路由"用例——每个工具必须含
+  // 独占名词、`admin_status` 不得含别人的独占名词，且必须点名四个细节工具。
   registerTool(pi, {
     name: 'autopilot_policy',
-    // 2026-10-07：点明与相邻工具的边界——只读诊断工具曾有三个近义名字（status/stats/failover），
-    // 已合并进 `autopilot_status` 的 section 参数；本工具专管**策略配置**，与"运行态"不是一回事。
     description:
-      '查看自主运行**策略配置**（failover 链、失败阈值、挂死检测、预算）。运行态/统计/故障转移预览请看 autopilot_status（用它的 section 参数），Agent 运行时请看 admin_status。策略修改请使用 /auto policy 命令。',
+      '查看自主运行**策略配置**（failover 链、阈值、挂死检测、预算）。运行态与统计用 autopilot_status；策略修改用 /auto policy 命令。',
     parameters: {},
     execute: async () => formatPolicyText(readAutopilotConfig()),
   });
@@ -258,7 +268,7 @@ export function registerAdminTools(pi: PiApi): void {
   registerTool(pi, {
     name: 'admin_status',
     description:
-      '查看当前 Agent 的运行时状态：当前模型/Provider、当前会话文件、运行模式、配置摘要、是否有待处理的重启操作。',
+      '总览 Agent 运行时状态（一屏摘要）。单项细节用专门工具：admin_list_models、admin_list_sessions、admin_get_config、autopilot_status。',
     parameters: {},
     execute: async (_args, ctx) => {
       const settings = readSettings();
@@ -274,14 +284,14 @@ export function registerAdminTools(pi: PiApi): void {
 
   registerTool(pi, {
     name: 'admin_list_models',
-    description: '列出 models.json 中所有可用的 Provider 及其模型列表，包含模型 ID、上下文窗口大小等信息。',
+    description: '列出 models.json 里的可选模型（含上下文窗口）。',
     parameters: {},
     execute: async () => formatModelsList(listProviders()),
   });
 
   registerTool(pi, {
     name: 'admin_set_model',
-    description: '切换默认模型和 Provider（更新 settings.json 并重启 Agent，自动恢复当前会话）。',
+    description: '写入默认 Provider/模型并重启 Agent（自动恢复当前会话）。',
     parameters: {
       provider: { type: 'string', description: 'Provider 名称，如 "deepseek"' },
       model: { type: 'string', description: '模型 ID' },
@@ -318,7 +328,7 @@ export function registerAdminTools(pi: PiApi): void {
 
   registerTool(pi, {
     name: 'admin_get_config',
-    description: '读取 settings.json 的配置项。不传 key 时返回全部配置（敏感字段掩蔽为 ***）。',
+    description: '**读** settings.json 的配置项内容（不传 key 返回全部，敏感字段掩蔽为 ***）。',
     parameters: {
       key: { type: 'string', description: '配置键名（可选），不传则返回全部', optional: true },
     },
@@ -330,7 +340,7 @@ export function registerAdminTools(pi: PiApi): void {
 
   registerTool(pi, {
     name: 'admin_set_config',
-    description: '修改 settings.json 中的配置项。敏感字段（如含 key/token/secret 的字段）需用户确认。修改立即生效。',
+    description: '**写** settings.json 的配置项（敏感字段如含 key/token/secret 需用户确认；立即生效）。',
     parameters: {
       key: { type: 'string', description: '配置键名' },
       value: { type: 'string', description: '配置值（字符串）。数组或对象字段会自动解析 JSON。' },

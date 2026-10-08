@@ -153,3 +153,73 @@ describe('工具面体积守门', () => {
     }
   });
 });
+
+/**
+ * 状态类工具的路由守门（2026-10-07）
+ *
+ * 事故形态：`admin_status` 曾在描述里**枚举**"模型 / 会话文件 / 配置摘要"，而这三项各自都是另一个
+ * 工具的**主管内容**。同一个关键词出现在多个 description 里，模型只能猜该叫哪个——30 天实测这几个
+ * "看状态"的工具各只有 1–3 次调用，说明确实没被稳定用起来（`admin_switch_session` / `admin_set_model`
+ * 更是 0 次）。
+ *
+ * 修法不是给每个描述加更多话（那只会让关键词继续互相污染），而是**让每个工具只声明自己独有的名词**，
+ * 需要跨工具时用**工具名指针**（"…用 admin_list_models"）而不是复述对方的职责。
+ *
+ * 「指针加在哪」也有纪律：**只在名词会重叠时加**。`admin_status` 是"总览"，与四个单项工具的名词天然
+ * 重叠 → 必须点名；成对工具（读/写 settings、列/切 models、列/切 sessions）靠**动词**区分即可，复述对方
+ * 职责既污染关键词、又让声明变大——2026-10-07 实测：给每一对都加指针后 autopilot 声明从 6.8KB 涨到
+ * 7.1KB，收掉这些冗余指针才回落到 6.7KB。
+ *
+ * 本守门锁三件事：
+ *   ① 每个工具必须含自己的**独占名词**；
+ *   ② 不得含别人的独占名词（谁把枚举加回去，这里立刻红）；
+ *   ③ 该有点针的地方必须有（总览类工具不点名 = 模型只能猜）。
+ */
+const STATUS_ROUTING: Array<{ tool: string; owns: string[]; forbidden?: string[]; pointers?: string[] }> = [
+  {
+    tool: 'admin_status',
+    owns: ['一屏摘要'],
+    forbidden: ['settings.json', 'models.json', '会话文件'],
+    pointers: ['admin_list_models', 'admin_list_sessions', 'admin_get_config', 'autopilot_status'],
+  },
+  { tool: 'admin_get_config', owns: ['**读** settings.json'], forbidden: ['models.json'] },
+  { tool: 'admin_set_config', owns: ['**写** settings.json'], forbidden: ['models.json'] },
+  { tool: 'admin_list_models', owns: ['models.json'], forbidden: ['settings.json'] },
+  { tool: 'admin_set_model', owns: ['Provider'], forbidden: ['settings.json'] },
+  { tool: 'admin_list_sessions', owns: ['历史会话文件'] },
+  {
+    tool: 'autopilot_status',
+    owns: ['自主运行状态'],
+    pointers: ['autopilot_policy', 'admin_status', 'schedule_task'],
+  },
+  { tool: 'autopilot_policy', owns: ['策略配置'], pointers: ['autopilot_status'] },
+  { tool: 'verify_config', owns: ['配置'] },
+];
+
+describe('状态类工具路由守门', () => {
+  it('每个工具只声明自己的名词，且点名相邻工具', async () => {
+    const tools = await captureAll();
+    const byName = new Map(tools.map((t) => [t.name, t]));
+    for (const spec of STATUS_ROUTING) {
+      const t = byName.get(spec.tool);
+      expect(t, `未注册工具: ${spec.tool}`).toBeDefined();
+      const desc = t?.description ?? '';
+      for (const noun of spec.owns) {
+        expect(desc, `${spec.tool} 的描述缺少独占名词「${noun}」：${desc}`).toContain(noun);
+      }
+      for (const bad of spec.forbidden ?? []) {
+        expect(desc, `${spec.tool} 的描述出现了别人的独占名词「${bad}」——枚举会与相邻工具互相污染：${desc}`).not.toContain(bad);
+      }
+      for (const p of spec.pointers ?? []) {
+        expect(desc, `${spec.tool} 的描述应点名相邻工具 ${p}（否则模型只能猜）：${desc}`).toContain(p);
+      }
+    }
+  });
+
+  it('状态类工具的描述两两不同（防复制粘贴式重复）', async () => {
+    const tools = await captureAll();
+    const descs = STATUS_ROUTING.map((s) => tools.find((t) => t.name === s.tool)?.description ?? '');
+    expect(descs.every((d) => d.length > 0)).toBe(true);
+    expect(new Set(descs).size, `有工具描述重复：${JSON.stringify(descs)}`).toBe(descs.length);
+  });
+});
