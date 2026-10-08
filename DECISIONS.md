@@ -2,6 +2,32 @@
 
 ## 格式
 
+### [2026-10-08] 休眠机制审计（P4）：56% 的"有意保留"其实是"未决策"；TOOL_LAYERING 必须二选一
+
+**来自 SoL-Pi**：C13 "Disable dormant mechanisms at configuration time"、C24 "Gate ObservationPack by
+expected lifetime value"、M24 "Gate V2 candidates on consumption, dormant behavior, and distribution shift"。
+**方向与我此前倾向相反**——我前几轮在纠结"要不要打开 `TOOL_LAYERING`"，而 SoL-Pi 的结论是
+**长期不被消费的机制应当在配置期就关掉/去掉**。
+
+**产出**：`docs/design/DORMANT-AUDIT.md`（只审计与提案，**不删任何东西、不改任何默认**）。
+
+**最重要的量化发现**：`dead-exports-allowlist.txt` 的 A 段（"有意保留"）**18 条里有 10 条（56%）是"未决策"**，
+成组属于三个未迁移子系统：**Best-of-N judge 5 条 / JSON 结构性压缩 3 条 / 记忆合并 2 条**。
+审计的价值就是把"有意保留"与"忘了处理"分开——这三组应当**尽快接线或删除二选一**。
+
+**最高优先**：`TOOL_LAYERING`（含 `tool-groups.ts` 休眠组与 `enable_tool`）是典型的"**关着但留着**"，
+而这是最差状态：组名单要持续与工具面同步（维护成本），却没有任何收益。
+且它有**历史消费证据**——30 天窗口里 `enable_tool` **8 次**（该工具只在开启时注册）⇒ 曾经被有意开启过。
+**建议二选一**：按 C13 删除整套，或打开它。**我倾向删除**（工具面已被 `deferred` + `DEFAULT_OFF_FEATURES`
+解决，`TOOL_LAYERING` 与之重叠且更复杂），但**削减能力属用户决策**，我不动。
+
+**口径纪律（本次特意强调）**：`tool_search` 30 天 0 次**不能**当"没用"的证据——它是**上一轮才启用**的
+（"尚未有机会被用"）；而 `enable_tool` 的 8 次是**真历史证据**。**拿启用时间与统计窗口对齐是判断"休眠"的
+前提**，否则会把新机制误判为死机制。
+
+**顺带修正一处我自己的错**：上轮把 `__setPoolFactoryForTest` 追加进了白名单的 **C 段（待清理存量）**，
+而它是**测试辅助（B 段）**。已移正，C 段清空。
+
 ### [2026-10-08] 工具输出归档对照审计（P3）：句柄已有、摘录与分页缺；阈值不动
 
 **来自 SoL-Pi 的 ObservationPack**：大输出本地归档，上下文留 **handle + 短摘录**，需要时**分页召回**；

@@ -102,7 +102,7 @@ system 段翻转**（147,555 + 10,308）。
 
 **产出**：审计报告 + **决策提案**（阈值/分页/句柄形态的候选值）。**改默认留给用户点头**。
 
-## P4 休眠机制审计：启用或删除，二选一 ✅ 待做
+## P4 休眠机制审计：启用或删除，二选一 ✅ **已完成（2026-10-08）**
 
 **SoL-Pi 依据**：C13 "Disable dormant mechanisms at configuration time"、C24 "Gate ObservationPack by
 expected lifetime value"、M24 "Gate V2 candidates on consumption, dormant behavior, and distribution shift"。
@@ -377,3 +377,26 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 
 **实测数字（本项的"效率指标"）**：归档目录 **563 文件 / 3.4MB**（活跃，非死代码）；
 召回 **2 次 / 4 会话、0 次分页、2 次走 bash**。
+
+### P4 实施结果（2026-10-08）
+
+**产出**：[docs/design/DORMANT-AUDIT.md](DORMANT-AUDIT.md)（清单 + 逐条建议）。**只审计与提案：不删任何东西、不改任何默认。**
+
+**最重要的量化发现**：`dead-exports-allowlist.txt` 的 A 段（"有意保留"）18 条里，**10 条（56%）其实是"未决策"**
+——它们成组地属于三个未迁移子系统：**Best-of-N judge 5 条**、**JSON 结构性压缩 3 条**、
+**记忆合并 2 条**。审计的作用正是把"**有意**保留"与"**忘了**处理"分开。
+
+**最高优先的一条**：`TOOL_LAYERING` 处于"**关着但留着**"——这是最差状态（`tool-groups.ts` 的组名单要持续与
+工具面同步，却没有任何收益）。而且它有**历史消费证据**：30 天窗口里 `enable_tool` 被调用 **8 次**
+（该工具只在 `TOOL_LAYERING` 开启时注册）⇒ 说明它**曾经被有意开启**，不是"从来没人用"。
+建议**二选一**：按 C13 删掉整套机制，或打开它。**我的倾向是删除**（工具面已被 `deferred` 与
+`DEFAULT_OFF_FEATURES` 解决，`TOOL_LAYERING` 与之重叠且更复杂），但那是削减能力，**留给用户决策**。
+
+**口径提醒（避免拿过期数据当结论）**：`tool_search` 30 天 0 次，但它是**上一轮才启用**的 ⇒ 那是"尚未有机会
+被用"，**不是"已证明没用"**；相对地 `enable_tool` 的 8 次是**真历史证据**。
+
+**顺带修掉一处我自己的分类错误**：上轮加的 `__setPoolFactoryForTest` 被我追加进了 **C 段（待清理存量）**，
+而它本质是**测试辅助（B 段）**。已移到 B 段；C 段因此清空。
+
+**明确保留并说明（不是休眠，是有意）**：`filterInjectedMessages`/`isInjectionBlock`（守门反面锚点）、
+`MIN_TAIL_LENGTH`（阻塞在上游事件）、budget/adapters 的公共 API。
