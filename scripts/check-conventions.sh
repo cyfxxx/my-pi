@@ -23,7 +23,7 @@ ok()   { echo "  ✓ $1"; }
 bad()  { echo "  ❌ $1"; FAIL=$((FAIL + 1)); }
 note() { echo "     $1"; }
 
-echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对） ==="
+echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对 / F 隐私边界） ==="
 
 # ── A. 运行时/每环境状态不入库 ──
 # 判定：入库的 JSON 里出现这些键即失败（应改写入 gitignored 的 *-state.json）。
@@ -176,6 +176,35 @@ if [ -d "$MODE_ASSETS_DIR" ]; then
 else
   note "尚无模式图片资产（$MODE_ASSETS_DIR 不存在）"
 fi
+
+# ── F. 隐私边界：数据默认不出本机 ──
+# 禁用上游外发通道（/share /bug）已被补丁删除；守门查补丁删除的命令是否在 diff 里。
+if grep -qE '^-.*\{ name: "share"' patches/010-disable-share-bug.patch && grep -qE '^-.*\{ name: "bug"' patches/010-disable-share-bug.patch; then
+  ok "patches/010 已从命令表删除 /share 与 /bug"
+else
+  bad "patches/010 未完全删除 /share 或 /bug 命令条目"
+fi
+if grep -qE 'Patch \(010-disable-share-bug\)' patches/010-disable-share-bug.patch && grep -q '此命令在 my-pi 中已禁用' patches/010-disable-share-bug.patch; then
+  ok "patches/010 含自标记 + handler 早退提示"
+else
+  bad "patches/010 缺自标记或 handler 未早退"
+fi
+if [ -f portable/agent/settings.json ]; then
+  if grep -qE '"enableInstallTelemetry"[[:space:]]*:[[:space:]]*false' portable/agent/settings.json; then
+    ok "settings.json enableInstallTelemetry:false"
+  else
+    bad "settings.json 未关闭 enableInstallTelemetry（隐私边界）"
+  fi
+else
+  bad "portable/agent/settings.json 不存在"
+fi
+for f in scripts/pi-supervisor.sh scripts/dev.sh; do
+  if [ -f "$f" ] && grep -qE 'PI_TELEMETRY=0' "$f"; then
+    ok "$f PI_TELEMETRY=0"
+  else
+    bad "$f 未设 PI_TELEMETRY=0"
+  fi
+done
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then
