@@ -2,6 +2,36 @@
 
 ## 格式
 
+### [2026-10-07] 私人助手：上游外发通道与角色身份裁剪
+
+**背景**：本仓库硬分叉 pi 为"自主进化的全能型私人助手"，但此前采取"只叠加、不裁剪"的追加式分叉策略，上游面向公众产品的三条默认通道原样保留。
+
+1. **`/share`**（`vendor/.../session-share.ts:57`）：把整个会话（含 system prompt 与工具 schema）先发 Radius 网关，失败回退创建 GitHub secret gist。
+2. **`/bug`**（`bug-report.ts` DISCLAMER）：上传 OS、模型/provider 配置、扩展、settings、错误诊断与可选会话内容到 Earendil。
+3. **install telemetry**（`interactive-mode.ts:1351`、`provider-attribution.ts:36`）：默认开，`GET https://pi.dev/api/report-install?version=…` + provider 请求带 `X-OpenRouter-Title: pi` / `HTTP-Referer: https://pi.dev` 等 attribution headers。
+
+此外上游 preamble 固定为"You are an expert coding assistant…"（`core/system-prompt.ts:154`），roleplay 模式只在 system prompt 尾部追加人设，前段仍自称编码助手；上游还有 `.pi/settings.json` 项目级配置劫持分支（`config.ts`，被 `PI_CODING_AGENT_DIR` 短路，属死分支）。
+
+**选项**：
+A) 打补丁彻底禁用 `/share`、`/bug` + settings/env 双处关 telemetry
+B) 只在 settings 关 telemetry，保留两个命令手动可控
+C) 全部不动
+
+**决策**：选项 A（与 VISION §3.2 新增的"数据不出本机"硬约束一致）。
+
+**理由**：
+- 私人助手的数据默认不出本机，/share 与 /bug 是唯一把私人内容主动发到外部的路径；上游安全立场（"把模型生成的命令与代码视为不可信"）对私人助手不成立——信任边界由用户自己机器承担，不应默认外发。
+- B 留手动可控通道：手动可控 ≠ 默认关闭，违背"默认安全"原则，且 `/bug` 上传含会话内容，误触即可外泄。
+- C 明显偏离 VISION §1（自主/进化都建立在数据主权之上）。
+
+**代价与约束**：
+- 新增补丁 `patches/010-disable-share-bug.patch`（3 个 hunk：命令表删 2 行、dispatch 早退 + 崩溃提示改指向本地日志、两个 handler 早退）；每次上游同步要重放，`check-upstream.sh` 会核对目标文件 churn（interactive-mode.ts ≈4%/6774 提交，slash-commands.ts 26 次，最近一次正是"add bug reporting"）。
+- telemetry 双处关：`enableInstallTelemetry:false`（入库配置）+ `PI_TELEMETRY=0`（env 优先级最高，防 settings 被重置）；上游若新增绕过该开关的上报路径，按 VISION §3.1 升格通道处理（先关配置 → 改默认值 → 最后才跳过整版）。
+- `.pi` 劫持分支从 `patches/002` 删除（连带删 `check-patches-behavior.mjs` 的 `projectPiDir` 断言与 `patches/README.md` 描述）；上游同步成本降低（少一个 hunk）。
+- roleplay preamble 半硬定点替换（`custom/features/mode/logic.ts`：`applyRoleplayIdentity`，锚点 `PI_CODING_PREAMBLE`；仅 `before_agent_start` 执行，tools/rules/docs 三段保留；上游改文案时守门测试 `roleplay-preamble.test.ts` 红），比 `--system-prompt` 方案（会连带删掉 tools/rules/docs）安全。
+
+**验证**：`npx vitest run` 76/851 全绿；`golden-tasks.sh --fast` 全绿；`check-conventions.sh` F 节隐私边界 4 项全绿；`check-patches-behavior.mjs` 11 个补丁标记齐全；dist 级确认 `name:"share"`/`name:"bug"` 已从命令表消失、handler 早退提示进入运行产物。
+
 ### [2026-10-07] browser 改走 `exposure: 'deferred'`：注册但不声明（补 patches/011 让 tool_search 认识中文）
 
 **背景**：上一批的可行性调研实测发现，pi 原生的 `exposure: 'deferred'` + `tool_search` 是比

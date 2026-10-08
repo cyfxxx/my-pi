@@ -9,8 +9,8 @@
 
 | 属性 | 值 |
 |------|-----|
-| 版本 | v3.1 |
-| 更新日期 | 2026-10-01 |
+| 版本 | v4.2 |
+| 更新日期 | 2026-10-07 |
 | 适用范围 | 项目愿景、方法论、治理规则、落地路线 |
 | 相关文档 | [DECISIONS.md](../../DECISIONS.md)、[PROGRESS.md](../../PROGRESS.md)、[../development/SKILLS-MAINTENANCE.md](../development/SKILLS-MAINTENANCE.md) |
 
@@ -71,6 +71,8 @@
 ### 3.2 硬优先原则
 安全边界、缓存纪律、数据完整性一律硬编码（功能逻辑 / 隔离边界脚本 / 回归测试），禁止依赖模型自觉遵守提示词。
 my-pi 现有硬约束：`custom/features/context/budget/budget.ts` 的预算与压力档位常量、`custom/core/secrets.ts` 的脱敏规则、`scripts/check-isolation.sh` 的依赖边界检查。
+
+**数据边界（2026-10-07 加入）**：私人助手的数据默认**不出本机**——任何"把会话内容/诊断/使用行为发往外部"的上游通道一律默认关闭且不得重新打开，禁止依赖模型自觉遵守提示词。现有落点：`portable/agent/settings.json` 的 `enableInstallTelemetry:false`、`scripts/pi-supervisor.sh` 与 `scripts/dev.sh` 的 `PI_TELEMETRY=0`（env 优先级最高，防 settings 被重置）、补丁 `patches/010-disable-share-bug.patch`（禁用 `/share` 与 `/bug`）；回归守门 `scripts/check-conventions.sh` 的 **F 节（隐私边界）**。上游同步时若出现绕过该开关的上报路径（独立 fetch、新 provider 的 attribution header），按 §3.1 走升格通道：先关配置、再改默认值、最后才跳过整版。
 
 ### 3.3 防退化第一
 进化的最大风险不是慢，是退化：一条错误教训入库后会自我强化污染后续行为。
@@ -143,3 +145,4 @@ my-pi 当前安全网 = `npm run golden`（20 步：隔离/注册面/死导出/�
 - 2026-10-01 v3.1：§4 现状列再回填——缓存口径由"工具级台账 `usage.jsonl`"更正为"每轮用量 `.usage-diag.jsonl` + 前缀断裂归因 `prefix-fingerprints.jsonl`，指标含加权命中率/未命中每轮/输出占比/前缀前端变更次数"；回归 golden 12 步 → **13 步、622 → 696 用例**；新增「上游」行（`check-upstream.sh` 把"升级代价"变成同步前的确定性读数）；任务行补 `/daily`。§1–§3、§5 的愿景与方法论未改动。
 - 2026-10-01 v4.1：P4 续做三批并收尾——① 碎调用软规则改为可观测（`daily-health` 出每步 bash 分布与单命令占比，基线 1.4%，漂移才告警）并降权；② 死导出守门补"测试引用不算接线"规则，存量 **50/50 闭环**（接线 6 / 删除 28 / 保留并写明理由 16），白名单 C 段清空且每条都有理由；③ 工具面前缀（payload 62.4 KB 中本仓库占 28.5 KB）落成守门并新增可选 `lean` 模式（去掉四组 14.5 KB）。**路线图 P0–P4 至此全部达成**，后续由 [UPGRADE-LEDGER.md](UPGRADE-LEDGER.md) 台账驱动（下一批：§5 升格候选转正需人工确认；观察项需真实会话新数据）。
 - 2026-10-01 v4：**P4 升格通道第一批执行完毕**——6 条软引导硬化（system 注入装配唯一入口 + 预算/易变内容守门、状态与敏感文件入库守门、生产代码规范守门、`tmux_wait` 60s 硬上限）并按 §3.1 同步降权原软引导；新增台账 [UPGRADE-LEDGER.md](UPGRADE-LEDGER.md)（已完成/待评各有证据与原因，判据=注入预算受控）；回归 golden **14 步**。§1–§3 的愿景与方法论未改动，§5 未改动。
+- 2026-10-07 v4.2：**数据边界写入 §3.2 硬约束**（用户确认）。上游 pi 原生的三条外发通道——`/share`（会话上传 Radius 网关/GitHub gist）、`/bug`（诊断与会话上传 Earendil）、`enableInstallTelemetry`（匿名 install ping + provider attribution headers）——与"私人助手"定位直接冲突，且此前一直是"只叠加、不裁剪"的追加式分叉。本次按 VISION §3.1 升格为硬约束：新增补丁 `patches/010-disable-share-bug.patch`（命令表删除两项、handler 早退、崩溃提示改指向本地日志），settings + `PI_TELEMETRY=0` 双处关闭遥测，删除 `patches/002` 里无消费者的 `projectPiDir` agentDir 劫持分支，roleplay 模式以半硬定点替换把 preamble 从"expert coding assistant"改为角色身份句（保留 tools/rules/docs 段）。§3.2 新增"数据不出本机"条款并配 `check-conventions.sh` F 节守门；§4/§5/§6 未改动。
