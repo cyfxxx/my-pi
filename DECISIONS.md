@@ -2,6 +2,36 @@
 
 ## 格式
 
+### [2026-10-08] 修复预算按"错误指纹"计（P7）：与既有"按工具名熔断"互补，不替换
+
+**来自 SoL-Pi 的发现**："Budget repair per error fingerprint"、"Give counterexamples precedence and
+break repeated failure loops"、"Break repeated diagnostic loops without stopping real progress"。
+
+**侦察时的关键发现（决定了实现形态）**：my-pi 的 `context/budget/tool-health.ts` 里**已经有**
+`updateFailStreak`（按**工具名**的连续失败熔断）与 `dehydrateErrorOutput`（错误输出脱水）。
+所以 P7 **不能另起一套归一化**，而是互补：
+
+| | 判据 | 语义 |
+|---|---|---|
+| 既有熔断 | 工具名连续失败 | "同一个工具连续失败 3 次"（每次错因可能不同） |
+| P7 修复预算 | **错误指纹**（跨不同参数） | "同一个错出现 3 次，期间换过 M 组参数仍失败" |
+
+后者才是真打转：**换参数无效说明问题不在参数上**。既有熔断**一字未改**（阈值与键都被依赖，
+改它属于改默认行为）。
+
+**实现**：`normalizeErrorForFingerprint`（去 ANSI/路径/UUID/长十六进制/耗时/行号列号/数字）、
+`errorFingerprint`、`createRepairBudget`、`observeRepairAttempt`（阈值 {3,5,8}、滑窗 15min、
+记录 `distinctArgs`）、`repairBudgetHint`。`argKey` 复用 `repeat-reminder.ts` 的 `stableKey`
+（统一一份稳定键，不写第二份）。接线在 `tool_result`（那里才有错误文本），与既有熔断**同一通道**
+追加提示，`try/catch` fail-open；**不引入新消息类型**。
+
+**守门重点**：归一化的**两个方向**都要钉住——太窄则同一错误的路径/行号一变就永不触发（等于没做），
+太宽则把不同错误并成一个指纹、给出误导提醒（比不提醒更糟）。`error-fingerprint.test.ts` 15 项里
+两个方向各有 4–5 条。
+
+**效率指标**：本项是预防型改动、无可比较的前后数字；可核对的行为事实是**只提醒不阻塞**
+（总是追加提示、从不阻断工具结果），且既有熔断行为未变（既有测试全绿）。
+
 ### [2026-10-08] golden 留出集纪律（P5）：第 19/20 步是验收留出集，开发期间不看
 
 **来自 SoL-Pi 的做法**：held-out 验证——"Held-out trajectories never enter subsequent analysis, and no

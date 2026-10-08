@@ -153,7 +153,7 @@ inside the auto-research loop sees the held-out results."。留出集是 EdgeBen
 `golden`、`check-dead-exports`。**效率指标**：真实会话里 `edit`→`bash` 相邻对的数量下降、轮次下降
 （从 `prefix-fingerprints.jsonl` + 会话文件统计）。
 
-## P7 重复提醒升级为"按错误指纹的修复预算" ✅ 待做
+## P7 重复提醒升级为"按错误指纹的修复预算" ✅ **已完成（2026-10-08）**
 
 **SoL-Pi 依据**：P15 "Budget repair per error fingerprint"、P23 "Break repeated diagnostic loops
 without stopping real progress"、P9 "Give counterexamples precedence and break repeated failure loops"。
@@ -291,3 +291,39 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 **"效率指标"在本项是"可验证的性质"**（本项买的是证据强度，方案里已写明不追效率）：实测常规开发路径
 `bash scripts/golden-tasks.sh --fast` —— 第 19/20 步都落在 `skip`，**留出集提醒出现 0 次** ⇒
 "开发期间看不见留出集"这条性质在当前工具链下**成立且可核对**，不依赖人的自觉。
+
+### P7 实施结果（2026-10-08）
+
+**侦察时的关键发现：不要另起一套。** my-pi 的 `context/budget/tool-health.ts` 里已经有
+`updateFailStreak`（**按工具名**的连续失败熔断，第 3 次给一次提示）与 `dehydrateErrorOutput`
+（错误输出确定性脱水）。所以 P7 做成**互补而非替换**：
+
+| | 判据 | 语义 |
+|---|---|---|
+| 既有熔断 | **工具名**连续失败 | "同一个工具连续失败 3 次"（可能每次错因不同） |
+| **P7 修复预算** | **错误指纹**（跨不同参数） | "同一个错误出现 3 次，期间换过 M 组参数仍失败" |
+
+**后者才是真打转的信号**：换参数无效说明问题不在参数上。既有的按名熔断**一个字没动**
+（它的阈值与键都被依赖，改它属于改默认行为）。
+
+**实现**（都加在 `tool-health.ts`，因为"工具健康度/失败逻辑"本就归它）：
+- `normalizeErrorForFingerprint(text)`：去掉 ANSI、绝对路径/家目录、UUID 与长十六进制、耗时、
+  行号列号、其余独立数字，空白折叠。**只用于指纹，不改给模型看的原文。**
+- `errorFingerprint(toolName, text)` → `{key: "bash:1a2b", excerpt}`（excerpt 截 160 字符）。
+- `createRepairBudget()` / `observeRepairAttempt(state, {toolName, errorText, argKey, nowMs?, windowMs?})`
+  → `{attempts, distinctArgs, remind, excerpt}`；阈值 `REPAIR_BUDGET_AT = {3,5,8}`、
+  滑窗 `REPAIR_WINDOW_MS = 15min`（窗口外的旧指纹丢弃——打转是短时间内的事）。
+  `argKey` 复用 `repeat-reminder.ts` 的 `stableKey(input)`（**统一一份稳定键实现**，不再写第二份）。
+- `repairBudgetHint(o)`：给出"同一错误已 N 次 + 换过 M 组参数"两个可操作事实，并明确"不要原样重试"。
+- 接线在 `context/index.ts` 的 `tool_result`（那里才有错误文本）：与既有熔断**同一通道**追加提示，
+  `e.isError` 为真才计，整段 `try/catch`（fail-open）。
+  **没有引入新的消息类型**——复用工具结果尾部提示这条既有通道。
+
+**能力地板**：`tsc` / `vitest` / `check-features` / `check-conventions` / `check-dead-exports` / `golden`。
+**守门**：`context/__tests__/error-fingerprint.test.ts` **15 项**，重点是归一化的**两个方向**：
+① 路径/行号列号/耗时/哈希/UUID/ANSI 不同 ⇒ **同一指纹**（否则永远不触发，等于没做）；
+② 不同 errno、不同目标模块、不同工具 ⇒ **不同指纹**（合并不同错误比不提醒更糟）。
+另测：跨参数计数与 distinctArgs、同参数 distinctArgs 保持 1、不同错误互不污染、滑窗外重置、提示文案。
+
+**效率指标**：本项是"打断打转"的**预防**型改动，没有可比较的前后数字。可核对的行为事实是
+**只提醒不阻塞**（总是 `out += hint`，从不阻断工具结果），且既有熔断行为完全未变（既有测试全绿）。

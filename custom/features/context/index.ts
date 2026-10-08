@@ -20,7 +20,7 @@ import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
 import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
 import { buildSkillsCatalog, skillsCatalogKey, SKILLS_CATALOG_TAG, type SkillLike } from './budget/skills-catalog';
-import { createRepeatState, observeRepeat, repeatReminderText } from './budget/repeat-reminder';
+import { createRepeatState, observeRepeat, repeatReminderText, stableKey } from './budget/repeat-reminder';
 import {
   DEFAULT_MISS_PREMIUM,
   DEFAULT_SUMMARY_RATIO,
@@ -43,6 +43,9 @@ import { recordTaskRecord } from './budget/task-record';
 import { buildPruneDumpRef, pruneRefsDir, PRUNE_REFS_RETENTION_DAYS } from './budget/prune-dump';
 import {
   updateFailStreak,
+  createRepairBudget,
+  observeRepairAttempt,
+  repairBudgetHint,
   dehydrateErrorOutput,
   rebuildTextContent,
   DEHYDRATE_HINT,
@@ -124,6 +127,8 @@ export function register(pi: ExtensionAPI): void {
   const toolState = createToolLifecycleState();
   // 连续失败熔断计数（进程内存态，成功即清零）
   const failStreak = new Map<string, number>();
+  // P7 修复预算：按**错误指纹**（跨不同参数）计数，与上面的"按工具名熔断"互补而非替换
+  const repairBudget = createRepairBudget();
   const compactDecider = makeCompactDecider(COMPACT_COOLDOWN_MS, {
     largeRatio: readEnvRatio('PI_CONTEXT_COMPACT_LARGE_RATIO'),
     smallRatio: readEnvRatio('PI_CONTEXT_COMPACT_SMALL_RATIO'),
@@ -783,6 +788,21 @@ export function register(pi: ExtensionAPI): void {
       const dehy = dehydrateErrorOutput(out);
       if (dehy !== undefined) out = dehy + DEHYDRATE_HINT;
       if (hint) out += hint;
+      // P7：同一**错误指纹**（去掉路径/行号/耗时/哈希后）在窗口内累计到 3/5/8 次就提醒——
+      // 关键是它**跨不同参数**计数：换了参数还是同一个错，说明问题不在参数上。
+      // 与熔断一样"只提醒不阻塞"，且整段 fail-open（提醒失败绝不影响工具结果）。
+      if (e.isError) {
+        try {
+          const o = observeRepairAttempt(repairBudget, {
+            toolName: name,
+            errorText: out,
+            argKey: stableKey(e.input ?? e.toolCallId ?? name),
+          });
+          if (o.remind) out += repairBudgetHint(o);
+        } catch {
+          /* fail-open */
+        }
+      }
       const pruned = pruneToolOutput(out, name);
       if (pruned === out && out === text) return;
       // 保留非文本块（图片等），原位回写文本（修复此前只返回单个 text 块丢块的问题）
