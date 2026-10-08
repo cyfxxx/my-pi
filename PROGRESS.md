@@ -2542,3 +2542,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 守门：`repeat-reminder.test.ts` **8 项**；`tool-execution-mode.test.ts` 的两张清单同时扩展
   （必须标 + 必须不标，两个方向都锁）。
 - 验证：tsc 干净；check-features / conventions 全绿；vitest 见提交说明。
+
+### SoL-Pi 借鉴 P1：目标完成语义三态（2026-10-08）
+
+- 做法见 `docs/design/SOL-PI-BORROW.md` 的 P1 节（含设计理由与验收证据）。
+- 一句话：`verified` 只能来自**由 harness 实际跑通的检查命令**（新 `store/run-check.ts`），
+  模型自封不了（三个构造器的结构约束 + 测试锁映射）；不带 `check` 一律 `declared` 并如实标注；
+  `blocked`/`pause` 与 harness 自判停止标 `advisory`。**旧默认行为不变。**
+- 守门：`goal.test.ts` 16 项 + `run-check.test.ts` 7 项；超时用例 1.32s 收口。

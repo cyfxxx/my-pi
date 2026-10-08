@@ -38,7 +38,7 @@
 
 ---
 
-## P1 目标完成语义：区分 verified / declared / advisory ✅ 待做
+## P1 目标完成语义：区分 verified / declared / advisory ✅ **已完成（2026-10-08）**
 
 **SoL-Pi 依据**：P 族发现——"Separate verified, declared, and advisory completion modes"、
 "Require validation evidence before claiming completion"、"Give counterexamples precedence"。
@@ -207,3 +207,32 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 
 每项完成后：更新本文件的状态标记 → 更新 `DECISIONS.md` / `PROGRESS.md` → 全量守门 → 提交推送。
 **任一项若实测否掉，就把负结果归档并把该项标 `❌ 已否掉（附证据）`**，不要悄悄跳过。
+
+### P1 实施结果（2026-10-08）
+
+**关键设计决定：`verified` 不能由模型自封。** 如果模型只要在 `goal complete` 里写一句"我有证据"就能升级，
+三态立刻退化成摆设。所以做成**结构约束**：
+
+- `store/goal.ts` 只暴露三个构造器：`declaredCompletion` / `advisoryCompletion` / `verifiedCompletion`，
+  **只有 `verifiedCompletion` 收得到「已跑通的检查结果」**——没有"带 mode 参数的通用完成函数"，
+  因此不存在自封路径。测试直接锁这条映射（`expect(outs).toEqual(['declared','advisory','verified'])`）。
+- `store/run-check.ts`（新）：`runCheckCommand(command)` 用 `sh -c` 跑一条**只读**检查命令，
+  默认 120s 超时（比 bash 前台 240s 上限更短——检查本就该快）、输出只留尾部 4000 字符、
+  超时按失败处理且不挂住调用方。**不接受模型自封**：只有 exit 0 才产生 `verified`。
+- `goal` 工具：新增 `evidence` 与 `check` 两个可选参数。
+  · 带 `check` → my-pi 实际执行；**通过** → `verified`（留存命令 + 输出尾部 + 时间）；
+    **不通过** → 目标**不标记完成**，把输出尾部回给模型（模型自己要求了判据，就按判据说话——
+    这条在新 opt-in 路径内，**不改任何旧默认**：不带 `check` 的 `goal complete` 行为与之前完全一致）。
+  · 不带 `check` → `declared`（状态文案明写"声称完成，未经校验"）。
+  · `blocked`/`pause` → `advisory`；**harness 自己判定的停止**（达到轮次上限、连续 3 轮无进展）也标 `advisory`。
+- `goalStatusText` 现在会打印 `完成语义：declared（声称完成，未经校验）/ verified（已独立校验）/ advisory（判断性结论，不是证明）`。
+
+**能力地板**：`tsc` 干净；`goal.test.ts` 16 项 + `run-check.test.ts` 7 项全绿；
+`check-features` / `check-conventions` / `check-dead-exports` / `golden` 全绿。
+**验收证据（本项不追效率，买的是可信度）**：`goalStatusText` 能区分三态、`verified` 只能来自跑通的检查
+（两条都有测试钉住）；`run-check` 的超时用例实测 **1.32s 收口**（`sleep 5` + 300ms 超时），
+证明"不会把调用方挂住"。
+
+**未做（留待以后）**：把 `verify_*`（LLM-as-a-Verifier，默认关闭）接成第二种校验来源。
+本项只用**确定性命令**做校验——这更符合 SoL-Pi 的"Demand a check that can distinguish the broken state"，
+而 LLM 评审是另一类（他们也是分开的：M15/M32 讲把评审证据绑定好，而不是拿它当唯一判据）。

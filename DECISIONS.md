@@ -2,6 +2,33 @@
 
 ## 格式
 
+### [2026-10-08] 目标完成语义三态（P1）：verified 只能来自"由 harness 实际跑通的检查"
+
+**来自 SoL-Pi 的发现**（项目页 P 族）："Separate verified, declared, and advisory completion modes"、
+"Require validation evidence before claiming completion"、"Demand a check that can distinguish the broken state"。
+
+**我们的缺口**：`goal` 的完成**只信模型自述**——`reason` 里我自己都写过"这是本功能唯一没有证据的一环"。
+
+**关键决定：`verified` 不许模型自封。** 否则三态就是摆设。做成**结构约束**而不是约定：
+`store/goal.ts` 只暴露 `declaredCompletion` / `advisoryCompletion` / `verifiedCompletion` 三个构造器，
+**只有第三个收得到「已跑通的检查结果」**，没有"带 mode 参数的通用完成函数"⇒ 不存在自封路径。
+并有测试锁这条映射（三个构造器 → 恰好 `['declared','advisory','verified']`）。
+
+**实现**：
+- 新 `store/run-check.ts`：`runCheckCommand(cmd)` 用 `sh -c` 执行**只读**检查，默认 120s 超时
+  （比 bash 前台 240s 上限短——检查本就该快）、输出留尾部 4000 字符、超时按失败且**不挂住调用方**。
+- `goal` 工具新增 `evidence` / `check`：
+  带 `check` 且 exit 0 → `verified`（留存命令+输出尾部+时间）；**非 0 → 目标不标记完成**并把输出回给模型；
+  不带 `check` → `declared`（文案明写"未经校验"）；`blocked`/`pause` 与**harness 自判的停止**
+  （轮次上限、连续无进展）→ `advisory`。
+- **不改任何旧默认**：不带 `check` 的 `goal complete` 行为与之前完全一致（只是现在被如实标注为 declared）。
+
+**为什么不用 LLM 评审当判据**：`verify_*`（LLM-as-a-Verifier）默认关闭，且 LLM 评审是另一类证据。
+确定性命令更贴合"能区分坏状态"的要求；把评审接成第二来源列为后续项。
+
+**验证**：`goal.test.ts` 16 项、`run-check.test.ts` 7 项；`tsc`/`check-features`/`check-conventions`/
+`check-dead-exports`/`golden` 全绿。超时用例实测 1.32s 收口（`sleep 5` + 300ms 超时）。
+
 ### [2026-10-07] fork 池化实测不成立：`new_session {parentSession}` 会"收下但不分叉"
 
 **要验证的假设**：把 `context: 'fork'` 也纳入常驻池——用 `new_session {parentSession}` 在每个任务前分叉，

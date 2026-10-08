@@ -13,8 +13,12 @@ import { registerTool } from '../../adapters/tool-adapter';
 import { registerCommand } from '../../adapters/ui-adapter';
 import { sendMessage, sendMessageAfterRebind } from '../../adapters/ui-adapter';
 import { getEffectiveModeConfig, resolveEffectiveMode } from '../mode/logic';
+import { describeCheck, runCheckCommand } from './store/run-check';
 import {
+  advisoryCompletion,
   createGoal,
+  declaredCompletion,
+  verifiedCompletion,
   continuePrompt,
   decideContinuation,
   goalStatusText,
@@ -938,7 +942,7 @@ export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
     name: 'goal',
     description:
-      '声明/查看/结束一个目标；声明后每轮结束会**自动续跑**，直到完成、受阻或达到轮次上限。action: set(objective 必填)/status/complete/blocked/pause/resume。上限按当前模式配置（full 256、其余默认 16、可被模式覆盖）；连续 3 轮无工具调用会自动判定受阻并停止。',
+      '声明/查看/结束一个目标；声明后每轮结束会**自动续跑**，直到完成、受阻或达到轮次上限。action: set(objective 必填)/status/complete/blocked/pause/resume。**完成分三态**：带 `check`（只读检查命令）且由 my-pi 跑通 = verified；不带 check 只能是 declared（声称完成）；blocked/pause 是 advisory。上限按当前模式配置（full 256、其余默认 16、可被模式覆盖）；连续 3 轮无工具调用会自动判定受阻并停止。',
     parameters: {
       action: {
         type: 'string',
@@ -947,6 +951,17 @@ export function register(pi: ExtensionAPI): void {
       },
       objective: { type: 'string', description: '目标描述（set 必填）', optional: true },
       note: { type: 'string', description: '结论或受阻原因（complete/blocked 建议填）', optional: true },
+      evidence: {
+        type: 'string',
+        description: 'complete 时的结论/证据说明（自由文本）。**不带 check 时只能是"声称完成"**。',
+        optional: true,
+      },
+      check: {
+        type: 'string',
+        description:
+          'complete 时可选：一条**只读**的检查命令（能区分完成与否，如跑定向测试）。由 my-pi 实际执行，exit 0 才把目标记为"已独立校验"；非 0 则目标**不会被标记完成**，并把输出尾部回给你。',
+        optional: true,
+      },
     },
     // 目标状态是共享可变的：与其它工具并发会得到错误结果
     executionMode: 'sequential',
@@ -962,9 +977,29 @@ export function register(pi: ExtensionAPI): void {
 每轮结束会自动续跑；完成时用 goal complete，推不动时用 goal blocked。`;
       }
       if (!goal) return goalStatusText(null);
-      if (action === 'complete' || action === 'blocked' || action === 'pause') {
-        const status = action === 'complete' ? 'complete' : action === 'blocked' ? 'blocked' : 'paused';
-        goal = { ...goal, status, note: typeof args.note === 'string' && args.note ? args.note : goal.note };
+      if (action === 'complete') {
+        const evidence = typeof args.evidence === 'string' ? args.evidence.trim() : '';
+        const check = typeof args.check === 'string' ? args.check.trim() : '';
+        if (check) {
+          // 独立校验：模型给判据，**harness 实际跑**（这才是 declared 与 verified 的区别）
+          const r = await runCheckCommand(check);
+          if (r.ok) {
+            goal = verifiedCompletion(goal, {
+              command: check,
+              outputTail: r.outputTail,
+              at: new Date().toISOString(),
+            });
+          } else {
+            // 不标记完成：模型自己要求了判据，就该按判据说话（这是新 opt-in 路径内的语义，不改旧默认）
+            goal = { ...goal, note: `${describeCheck(check, r)}${evidence ? `｜结论：${evidence}` : ''}` };
+            return `目标**未**标记完成——${describeCheck(check, r)}\n\n输出尾部：\n${r.outputTail.slice(-1200)}\n\n修好后重试 complete，或调用 goal blocked 说明卡点。`;
+          }
+        } else {
+          // 没有判据 ⇒ 只能是"声称完成"。模型**无法自己升级到 verified**（结构上由构造器保证）
+          goal = declaredCompletion(goal, evidence);
+        }
+      } else if (action === 'blocked' || action === 'pause') {
+        goal = advisoryCompletion(goal, action === 'blocked' ? 'blocked' : 'paused', typeof args.note === 'string' ? args.note : '');
       } else if (action === 'resume') {
         goal = { ...goal, status: 'active', note: '' };
       }

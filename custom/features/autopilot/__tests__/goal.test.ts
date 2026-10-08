@@ -10,6 +10,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   BLOCKED_AFTER_NO_PROGRESS_ROUNDS,
+  advisoryCompletion,
+  declaredCompletion,
+  verifiedCompletion,
   DEFAULT_GOAL_MAX_ROUNDS,
   FULL_MODE_GOAL_MAX_ROUNDS,
   continuePrompt,
@@ -110,5 +113,69 @@ describe('文案', () => {
     expect(t).toContain('进行中');
     expect(t).toContain('2/12');
     expect(t).toContain('卡在缺少凭据');
+  });
+});
+
+describe('完成语义三态（P1：模型不能自封 verified）', () => {
+  const base = () => createGoal('做 A', 10);
+
+  it('三个构造器一一对应三态，且 verified 只认"已跑通的检查"', () => {
+    const outs = [
+      declaredCompletion(base()).completionMode,
+      advisoryCompletion(base(), 'blocked', '卡住了').completionMode,
+      verifiedCompletion(base(), { command: 'npm test', outputTail: 'ok', at: '2026-10-08T00:00:00Z' }).completionMode,
+    ];
+    // 这条同时是契约：没有第四个能产出 'verified' 的入口（结构上把"自封"堵死）
+    expect(outs).toEqual(['declared', 'advisory', 'verified']);
+  });
+
+  it('declared：状态文案必须点明"未经校验"，带证据时把证据带上', () => {
+    const g1 = declaredCompletion(base());
+    expect(g1.status).toBe('complete');
+    expect(goalStatusText(g1)).toContain('declared');
+    expect(goalStatusText(g1)).toContain('未经校验');
+    expect(g1.note).toContain('未提供证据');
+
+    const g2 = declaredCompletion(base(), 'vitest 全绿');
+    expect(g2.note).toContain('vitest 全绿');
+    expect(g2.verification).toBeUndefined();
+  });
+
+  it('verified：必须留存校验命令与输出尾部，并在状态文案里可见', () => {
+    const g = verifiedCompletion(base(), {
+      command: 'bash scripts/golden-tasks.sh --fast',
+      outputTail: 'golden tasks 全部通过',
+      at: '2026-10-08T00:00:00Z',
+    });
+    expect(g.completionMode).toBe('verified');
+    expect(g.verification?.command).toContain('golden-tasks');
+    const text = goalStatusText(g);
+    expect(text).toContain('verified');
+    expect(text).toContain('已独立校验');
+    expect(text).toContain('golden-tasks');
+  });
+
+  it('advisory：受阻/暂停是判断性结论，不是证明', () => {
+    const g = advisoryCompletion(base(), 'blocked', '缺少凭据');
+    expect(g.status).toBe('blocked');
+    expect(goalStatusText(g)).toContain('advisory');
+    expect(goalStatusText(g)).toContain('缺少凭据');
+  });
+
+  it('harness 自己判定的停止也标 advisory（上限 / 连续无进展）', () => {
+    const capped = decideContinuation({ ...createGoal('x', 3), roundsUsed: 3 }, 5);
+    expect(capped.action).toBe('capped');
+    expect(capped.next.completionMode).toBe('advisory');
+
+    let g = createGoal('x', 10);
+    g = decideContinuation(g, 0).next;
+    g = decideContinuation(g, 0).next;
+    const blocked = decideContinuation(g, 0);
+    expect(blocked.action).toBe('blocked');
+    expect(blocked.next.completionMode).toBe('advisory');
+  });
+
+  it('新建的目标完成语义为空（未结束不该有完成态）', () => {
+    expect(createGoal('x', 5).completionMode).toBeNull();
   });
 });

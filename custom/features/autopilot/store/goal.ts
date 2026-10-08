@@ -19,6 +19,15 @@
 
 export type GoalStatus = 'active' | 'paused' | 'complete' | 'blocked';
 
+/**
+ * **完成语义三态**（借鉴 SoL-Pi："Separate verified, declared, and advisory completion modes"）。
+ *
+ * - `declared`  —— 模型**声称**完成。这是模型唯一能自己给出的级别（自封 `verified` 会让区分变成摆设）。
+ * - `verified`  —— 有**独立于模型叙述**的证据：模型给出可判定的检查命令，**由 my-pi 实际跑通**（exit 0）。
+ * - `advisory`  —— 受阻/暂停这类**判断性**结论（不是证明）。
+ */
+export type GoalCompletionMode = 'declared' | 'verified' | 'advisory';
+
 export interface GoalState {
   objective: string;
   status: GoalStatus;
@@ -29,6 +38,10 @@ export interface GoalState {
   noProgressRounds: number;
   /** 状态说明（为什么停的） */
   note: string;
+  /** 完成语义（未结束前为 null）；见 GoalCompletionMode */
+  completionMode: GoalCompletionMode | null;
+  /** 独立校验的凭据（仅 `verified` 会有）：检查命令 + 输出尾部 + 时间 */
+  verification?: { command: string; outputTail: string; at: string };
 }
 
 /** 连续多少轮没有任何工具调用就判定受阻（对齐 DSH 的 blockedAfterConsecutiveRounds） */
@@ -50,7 +63,15 @@ export function resolveGoalCap(modeName: string, configured: number | null | und
 }
 
 export function createGoal(objective: string, maxRounds: number): GoalState {
-  return { objective, status: 'active', roundsUsed: 0, maxRounds, noProgressRounds: 0, note: '' };
+  return {
+    objective,
+    status: 'active',
+    roundsUsed: 0,
+    maxRounds,
+    noProgressRounds: 0,
+    note: '',
+    completionMode: null,
+  };
 }
 
 export type GoalAction = 'continue' | 'paused' | 'complete' | 'blocked' | 'capped';
@@ -73,7 +94,8 @@ export function decideContinuation(goal: GoalState, toolCallsThisRound: number):
 
   if (goal.roundsUsed >= goal.maxRounds) {
     const note = `达到轮次上限 ${goal.maxRounds}`;
-    return { next: { ...goal, status: 'blocked', note }, action: 'capped', reason: note };
+    // harness 自己判定的停止属于"判断性结论"，不是模型声称、也没有独立校验 → advisory
+    return { next: { ...goal, status: 'blocked', completionMode: 'advisory', note }, action: 'capped', reason: note };
   }
 
   if (toolCallsThisRound > 0) {
@@ -88,7 +110,14 @@ export function decideContinuation(goal: GoalState, toolCallsThisRound: number):
   if (noProgress >= BLOCKED_AFTER_NO_PROGRESS_ROUNDS) {
     const note = `连续 ${noProgress} 轮没有任何工具调用（没有推进）`;
     return {
-      next: { ...goal, roundsUsed: goal.roundsUsed + 1, noProgressRounds: noProgress, status: 'blocked', note },
+      next: {
+        ...goal,
+        roundsUsed: goal.roundsUsed + 1,
+        noProgressRounds: noProgress,
+        status: 'blocked',
+        completionMode: 'advisory',
+        note,
+      },
       action: 'blocked',
       reason: note,
     };
@@ -107,18 +136,56 @@ export function continuePrompt(goal: GoalState): string {
     `[目标续跑 ${goal.roundsUsed}/${goal.maxRounds}] 继续推进这个目标，不要重新汇报或复述计划：`,
     goal.objective,
     '',
-    `剩余约 ${left} 轮。完成时调用 \`goal complete\`（带一句结论）；确实推不动时调用 \`goal blocked\`（说明卡在哪）。`,
+    `剩余约 ${left} 轮。完成时调用 \`goal complete\`；**想让它算"已校验"就带 \`check\`（一条能区分完成与否的只读命令）**，` +
+      `否则只会被记为"声称完成（未经校验）"。确实推不动时调用 \`goal blocked\`（说明卡在哪）。`,
     '本轮若无需动作就直接给出结论——连续 3 轮没有工具调用会被自动判定为受阻并停止。',
   ].join('\n');
+}
+
+/**
+ * 完成态构造器。**分成三个入口而不是一个 `mode` 参数**，是为了让"模型不能自封 verified"成为
+ * **结构约束**而不是约定：只有 `verifiedCompletion` 收得到「已跑通的检查结果」。
+ */
+export function declaredCompletion(goal: GoalState, evidence?: string): GoalState {
+  return {
+    ...goal,
+    status: 'complete',
+    completionMode: 'declared',
+    note: evidence ? `声称完成（未经校验）：${evidence}` : '声称完成（未提供证据，未经校验）',
+  };
+}
+
+export function advisoryCompletion(goal: GoalState, status: 'blocked' | 'paused', note: string): GoalState {
+  return { ...goal, status, completionMode: 'advisory', note: note || goal.note };
+}
+
+export function verifiedCompletion(
+  goal: GoalState,
+  check: { command: string; outputTail: string; at: string },
+): GoalState {
+  return {
+    ...goal,
+    status: 'complete',
+    completionMode: 'verified',
+    note: `已通过独立校验：\`${check.command}\``,
+    verification: check,
+  };
 }
 
 /** 状态文案（工具返回 / 通知用） */
 export function goalStatusText(goal: GoalState | null): string {
   if (!goal) return '当前没有目标（用 `goal set` 声明一个目标后才会自动续跑）。';
   const label: Record<GoalStatus, string> = { active: '进行中', paused: '已暂停', complete: '已完成', blocked: '受阻' };
+  const modeLabel: Record<GoalCompletionMode, string> = {
+    declared: 'declared（声称完成，未经校验）',
+    verified: 'verified（已独立校验）',
+    advisory: 'advisory（判断性结论，不是证明）',
+  };
   return [
     `目标：${goal.objective}`,
     `状态：${label[goal.status]}　轮次：${goal.roundsUsed}/${goal.maxRounds}　连续无进展：${goal.noProgressRounds}`,
+    goal.completionMode ? `完成语义：${modeLabel[goal.completionMode]}` : '',
+    goal.verification ? `校验命令：\`${goal.verification.command}\`（输出尾部：${goal.verification.outputTail.slice(-160)}）` : '',
     goal.note ? `说明：${goal.note}` : '',
   ]
     .filter(Boolean)
