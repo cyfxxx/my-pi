@@ -31,6 +31,24 @@ const HELP = `浏览器工具集:
   browser_close()                        关闭浏览器
   browser_help()                         本帮助`;
 
+/**
+ * 18 个浏览器工具统一用 `deferred` 暴露方式（2026-10-07）。
+ *
+ * 为什么：这一组实测 18 个工具 / 约 6.3KB 声明，是注册面里第二大的单组；而 30 天真实调用分布显示
+ * 它的 28 次调用**全部挤在 1.0 天内**（其中 15 个工具是同一分钟被逐个试了一遍），此后 10 天零调用。
+ * `deferred` 的语义是"**注册但不声明**"——pi 只在 `direct`/`model-only` 时"注册即激活"，其余暴露方式
+ * 不激活，因此这些工具**不占请求前缀的字节**，模型改用 `tool_search` 按需把它们拉出来。
+ *
+ * 前置条件（缺一不可）：
+ *   1. `tool_search` 必须激活（`settings.json` 的 `defaultTools` 里有 `+tool_search`）；
+ *   2. 检索要能命中——pi 原生的分词是 `split(/[^a-z0-9]+/)`，**中文全部被当分隔符丢掉**，
+ *      中文 query 会得到 0 个词、返回"No matching tools found."。修正是
+ *      `patches/011-tool-search-cjk.patch`（给 CJK 连续段补 2 字 bigram）。
+ *      守门：`custom/adapters/__tests__/tool-search-cjk.test.ts`。
+ *   3. `custom/adapters/tool-adapter.ts` 必须把这个字段透传给 pi（漏了就静默退化成"默认声明"）。
+ */
+const BROWSER_EXPOSURE = 'deferred' as const;
+
 export function register(pi: ExtensionAPI): void {
   const cfg = loadConfig();
   const browser = new BrowserManager(cfg.browser, () => process.env.PI_BROWSER_PROXY || null);
@@ -39,6 +57,7 @@ export function register(pi: ExtensionAPI): void {
   };
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_navigate',
     description: '在浏览器中打开 URL。text_mode: summary（默认，标题+关键段落）/ full（整页文本）/ none。',
     parameters: {
@@ -56,6 +75,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_screenshot',
     description: '对当前页面截图并保存到本地，返回文件路径。',
     parameters: { full_page: { type: 'boolean', description: '是否整页截图', optional: true } },
@@ -66,6 +86,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_click',
     description: '点击页面：提供 selector 用元素点击，否则用 x/y 坐标。',
     parameters: {
@@ -90,6 +111,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_type',
     description: '输入文本（提供 selector 时填入该元素，否则在焦点处键入）。',
     parameters: {
@@ -104,6 +126,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_scroll',
     description: '滚动当前页面。',
     parameters: {
@@ -122,6 +145,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_extract',
     description: '提取页面（或指定选择器）的文本内容。',
     parameters: { selector: { type: 'string', description: 'CSS 选择器（留空提取整页）', optional: true } },
@@ -133,6 +157,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_evaluate',
     description: '在页面中执行 JavaScript，返回 JSON 序列化结果。',
     parameters: { script: { type: 'string', description: '要执行的 JS 表达式' } },
@@ -144,6 +169,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_find',
     description: '穿透 Shadow DOM 查找首个匹配元素，返回中心坐标与文本。',
     parameters: { selector: { type: 'string', description: 'CSS 选择器' } },
@@ -155,6 +181,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_wait_for',
     description: '等待选择器到位或网络空闲。',
     parameters: {
@@ -173,6 +200,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_network',
     description: '查询最近网络请求日志（支持 URL/方法/类型过滤）。',
     parameters: {
@@ -199,6 +227,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_select_option',
     description: '选择 <select> 下拉框选项（按 value 或可见文本）。',
     parameters: {
@@ -214,6 +243,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_dialog',
     description: '设置弹窗处理策略（accept/dismiss/input），或查询最近弹窗文本。',
     parameters: {
@@ -232,6 +262,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_download',
     description: '查看已下载文件列表，或设置下载保存目录。',
     parameters: { dir: { type: 'string', description: '设置下载目录（可选）', optional: true } },
@@ -243,6 +274,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_upload',
     description: '向 <input type="file"> 设置要上传的本地文件路径（拒绝敏感凭据文件）。',
     parameters: {
@@ -257,6 +289,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_cookies',
     description: '读取（get）或新增（set）cookie。',
     parameters: {
@@ -278,6 +311,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_pdf',
     description: '将当前页面打印为 PDF 并返回文件路径。',
     parameters: { path: { type: 'string', description: '保存路径（可选）', optional: true } },
@@ -288,6 +322,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_help',
     description: '显示浏览器工具用法帮助。',
     parameters: {},
@@ -295,6 +330,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   registerTool(pi, {
+    exposure: BROWSER_EXPOSURE,
     name: 'browser_close',
     description: '关闭浏览器并释放资源。',
     parameters: {},

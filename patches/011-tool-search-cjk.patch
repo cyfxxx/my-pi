@@ -1,0 +1,35 @@
+diff --git a/packages/coding-agent/src/extensions/tool-search/tool.ts b/packages/coding-agent/src/extensions/tool-search/tool.ts
+index 85b29a4cd..2aae1ba95 100644
+--- a/packages/coding-agent/src/extensions/tool-search/tool.ts
++++ b/packages/coding-agent/src/extensions/tool-search/tool.ts
+@@ -70,13 +70,29 @@ function stem(term: string): string {
+ 
+ /** Lowercase terms, split at camelCase boundaries and non-alphanumerics, without stop words. */
+ export function tokenize(text: string): string[] {
+-	return text
++	const terms = text
+ 		.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+ 		.replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+ 		.toLowerCase()
+ 		.split(/[^a-z0-9]+/)
+ 		.filter((term) => term.length > 0 && !STOP_WORDS.has(term))
+ 		.map(stem);
++	// Patch (011-tool-search-cjk): the split above treats every run of non-`a-z0-9` as a separator,
++	// so CJK text contributes no terms at all. A tool document written in Chinese then reduces to
++	// just its English identifier and parameter names, and a Chinese query tokenizes to an empty
++	// list, so `tool_search` answers "No matching tools found." for every such query. Measured with
++	// real tool metadata: 5/5 realistic Chinese queries returned 0 terms and no result, while the
++	// same intent in English matched. A model cannot compensate by using the English name, because
++	// deferred tools are exactly the ones it has not been told about. Add 2-character bigrams for
++	// CJK runs so both documents and queries carry CJK terms; the English path above is untouched.
++	for (const run of text.match(/[\u3400-\u4dbf\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+/g) ?? []) {
++		if (run.length === 1) {
++			terms.push(run);
++			continue;
++		}
++		for (let i = 0; i + 1 < run.length; i++) terms.push(run.slice(i, i + 2));
++	}
++	return terms;
+ }
+ 
+ function isObject(value: unknown): value is Record<string, unknown> {

@@ -6,7 +6,8 @@
   "defaultTools": [
     "+grep",
     "+find",
-    "+ls"
+    "+ls",
+    "+tool_search"
   ],
   "steeringMode": "all",
   "followUpMode": "all",

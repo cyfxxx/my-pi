@@ -15,8 +15,9 @@ patches/
 ├── 006-footer-cost-and-cache-window.patch  # 汇率可配置 + CH 右值改最近 20 轮滑动窗口
 ├── 007-footer-reorder.patch   # stats 行重排 + 去掉 ↑未命中 + CH 收敛为会话累计单值
 ├── 008-footer-cache-var-cleanup.patch  # 清理 007 遗留的 latestCacheHitRate 引用（修复 tsc 编译）
-└── 009-footer-badge.patch     # footer 第一行 badge：`badge:` 前缀状态渲染到 pwd/branch 旁
-└── 010-disable-share-bug.patch    # 禁用 `/share` 与 `/bug`（私人助手不外发会话内容）
+├── 009-footer-badge.patch     # footer 第一行 badge：`badge:` 前缀状态渲染到 pwd/branch 旁
+├── 010-disable-share-bug.patch    # 禁用 `/share` 与 `/bug`（私人助手不外发会话内容）
+└── 011-tool-search-cjk.patch      # tool_search 分词补 CJK 2 字 bigram（中文 query 检索得到 deferred 工具）
 ```
 
 ## 补丁命名规范
@@ -39,6 +40,7 @@ patches/
 | `008-footer-cache-var-cleanup.patch` | 007 删除了 `latestCacheHitRate` 的声明与赋值，但漏删 `SessionStats` 接口字段、stats 对象属性与 render 解构三处引用，导致 `tsc` 报 TS18004；本补丁补齐删除 | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `009-footer-badge.patch` | **footer 第一行的常驻模式标识**：扩展状态 key 以 `badge:` 前缀注册时，剥离前缀后用 `warning` 色渲染在 `~/my-pi (main)` 之后（其余 key 仍走第三行状态行）。动机：计划模式是强只读约束，此前进入后仅一次性 `notify`（提示一滚走就无从判断），`/plan status` 又要主动查询；模式标识与「当前目录/分支」同属会话级状态，应常驻在 pwd 行。用前缀而非白名单，后续模式（roleplay 等）可零改动复用。当前消费方：`custom/features/plan-mode`（`badge:plan`） | `vendor/pi/packages/coding-agent/src/modes/interactive/components/footer.ts` |
 | `010-disable-share-bug.patch` | 禁用 `/share`（会话上传 Radius 网关/GitHub gist）与 `/bug`（诊断上传 Earendil）：命令表删除两项，两个 handler 早退并提示已禁用，崩溃提示改为只指向本地调试日志。动机：私人助手不允许把会话内容发往外部 | `vendor/pi/packages/coding-agent/src/core/slash-commands.ts`、`vendor/pi/packages/coding-agent/src/modes/interactive/interactive-mode.ts` |
+| `011-tool-search-cjk.patch` | **让 `tool_search` 的分词认识中文**：上游 `tokenize` 是 `toLowerCase().split(/[^a-z0-9]+/)`，**非 a-z0-9 一律当分隔符**，于是 CJK 全部被丢掉——中文工具描述只贡献它的英文标识符与参数名（实测 `browser_screenshot` 的检索文档只剩 6 个词），中文 query 更是得到 **0 个词**、`tool_search` 永远答 "No matching tools found."。而 deferred 工具恰恰是模型**没被告知过**的工具，它不可能改用英文名去搜，所以这条链在中文优先环境里等于不可用（实测 5/5 真实中文 query 无结果）。补丁给 CJK 连续段补 2 字 bigram（英文路径完全不变），实测 7 个中文 query 中 6 个命中正确工具。动机：browser 的 18 个工具改走 `exposure: 'deferred'`（注册但不声明 = 0 前缀字节）后，必须靠 `tool_search` 按需拉出 | `vendor/pi/packages/coding-agent/src/extensions/tool-search/tool.ts` |
 
 ## 验证补丁
 

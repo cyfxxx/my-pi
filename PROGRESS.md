@@ -2430,3 +2430,21 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   7 个中文 query 中 6 个命中正确工具（"填写表单"失败是 `browser_type` 文案问题）。
 - 结论：**保持 browser 走 `DEFAULT_OFF_FEATURES`**；将来先打 CJK 分词补丁、再上 deferred+tool_search
   （前缀净 −5.65KB，且不再需要重启）。详见 `DECISIONS.md` 同条（含复现命令与三条备选路线的代价）。
+
+### browser 改走 `deferred`（注册但不声明）+ 补 patches/011 让 tool_search 认识中文（2026-10-07）
+
+- 新增**第 11 个补丁** `011-tool-search-cjk.patch`：给 pi 的 `tokenize` 补 CJK 连续段 2 字 bigram
+  （英文路径完全不变），带 `Patch (011-tool-search-cjk):` 自标记。实测 `browser_screenshot` 的检索文档
+  token **6 → 25**，7 个真实中文 query **6 个命中正确工具**。dist 已重建。
+- `tool-adapter.ts` 透传 `exposure`：原先只拷贝 5 个字段，漏转发会让 `deferred` **静默退化成默认声明**。
+- browser 18 个工具全部 `deferred`（`BROWSER_EXPOSURE` 常量 + 机械插入）；`settings.json` 启用
+  `+tool_search`；browser **移出 `DEFAULT_OFF_FEATURES`**——判据是它的**注册没有副作用**（浏览器进程
+  首次调用才起），voice/link 注册即有副作用（whisper 服务 / 入站远控通道）故仍在名单里。
+- **端到端实测（真实无头会话）**：`toolsBytes` **38 383 → 28 320（−26%）**；声明工具 **45 个**
+  （= 注册 61 − 默认关闭 5 − browser 18 不声明 + 7 内置，与预测完全吻合）；请求里 `browser_*` **18 → 0**、
+  `tool_search` **无 → 有**。
+- 取舍：相对"默认关闭"是 **+0.65KB**（tool_search 自身）换"要用时不用重启"（代价是一次前缀重算）；
+  相对"常年声明"是 **−5.65KB**。选它是因为它对齐"减少中断"这个更高优先级诉求。
+- 守门：新增 `custom/adapters/__tests__/tool-exposure.test.ts` **7 项**，驱动 pi 的真实实现
+  （补丁被上游冲掉即红）；`roleplay-surface.test.ts` 的 `defaultTools` 精确断言已同步。
+- 验证：tsc 干净；vitest **79 文件 892 例**；check-features / conventions / check-patches-behavior（11 补丁）全绿。

@@ -2,6 +2,57 @@
 
 ## 格式
 
+### [2026-10-07] browser 改走 `exposure: 'deferred'`：注册但不声明（补 patches/011 让 tool_search 认识中文）
+
+**背景**：上一批的可行性调研实测发现，pi 原生的 `exposure: 'deferred'` + `tool_search` 是比
+"默认关闭"更轻的手段——**注册但不声明 = 0 前缀字节，且要用时不用重启**；但**中文环境里不可用**，
+因为 `tokenize` 把 CJK 全当分隔符（5/5 真实中文 query 得到 0 个词、`tool_search` 永远答"无结果"），
+而 deferred 工具恰恰是模型没被告知过的，它不可能改用英文名去搜。当时结论是"暂不采用"。
+本次按用户口径执行：**先补 CJK 分词，再上机制**。
+
+**改动一：`patches/011-tool-search-cjk.patch`（新增第 11 个补丁）**
+给 `tokenize` 补 CJK 连续段的 2 字 bigram，**英文路径完全不变**（原 `split` 的结果先算好，bigram 追加在后面）。
+自标记 `Patch (011-tool-search-cjk):` 使行为守门能锚定它（`check-patches-behavior.mjs` ✓）。
+实测（真实 browser 工具元数据）：`browser_screenshot` 的检索文档 token **6 → 25**；
+7 个真实中文 query 中 **6 个命中正确工具**（截图→`browser_screenshot`、点击按钮→`browser_click`、
+下载文件→`browser_download`、抓取页面内容→`browser_extract`、打开网页→`browser_navigate`）；
+唯一失败的"填写表单"是 `browser_type` 的**文案**问题（描述写的是"输入文本"），不是机制问题。
+dist 已重建（`bash scripts/build.sh`），产物里带补丁。
+
+**改动二：适配器透传 `exposure`**
+`custom/adapters/tool-adapter.ts` 原先**只显式拷贝** `name/label/description/parameters/execute`，
+不转发 `exposure`——漏转发会让 `deferred` **静默退化成"默认声明"**（白占前缀却毫无察觉）。
+现在按需转发（未声明时不传字段，让 pi 用自己的默认值，而不是被我们写死成 `direct`）。
+
+**改动三：browser 18 个工具全部 `deferred` + `settings.json` 启用 `+tool_search` + browser 移出 `DEFAULT_OFF_FEATURES`**
+判据是 browser 与 voice/link 的**关键区别**：browser 的**注册本身没有副作用**（只是登记 18 个工具，
+浏览器进程要到第一次调用才起），所以它不需要"默认关闭"这种重手段；voice（拉起 whisper 服务）/
+link（打开入站远控通道）注册即有副作用，`deferred` 对它们没有意义，仍留在 `DEFAULT_OFF_FEATURES`。
+
+**端到端实测（真实无头会话，`./my-pi.sh -p`，读会话文件的 `toolsAdded` 与指纹日志的 `toolsBytes`）**：
+
+| | 改前 | 改后 |
+|---|---|---|
+| `toolsBytes`（实际请求的工具声明） | 38 383 | **28 320（−10 063 B，−26%）** |
+| 声明工具数 | — | **45**（38 个 my-pi 工具 + 7 个 pi 内置；与"注册 61 − 默认关闭 5 − browser 18 不声明 + 7"完全吻合） |
+| 请求里出现 `browser_*` | 18 个 | **0 个** |
+| 请求里出现 `tool_search` | 无 | **有** |
+
+**取舍要诚实说**：相对**改前的状态**（browser 走默认关闭），这次是 **+约 0.65KB**（`tool_search` 自身的声明）
+换"要用浏览器时不用重启"——`tool_search` 命中会改变工具数组，代价是**一次整段前缀重算**。
+相对"browser 常年声明"则是 **−约 5.65KB**。选它的理由是它对齐"减少中断"这个更高优先级的诉求：
+默认关闭的重启会丢掉当前会话上下文，而前缀重算是可付的一次性成本。
+
+**守门**：新增 `custom/adapters/__tests__/tool-exposure.test.ts`（**7 项**），驱动的是 **pi 的真实实现**
+（`tokenize` / `createToolSearchDocument` / `tool_search` 定义），不是复刻：
+① 适配器必须透传 `exposure`（漏转发即红）；② 中文 query 与中文描述必须产出检索词（**补丁被上游冲掉即红**）；
+③ 中文 query 能激活 deferred 工具、`direct` 工具不会被误加载、英文 query 仍可用；④ browser 全部 18 个都是 `deferred`。
+其中测试用**运行时拼出的路径**动态导入 vendor，避免 `tsc -p custom/` 把整棵 `vendor/pi` 纳入自定义层的
+类型检查（否则 vendor 自身的类型问题会污染本仓库的 tsc 门禁）。
+
+**验证**：tsc 干净；vitest **79 文件 892 例**（+7）；`check-features` / `check-conventions` /
+`check-patches-behavior`（11 个补丁）全绿；`roleplay-surface.test.ts` 的 `defaultTools` 精确断言已同步。
+
 ### [2026-10-07] 调研：重型工具"只给子代理"与 `deferred` + `tool_search` 两条路的实测结论（**暂不采用**）
 
 **起因**：提出一个想法——像 browser 这类重型工具能否只给子代理用、主会话默认关闭，以此减少工具数量

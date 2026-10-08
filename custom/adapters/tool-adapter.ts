@@ -68,6 +68,15 @@ export interface ToolDefinition {
   description: string;
   parameters: Record<string, ToolParameter>;
   execute: (args: Record<string, unknown>, ctx?: ToolExecuteContext) => Promise<string>;
+  /**
+   * 可选：工具对模型的**暴露方式**（透传给 Pi）。默认 `direct`（注册即激活、直接声明给模型）。
+   *
+   * `deferred` = **不进声明**（0 前缀字节），要等模型调用 `tool_search` 命中后才被激活声明。
+   * 用途：重型工具组（如 browser 的 18 个工具）默认不占前缀，需要时由 `tool_search` 按需拉出。
+   * 前置条件：`tool_search` 必须处于激活状态，且**检索要能命中**——pi 的分词原先丢弃全部 CJK，
+   * 中文 query 会得到 0 token（见 `patches/011-tool-search-cjk.patch`）。
+   */
+  exposure?: 'direct' | 'model-only' | 'codemode' | 'deferred' | 'hidden';
   /** 可选：TUI 渲染回调（透传给 Pi；theme/context 不透明） */
   renderCall?: (args: Record<string, unknown>, theme: unknown, context: unknown) => unknown;
   renderResult?: (
@@ -155,6 +164,9 @@ export function registerTool(pi: ExtensionAPI, def: ToolDefinition): void {
     label: def.name,
     description: def.description,
     parameters: buildParameterSchema(def.parameters),
+    // 暴露方式必须转发：`deferred` 的工具不会在注册时被激活，因此不进请求声明（省前缀字节），
+    // 只由 `tool_search` 命中后激活。漏转发会让"deferred"静默退化成"默认声明"。
+    ...(def.exposure ? { exposure: def.exposure } : {}),
     execute: async (
       _toolCallId: string,
       params: Record<string, unknown>,

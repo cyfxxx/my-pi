@@ -45,7 +45,10 @@ describe('roleplay 工具面契约（mode = 启动档位）', () => {
     const list = tools as string[];
     expect(list.length).toBeGreaterThan(0);
     for (const entry of list) expect(entry.startsWith('+')).toBe(true);
-    // roleplay 需要的文件检索三件套；不趁机把 browser_* / admin_* 之类塞进来
-    expect(list).toEqual(['+grep', '+find', '+ls']);
+    // roleplay 需要的文件检索三件套；不趁机把 browser_* / admin_* 之类塞进来。
+    // `+tool_search` 是 2026-10-07 加入的：browser 的 18 个工具改走 `exposure: 'deferred'`
+    // （注册但不声明 = 不占前缀字节），必须靠它按需拉出；
+    // 见 custom/adapters/__tests__/tool-exposure.test.ts 与 patches/011-tool-search-cjk.patch。
+    expect(list).toEqual(['+grep', '+find', '+ls', '+tool_search']);
   });
 });

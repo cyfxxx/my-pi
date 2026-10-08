@@ -373,20 +373,23 @@ export function getEffectiveModeConfig(): ModeConfig {
 /**
  * **默认关闭**的功能：`'*'`（"全部功能"模式）**不**包含它们。
  *
- * 为什么需要这一档：`full` 模式用的是 `features: ['*']`。而这三个属于"装好了但极少用"的重功能——
- * voice 启动时会拉起 whisper 服务，link 会打开入站远控通道，browser 要 18 个工具声明。
- * 把它们留在 `'*'` 里等于每次启动都付固定成本（23 个工具、约 8KB 工具声明、2 个命令、1 个快捷键），
- * 却几乎不会被调用。
+ * 为什么需要这一档：`full` 模式用的是 `features: ['*']`。而这两个属于"装好了但极少用、且**注册本身
+ * 有副作用**"的重功能——voice 启动时会拉起 whisper 服务，link 会打开入站远控通道。把它们留在 `'*'`
+ * 里等于每次启动都付固定成本（5 个工具、2 个命令、1 个快捷键，外加两个常驻服务/通道），却几乎不会被调用。
  *
  * **判据是实测调用分布，不是印象**（`portable/memory/stats/tool-count-localhost.json`，30 天窗口）：
- *   · browser  28 次调用**全部挤在 1.0 天内**（其中 15 个工具是同一分钟被逐个试了一遍），此后 10 天零调用；
- *   · voice     5 次 / link 3 次，跨度同为 1 天 → 同属"探索过一次就没再用"。
- *   对照：autopilot 27 次跨 11.7 天、memory 26 次跨 13.7 天 → 真日常，**不**放进这一档。
+ *   · voice 5 次 / link 3 次，跨度同为 1 天 → "探索过一次就没再用"。
+ *   对照：autopilot 27 次跨 11.7 天、memory 26 次跨 13.7 天 → 真日常，**不**放进这一档（只做合并/精简）。
  *
- * 启用方式：**显式列进某个模式的 `features`**（`['*', 'browser']` 也成立）。
- * 2026-10-07：先按用户口径关闭 voice/link，随后按上面的实测数据把 browser 一并归入。
+ * 启用方式：**显式列进某个模式的 `features`**（`['*', 'voice']` 也成立）。
+ *
+ * **2026-10-07 后续：browser 从这里移出，改走 `deferred`。** 理由是它与 voice/link 有一处**关键区别**：
+ * browser 的**注册本身没有副作用**（只是登记 18 个工具，浏览器进程要到第一次调用才起），所以它不需要
+ * "默认关闭"这种重手段——`exposure: 'deferred'`（注册但不声明 = 0 前缀字节）就能达到同样的省字节效果，
+ * 而且**要用时不用重启**（`tool_search` 按需拉出）。详见 `custom/features/browser/index.ts` 的
+ * `BROWSER_EXPOSURE` 与 `patches/011-tool-search-cjk.patch`。
  */
-export const DEFAULT_OFF_FEATURES: ReadonlySet<string> = new Set(['voice', 'link', 'browser']);
+export const DEFAULT_OFF_FEATURES: ReadonlySet<string> = new Set(['voice', 'link']);
 
 /** 该功能是否在当前模式启用 */
 export function isFeatureEnabled(featureName: string, config: ModeConfig): boolean {
