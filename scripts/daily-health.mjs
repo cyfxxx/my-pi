@@ -47,6 +47,9 @@ const FINGERPRINTS = process.env.PI_PREFIX_FINGERPRINT_FILE || join(MEM, 'logs',
 // 上下文压缩记录（context 功能的 compact 检查点）。只取 ts/reason，用于把"压缩导致的
 // 前缀重放"与"来源不明的缓存退化"分开；目录不存在（测试夹具/新设备）时整条逻辑为空。
 const COMPACT_DIR = process.env.PI_HEALTH_COMPACT_DIR || join(MEM, 'checkpoints', 'compact');
+// 压缩回本（P2 观察，context/budget/compact-payback.ts 产出）：每次压缩前记一条"按回本算值不值"。
+// 这里只统计**回本轮数**的分布，用来回答"这些压缩是不是压早了"——不改任何压缩行为。
+const COMPACT_PAYBACK = process.env.PI_COMPACT_PAYBACK_FILE || join(MEM, 'logs', 'compact-payback.jsonl');
 /** 缓存安全线：低于此命中率视为退化（日常应在 97% 以上；加权口径） */
 const HIT_FLOOR = Number(process.env.PI_HEALTH_HIT_FLOOR) || 0.97;
 /** 每次调用的未命中输入上限：超过说明存在整段重算 */
@@ -425,7 +428,17 @@ const bashStepStr = bashPerStep ? `p50=${bashPerStep.p50}/p90=${bashPerStep.p90}
 const singleCmdStr = singleCmd
   ? `${(singleRatio * 100).toFixed(1)}%(${singleCmd.single}/${singleCmd.total})`
   : 'n/a(旧记录无字段)';
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+// 压缩回本分布：paybackTurns = "还要几轮才回本"（客观数，不依赖剩余轮次估计）
+const paybackRows = loadJSONL(COMPACT_PAYBACK).filter(inWindow);
+const paybackTurnsArr = paybackRows
+  .map((r) => r.paybackTurns)
+  .filter((n) => typeof n === 'number')
+  .sort((a, b) => a - b);
+const paybackStr = paybackRows.length
+  ? `p50=${percentile(paybackTurnsArr, 50) ?? 'n/a'}/n=${paybackRows.length}`
+  : 'n/a';
+
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);

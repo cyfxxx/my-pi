@@ -2,6 +2,31 @@
 
 ## 格式
 
+### [2026-10-08] 压缩"回本"估算（P2）：只建立测量，不接管阈值
+
+**来自 SoL-Pi 的发现**：压缩是**一次前缀重写**，触发时钟不该只是"上下文压力"，还要看**预期未来节省能否
+还清重写成本**（Online Context Compact：把子任务完成当触发点，且只在能回本时动作）。
+
+**我们的缺口**：`auto-compact.ts` 是纯阈值驱动（0.8/0.85），**没有任何回本计算**。而重写的代价我们实测过：
+那次会话 259,833 未命中里 **60.8% 只来自 2 次 system 段翻转**。
+
+**决策：本项只算不决策。** 新增 `compact-payback.ts` 给出**与剩余轮次无关的客观数** `paybackTurns`
+（还要几轮才回本）。没给剩余轮次估计时 `verdict = 'unknown'`——**不做猜测**。接管阈值是改默认行为，
+留给用户决策。
+
+**成本模型（显式，便于以后修正）**：`savedPerTurn = 上下文 − 摘要`；
+`rewriteCostTokens = 上下文 × (1 + missPremium)`（生成摘要读一遍整段 + 压缩后整段前缀失效重读一遍）；
+`missPremium` 默认 49（命中价约为未命中 1/50）。模型偏保守（成本算高）。
+
+**量化结果**：默认参数下**回本约 60 轮**；把缓存溢价设为 0 时只需 **2 轮** ⇒
+**"重写很贵"几乎全部来自缓存失效**，不是摘要本身的开销。这条把我们的成本结构说清楚了。
+
+**观察点位置有讲究**：必须放在 `session_before_compact` 处理器**最前面**——自动压缩分支此前会因
+`snapshotDoneForCompact` 提前 `return`。整个观察段包 try/catch：观察失败绝不影响压缩。
+
+**测试抓到的真实缺陷**：`missPremium: NaN` 会污染 `paybackTurns`（`Number.isFinite` 变 false）。
+根因是 `missPremium` 合法值含 0，不能套用"必须 > 0"的通用正数守卫。已加显式有限性检查。
+
 ### [2026-10-08] 目标完成语义三态（P1）：verified 只能来自"由 harness 实际跑通的检查"
 
 **来自 SoL-Pi 的发现**（项目页 P 族）："Separate verified, declared, and advisory completion modes"、

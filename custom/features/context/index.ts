@@ -8,7 +8,7 @@
  * 迁移自 pi-tools pi-context：使用真实 contextWindow/用量校准上下文预算。
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { registerHook } from '../../adapters/hook-adapter';
@@ -21,6 +21,12 @@ import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from '.
 import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
 import { buildSkillsCatalog, skillsCatalogKey, SKILLS_CATALOG_TAG, type SkillLike } from './budget/skills-catalog';
 import { createRepeatState, observeRepeat, repeatReminderText } from './budget/repeat-reminder';
+import {
+  DEFAULT_MISS_PREMIUM,
+  DEFAULT_SUMMARY_RATIO,
+  estimateCompactPayback,
+  formatPayback,
+} from './budget/compact-payback';
 import { normalizeSessionTitle, MAX_SESSION_TITLE_BYTES } from './budget/session-title';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
@@ -136,6 +142,9 @@ export function register(pi: ExtensionAPI): void {
   let lastFingerprint: PrefixFingerprint | null = null;
   // 加固块丢失的独立台账（量小、只在实际丢失时写）：这是"整段前缀作废"的直接证据。
   const appendLostFile = process.env.PI_SYSTEM_APPEND_LOST_FILE || join(getMemoryDir(), 'logs', 'system-append-lost.jsonl');
+  // P2（只观察）：每次压缩前记一条"按回本算值不值"，供 daily-health 与后续决策使用
+  const compactPaybackFile =
+    process.env.PI_COMPACT_PAYBACK_FILE || join(getMemoryDir(), 'logs', 'compact-payback.jsonl');
   // 上一次追加的易变运行时提示内容（仅变化时追加，避免每轮重插导致的消息序列位移）
   let lastVolatileContext: string | null = null;
   // 上一次注入的技能目录内容键（同上：仅变化时追加一份完整替换）
@@ -838,6 +847,39 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'session_before_compact',
     handler: () => {
+      // ── P2 观察（**只记录，不改变压缩行为**）──────────────────────────────────
+      // 必须放在任何早退之前：下面自动压缩分支会因 snapshotDoneForCompact 提前 return。
+      // 代价模型与理由见 budget/compact-payback.ts 的文件头。
+      try {
+        const report = getBudgetReport();
+        const forcedRatio = report.total > 0 ? report.budgetBase / report.total : 0.8;
+        const r = estimateCompactPayback({
+          contextTokens: report.used,
+          contextWindow: report.total,
+          forcedRatio,
+        });
+        appendFileSync(
+          compactPaybackFile,
+          JSON.stringify({
+            ts: Date.now(),
+            source: 'session_before_compact',
+            used: report.used,
+            window: report.total,
+            forcedRatio,
+            savedPerTurn: r.savedPerTurn,
+            rewriteCostTokens: r.rewriteCostTokens,
+            paybackTurns: r.paybackTurns,
+            trigger: r.trigger,
+            verdict: r.verdict,
+            // 人类可读的一行，便于直接看日志（也避免这个格式化函数变成"只被测试引用"的死导出）
+            payback: formatPayback(r),
+            summaryRatio: DEFAULT_SUMMARY_RATIO,
+            missPremium: DEFAULT_MISS_PREMIUM,
+          }) + '\n',
+        );
+      } catch {
+        /* 观察失败绝不影响压缩本身 */
+      }
       if (snapshotDoneForCompact) {
         // 本轮自动压缩已快照过，避免重复
         snapshotDoneForCompact = false;

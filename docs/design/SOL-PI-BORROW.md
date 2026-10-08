@@ -60,7 +60,7 @@
 **落点**：`autopilot/store/goal.ts`（纯逻辑，加 `completionMode` 字段 + 判定）、`autopilot/index.ts`（工具参数）、
 `autopilot/__tests__/goal.test.ts`。
 
-## P2 压缩"回本"决策（Online Context Compact 最小版）✅ 待做
+## P2 压缩"回本"决策（Online Context Compact 最小版）✅ **已完成（2026-10-08）**
 
 **SoL-Pi 依据**：把**子任务完成**当作压缩触发的时钟，且**只在预期未来节省能还清重写成本时**才动作
 （原话：compaction is a rewrite；KV-cache 复用通常把压缩推迟到很晚）。
@@ -236,3 +236,34 @@ without stopping real progress"、P9 "Give counterexamples precedence and break 
 **未做（留待以后）**：把 `verify_*`（LLM-as-a-Verifier，默认关闭）接成第二种校验来源。
 本项只用**确定性命令**做校验——这更符合 SoL-Pi 的"Demand a check that can distinguish the broken state"，
 而 LLM 评审是另一类（他们也是分开的：M15/M32 讲把评审证据绑定好，而不是拿它当唯一判据）。
+
+### P2 实施结果（2026-10-08）
+
+**只观察、不改默认**（这是本项的边界：接管阈值 = 改默认行为，留给用户）。
+
+- 新增纯逻辑 `context/budget/compact-payback.ts`：`estimateCompactPayback({contextTokens, contextWindow,
+  forcedRatio, summaryRatio?, missPremium?, remainingTurns?})` → `{trigger, savedPerTurn,
+  rewriteCostTokens, paybackTurns, verdict, reason}`。
+  **成本模型显式写出**：`savedPerTurn = 上下文 − 摘要`；`rewriteCostTokens = 上下文 × (1 + missPremium)`
+  （生成摘要要读一遍整段 + 压缩后整段前缀失效要重读一遍）；`missPremium` 默认 **49**（DeepSeek 命中价
+  约为未命中的 1/50）。模型**偏保守**（把重写成本算高），所以它说"值得压"时可信度更高。
+- **当前默认参数下的客观数：回本约 60 轮**（省 84%、成本 50 倍上下文）。而把缓存溢价设成 0 时只需 **2 轮**
+  ——**"重写很贵"几乎全部来自缓存失效**，这条把我们的成本结构量化了。
+- **不猜测**：没给 `remainingTurns` 就是 `verdict: 'unknown'`（只给客观的"还要几轮回本"）。
+  允许调用方以后拿真实会话的剩余轮次分布来判定，而不是我现在拍一个。
+- 观察点：`context/index.ts` 的 `session_before_compact` 处理器**最前面**（必须放早退之前——自动压缩
+  分支此前会因 `snapshotDoneForCompact` 提前 return），每次压缩前写一条
+  `portable/memory/logs/compact-payback.jsonl`。**整段 try/catch：观察失败绝不影响压缩。**
+- 日报接上：`daily-health.mjs` 读该日志并输出新字段 **`压缩回本=p50=<轮数>/n=<条数>`**。
+
+**能力地板**：`tsc` / `vitest`（含新增 11 项）/ `check-features` / `check-conventions` /
+`check-dead-exports` / `golden`。
+**效率指标**：本项**只建立测量**（还没有可比较的"优化前后"）——但给出了第一个可比较的客观数
+（回本 60 轮 vs 无缓存溢价 2 轮），并让日报每天给出真实会话的 p50 回本轮数。
+
+**测试抓到的真实缺陷**：`missPremium: NaN` 会一路污染 `rewriteCostTokens` 与 `paybackTurns`
+（`Number.isFinite` 变 false）。原因是 `missPremium` 的合法值包含 0，不能用"必须 > 0"的通用正数守卫。
+已加显式有限性检查——**这是先写测试再跑出来的，不是我读代码看出来的**。
+
+**下一步（需要用户点头）**：积累几天 `压缩回本` 数据后，若 p50 回本轮数明显大于实际剩余轮次，
+再考虑让回本判定参与压缩阈值。**在那之前不动默认阈值。**
