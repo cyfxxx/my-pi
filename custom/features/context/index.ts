@@ -19,6 +19,7 @@ import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
 import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
 import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
+import { buildSkillsCatalog, skillsCatalogKey, SKILLS_CATALOG_TAG, type SkillLike } from './budget/skills-catalog';
 import { normalizeSessionTitle, MAX_SESSION_TITLE_BYTES } from './budget/session-title';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
 import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
@@ -136,6 +137,8 @@ export function register(pi: ExtensionAPI): void {
   const appendLostFile = process.env.PI_SYSTEM_APPEND_LOST_FILE || join(getMemoryDir(), 'logs', 'system-append-lost.jsonl');
   // 上一次追加的易变运行时提示内容（仅变化时追加，避免每轮重插导致的消息序列位移）
   let lastVolatileContext: string | null = null;
+  // 上一次注入的技能目录内容键（同上：仅变化时追加一份完整替换）
+  let lastSkillsCatalogKey: string | null = null;
   const recordFingerprint = (
     payload: { messages?: unknown[]; tools?: unknown },
     ctx?: { hasUI?: boolean; ui?: { notify?: (message: string, level?: string) => void } },
@@ -411,6 +414,45 @@ export function register(pi: ExtensionAPI): void {
       // 工具输出归档目录此前无任何清理（实测 442 文件已无上限增长）；按 14 天/200MB 回收，
       // 保留窗口比 prune-refs 宽，因为归档是"凭路径读回原文"的凭据。
       void sweepArchive().catch(() => {});
+    },
+  });
+
+  // ── 技能目录移出 system prompt（2026-10-07，对齐 DSH）──────────────────────────
+  //
+  // pi 原生把 `<skills>` 段渲染进 system prompt（每技能一段 XML，4 个技能约 2.5KB）。
+  // 两个后果：① 它占着**前缀最前处**的体积，每次冷启动/断链全价重发；② 技能文件一改
+  // （本仓库历史里改过 14 次）就作废**整段**前缀。
+  //
+  // 处置：把 `systemPromptOptions.skills` 清空（渲染即刻不再含该段），目录改由**尾部
+  // append-only 消息**注入（内容变化时才追加一份完整替换）。`/skill:<name>` 显式调用走
+  // resourceLoader、不读 options，因此**不受影响**——这一点是选择"清空 options"而不是
+  // `--no-skills` 或 vendor 补丁的原因：零补丁、零能力损失。
+  //
+  // ⚠️ 注册顺序是**契约**：本处理器必须在下面那个"回合开始"处理器**之前**注册。
+  // 因为后者会读 `event.systemPrompt`（惰性渲染，读它才定稿文本）；若那时 `skills` 还没被清空，
+  // `forceSystemPrompt` 会带着 `<skills>` 段，而 fallback 渲染（同一份 options）却不带 →
+  // 两条渲染路径不一致 = 前缀漂移（与"加固块丢失"同一类事故）。
+  // 回归锁：`__tests__/skills-catalog-wiring.test.ts` 断言"跑完所有 before_agent_start 后
+  // options.skills 为空、且返回的 systemPrompt 不含 <skills>"。
+  registerHook(pi, {
+    event: 'before_agent_start',
+    handler: async (event) => {
+      const sysOptions = (event as { systemPromptOptions?: { skills?: SkillLike[] } }).systemPromptOptions;
+      const skills = Array.isArray(sysOptions?.skills) ? sysOptions.skills : [];
+      if (!sysOptions || skills.length === 0) return;
+      // 关键动作（纯数组赋值，不会抛）：必须在任何可能失败的步骤之前完成。
+      sysOptions.skills = [];
+      // 以下是可选增强：目录构造/变更判定失败只会"少一次注入"，不影响上面的清空。
+      try {
+        const key = skillsCatalogKey(skills);
+        if (key === lastSkillsCatalogKey) return;
+        const catalog = buildSkillsCatalog(skills);
+        if (!catalog) return;
+        lastSkillsCatalogKey = key;
+        return { message: { customType: SKILLS_CATALOG_TAG, content: catalog, display: false } };
+      } catch {
+        return;
+      }
     },
   });
 

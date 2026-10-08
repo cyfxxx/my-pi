@@ -2353,3 +2353,20 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 明确不做：改 `defaultProjectTrust`（当前无触发条件，属无操作）、拆 `admin_set_config` 的敏感键确认（真安全闸）。
 - 验证：tsc 干净；vitest **77 文件 873 例**（+8）；check-features 通过（63 工具/12 命令/2 快捷键/48 钩子）；
   conventions 通过；注入面基线 `ebfa65e5…` → `8493be6d…`；supervisor 111 / state-audit 55 / usage-metrics 56。
+
+### 技能目录移出 system prompt（2026-10-07）
+
+- 起因：pi 原生把 `<skills>` 段渲染进 system prompt，实测 4 个技能 **2269B**（占 system 约 29%）；
+  而技能文件在仓库历史里被改过 **14 次** → 每改一次就作废**整段**前缀。
+- 做法（**零 vendor 补丁、零能力损失**）：在 `before_agent_start` 里清空 `systemPromptOptions.skills`
+  （渲染即刻不含该段），目录改由**尾部 append-only 消息**注入（内容变化时才追加一份完整替换）。
+  关键事实：pi 的 `/skill:<name>` 展开读的是 **resourceLoader**、不读 options，所以不受影响——
+  这正是没选 `--no-skills`（会丢 `/skill:`）也没选 vendor 补丁的原因。
+- 目录内容直接取自 `options.skills`，**不重新实现技能发现**（frontmatter/`+skills/...` 覆盖模式都不用碰）；
+  同源技能只给一条根路径规则，异源时自动退化为逐条绝对路径。
+- **契约**：技能处理器必须注册在主处理器**之前**（后者读惰性 getter 定稿 system 文本；
+  顺序反了会出现"forced 带 `<skills>` / fallback 不带"的漂移）。清空放在关键路径，目录构造才是可选增强。
+- 实测：system prompt **−2269B**；目录 1636B 转尾部；净上下文 **−633B**。
+  配合同批改动，前缀每次冷启动少约 **4.3KB**（工具声明 37,136B → 约 35.1KB，工具 70 → 约 65）。
+- 验证：`skills-catalog.test.ts` **10 项**（含"getter 被读到的每一刻都是 0 个技能"与"增强失败不影响清空"）；
+  vitest **78 文件 883 例**；注入面基线未变（本次不动 system 注入文本）。

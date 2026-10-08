@@ -2,6 +2,59 @@
 
 ## 格式
 
+### [2026-10-07] 技能目录移出 system prompt：清空 `systemPromptOptions.skills` + 尾部 append-only 注入（零补丁、零能力损失）
+
+**背景**：pi 原生把 `<skills>` 段渲染进 **system prompt**（每技能一段 XML：name/description/location）。
+实测本仓库 4 个技能该段 **2269B**，占 system prompt（约 7.9KB）的 29%。两个后果：
+
+1. 它占着**前缀最前处**的体积，每次冷启动/断链都要全价重发（实测冷启动未命中约 16.2K token/次）；
+2. **技能文件一改就作废整段前缀**——而技能是 my-pi 自己维护的文档，`git log -- portable/agent/skills`
+   有 **14 次**变更（同口径下 `AGENTS.md` 27 次，后者早已因此移出 system）。
+
+DSH 的做法正相反：技能目录**不进** system prompt，而是一条消息（`- name: description` 形式），
+内容变化时才追加替换。这条对齐是本次改造的动机。
+
+**选项**：
+1. 打 vendor 补丁：给 `system-prompt.ts` 加开关，跳过 skills 段。
+2. `--no-skills` 关掉 pi 的技能发现，my-pi 自己扫描并注入目录。
+3. 只把 SKILL.md 的 description 改短（内容层优化）。
+4. **清空 `systemPromptOptions.skills`**（渲染即刻不含该段）+ my-pi 注入紧凑目录。
+
+**决策**：选项 4。
+
+**理由**：
+- 选项 1 要多维护一个补丁（要随上游同步 rebase），而收益并不比选项 4 多——**选项 4 完全不用改 vendor**。
+- 选项 2 会丢掉 `/skill:<name>` 显式调用（`_expandSkillCommand` 依赖 resourceLoader 的技能表）。
+- 选项 3 治标：description 里的触发词（"用户说'备份''存档'…"）与"不适用：…"是模型的**路由信号**，
+  改短会直接降低技能被正确触发的概率；而且它解决不了"改技能作废前缀"这个结构问题。
+- 选项 4 的关键事实：`systemPromptOptions` 本就对扩展开放（my-pi 已经在里面改 `selectedTools`），
+  而 pi 的 `/skill:` 展开读的是 **resourceLoader**、不读 options ——所以"清空 options.skills"
+  既能从渲染里拿掉该段，又**不影响 `/skill:`**。零补丁、零能力损失。
+- 目录内容直接从 `options.skills` 里取（还没清空时），**不需要 my-pi 重新实现技能发现**
+  （frontmatter 解析、`settings.json` 的 `+skills/...` 覆盖模式都不用碰）。
+
+**关键契约（必须记住，否则会重新造出"前缀漂移"）**：技能处理器**必须注册在主处理器之前**。
+主处理器会读 `event.systemPrompt`（惰性 getter，读它才定稿文本）；若那时 `skills` 还没清空，
+`forceSystemPrompt` 会带 `<skills>` 段，而 fallback 渲染（同一份 options）不带 →
+两条渲染路径不一致 = 整段前缀作废（与"加固块丢失"同一类事故）。
+回归锁：`__tests__/skills-catalog.test.ts` 用**模拟 pi 惰性渲染**的事件断言
+"跑完所有 `before_agent_start` 后 `options.skills` 为空、且 getter 被读到的每一刻都是 0 个技能、
+返回的 systemPrompt 不含 `<skills>`"，另有一例断言"增强失败（`getContextUsage` 抛错）也不影响清空"。
+清空动作因此被放在**关键路径**（纯数组赋值，不会抛），目录构造/变更判定才是可选增强。
+
+**实测收益**（真实 4 个技能，用真实 frontmatter 跑 `buildSkillsCatalog`）：
+system prompt **−2269B**；紧凑目录 **1636B** 改为尾部 append-only 消息；净上下文 **−633B**。
+配合同批的 voice/link 默认关闭与 `web_fetch` 删除，前缀每次冷启动少约 **4.3KB**
+（工具声明实测 37,136B → 约 35.1KB，工具数 70 → 约 65）。
+
+**代价与约束**：
+- 目录格式与 pi 原生不同（紧凑列表 vs XML）。模型拿到的信息等价（name + description + 路径规则），
+  但"技能同源时只给一条根路径"依赖 `dirname(baseDir)` 一致——异源时自动退化为逐条给绝对路径（有测试）。
+- 首次生效会让 system prompt 变化一次（前缀失效一次，预期内）。
+
+**验证**：`skills-catalog.test.ts` **10 项**（纯逻辑 6 + 接线 4）；`tsc -p custom/` 干净；
+vitest 全量 / `check-features` / `check-conventions` / 注入面基线 / `test-usage-metrics` 见同批提交说明。
+
 ### [2026-10-07] 体验优化第一批：默认关闭重功能 + 工具面去误导 + 提示词按"意图优先/交付展示"重排 + tmux 通知加空闲门
 
 **背景**：在完成 my-pi 与 DSH 的编排/系统提示词对照分析后，按用户口径做一轮面向"顺畅使用"的改造。
