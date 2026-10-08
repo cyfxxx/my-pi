@@ -1,10 +1,11 @@
 /**
  * browser 纯逻辑回归测试
- * 覆盖配置解析、临时目录隔离、navigate 协议守卫、upload 敏感文件拒绝（均无需启动浏览器）。
+ * 覆盖配置解析、临时目录隔离、navigate 协议守卫、upload 敏感文件拒绝、
+ * evaluate 字符串表达式（isFunction=false）语义、findElement __name 插桩（均无需启动浏览器）。
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadConfig } from '../config';
-import { BrowserManager, shotDir, pdfDir, downloadsDirDefault, isSensitiveUploadPath, shouldBlockRequest } from '../impl';
+import { BrowserManager, shotDir, pdfDir, downloadsDirDefault, isSensitiveUploadPath, shouldBlockRequest, looksLikeFunctionExpression } from '../impl';
 
 describe('config', () => {
   const saved: Record<string, string | undefined> = {};
@@ -99,5 +100,23 @@ describe('upload 敏感凭据拒绝（无需启动浏览器）', () => {
     expect(isSensitiveUploadPath('/home/u/authorized_keys')).toBe(false);
     expect(isSensitiveUploadPath('/home/u/authorized_keys.pub')).toBe(false);
     expect(isSensitiveUploadPath('/tmp/photo.png')).toBe(false);
+  });
+});
+
+describe('looksLikeFunctionExpression', () => {
+  it('识别各类函数表达式', () => {
+    expect(looksLikeFunctionExpression('() => x')).toBe(true);
+    expect(looksLikeFunctionExpression('async () => x')).toBe(true);
+    expect(looksLikeFunctionExpression('(x) => x')).toBe(true);
+    expect(looksLikeFunctionExpression('function f() {}')).toBe(true);
+    expect(looksLikeFunctionExpression('async function f() {}')).toBe(true);
+    expect(looksLikeFunctionExpression('(async (x) => x)')).toBe(true);
+  });
+  it('不误判普通表达式/语句体', () => {
+    expect(looksLikeFunctionExpression('document.title')).toBe(false);
+    expect(looksLikeFunctionExpression('let t = document.title; t')).toBe(false);
+    expect(looksLikeFunctionExpression('x + 1')).toBe(false);
+    expect(looksLikeFunctionExpression('  () => x  ')).toBe(true);
+    expect(looksLikeFunctionExpression('')).toBe(false);
   });
 });

@@ -130,6 +130,17 @@ function isProtocolSecurityError(e: unknown): boolean {
   );
 }
 
+/**
+ * 判定字符串是否为函数表达式（而非普通表达式/语句体）。
+ * 用于 browser_evaluate：Playwright 对字符串走「表达式求值」语义（isFunction=false），
+ * 若传入 `() => x`，求值结果是函数对象、序列化后变 undefined，需包成 `(<expr>)()` 调用。
+ */
+export function looksLikeFunctionExpression(expression: string): boolean {
+  // 含 `function` 关键字（function 声明/表达式）或 `=>` 箭头函数体；
+  // 普通表达式（`document.title` / `let t=1; t` 等）不含这些。
+  return /\bfunction\b|=>/.test(expression.trim());
+}
+
 export class BrowserManager {
   private browser: Browser | null = null;
   private page: Page | null = null;
@@ -317,8 +328,19 @@ export class BrowserManager {
     await page.screenshot({ path, fullPage });
     return path;
   }
+
   async evaluate(expression: string): Promise<unknown> {
     const page = await this.ensurePage();
+    // Playwright 对字符串走「表达式求值」语义（isFunction=false），若传入的是函数表达式
+    // （如 `() => x` / `function(){...}`），求值结果是函数对象、序列化后变 undefined。
+    // 判定为函数表达式时包成调用 `(<expr>)()`，失败再退回原始表达式（覆盖 `let x=1; x` 等语句体）。
+    if (looksLikeFunctionExpression(expression)) {
+      try {
+        return await page.evaluate(`(${expression})()`);
+      } catch {
+        /* fall through to raw expression */
+      }
+    }
     return page.evaluate(expression);
   }
   async extractContent(selector?: string): Promise<string> {
@@ -455,16 +477,19 @@ export class BrowserManager {
   }
   async findElement(selector: string): Promise<{ x: number; y: number; text: string } | null> {
     const page = await this.ensurePage();
+    // 用迭代栈而非嵌套函数：tsx 会向任何嵌套函数体注入 __name 插桩，
+    // 而 Playwright 把函数原样送到浏览器执行，导致 ReferenceError: __name is not defined。
     const found = await page.evaluate((sel: string) => {
       const candidates: Element[] = [];
-      const walk = (root: Document | ShadowRoot): void => {
+      const roots: (Document | ShadowRoot)[] = [document];
+      while (roots.length) {
+        const root = roots.pop()!;
         for (const el of Array.from(root.querySelectorAll(sel))) candidates.push(el);
         for (const el of Array.from(root.querySelectorAll('*'))) {
           const sr = (el as HTMLElement).shadowRoot;
-          if (sr) walk(sr);
+          if (sr) roots.push(sr);
         }
-      };
-      walk(document);
+      }
       if (candidates.length === 0) return null;
       const el = candidates[0] as HTMLElement;
       const r = el.getBoundingClientRect();
