@@ -112,3 +112,31 @@ subagent(parallel) ─┤ 1. new_session (fresh)          或 new_session {paren
 - **`executionMode`**（`adapters/tool-adapter.ts`）：`subagent` 将来若支持**异步/后台**，需要评估它是否
   该标 `sequential`——目前它是同步阻塞的，**不标**是正确的；一旦改成后台，判定要重做。
 - **`deferred` + `tool_search`**：让"子代理也加载扩展"变得可负担（见设计要点 5）。
+
+## 七、S1 进展（2026-10-07，实测）
+
+探针脚本 `/tmp/rpc-probe.mjs`（临时件，不入库）：起 `pi --mode rpc --no-extensions --no-session`，
+依次 `prompt` → 等 `agent_settled` → `new_session` → `prompt`。
+
+**已拿到的确定性数据（可信）**：
+
+| | 墙钟 |
+|---|---|
+| 冷：进程启动 + 任务 1 | **28.5s** |
+| 热：复用同一进程跑任务 2 | **10.4s** |
+| 节省 | **18.1s（63%）** |
+
+`new_session` 返回 `{"success":true,"data":{"cancelled":false}}`；`prompt` 返回
+`{"success":true,"data":{"disposition":"started"}}`，而"这轮跑完"确实由 `agent_settled` 事件通知
+（与设计预期一致，任务 2 期间收到 101 个事件）。
+
+**隔离结论：未验证（不能说成立，也不能说失败）。**
+
+原因是我第一次用了**错误的方法**：问模型"你此前收到过几条用户消息"，它答 **「2」**。
+这**既可能**是任务 1 的上下文残留（任务 1 有 1 条用户消息 + 本次提问 = 2），
+**也可能**只是模型数不清（让 LLM 自省消息条数本来就不可靠）。**两种解释无法区分**，
+所以这条证据无法支撑任何结论——**方法论问题，不是 pi 的行为证据**。
+
+**下一步（S1 v2）**：改用**确定性**判据——把 rpc 进程指向 `scripts/lib-fake-provider.mjs`
+（它会记录每个请求的 body），直接断言**第二次任务的 `messages` 里只有任务 2、不含任务 1**。
+不依赖模型自述。在这一步通过之前，**S2 不启动**（整个池方案押在"`new_session` 真隔离"上）。
