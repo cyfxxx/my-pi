@@ -2652,3 +2652,12 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   **理由**：`edit_and_run` 依赖 pi 的嵌套调用契约，单元测试（假 ctx）**结构上抓不到**这类漂移。
 - `fork-probe.mjs` → **清理**：结论已归档（SUBAGENT-POOL §13），无功能依赖；重建成本约 80 行、文档有确切配方。
 - 移植时修掉一个索引错误：**tool 消息在后续请求里累积**，跨请求 flatMap 会得到 `[失败,失败,成功]`。
+
+### 用户批复第 4 项：子代理 writeTools 可观测（2026-10-08 / P8-A）
+
+- `usage-log.ts` 新增 `WRITE_TOOLS={write,edit,edit_and_run}` + `extractWriteTools()`（去重保序），
+  `SubagentUsageRecord.writeTools` 落进 `portable/memory/subagent/usage.jsonl`。
+- **口径边界写进类型注释并用测试显式钉住**：故意排除 `bash`/`ctx_exec`/`tmux_*`（catch-all 含进来会让
+  字段恒为非空、信息量归零）⇒ 它是"用过编辑类工具"的**下界**，不是"文件变没变"的完备判据。
+- 测试 `usage-write-tools.test.ts` **8 项**（含"WRITE_TOOLS 不得含 catch-all"的反向断言）。
+- 两步中的第一步；第二步（返工代理指标）与 P8-B/P8-C 仍待定。**不改默认行为**。
