@@ -216,6 +216,13 @@ if [ -f scripts/gen-doc-index.mjs ]; then
     bad "docs/INDEX.md 已漂移（跑 node scripts/gen-doc-index.mjs --update 后提交）"
   fi
 fi
+if [ -f scripts/gen-changes-ledger.mjs ]; then
+  if node scripts/gen-changes-ledger.mjs --check >/dev/null 2>&1; then
+    ok "改动台账与 git 历史一致（docs/CHANGES.jsonl）"
+  else
+    bad "docs/CHANGES.jsonl 已漂移（跑 node scripts/gen-changes-ledger.mjs --update 后提交）"
+  fi
+fi
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then

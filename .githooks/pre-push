@@ -46,3 +46,7 @@ if ! bash scripts/golden-tasks.sh $FAST_ARG 2>&1 | tee "$LOG"; then
   echo "修复后重试；确实需要临时跳过用 git push --no-verify（不推荐）。"
   exit 1
 fi
+
+# ── 变更台账提醒（WikiSkill 借鉴 B 项，2026-10-08）──
+# 只提示、不写文件（避免每次推送后留脏工作区）；失败绝不影响推送。
+node scripts/record-change.mjs --remind 2>/dev/null || true

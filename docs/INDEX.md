@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（143 条）
+## 决策台账（144 条）
 
+- `DECISIONS.md` · [2026-10-08] 改动台账（WikiSkill 借鉴 B 项）+ 一次并发越界的复盘 · **来自论文**（arXiv:2608.27454）：`wiki/skill-impact.md` 由**外层 harness 程序化写入**， · 数字: 3 次 / 2 次 / 120 条 / 17 条
 - `DECISIONS.md` · [2026-10-08] 知识索引（WikiSkill 借鉴 A 项）：把"找先例"从 grep 变成查索引 · **来自论文**（arXiv:2608.27454）：WikiSkill 的核心之一是 `wiki/index.md` —— **知识要能被检索， · 数字: 3 次 / 2 次 / 497 条
 - `DECISIONS.md` · [2026-10-08] 执行预算决策 (B)：删除 `verify_*` 三工具，前缀多出 1 263 B（未动任何阈值） · **用户批准 (B)**（分析见 `docs/design/TOOL-BUDGET-DECISION.md`）。 · 数字: 773 B / 44 个 / 558B / 41 个
 - `DECISIONS.md` · [2026-10-08] 工具面顶格后的预算决策分析：推荐删掉 `verify_*` 三工具，不动预算 · **现状**：前缀 25 558/25 558、合计 32 000/32 000 —— **两条上限都是 0 余量**。完整分析见 · 数字: 773 B / 30 天 / 3 次
@@ -151,7 +152,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（141 条）
+## 进度记录（142 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -294,6 +295,7 @@
 - `PROGRESS.md` · 工具面预算决策分析（2026-10-08） · - 记录：[docs/design/TOOL-BUDGET-DECISION.md](design/TOOL-BUDGET-DECISION.md)。 · 数字: 773B / 30 天 / 3 次
 - `PROGRESS.md` · 执行预算决策 (B)：删除 verify_* 三工具（2026-10-08，用户批准） · - 删除 `verify_report`/`verify_config`/`verify_test`（整个 verify-tools.ts）+ 注册调用 + 只服务它们的测试块 · 数字: 773B / 44 个 / 558B / 41 个
 - `PROGRESS.md` · WikiSkill 借鉴 A：知识索引（2026-10-08） · - `scripts/gen-doc-index.mjs`（`--update`/`--check`，**确定性输出**）→ `docs/INDEX.md`，实测 **497 条** · 数字: 497 条 / 3 次 / 2 次
+- `PROGRESS.md` · WikiSkill 借鉴 B：改动台账（2026-10-08）+ 并发越界复盘 · - `docs/CHANGES.jsonl` 由 `scripts/gen-changes-ledger.mjs` **从 git 历史回溯生成**（`--update`/`--check`， · 数字: 2 个 / 510 条
 
 ## 缺陷回放（16 条）
 
@@ -314,13 +316,27 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（69 条）
+## 设计文档（83 条）
 
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
 - `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 四、本次的实测数字（本项的"效率指标"） · - 未接线清单规模：**A 段 18 条 + B 段 4 条 + C 段 1 条（我误放的，已移正）**； · 数字: 18 条 / 4 条 / 1 条 / 5 条
 - `docs/design/DORMANT-AUDIT.md` · 五、执行结果（2026-10-08）：`TOOL_LAYERING` 已删除 · 用户授权"由你决定"。**判断：删除。** 依据（按分量排序）： · 数字: 100 个 / 18 个 / 442B / 60.8%
+- `docs/design/HUMANIZE-BORROW.md` · 0. 阅读边界（先说清，免得把推断当事实） · ⇒ **代码一行未读到**。因此凡涉及实现细节（72 道门的清单、plan contract 的字段、评审者提示词、FlowBench 评分口径）**一律标"未读到"**，不做猜测。下方所有论文内容**均来自 HTML v2 的正文**，并
+- `docs/design/HUMANIZE-BORROW.md` · 1. 论文 / 项目页 / 两个代码仓是什么关系（依据论文自述，不是推测） · 论文自己写清了三代谱系与两条代码线：
+- `docs/design/HUMANIZE-BORROW.md` · 2. 机制（谁做什么、什么被度量） · ### 2.1 核心命题与四个原则（§2 Judgement Engineering） · 数字: 42 轮
+- `docs/design/HUMANIZE-BORROW.md` · 3. 实验与结论强度 · **证据形态**：**观察性**，论文三处自述"not a controlled comparison"（§1 末、§4、§8）。**没有**同 builder 开/关 reviewer 的对照跑（§5 明说）。 · 数字: 108 天 / 68 个 / 61% / 150 个
+- `docs/design/HUMANIZE-BORROW.md` · 4. 对照 my-pi（逐条：有 / 部分有 / 没有 + 会话证据） · 数字: 50.0% / 1次 / 3 轮 / 499 条
+- `docs/design/HUMANIZE-BORROW.md` · 5. 可借鉴的（按性价比排序；落点/做法/验证/成本/是否改默认） · **1. 评审者换模型 + 要求它能执行（对应 §2.1，论文给了概率论证，我们只差参数与断言）** · 数字: 558 B / 263 B
+- `docs/design/HUMANIZE-BORROW.md` · 6. 明确不该照搬的，与关键缺口 · **不该照搬**： · 数字: 108 天 / 68 个 / 771 条
+- `docs/design/HUMANIZE-BORROW.md` · 7. 可执行的下一步（≤3 条） · 1. **评审者换模型 + 必须能执行**（§5.1）：改 `run/goal-verdict.ts` 加可选 `model`、扩 `goal-judge-e2e.test.ts` 断言 `body.model` 与执行能力。**不需要再读 · 数字: 263 B
+- `docs/design/LEAN4AGENT-BORROW.md` · 一、它在解决什么，以及关键设计选择背后的理由 · **问题**（§1）：LLM agent 已被部署到高风险场景，但**多数 agent 系统缺乏"形式化地规定、验证、调试工作流与执行轨迹"的方法**。
+- `docs/design/LEAN4AGENT-BORROW.md` · 二、实验与结论强度 · **数据集**（§3.1.1）：SWE-Bench-Verified **随机抽 50 题的困难子集**（作者称这些题人类工程师通常需 >1 小时）；ELAIP-Bench（403 道选择题）**随机抽 100 题**（AI 论文理解）。 · 数字: 1 小时 / 3 个 / 40 个 / 5 个
+- `docs/design/LEAN4AGENT-BORROW.md` · 三、对照 my-pi（逐条：有 / 部分有 / 没有 + 会话证据） · **附带可对照的一条**：Layer-1 的"读写一致性"与我们 P4 审计的思路**高度同构**——那次我们逐条问"这个机制**有存在理由吗、最近被消费过吗**"，并删掉了 `TOOL_LAYERING`（提交 `1cc0cc1f3`，3 · 数字: 558 B · 证据: fd1f22b0d / 6291592f7
+- `docs/design/LEAN4AGENT-BORROW.md` · 四、可借鉴的（按性价比排序） · **A. 给关键工作流写一份"前置/后置条件"清单，并挂到既有守门上（推荐，成本低，零运行时改动）** · 数字: 5 个 / 4 条 / 30 天 / 8 次
+- `docs/design/LEAN4AGENT-BORROW.md` · 五、明确不该照搬的，以及决定可不可照搬的关键缺口 · **不该照搬**： · 数字: 40 个 / 3 个
+- `docs/design/LEAN4AGENT-BORROW.md` · 六、可执行的下一步（≤3 条） · 1. **做 A：`docs/design/WORKFLOW-INVARIANTS.md` + 把可自动化的挂进既有守门**，每条不变量配坏样本并证明守门会红。**不改任何默认行为**、不新增 golden 步。这是三篇论文里**唯一不需要
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 一、我们已有什么（实现事实，均注明落点） · **比 SoL-Pi 多的两处**：写盘前脱敏、内容哈希去重。后者恰好回答了它的核心论点——**同一个大输出重复出现时， · 数字: 14 天 / 200MB
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 二、审计清单逐条结论（含证据） · ### 1. 上下文里留的是句柄还是只有一句"已归档"？→ **是句柄，但缺摘录** · 数字: 4 个 / 2 次 / 1 个 / 0 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 三、决策提案（**均不改默认**，等用户点头） · **建议顺序**：先 **P3-D**（拿到可观测数据）→ 再决定要不要 **P3-A/B**（它们都是"改句柄内容"， · 数字: 0 次 / 2 次

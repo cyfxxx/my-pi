@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 52 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
+├── scripts/             # 54 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -98,7 +98,8 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `009-footer-badge.patch`：footer 第一行常驻 badge（扩展状态 key 加 `badge:` 前缀即渲染到 pwd/branch 旁；消费方 `plan-mode`）
 
 ### `scripts/`
-共 52 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+（另有 `docs/CHANGES.jsonl` 改动台账：由 pre-push 追加、由约定守门校验格式）
+共 54 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`

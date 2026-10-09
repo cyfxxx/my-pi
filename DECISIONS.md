@@ -2,6 +2,28 @@
 
 ## 格式
 
+### [2026-10-08] 改动台账（WikiSkill 借鉴 B 项）+ 一次并发越界的复盘
+
+**来自论文**（arXiv:2608.27454）：`wiki/skill-impact.md` 由**外层 harness 程序化写入**，
+内容是「提案 + 目标 + unified diff + 验证分数 + **接受/拒绝**」；论文给它的作用一句话说清：
+**"被否的改动不会被重复提出"**。my-pi 恰好缺这条，且有可指认的代价：工具面预算顶格被提 **3 次**、
+白名单纪律 **2 次**、"默认关闭/不擅自动默认"几乎每批重申——因为"被否的理由"没有可查询的结构。
+
+**落地**：`docs/CHANGES.jsonl`（**放 docs，不放 portable/memory**——后者是运行时数据），
+由 `scripts/gen-changes-ledger.mjs` 从 **git 历史回溯生成**（`--update`/`--check`，确定性输出；
+排除"改动台账自身"的提交以免自指循环），当前 **change 120 条 + rejected 17 条**（rejected 从
+`DECISIONS.md` 的负结果条目抽取）。**不新增 golden 步**：`--check` 挂在既有 `check-conventions.sh`；
+`pre-push` 只跑 `record-change.mjs --remind`（**只提示、不写文件** ⇒ 不会每次推送后留脏工作区）。
+
+**并发越界的复盘（我的流程失误，值得记下）**：我把**带活跃目标的完整会话**交给两个分析子代理，
+同时**自己在同一批文件上做同一件事**——其中一支子代理因此**越界替我把 B 也实现了**（新增
+`gen-changes-ledger.mjs`/`record-change.mjs` 并改了 `STRUCTURE.md`）。处置：**保留它那套**（比我的更完整：
+git 回溯生成、`--check` 漂移检测、排除自指），**删掉我这套**（钩子追加块 + 内联格式校验），并**修掉它那套
+一个真实缺陷**——它的两个脚本 schema 互相矛盾（`record-change --check` 要求 `kind`/`ts`，而
+`gen-changes-ledger` 写的是 `type`/`date`/`topic`），由守门抓出；已把生成器对齐到规范 schema。
+**教训**：给继承活跃目标的子代理派活时，要么**先自己做完再派**，要么**明确"那个目标不是你的、且我正在
+同一批文件上工作"**——只写约束不够，要**消除越界的动机**。
+
 ### [2026-10-08] 知识索引（WikiSkill 借鉴 A 项）：把"找先例"从 grep 变成查索引
 
 **来自论文**（arXiv:2608.27454）：WikiSkill 的核心之一是 `wiki/index.md` —— **知识要能被检索，

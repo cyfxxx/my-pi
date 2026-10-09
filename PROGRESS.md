@@ -2779,3 +2779,13 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   （决策 142 / 进度 140 / 缺陷回放 16 / 设计 69 / 开发 130）；每条含**实测数字**与**证据**（提交 sha 或可重跑命令）。
 - `--check` 挂进**既有** `check-conventions.sh`（第 E 节），不新增 golden 步；脚本数 51 → 52，STRUCTURE 两处同步。
 - **不进模型上下文**、不改任何运行时行为；治的病是"同类判断反复重述"（预算顶格 3 次、白名单纪律 2 次）。
+
+### WikiSkill 借鉴 B：改动台账（2026-10-08）+ 并发越界复盘
+
+- `docs/CHANGES.jsonl` 由 `scripts/gen-changes-ledger.mjs` **从 git 历史回溯生成**（`--update`/`--check`，
+  确定性、排除自指提交），当前 **change 120 / rejected 17**（rejected 由 DECISIONS 的负结果抽取）。
+- 接线：`--check` 挂既有 `check-conventions.sh`（不新增 golden 步）；`pre-push` 只跑 `--remind`（不写盘 ⇒ 无脏工作区）。
+- **并发越界**：一支子代理替我实现了 B（2 个脚本 + STRUCTURE）。处置：**保留它那套**、删掉我这套，
+  并修掉它"两个脚本 schema 互相矛盾"的真实缺陷（`type/date/topic` → `kind/ts/proposal`）。
+  教训：派活给继承活跃目标的子代理时，要么先自己做完，要么明确"目标不是你的"——**消除动机比写约束有效**。
+- 脚本数 51 → **54**（gen-doc-index + 它们的两个），STRUCTURE 两处同步；索引重生成 **510 条**。
