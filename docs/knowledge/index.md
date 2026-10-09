@@ -37,6 +37,12 @@
 - [rej-38ab10](patterns/rej-38ab10.md): [2026-09-22] task-record/task-summarizer 改为适配迁移（取代同日"不迁移"口径） + **背景**：先前以"依赖整条未迁移数据链"为由暂缓；实际 `task-record` 生产者可确定性重建（agent_settled 写结构化记录），总结层可去掉 spawn 强依赖。 + 未实施（被否）
 - [rej-1d6971](patterns/rej-1d6971.md): [2026-09-25] 通知与入站通道：出站用 webhook、入站用 link（不迁移 notify.json / ntfy-relay） + **决策**：两者均**不迁移**，由既有能力取代： + 未实施（被否）
 
-## 证据不足、**故意未生成**的来源（判据第 ⑤ 条：宁可少产出）
+## 反复失败的错误指纹（0 条，来源：`portable/memory/logs/error-fingerprints.jsonl`）
 
-- **错误指纹（P7）**：`errorFingerprint`/`observeRepairAttempt` 的状态只活在内存里（`custom/features/context/index.ts` 的 `repairBudget`），**未落盘** ⇒ 没有语料可编译。落盘的 `portable/memory/logs/prefix-fingerprints.jsonl` 是**前缀缓存**指纹，不是错误指纹。
+> 判据第 ⑤ 条：**只记可泛化的**。这里只收 `remind===true`（已按 `REPAIR_THRESHOLDS {3,5,8}` 触发过修复提醒）或 `attempts>=3` 的指纹；**一次性手误不入库**。同一指纹一页（取最新一条）。
+
+- （该来源**已接线**，但 `portable/memory/logs/error-fingerprints.jsonl` **还不存在** ⇒ 没有语料可编译；**不造数据**）
+
+## 明确未接线的来源
+
+- **前缀缓存指纹**（`portable/memory/logs/prefix-fingerprints.jsonl`）：它是**前缀缓存**指纹、不是错误指纹，**与"经验→知识"无关**，故不接入。

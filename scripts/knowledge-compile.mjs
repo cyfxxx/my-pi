@@ -38,7 +38,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, dirname } from 'node:path';
+import { join, dirname , resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -180,6 +180,83 @@ function defuse(s) {
   return String(s).split('](').join('] (');
 }
 
+/**
+ * 从 `portable/memory/logs/error-fingerprints.jsonl` 抽**反复出现的错误**（第四个来源，2026-10-08 接线）。
+ *
+ * 写入侧见 `custom/features/context/budget/fingerprint-log.ts`：**只在工具调用失败时**追加一行，
+ * 字段恰好 8 个（`ts/fingerprint/tool/attempts/distinctArgs/windowMs/remind/excerpt`），
+ * 默认开、`PI_ERROR_FINGERPRINT=off` 可关，路径 `PI_ERROR_FINGERPRINT_FILE` 可覆盖（这里**沿用同一个
+ * 环境变量**，所以既能测又不改默认）。
+ *
+ * **只收"可泛化"的**（判据第 ⑤ 条）：`remind===true`（已按 `REPAIR_THRESHOLDS {3,5,8}` 触发过修复提醒）
+ * 或 `attempts >= 3`（达到第一档阈值）。**一次性手误不入库。**
+ *
+ * 同一指纹取**最新一条**（并集最大 attempts）⇒ 一个指纹一页，天然不重复。
+ */
+function readFingerprints() {
+  const file = process.env.PI_ERROR_FINGERPRINT_FILE || 'portable/memory/logs/error-fingerprints.jsonl';
+  // 用 resolve 而不是 join：写入侧的 PI_ERROR_FINGERPRINT_FILE 允许是**绝对路径**，join 会把它拼错
+  const abs = resolve(ROOT, file);
+  if (!existsSync(abs)) return { rows: [], available: false, file };
+  const best = new Map();
+  for (const line of readFileSync(abs, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue; // 非法行由守门负责报，这里不猜
+    }
+    if (!row.fingerprint || !row.tool) continue; // 缺关键字段 ⇒ 宁可少产出
+    const generalizable = row.remind === true || Number(row.attempts) >= 3;
+    if (!generalizable) continue;
+    const prev = best.get(row.fingerprint);
+    if (!prev || Number(row.attempts) >= Number(prev.attempts)) best.set(row.fingerprint, row);
+  }
+  return { rows: [...best.values()], available: true, file };
+}
+
+/** 指纹页名：**内容哈希**（与负结果同理——指纹是稳定标识，页名不该随新记录漂移） */
+function nameForFingerprint(fingerprint) {
+  return `fp-${createHash('sha1').update(String(fingerprint)).digest('hex').slice(0, 6)}`;
+}
+
+/**
+ * 指纹页的模板。**这个来源天然缺"根因/命令/解法"**（它只记"哪个指纹失败了、几次、长什么样"）
+ * ⇒ 大量字段会写"未记录"，**这是正常的、也是判据第 ⑤ 条要的**：宁可少写，不许编。
+ */
+function renderFingerprintPattern(r) {
+  const excerpt = r.excerpt ? defuse(String(r.excerpt).slice(0, 200)) : '';
+  return [
+    `# 反复失败：${defuse(String(r.tool))}（指纹 ${nameForFingerprint(r.fingerprint)}）`,
+    '',
+    `**来源**：\`${defuse(readFingerprints().file)}\`（最新记录 ${r.ts ?? '未标时间'}）。该日志**只在工具调用失败时**追加。`,
+    '',
+    '**是什么**',
+    `工具 \`${defuse(String(r.tool))}\` 的同一错误指纹在 ${r.windowMs ?? '未记录'}ms 窗口内**反复失败 ${r.attempts ?? '未记录'} 次**（不同参数 ${r.distinctArgs ?? '未记录'} 种）。`,
+    '',
+    '**根因（WHY）**',
+    excerpt ? `已归一化的错误片段：${excerpt}` : '未记录（该记录没有 excerpt 字段 ⇒ **不编造根因**）',
+    '',
+    '**确切命令序列**（复现/回归都靠它）',
+    '未记录（**指纹日志不含命令原文** ⇒ 不编造；可用该指纹去会话记录里检索对应的那次调用）',
+    '',
+    '**怎么发现它（指纹）**',
+    `P7 的"按错误指纹计修复预算"（\`errorFingerprint\`）在失败路径上落盘：\`${defuse(String(r.fingerprint))}\``,
+    '',
+    '**含确切语法的解法**',
+    r.remind === true
+      ? '该指纹已触发过**修复提醒**（\`observeRepairAttempt\` 的提醒档）⇒ 说明它反复出现到需要干预；具体改法本记录未留下，**不编造**。'
+      : '未记录（尚未触发提醒；达到提醒档后本页会被**更新**而不是新建）',
+    '',
+  ].join('\n');
+}
+
+function renderFingerprintIndexEntry(r) {
+  const n = nameForFingerprint(r.fingerprint);
+  return `- [${n}](patterns/${n}.md): ${defuse(String(r.tool))} 反复失败 ${r.attempts ?? '?'} 次 + ${r.remind === true ? '已触发修复提醒' : '未触发提醒'} + 命令/解法未记录`;
+}
+
 /** 负结果的页名：**内容哈希**而非序号——序号会因"新增一条更早的负结果"而集体改号（页名就不稳定了） */
 function nameForRejected(proposal) {
   return `rej-${createHash('sha1').update(proposal).digest('hex').slice(0, 6)}`;
@@ -235,6 +312,7 @@ function renderRejectedIndexEntry(r) {
 function build() {
   const incidents = readIncidents();
   const rejected = readRejected();
+  const fingerprints = readFingerprints();
   const creates = [];
   const updates = [];
   const pages = new Map();
@@ -243,6 +321,7 @@ function build() {
   const sources = [
     ...incidents.map((it) => ({ name: nameFor(it.idx), content: renderPattern(it) })),
     ...rejected.map((r) => ({ name: nameForRejected(r.proposal), content: renderRejectedPattern(r) })),
+    ...fingerprints.rows.map((r) => ({ name: nameForFingerprint(r.fingerprint), content: renderFingerprintPattern(r) })),
   ];
   for (const s of sources) {
     pages.set(s.name, s.content);
@@ -283,9 +362,21 @@ function build() {
     '',
     ...rejected.map(renderRejectedIndexEntry),
     '',
-    '## 证据不足、**故意未生成**的来源（判据第 ⑤ 条：宁可少产出）',
+    `## 反复失败的错误指纹（${fingerprints.rows.length} 条，来源：\`${fingerprints.file}\`）`,
     '',
-    '- **错误指纹（P7）**：`errorFingerprint`/`observeRepairAttempt` 的状态只活在内存里（`custom/features/context/index.ts` 的 `repairBudget`），**未落盘** ⇒ 没有语料可编译。落盘的 `portable/memory/logs/prefix-fingerprints.jsonl` 是**前缀缓存**指纹，不是错误指纹。',
+    '> 判据第 ⑤ 条：**只记可泛化的**。这里只收 `remind===true`（已按 `REPAIR_THRESHOLDS {3,5,8}` 触发过修复提醒）或 `attempts>=3` 的指纹；**一次性手误不入库**。同一指纹一页（取最新一条）。',
+    '',
+    ...(fingerprints.rows.length
+      ? fingerprints.rows.map(renderFingerprintIndexEntry)
+      : [
+          fingerprints.available
+            ? '- （该来源**已接线但当前没有达到收录门槛的记录**——指纹日志只在工具调用失败时追加，且要反复出现才入库）'
+            : `- （该来源**已接线**，但 \`${fingerprints.file}\` **还不存在** ⇒ 没有语料可编译；**不造数据**）`,
+        ]),
+    '',
+    '## 明确未接线的来源',
+    '',
+    '- **前缀缓存指纹**（`portable/memory/logs/prefix-fingerprints.jsonl`）：它是**前缀缓存**指纹、不是错误指纹，**与"经验→知识"无关**，故不接入。',
     '',
   ];
   if (orphans.length) {
@@ -293,7 +384,7 @@ function build() {
   }
   const index = indexLines.join('\n');
 
-  return { creates, updates, index, orphans, count: incidents.length, rejectedCount: rejected.length };
+  return { creates, updates, index, orphans, count: incidents.length, rejectedCount: rejected.length, fpCount: fingerprints.rows.length, fpAvailable: fingerprints.available };
 }
 
 function fail(msg) {

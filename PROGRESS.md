@@ -2848,3 +2848,14 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 修法：`PI_MEMORY_DIR` 一起指向临时目录并在 afterEach 还原。**因果证明**：修前每跑一次 +2~5 行；
   修后 e2e 跑通而台账 **12 → 12 不变**。
 - 历史噪声：整档备份到 `usage.jsonl.pre-e2e-cleanup.bak` 后剔除 7 条（**归档不销毁**）。
+
+### 错误指纹接进知识编译器（第四来源，2026-10-08）
+
+- `knowledge-compile.mjs` 增加第四来源 `logs/error-fingerprints.jsonl`（`fp-<6hex>`），沿用写入侧
+  `PI_ERROR_FINGERPRINT_FILE` 做路径覆盖（不改默认行为）。
+- **真实环境暂无数据** ⇒ 真实跑 create 0/update 0，知识库仍 23 页，索引**如实写明"已接线但无语料、不造数据"**。
+- 用合成数据验证判据：低信号指纹（attempts=1/remind=false）**被正确排除**；同指纹合成 1 页取最新；
+  **不建重复**实测通过（页数不变）；`--check` 两次 rc 0。
+- **负面记录**：① 我的"测试污染"源码级守门**自证没绿** ⇒ **删掉，不留未证明的守门**；顺带查实
+  `tmux/__tests__/registry-lock.test.ts` 没隔离 `PI_CODING_AGENT_DIR`（可能的第二污染源，待查）。
+  ② 注释里写"粗体+斜杠"会因 `**/` 提前关闭块注释 ⇒ 报 Unterminated string（踩过，纪律已记）。
