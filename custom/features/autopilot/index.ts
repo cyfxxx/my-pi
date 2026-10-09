@@ -970,14 +970,17 @@ export function register(pi: ExtensionAPI): void {
         if (!objective) return 'action=set 需要 objective。';
         const cap = resolveGoalCap(resolveEffectiveMode(), getEffectiveModeConfig().goalMaxRounds);
         if (cap <= 0) return '当前模式已禁用自动续跑（goalMaxRounds<=0），未声明目标。';
-        goal = createGoal(objective, cap);
+        const contractCheck = typeof args.check === 'string' ? args.check.trim() : '';
+        goal = { ...createGoal(objective, cap), ...(contractCheck ? { check: contractCheck } : {}) };
         return `已声明目标（上限 ${cap} 轮）：${objective}
 每轮结束会自动续跑；完成时用 goal complete，推不动时用 goal blocked。`;
       }
       if (!goal) return goalStatusText(null);
       if (action === 'complete') {
         const evidence = typeof args.evidence === 'string' ? args.evidence.trim() : '';
-        const check = typeof args.check === 'string' ? args.check.trim() : '';
+        // 契约优先：`goal set` 挂过的验收判据在这里**自动采用**（显式传入的 check 覆盖它）
+        const explicitCheck = typeof args.check === 'string' ? args.check.trim() : '';
+        const check = explicitCheck || (goal.check ?? '');
         if (check) {
           // 独立校验：模型给判据，**harness 实际跑**（这才是 declared 与 verified 的区别）
           const r = await runCheckCommand(check);

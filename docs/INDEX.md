@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（145 条）
+## 决策台账（146 条）
 
+- `DECISIONS.md` · [2026-10-08] 验收判据前移到 `goal set`（Humanize 借鉴 ③） · **来自 Humanize**（arXiv:2610.08900 §3.1「计划即契约」）：**验收判据应当在动手前固定**，而不是做完再补
 - `DECISIONS.md` · [2026-10-08] 评审者换模型 + 必须能执行（Humanize 借鉴第 1 项） · **来自 Humanize**（arXiv:2610.08900）：§2.1 联合采样指出单模型的"提议"与"接受"共用同一盲区 · 数字: 399 B / 159 B
 - `DECISIONS.md` · [2026-10-08] 改动台账（WikiSkill 借鉴 B 项）+ 一次并发越界的复盘 · **来自论文**（arXiv:2608.27454）：`wiki/skill-impact.md` 由**外层 harness 程序化写入**， · 数字: 3 次 / 2 次 / 120 条 / 17 条
 - `DECISIONS.md` · [2026-10-08] 知识索引（WikiSkill 借鉴 A 项）：把"找先例"从 grep 变成查索引 · **来自论文**（arXiv:2608.27454）：WikiSkill 的核心之一是 `wiki/index.md` —— **知识要能被检索， · 数字: 3 次 / 2 次 / 497 条
@@ -153,7 +154,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（143 条）
+## 进度记录（144 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -298,6 +299,7 @@
 - `PROGRESS.md` · WikiSkill 借鉴 A：知识索引（2026-10-08） · - `scripts/gen-doc-index.mjs`（`--update`/`--check`，**确定性输出**）→ `docs/INDEX.md`，实测 **497 条** · 数字: 497 条 / 3 次 / 2 次
 - `PROGRESS.md` · WikiSkill 借鉴 B：改动台账（2026-10-08）+ 并发越界复盘 · - `docs/CHANGES.jsonl` 由 `scripts/gen-changes-ledger.mjs` **从 git 历史回溯生成**（`--update`/`--check`， · 数字: 2 个 / 510 条
 - `PROGRESS.md` · Humanize 借鉴 ①：评审者换模型 + 必须能执行（2026-10-08） · - `goal` 新增 opt-in `verifyModel`；评审固定派 `agent: reviewer`（**它的 tools 含 bash ⇒ 能自己跑测试**， · 数字: 399B / 159B
+- `PROGRESS.md` · Humanize 借鉴 ③：验收判据前移到 `goal set`（2026-10-08） · - `goal set {objective, check}` 把判据存进 `GoalState.check`；`complete` 未另给 `check` 则**自动采用**，
 
 ## 缺陷回放（16 条）
 

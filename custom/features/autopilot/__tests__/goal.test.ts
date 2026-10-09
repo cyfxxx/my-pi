@@ -7,6 +7,8 @@
  *      blockedAfterConsecutiveRounds）；
  *   ③ 达到上限 → 停止并记明原因；显式 complete/blocked/pause 之后不再续跑。
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   BLOCKED_AFTER_NO_PROGRESS_ROUNDS,
@@ -203,5 +205,18 @@ describe('第二来源：独立评审（judge）', () => {
     const byCmd = verifiedCompletion(createGoal('x', 5), { command: 'npm test', outputTail: 'ok', at: 't' });
     expect(goalStatusText(byCmd)).toContain('校验命令：`npm test`');
     expect(goalStatusText(byCmd)).not.toContain('独立评审');
+  });
+});
+
+describe('验收判据前移到 goal set（Humanize §3.1）', () => {
+  it('set 时存下契约里的 check；complete 时**没另给就自动采用**（显式覆盖契约）', () => {
+    const src = readFileSync(join(__dirname, '..', 'index.ts'), 'utf8');
+    expect(src).toContain('...(contractCheck ? { check: contractCheck } : {})');
+    // 自动采用的表达式必须**显式传入优先**，否则模型给的新判据会被旧契约压掉
+    expect(src).toContain("const check = explicitCheck || (goal.check ?? '');");
+  });
+  it('GoalState 有可选的 check 字段（契约存在状态里，重启/续跑后仍在）', () => {
+    const t = readFileSync(join(__dirname, '..', 'store', 'goal.ts'), 'utf8');
+    expect(t).toMatch(/export interface GoalState \{[\s\S]*?check\?: string;/);
   });
 });

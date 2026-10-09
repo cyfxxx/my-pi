@@ -29,6 +29,11 @@ export type GoalStatus = 'active' | 'paused' | 'complete' | 'blocked';
 export type GoalCompletionMode = 'declared' | 'verified' | 'advisory';
 
 export interface GoalState {
+  /**
+   * 验收判据（**契约的一部分**）：`goal set` 时可挂；`complete` 时若没另给 check 就**自动采用它**。
+   * 来自 Humanize §3.1「计划即契约」：判据应在**动手前**固定，而不是做完再补一条刚好能过的命令。
+   */
+  check?: string;
   objective: string;
   status: GoalStatus;
   /** 已推进的轮数（含自动续跑的每一轮） */

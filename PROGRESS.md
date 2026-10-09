@@ -2795,3 +2795,9 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - `goal` 新增 opt-in `verifyModel`；评审固定派 `agent: reviewer`（**它的 tools 含 bash ⇒ 能自己跑测试**，
   满足 §7"不能跑测试的跨模型评审有害"）；不传时**请求体无 model 键** ⇒ 默认逐字节不变。
 - 守门 +3 项（派 reviewer / 有无 model / 源码级接线）；前缀 **24 399B**（余量 1 159B）未顶破。
+
+### Humanize 借鉴 ③：验收判据前移到 `goal set`（2026-10-08）
+
+- `goal set {objective, check}` 把判据存进 `GoalState.check`；`complete` 未另给 `check` 则**自动采用**，
+  显式传入**优先**（新判据覆盖旧契约）。复用既有参数 ⇒ **声明面零字节变化**。
+- 守门：`goal.test.ts` +2 项源码级接线断言（含"显式优先"的顺序断言）。
