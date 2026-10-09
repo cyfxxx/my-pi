@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（148 条）
+## 决策台账（149 条）
 
+- `DECISIONS.md` · [2026-10-08] 修台账 `rejected` 误抽（C 项暴露的缺陷 2） · **症状（C 项编译器发现并拒绝采用）**：18 条 `rejected` 里只有 1 条勉强过硬、且那 1 条也是误抽—— · 数字: 18 条 / 1 条 / 7 条
 - `DECISIONS.md` · [2026-10-08] C 项落地（离线「经验→知识」编译器）+ 它暴露的两个真实缺陷 · **来自 WikiSkill 附录 E.2（本轮才拿到判据）**：输出 JSON（`create_patterns`/`update_patterns`/`update_index`）； · 数字: 18 条 / 1 条
 - `DECISIONS.md` · [2026-10-08] 修台账自指排除缺陷：不再依赖脆弱的块解析，改为**逐条硬校验** + 一条收敛命令 · **症状（实测）**：提交 `2d1741860` 明明包含 `docs/CHANGES.jsonl`，却被记入台账 ⇒ 台账在"提交之后"必然 · 数字: 4 次 / 3 条 / 4 轮 · 证据: 2d1741860 / node scripts/gen-changes-ledger.mjs --settle
 - `DECISIONS.md` · [2026-10-08] 验收判据前移到 `goal set`（Humanize 借鉴 ③） · **来自 Humanize**（arXiv:2610.08900 §3.1「计划即契约」）：**验收判据应当在动手前固定**，而不是做完再补
@@ -156,7 +157,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（146 条）
+## 进度记录（147 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -304,6 +305,7 @@
 - `PROGRESS.md` · Humanize 借鉴 ③：验收判据前移到 `goal set`（2026-10-08） · - `goal set {objective, check}` 把判据存进 `GoalState.check`；`complete` 未另给 `check` 则**自动采用**，
 - `PROGRESS.md` · 修台账自指排除缺陷（2026-10-08） · - 症状：含 `docs/CHANGES.jsonl` 的提交仍被记入 ⇒ 每次提交后台账必漂移、要 amend 两次（本批连续撞 4 次）。 · 数字: 4 次 / 4 轮
 - `PROGRESS.md` · WikiSkill 借鉴 C：离线「经验 → 知识」编译器（2026-10-08） · - `scripts/knowledge-compile.mjs`（`--update`/`--check`，确定性）→ `docs/knowledge/`（index + **16 页**）。
+- `PROGRESS.md` · 修台账 rejected 误抽（2026-10-08，C 项暴露的缺陷 2） · - 根因：标记词在 `title + 整段正文` 里搜 ⇒ 决策条目正文常提"不推荐/不做"，被大面积误判。 · 数字: 7 条
 
 ## 缺陷回放（16 条）
 

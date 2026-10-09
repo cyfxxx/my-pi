@@ -97,8 +97,13 @@ function rejected() {
   const flush = () => {
     if (title === null) return;
     const all = `${title}\n${body.join('\n')}`;
-    if (/否掉|已否掉|不迁移|不推荐|负结果|收下但不分叉|不做\b/.test(all)) {
-      const reasonLine = body.map((l) => l.trim()).find((l) => l && !l.startsWith('|') && !l.startsWith('```')) ?? '';
+    // **修缺陷（2026-10-08，由 C 项暴露）**：原来把标记词在整个正文里搜 ⇒ 只要正文提到"不推荐/不做"
+    // 就被判成"被否提案"（18 条里仅 1 条勉强过硬且也是误抽），产物会变成伪知识。
+    // 现在**只在标题里认标记**（负结果的结论通常就写在标题上），且 reason 取**含标记的那一行**。
+    const NEG_TITLE = /否掉|已否掉|不迁移|不推荐|负结果|收下但不分叉|不做|暂不做|不采用|予以否决|拒绝采纳/;
+    if (NEG_TITLE.test(title)) {
+      const marked = body.map((l) => l.trim()).find((l) => l && NEG_TITLE.test(l) && !l.startsWith('|') && !l.startsWith('```'));
+      const reasonLine = marked ?? body.map((l) => l.trim()).find((l) => l && !l.startsWith('|') && !l.startsWith('```')) ?? '';
       const sha = (all.match(/\b[0-9a-f]{7,40}\b/) ?? [''])[0];
       out.push({
         kind: 'rejected',
