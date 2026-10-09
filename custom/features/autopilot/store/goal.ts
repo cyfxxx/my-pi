@@ -43,6 +43,21 @@ export interface GoalState {
   noProgressRounds: number;
   /** 状态说明（为什么停的） */
   note: string;
+  /**
+   * 【终止设计·只记录】评审/校验阶段的界：**连续多少次评审没有通过**（通过即清零）。
+   * 达到 `REVIEW_BUDGET_ROUNDS` 时只写 `stopReason`，**不改变任何既有判定**（见 Humanize §6"终止必须被设计"）。
+   */
+  reviewRoundsWithoutPass?: number;
+  /**
+   * 【终止设计·只记录】停止理由的分类标签。当前只产出 `'review-budget-exhausted'`（评审预算用完）。
+   * 它是**记录**，不是闸门：是否继续仍完全由 `decideContinuation` 决定。
+   */
+  stopReason?: string;
+  /**
+   * 【终止设计·只记录】受阻的性质：`'environment'`（环境/权限/网络等外部条件）或 `'failure'`（真失败）。
+   * 判据是**可复核的字符串特征**（见 `ENVIRONMENT_ERROR_MARKERS`），不做 LLM 判断；无从判断时**不写**。
+   */
+  blockedKind?: 'environment' | 'failure';
   /** 完成语义（未结束前为 null）；见 GoalCompletionMode */
   completionMode: GoalCompletionMode | null;
   /** 独立校验的凭据（仅 `verified` 会有）：检查命令 + 输出尾部 + 时间 */
@@ -224,8 +239,65 @@ export function goalStatusText(goal: GoalState | null): string {
         ? `独立评审：DONE（理由：${goal.verification.reason ?? ''}）`
         : `校验命令：\`${goal.verification.command}\`（输出尾部：${(goal.verification.outputTail ?? '').slice(-160)}）`
       : '',
+    goal.stopReason ? `停止理由（记录）：${goal.stopReason}` : '',
+    goal.blockedKind ? `受阻性质（记录）：${goal.blockedKind === 'environment' ? '环境（权限/网络/磁盘等外部条件）' : '失败'}` : '',
+    typeof goal.reviewRoundsWithoutPass === 'number' && goal.reviewRoundsWithoutPass > 0
+      ? `评审未通过（连续）：${goal.reviewRoundsWithoutPass}/${REVIEW_BUDGET_ROUNDS}`
+      : '',
     goal.note ? `说明：${goal.note}` : '',
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/** 评审阶段的界（**只记录**）：连续这么多轮评审都没通过 ⇒ 写 `stopReason`。阈值给得**宽**（宁可晚停）。 */
+export const REVIEW_BUDGET_ROUNDS = 6;
+
+/**
+ * 「环境性」错误特征（**可复核的字符串**，不是 LLM 判断）。
+ *
+ * 用途：区分"被环境阻塞"与"真失败"——Humanize §6 的发现之一是"**证据与环境决定终止**"，
+ * 收不齐证据时应当**问人类**而不是烧回合；两者在记录上必须分得开。
+ * 采集的是 errno 风格标记与常见环境性文案；**匹配不到就不算环境性**（宁可归类为 failure）。
+ */
+export const ENVIRONMENT_ERROR_MARKERS: readonly string[] = [
+  'EACCES', 'EPERM', 'ENOSPC', 'EROFS', 'EBUSY',
+  'ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EHOSTUNREACH',
+  'command not found', 'No such file or directory', 'network is unreachable',
+  'Temporary failure in name resolution', 'Could not resolve host', 'Operation not permitted',
+];
+
+/**
+ * 【纯逻辑·只记录】按可复核特征给错误分类。
+ * - 一条错误都没有 ⇒ `'unknown'`（**不乱分类**，也不写字段）
+ * - 命中任一环境标记 ⇒ `'environment'`
+ * - 有错误但都不命中 ⇒ `'failure'`
+ */
+export function classifyErrorKind(errors: readonly string[]): 'environment' | 'failure' | 'unknown' {
+  const meaningful = errors.filter((e) => typeof e === 'string' && e.trim() !== '');
+  if (meaningful.length === 0) return 'unknown';
+  return meaningful.some((e) => ENVIRONMENT_ERROR_MARKERS.some((m) => e.includes(m))) ? 'environment' : 'failure';
+}
+
+/** 【纯逻辑·只记录】把本轮错误分类写进状态（`unknown` 不写）。 */
+export function recordRoundOutcome(goal: GoalState, round: { errors: readonly string[] }): GoalState {
+  const kind = classifyErrorKind(round.errors);
+  if (kind === 'unknown') return goal;
+  return { ...goal, blockedKind: kind };
+}
+
+/**
+ * 【纯逻辑·只记录】记一次评审结果：通过 ⇒ 清零；未通过 ⇒ 累加。
+ * 累加到 `REVIEW_BUDGET_ROUNDS` 时写 `stopReason='review-budget-exhausted'`——
+ * **注意：它绝不改 `status`/`roundsUsed`/`noProgressRounds`**，是否继续仍由 `decideContinuation` 决定。
+ */
+export function noteReviewAttempt(goal: GoalState, passed: boolean): GoalState {
+  if (passed) {
+    return { ...goal, reviewRoundsWithoutPass: 0 };
+  }
+  const n = (goal.reviewRoundsWithoutPass ?? 0) + 1;
+  if (n >= REVIEW_BUDGET_ROUNDS) {
+    return { ...goal, reviewRoundsWithoutPass: n, stopReason: 'review-budget-exhausted' };
+  }
+  return { ...goal, reviewRoundsWithoutPass: n };
 }

@@ -25,7 +25,10 @@ import {
   decideContinuation,
   goalStatusText,
   resolveGoalCap,
+  noteReviewAttempt,
+  recordRoundOutcome,
 } from './store/goal';
+import { appendTerminationRecord } from './run/termination-log';
 import type { GoalState } from './store/goal';
 
 import {
@@ -937,6 +940,10 @@ export function register(pi: ExtensionAPI): void {
   let goal: GoalState | null = null;
   /** 本轮（自 turn_start 起）的工具调用数，**不含 goal 自身**（否则反复查状态会被当成有推进） */
   let toolCallsThisRound = 0;
+  // 【终止设计·只记录】本轮的工具错误文本（用于区分"环境阻塞"与"真失败"）与最近一次评审结果。
+  // **两者都不参与任何判定**：是否继续仍由 decideContinuation 决定。
+  let roundErrors: string[] = [];
+  let lastReviewOutcome: 'passed' | 'failed' | undefined;
   const GOAL_CUSTOM_TYPE = 'my-pi-goal';
 
   registerTool(pi, {
@@ -984,6 +991,7 @@ export function register(pi: ExtensionAPI): void {
         if (check) {
           // 独立校验：模型给判据，**harness 实际跑**（这才是 declared 与 verified 的区别）
           const r = await runCheckCommand(check);
+          lastReviewOutcome = r.ok ? 'passed' : 'failed'; // 只记录，不改变下面任何分支的既有语义
           if (r.ok) {
             goal = verifiedCompletion(goal, {
               command: check,
@@ -1003,6 +1011,7 @@ export function register(pi: ExtensionAPI): void {
             note: evidence,
             ...(typeof args.verifyModel === 'string' && args.verifyModel ? { model: args.verifyModel } : {}),
           });
+          lastReviewOutcome = judged.done === true ? 'passed' : 'failed'; // 只记录
           if (judged.done === true) {
             goal = judgeVerifiedCompletion(goal, { reason: judged.reason, at: new Date().toISOString() });
           } else {
@@ -1033,6 +1042,8 @@ export function register(pi: ExtensionAPI): void {
       setTurnBusy(true);
       touchActivity();
       toolCallsThisRound = 0;
+      roundErrors = [];
+      lastReviewOutcome = undefined;
     },
   });
   // 计数本轮工具调用（排除 goal 自身）：判"有没有推进"的唯一依据
@@ -1041,6 +1052,24 @@ export function register(pi: ExtensionAPI): void {
     handler: async (event) => {
       const name = (event as { toolName?: string }).toolName;
       if (name && name !== 'goal') toolCallsThisRound++;
+    },
+  });
+  // 【终止设计·只记录】采集本轮工具错误文本：只用于**分类**（环境 vs 失败），不参与判定。
+  registerHook(pi, {
+    event: 'tool_result',
+    handler: async (event) => {
+      const e = event as { content?: unknown; isError?: boolean };
+      if (e.isError !== true || roundErrors.length >= 20) return;
+      let text = '';
+      if (typeof e.content === 'string') {
+        text = e.content;
+      } else if (Array.isArray(e.content)) {
+        text = (e.content as { type?: string; text?: string }[])
+          .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
+          .map((b) => b.text as string)
+          .join('\n');
+      }
+      if (text) roundErrors.push(text.slice(0, 500));
     },
   });
   registerHook(pi, {
@@ -1056,6 +1085,23 @@ export function register(pi: ExtensionAPI): void {
       setTurnBusy(false);
       touchActivity();
       if (!goal || goal.status !== 'active') return;
+      // ── 【终止设计·只记录】── 以下三行只往状态里写"记录字段"，**不参与**是否继续的判定。
+      // 分类判据是可复核的字符串特征（store/goal.ts 的 ENVIRONMENT_ERROR_MARKERS），不做 LLM 判断。
+      const beforeRecord = goal;
+      goal = recordRoundOutcome(goal, { errors: roundErrors });
+      if (lastReviewOutcome !== undefined) goal = noteReviewAttempt(goal, lastReviewOutcome === 'passed');
+      if (goal.stopReason !== beforeRecord.stopReason || goal.blockedKind !== beforeRecord.blockedKind) {
+        // append-only、fail-open：写不进去也绝不影响任何判定
+        appendTerminationRecord({
+          ts: new Date().toISOString(),
+          stopReason: goal.stopReason,
+          blockedKind: goal.blockedKind,
+          reviewRoundsWithoutPass: goal.reviewRoundsWithoutPass,
+          roundsUsed: goal.roundsUsed,
+        });
+      }
+      roundErrors = [];
+      lastReviewOutcome = undefined;
       const d = decideContinuation(goal, toolCallsThisRound);
       goal = d.next;
       try {

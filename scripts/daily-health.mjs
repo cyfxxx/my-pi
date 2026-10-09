@@ -56,6 +56,11 @@ const SUBAGENT_POOL = process.env.PI_SUBAGENT_POOL_LOG || join(MEM, 'logs', 'sub
 // 子代理返工（P8-A 第二步）：子代理改过的文件，**父级是否在随后的 N 个回合内又改了同一个文件**。
 // 口径写在 README 的"子代理返工"一节；由 test-usage-metrics.mjs 的合成夹具钉住。
 const SUBAGENT_USAGE = process.env.PI_SUBAGENT_USAGE_FILE || join(MEM, 'subagent', 'usage.jsonl');
+// 终止设计（Humanize 借鉴，autopilot/run/termination-log.ts 产出）：**只记录**停止理由的分类与受阻性质。
+// 前者回答"评审预算是不是用完了"，后者区分"被环境阻塞"（权限/网络/磁盘）与"真失败"——论文 §6 的
+// "证据与环境决定终止"要求把这两种情形分开看。**本字段不参与任何判定**。
+const GOAL_TERMINATIONS =
+  process.env.PI_GOAL_TERMINATION_LOG || join(MEM, 'logs', 'goal-terminations.jsonl');
 const SESSIONS_DIR = process.env.PI_SESSIONS_DIR || join(AGENT, 'sessions');
 /** 父级在其后的多少个助手回合内再改同一文件算"返工" */
 const REWORK_TURNS = Number(process.env.PI_HEALTH_REWORK_TURNS) || 5;
@@ -569,7 +574,12 @@ const paybackStr = paybackRows.length
   ? `p50=${percentile(paybackTurnsArr, 50) ?? 'n/a'}/n=${paybackRows.length}`
   : 'n/a';
 
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+const termRows = loadJSONL(GOAL_TERMINATIONS).filter(inWindow);
+const reviewCapped = termRows.filter((r) => r && r.stopReason === 'review-budget-exhausted').length;
+const envBlocked = termRows.filter((r) => r && r.blockedKind === 'environment').length;
+const termStr = `评审到界=${reviewCapped} 环境阻塞=${envBlocked}`;
+
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} ${termStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);
