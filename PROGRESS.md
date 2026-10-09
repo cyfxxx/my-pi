@@ -2746,3 +2746,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   ⇒ 自封 verified 仍不可能）；不传时**行为逐字节不变**；未通过/认不出/失败/超时**一律 fail-open 退回 declared**；
   命令优先级高于评审。
 - 守门：`goal-verdict.test.ts` 12 项 + `goal-judge.test.ts` 8 项（含通道接线的源码级断言）。
+
+### 第二校验来源的端到端探针（2026-10-08）
+
+- `custom/features/autopilot/__tests__/goal-judge-e2e.test.ts`：**显式 opt-in**（`PI_GOAL_JUDGE_E2E=1`），
+  真 pi + 自造 SSE provider，按请求内容路由区分父级与评审子代理。
+- 因果级断言：评审请求真到达（独立进程真跑）/**消息数 ≤4**（独立上下文）/父级记成 `独立评审：DONE` + `verified`。
+- 实测：默认自跳过 ✓；opt-in 下 **56.5s 通过**。
