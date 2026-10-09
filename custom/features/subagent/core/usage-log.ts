@@ -44,6 +44,14 @@ export interface SubagentUsageRecord {
    *   · 因此它是"**用过文件编辑工具**"的**下界**，不是完备判据。要判"文件到底变没变"得看盘面（后续项）。
    */
   writeTools: string[];
+  /**
+   * 子代理**改动过的文件路径**（去重、保序，最多 `WRITE_PATHS_MAX` 条；只读子代理为 `[]`）。
+   *
+   * 用途：**返工代理指标**（P8-A 第二步）——"父级在子代理返回后 N 轮内是否又改了同一批文件"
+   * 必须知道改的是**哪些**文件，只记工具名不够。时间窗 join 的另一半来自父级会话文件（带逐条时间戳）。
+   * 只记**路径**，不记内容（内容在工具输出/归档里，不在这个账本里）。
+   */
+  writePaths: string[];
 }
 
 /** 落盘路径；可用 `PI_SUBAGENT_USAGE_FILE` 覆盖（测试用） */
@@ -56,6 +64,49 @@ export function subagentUsageFile(): string {
  * 统计恒为非空——见 `SubagentUsageRecord.writeTools` 的语义边界说明）。
  */
 export const WRITE_TOOLS: ReadonlySet<string> = new Set(['write', 'edit', 'edit_and_run']);
+
+/** 写类工具参数里承载文件路径的键（pi 的 edit/write 用 `path`；别名用于容忍形状变化） */
+export const WRITE_PATH_KEYS: readonly string[] = ['path', 'file_path', 'filePath', 'file'];
+
+/** `writePaths` 最多记这么多条：够做返工判定，又不让账本随长任务膨胀 */
+export const WRITE_PATHS_MAX = 20;
+
+/**
+ * 从子代理消息里提取**改动过的文件路径**（去重、保序、限长）。
+ *
+ * 与 `extractWriteTools` 同一次遍历口径：只认 `WRITE_TOOLS` 里的工具（catch-all 不算——
+ * 见 `SubagentUsageRecord.writeTools` 的语义边界），参数取 `WRITE_PATH_KEYS` 里第一个命中的字符串。
+ * 畸形/未知结构一律跳过（旁路统计绝不抛错）。
+ */
+export function extractWritePaths(messages: readonly unknown[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const msg of messages) {
+    if (!msg || typeof msg !== 'object') continue;
+    const content = (msg as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      if (!block || typeof block !== 'object') continue;
+      const b = block as { type?: unknown; name?: unknown; arguments?: unknown; input?: unknown };
+      if (b.type !== 'toolCall' || typeof b.name !== 'string' || !WRITE_TOOLS.has(b.name)) continue;
+      const raw = b.arguments ?? b.input;
+      if (!raw || typeof raw !== 'object') continue;
+      const args = raw as Record<string, unknown>;
+      for (const key of WRITE_PATH_KEYS) {
+        const v = args[key];
+        if (typeof v !== 'string') continue;
+        const path = v.trim();
+        if (path && !seen.has(path)) {
+          seen.add(path);
+          out.push(path);
+          if (out.length >= WRITE_PATHS_MAX) return out;
+        }
+        break; // 命中第一个路径键就够，不再看别名
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * 从子代理消息里提取文件编辑类工具名（**去重、保留首次出现顺序**）。
@@ -99,6 +150,7 @@ export function buildUsageRecord(result: SingleResult, ts: number = Date.now()):
     cost: result.usage.cost,
     task: result.task.slice(0, 200),
     writeTools: extractWriteTools(result.messages ?? []),
+    writePaths: extractWritePaths(result.messages ?? []),
   };
 }
 

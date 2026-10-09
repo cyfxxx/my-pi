@@ -9,7 +9,13 @@
  *   ④ 只读子代理 = 空数组（"没动过文件"必须能被表达出来）。
  */
 import { describe, it, expect } from 'vitest';
-import { WRITE_TOOLS, buildUsageRecord, extractWriteTools } from '../core/usage-log';
+import {
+  WRITE_PATHS_MAX,
+  WRITE_TOOLS,
+  buildUsageRecord,
+  extractWritePaths,
+  extractWriteTools,
+} from '../core/usage-log';
 import type { SingleResult } from '../core/types';
 
 const asst = (...names: string[]) => ({
@@ -86,5 +92,58 @@ describe('buildUsageRecord：把字段写进账本', () => {
   it('messages 缺失也不抛错（字段退化为 []）', () => {
     const r = buildUsageRecord({ ...base, messages: [] });
     expect(r.writeTools).toEqual([]);
+  });
+});
+
+describe('extractWritePaths：返工指标的前提（知道改了哪些文件）', () => {
+  const edit = (name: string, args: Record<string, unknown>, i = 0) => ({
+    role: 'assistant',
+    content: [{ type: 'toolCall', id: `c${i}`, name, arguments: args }],
+  });
+
+  it('提取 path 并去重保序', () => {
+    const msgs = [edit('edit', { path: '/a.ts', edits: [] }, 0), edit('write', { path: '/b.ts', content: 'x' }, 1), edit('edit', { path: '/a.ts' }, 2)];
+    expect(extractWritePaths(msgs)).toEqual(['/a.ts', '/b.ts']);
+  });
+
+  it('兼容别名键（file_path / filePath / file）', () => {
+    expect(extractWritePaths([edit('write', { file_path: '/x.ts' })])).toEqual(['/x.ts']);
+    expect(extractWritePaths([edit('write', { filePath: '/y.ts' })])).toEqual(['/y.ts']);
+    expect(extractWritePaths([edit('write', { file: '/z.ts' })])).toEqual(['/z.ts']);
+  });
+
+  it('**只认写类工具**：bash/catch-all 的路径参数不算（与 writeTools 同一口径）', () => {
+    expect(extractWritePaths([edit('bash', { command: 'rm /a', path: '/a.ts' })])).toEqual([]);
+    expect(extractWritePaths([edit('read', { path: '/a.ts' })])).toEqual([]);
+  });
+
+  it('路径为空/非字符串一律跳过', () => {
+    expect(extractWritePaths([edit('edit', { path: '   ' }), edit('edit', { path: 42 }), edit('edit', {})])).toEqual([]);
+  });
+
+  it('限长：最多 WRITE_PATHS_MAX 条（不让账本随长任务膨胀）', () => {
+    const many = Array.from({ length: WRITE_PATHS_MAX + 5 }, (_, i) => edit('edit', { path: `/f${i}.ts` }, i));
+    expect(extractWritePaths(many)).toHaveLength(WRITE_PATHS_MAX);
+  });
+
+  it('畸形结构不抛错；arguments 缺失时回退 input', () => {
+    const junk: unknown[] = [null, 1, 'x', {}, { content: 'plain' }, { content: [null] }, { content: [{ type: 'toolCall' }] }];
+    expect(extractWritePaths(junk)).toEqual([]);
+    const viaInput = { role: 'assistant', content: [{ type: 'toolCall', name: 'edit', input: { path: '/via-input.ts' } }] };
+    expect(extractWritePaths([viaInput])).toEqual(['/via-input.ts']);
+  });
+
+  it('buildUsageRecord 带上 writePaths', () => {
+    const r = buildUsageRecord({
+      agent: 'editor',
+      agentSource: 'user',
+      task: 't',
+      exitCode: 0,
+      messages: [edit('edit', { path: '/a.ts' }), edit('bash', { command: 'x', path: '/nope.ts' })],
+      stderr: '',
+      usage: { turns: 1, input: 1, cacheRead: 1, cacheWrite: 0, output: 1, cost: 0, contextTokens: 2 },
+    });
+    expect(r.writePaths).toEqual(['/a.ts']);
+    expect(r.writeTools).toEqual(['edit']);
   });
 });

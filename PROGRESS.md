@@ -2691,3 +2691,13 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 第二步（返工代理指标）标为**进行中**：已确认父会话消息**带逐条时间戳**（`{type:'message',timestamp,...}`），
   可做时间窗 join；还缺"子代理改过哪些文件"（需先补 `writePaths`）。
 - 口径边界的决策**上一批已进 DECISIONS**，本步不重复记账。
+
+### P8 后续（二）：`usage.jsonl` 加 `writePaths`（2026-10-08）
+
+- 返工判定的前提：要知道子代理改过**哪些文件**（只记工具名不够）。
+  `usage-log.ts` 新增 `extractWritePaths()` + `WRITE_PATH_KEYS`（`path`/`file_path`/`filePath`/`file` 别名）
+  + `WRITE_PATHS_MAX = 20`；记录新增 `writePaths: string[]`（去重保序、只记路径不记内容）。
+- 口径与 `writeTools` **完全一致**（只认 `WRITE_TOOLS`，`bash` 等 catch-all 不算）；畸形结构一律跳过。
+- 测试：`usage-write-tools.test.ts` 增至 **15 项**（新增 7 项：去重保序、别名键、catch-all 排除、
+  空/非字符串、限长、畸形容错+input 回退、记录写入）。
+- 时间窗 join 的另一半（父级会话）已确认**带逐条时间戳** ⇒ 下一步做 `computeRework` 纯函数 + 接进 daily-health。
