@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（151 条）
+## 决策台账（152 条）
 
+- `DECISIONS.md` · [2026-10-08] 修 e2e 测试污染生产用量台账（并归档历史噪声） · **症状（实测）**：`pool-e2e.test.ts` 把 `agent:"e2e-worker"` 记录写进了**生产的** · 数字: 10 条 / 5 条 / 12 条 / 7 条
 - `DECISIONS.md` · [2026-10-08] 错误指纹落盘（缺陷 1）：让"经验"可被离线消费，判定行为一行未动 · **缺陷**：`errorFingerprint`/`observeRepairAttempt` 的状态**只活在内存**（`repairBudget`）⇒ 知识层拿不到， · 数字: 1MB / 8 个 / 41 个 / 399B
 - `DECISIONS.md` · [2026-10-08] 知识库补上"失败那一半"：把被否提案接进编译器（WikiSkill 判据②） · **论文判据**（附录 E.2）：**成功与失败都记**。此前编译器只吃 `docs/BUG-REPLAYS.md`（16 条事故）， · 数字: 16 条 / 18 条 / 7 条
 - `DECISIONS.md` · [2026-10-08] 修台账 `rejected` 误抽（C 项暴露的缺陷 2） · **症状（C 项编译器发现并拒绝采用）**：18 条 `rejected` 里只有 1 条勉强过硬、且那 1 条也是误抽—— · 数字: 18 条 / 1 条 / 7 条
@@ -159,7 +160,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（149 条）
+## 进度记录（150 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -310,6 +311,7 @@
 - `PROGRESS.md` · 修台账 rejected 误抽（2026-10-08，C 项暴露的缺陷 2） · - 根因：标记词在 `title + 整段正文` 里搜 ⇒ 决策条目正文常提"不推荐/不做"，被大面积误判。 · 数字: 7 条
 - `PROGRESS.md` · 知识库补上失败那一半（2026-10-08） · - `knowledge-compile.mjs` 接入 `CHANGES.jsonl` 的 `rejected` ⇒ 知识库 **23 页**（bug 16 + **rej 7**）。 · 数字: 3 次
 - `PROGRESS.md` · 缺陷 1 修复：错误指纹可被离线消费（2026-10-08） · - 先查证惯例：前缀指纹**默认写 + 可 opt-out**（`index.ts:143`）⇒ 错误指纹沿用同一惯例 · 数字: 1MB / 399B
+- `PROGRESS.md` · 修 e2e 污染生产用量台账（2026-10-08） · - 根因：`pool-e2e.test.ts` 只改了 `PI_CODING_AGENT_DIR`、**没改 `PI_MEMORY_DIR`** ⇒ 用量台账写生产目录 · 数字: 10 条 / 5 条 / 12 条 / 7 条
 
 ## 缺陷回放（16 条）
 

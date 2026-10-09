@@ -2,6 +2,22 @@
 
 ## 格式
 
+### [2026-10-08] 修 e2e 测试污染生产用量台账（并归档历史噪声）
+
+**症状（实测）**：`pool-e2e.test.ts` 把 `agent:"e2e-worker"` 记录写进了**生产的**
+`portable/memory/subagent/usage.jsonl` —— 当时 10 条里 **5 条是测试噪声**，后来涨到 12 条里 7 条
+⇒ **我建的两项度量（子代理池复用、返工）有一半以上是测试数据**。
+
+**根因**：该测试只把 `PI_CODING_AGENT_DIR` 指向临时目录，**没有设 `PI_MEMORY_DIR`** ⇒ 用量台账仍写默认目录。
+
+**修法**：把 `PI_MEMORY_DIR` 也指向 `agentDir/memory` 并在 afterEach 还原。
+
+**因果证明**：修前每跑一次 e2e 台账 **+2~5 行**；修后 `PI_SUBAGENT_POOL_E2E=1` 跑通（1 passed、tsc 干净）
+而台账 **12 → 12 行不变** ✓。
+
+**历史噪声的处理（不静默删）**：整档备份到 `usage.jsonl.pre-e2e-cleanup.bak`，再把 7 条 `e2e-worker`
+记录从主台账剔除，保留真实记录 —— **是归档不是销毁**，随时可回溯。
+
 ### [2026-10-08] 错误指纹落盘（缺陷 1）：让"经验"可被离线消费，判定行为一行未动
 
 **缺陷**：`errorFingerprint`/`observeRepairAttempt` 的状态**只活在内存**（`repairBudget`）⇒ 知识层拿不到，

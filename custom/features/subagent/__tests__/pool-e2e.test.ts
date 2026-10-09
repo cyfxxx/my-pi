@@ -22,6 +22,7 @@ const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../sc
 
 describe.skipIf(!ENABLED)('池端到端：两次同 profile 的任务只起一个进程', () => {
   let agentDir = '';
+  let savedMemoryDir: string | undefined;
   let savedAgentDir: string | undefined;
   let savedPool: string | undefined;
   let spawnCount = 0;
@@ -60,6 +61,7 @@ describe.skipIf(!ENABLED)('池端到端：两次同 profile 的任务只起一�
     savedAgentDir = process.env.PI_CODING_AGENT_DIR;
     savedPool = process.env.PI_SUBAGENT_POOL;
     process.env.PI_CODING_AGENT_DIR = agentDir; // 子进程走 filteredSubagentEnv()，即继承本进程环境
+    process.env.PI_MEMORY_DIR = join(agentDir, 'memory');
     process.env.PI_SUBAGENT_POOL = 'on';
 
     // 数进程启动：工厂每次被调用 = 新建一个 rpc 进程
@@ -74,6 +76,8 @@ describe.skipIf(!ENABLED)('池端到端：两次同 profile 的任务只起一�
     if (savedArgv1 !== undefined) process.argv[1] = savedArgv1;
     if (savedAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = savedAgentDir;
+    if (savedMemoryDir === undefined) delete process.env.PI_MEMORY_DIR;
+    else process.env.PI_MEMORY_DIR = savedMemoryDir;
     if (savedPool === undefined) delete process.env.PI_SUBAGENT_POOL;
     else process.env.PI_SUBAGENT_POOL = savedPool;
     await closeProvider?.();
