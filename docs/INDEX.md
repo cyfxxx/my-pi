@@ -1,0 +1,521 @@
+# 知识索引（自动生成，勿手改）
+
+> 由 `node scripts/gen-doc-index.mjs --update` 生成；`--check` 挂在 `check-conventions.sh` 里防漂移。
+> 用途：**找先例**（"这条判断以前做过吗、结论是什么、证据在哪"），由 WikiSkill 借鉴的 A 项引入。
+> 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
+> 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
+
+## 决策台账（143 条）
+
+- `DECISIONS.md` · [2026-10-08] 知识索引（WikiSkill 借鉴 A 项）：把"找先例"从 grep 变成查索引 · **来自论文**（arXiv:2608.27454）：WikiSkill 的核心之一是 `wiki/index.md` —— **知识要能被检索， · 数字: 3 次 / 2 次 / 497 条
+- `DECISIONS.md` · [2026-10-08] 执行预算决策 (B)：删除 `verify_*` 三工具，前缀多出 1 263 B（未动任何阈值） · **用户批准 (B)**（分析见 `docs/design/TOOL-BUDGET-DECISION.md`）。 · 数字: 773 B / 44 个 / 558B / 41 个
+- `DECISIONS.md` · [2026-10-08] 工具面顶格后的预算决策分析：推荐删掉 `verify_*` 三工具，不动预算 · **现状**：前缀 25 558/25 558、合计 32 000/32 000 —— **两条上限都是 0 余量**。完整分析见 · 数字: 773 B / 30 天 / 3 次
+- `DECISIONS.md` · [2026-10-08] 第二校验来源的端到端探针：证明"独立评审"真的独立 · **为什么要真跑**：这条链路的每一环都只有真跑才能证明——`goal complete {verify:true}` →
+- `DECISIONS.md` · [2026-10-08] `goal complete` 的第二校验来源（独立评审）+ 更正一处我自己的错说法 · **用户指定**：把 `verify_*` 那个（LLM 评审）接成 `goal` 的第二校验来源。 · 数字: 5 个 / 5 条
+- `DECISIONS.md` · [2026-10-08] 文档一致性审计（用户要求）：9 处修正 + "哪些不需要动"的判据 · 用户要求"检查一下在经过多次修改优化后，相关文档是否都更新了"。**方法**：grep 驱动、逐个产物核对 · 数字: 60 轮
+- `DECISIONS.md` · [2026-10-08] 返工指标精确归属（`parentSession`）；顺带暴露并修掉 S4 的"参数漏传"缺陷 · **用户要求**：处理返工指标的残余误归属风险。 · 数字: 0.0%
+- `DECISIONS.md` · [2026-10-08] 返工代理指标落地（P8-A 第二步）：口径五条 + 一处实现形态偏离 + 基于数据的 P8-B/C 建议 · **回答的问题**：子代理改过文件后，**父级是否在随后的 N 个回合内又改回同一文件**——"改动质量"的代理信号。 · 数字: 50.0% / 6 个 / 0 条 / 9 次
+- `DECISIONS.md` · [2026-10-08] 三个未迁移子系统：**都不迁移**（用户批复第 3 项），但理由各不相同且都是实测 · 用户批复："查看这三个子系统，**有用就迁移**，无用则记录理由并按白名单规则处理。" · 数字: 563 个 / 2KB / 99 个 / 0 个
+- `DECISIONS.md` · [2026-10-08] 删除 `TOOL_LAYERING`（工具分层/休眠组）：它自己的成本审计就判了它不划算 · **用户批复第 2 项**："应不应该保留，分析一下由你决定"。**我的决定：删除。** · 数字: 100 个 / 18 个 / 442B / 60.8%
+- `DECISIONS.md` · [2026-10-08] 子代理 `writeTools`（用户批复第 4 项 / P8-A）：先让"有没有动文件"可观测 · **为什么做**：P8 的结论是 SoL-Pi 的 D6（"不要在没有 verifier 契约时派生成式编辑代理"）在我们这里
+- `DECISIONS.md` · [2026-10-08] 临时探针处置（用户批复第 5 项）：有用的收进仓库、无用的清理 · 两个探针都是长任务期间的一次性验证件（放在 `/tmp`，不入库）。逐个判：
+- `DECISIONS.md` · [2026-10-08] 工具面体积守门拆成两个桶（用户批复第 1 项）：TOTAL 未改，严格程度一字节没放宽 · **起因**：P6 新增 `edit_and_run` 时该守门红了（总量 32397 > 32000）。当时的处置是**不改预算**、 · 数字: 18 个 / 44 个 / 554 B / 442 B
+- `DECISIONS.md` · [2026-10-08] 编辑类子代理的 verifier 契约（P8）：风险尚未发生 ⇒ 先测量，不强制 · **来自 SoL-Pi 的 D6**："Avoid generative edit delegates without a verifier contract"。 · 数字: 9 次
+- `DECISIONS.md` · [2026-10-08] `edit_and_run`（P6）：嵌套调用绕过 `prepareArguments`；工具面预算不许事后放宽 · **来自 SoL-Pi 的 Action Fusion**（编辑→命令 占跨轮转场 12.3%，bash 占后继 85.1%，融合后 −10.8% 轮次）。 · 数字: 12.3% / 85.1% / 10.8% / 6.4%
+- `DECISIONS.md` · [2026-10-08] `edit_and_run`（P6）：嵌套调用**绕过** `prepareArguments`，必须用规范 schema · **来自 SoL-Pi 的 Action Fusion**：编辑/写入 → 命令 的相邻转场占跨轮转场 12.3%，bash 占后继动作 85.1%； · 数字: 12.3% / 85.1% / 10.8% / 11.5%
+- `DECISIONS.md` · [2026-10-08] 休眠机制审计（P4）：56% 的"有意保留"其实是"未决策"；TOOL_LAYERING 必须二选一 · **来自 SoL-Pi**：C13 "Disable dormant mechanisms at configuration time"、C24 "Gate ObservationPack by · 数字: 18 条 / 10 条 / 56% / 5 条
+- `DECISIONS.md` · [2026-10-08] 工具输出归档对照审计（P3）：句柄已有、摘录与分页缺；阈值不动 · **来自 SoL-Pi 的 ObservationPack**：大输出本地归档，上下文留 **handle + 短摘录**，需要时**分页召回**； · 数字: 14 天 / 200MB / 4 个 / 2 次
+- `DECISIONS.md` · [2026-10-08] 子代理池复用度量进日报（P9）：把"复用"从一次性断言升级为持续指标 · **来自 SoL-Pi**：D4 "Bound child work and **measure parent reuse**"。 · 数字: 2 条 / 1 次
+- `DECISIONS.md` · [2026-10-08] 修复预算按"错误指纹"计（P7）：与既有"按工具名熔断"互补，不替换 · **来自 SoL-Pi 的发现**："Budget repair per error fingerprint"、"Give counterexamples precedence and · 数字: 3 次 / 5 条
+- `DECISIONS.md` · [2026-10-08] golden 留出集纪律（P5）：第 19/20 步是验收留出集，开发期间不看 · **来自 SoL-Pi 的做法**：held-out 验证——"Held-out trajectories never enter subsequent analysis, and no · 数字: 51 个 / 0 次 · 证据: bash scripts/golden-tasks.sh --fast
+- `DECISIONS.md` · [2026-10-08] 压缩"回本"估算（P2）：只建立测量，不接管阈值 · **来自 SoL-Pi 的发现**：压缩是**一次前缀重写**，触发时钟不该只是"上下文压力"，还要看**预期未来节省能否 · 数字: 60.8% / 2 次 / 60 轮 / 2 轮
+- `DECISIONS.md` · [2026-10-08] 目标完成语义三态（P1）：verified 只能来自"由 harness 实际跑通的检查" · **来自 SoL-Pi 的发现**（项目页 P 族）："Separate verified, declared, and advisory completion modes"、
+- `DECISIONS.md` · [2026-10-07] fork 池化实测不成立：`new_session {parentSession}` 会"收下但不分叉" · **要验证的假设**：把 `context: 'fork'` 也纳入常驻池——用 `new_session {parentSession}` 在每个任务前分叉，
+- `DECISIONS.md` · [2026-10-07] 子代理池端到端验证通过：两次任务只起一个进程（S1–S3 收口） · **为什么这一步不能省**：S2 的缺陷（复用键写成每次新建的临时文件路径 ⇒ **池从未复用**）能溜过 14 项
+- `DECISIONS.md` · [2026-10-07] 子代理池 S3：修正"从未真正复用"的缺陷 + 租借语义 + 进程回收 · **缺陷一（严重）：S2 的池从未复用。** 复用键写成了 `${model}|${临时 prompt 文件路径}`，而该路径每次
+- `DECISIONS.md` · [2026-10-07] 子代理常驻 RPC 池（S2）：省掉每次 19.1s 的进程启动，且不改事件映射 · **问题**：my-pi 的每次子代理任务都 `spawn` 一个新 pi 进程，本机实测**纯启动 19.1s**
+- `DECISIONS.md` · [2026-10-07] 目标级自动续跑（`goal`）：上限按模式配置，停止条件是本功能的要害 · **背景（编排优化第 4 项）**：my-pi 的自动唤醒只有"tmux 完成通知"与"定时任务"，**没有"朝一个目标连续推进"** · 数字: 256 轮 / 3 轮 / 3 条
+- `DECISIONS.md` · [2026-10-07] 完全相同重复调用的提醒（第 3 项）：判据必须是"名字 + 参数都相同" · **动机**：模型卡在"重试同一个动作"上是真实浪费（对照 DSH 的 `repeat-tool-reminder`，阈值 3/5/8）。 · 数字: 1190 次 / 8 次 / 3 次 / 9 次
+- `DECISIONS.md` · [2026-10-07] 并发语义审计（第 1 项的延续）：哪些 mutator 该 `sequential`，哪些明确不标 · 第 1 项只标了三组判据最硬的（browser / autopilot 重启配置族 / todo）并把其余记为"下一步审计项"。 · 数字: 30 天 / 14 次 / 10 个 / 4 个
+- `DECISIONS.md` · [2026-10-07] bash 超时不再"杀掉丢工作"：转后台 + 完成唤醒（且转后台必须保留硬上限） · **背景（编排优化第 2 项）**：my-pi 在 `features/context/index.ts` 给**没写 `timeout` 的 bash** 注入
+- `DECISIONS.md` · [2026-10-07] 接线 `executionMode`：pi 默认并行执行工具调用，而 my-pi 的共享状态工具没有互斥 · **背景（与 DSH 对比时发现）**：两边的并发默认值**相反**—— · 数字: 61 个 / 115 个 / 52 轮 / 2 个
+- `DECISIONS.md` · [2026-10-07] 私人助手：上游外发通道与角色身份裁剪 · **背景**：本仓库硬分叉 pi 为"自主进化的全能型私人助手"，但此前采取"只叠加、不裁剪"的追加式分叉策略，上游面向公众产品的三条默认通道原样保留。 · 数字: 3 个 / 4% / 26 次 / 11 个
+- `DECISIONS.md` · [2026-10-07] browser 改走 `exposure: 'deferred'`：注册但不声明（补 patches/011 让 tool_search 认识中文） · **背景**：上一批的可行性调研实测发现，pi 原生的 `exposure: 'deferred'` + `tool_search` 是比 · 数字: 0 个 / 11 个 / 7 个 / 6 个
+- `DECISIONS.md` · [2026-10-07] 调研：重型工具"只给子代理"与 `deferred` + `tool_search` 两条路的实测结论（**暂不采用**） · **起因**：提出一个想法——像 browser 这类重型工具能否只给子代理用、主会话默认关闭，以此减少工具数量 · 数字: 6.3KB / 29KB / 6 个 / 5.65KB
+- `DECISIONS.md` · [2026-10-07] 状态类工具描述去重：让每个工具只声明自己的名词，指针只加在会重叠处 · **背景**：上一批合并了 `autopilot_status/stats/failover` 之后，我留了一句"`admin_status`/`admin_get_config`/ · 数字: 16 个 / 360B / 30 天 / 3 次
+- `DECISIONS.md` · [2026-10-07] autopilot 工具面合并：三个"看状态"的近义工具收进 `autopilot_status` 的 `section` · **背景**：上一批按 30 天实测数据把 voice/link/browser 默认关闭后，`autopilot` 成了默认面里**最大的单组** · 数字: 30 天 / 6.8KB / 27 次 / 11.7 天
+- `DECISIONS.md` · [2026-10-07] 按实测调用分布把 browser 也归入默认关闭（不是印象，是数据） · **背景**：上一批按用户口径默认关闭了 voice/link，并留了一句"browser 是最大的一块极少用声明，但要不要关是产品决策"。 · 数字: 30 天 / 71 个 / 6.3KB / 1.0 天
+- `DECISIONS.md` · [2026-10-07] 技能目录移出 system prompt：清空 `systemPromptOptions.skills` + 尾部 append-only 注入（零补丁、零能力损失） · **背景**：pi 原生把 `<skills>` 段渲染进 **system prompt**（每技能一段 XML：name/description/location）。 · 数字: 4 个 / 2269B / 7.9KB / 29%
+- `DECISIONS.md` · [2026-10-07] 体验优化第一批：默认关闭重功能 + 工具面去误导 + 提示词按"意图优先/交付展示"重排 + tmux 通知加空闲门 · **背景**：在完成 my-pi 与 DSH 的编排/系统提示词对照分析后，按用户口径做一轮面向"顺畅使用"的改造。 · 数字: 63 个 / 1793B / 2048B / 696B · 证据: ebfa65e5 / 8493be6d
+- `DECISIONS.md` · [2026-10-07] 前缀缓存：进程内 system 漂移的定位、判据与告警（不引入自动重启） · **背景**：用户报"my-pi 的缓存命中到了九十几之后上升得特别慢，体验也比当前 agent 差"。取真实会话 · 数字: 85 次 / 96.97% / 99.78% / 4 次 · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
+- `DECISIONS.md` · [2026-10-07] G3（压缩暖前缀重放）定案：代码核对确认死代码，**实测收益≈0，不打补丁** · **背景**：迁移审计的最后一个开口项 G3 —— "压缩摘要的暖前缀重放是死代码，需改 vendor"。文档原本的建议 · 数字: 929 条 / 2 次 / 0 次 / 55 个
+- `DECISIONS.md` · [2026-10-07] 相位实验：在 `session_start` 里触发回合是**非法用法**（pi 直接报错），不只是"时机不好" · **要回答的问题**：新进程启动后，究竟等到什么时候注入"续跑回合"才不会丢回复？（上一轮证伪了"换绑事件"方案，见下条。） · 数字: 3 次
+- `DECISIONS.md` · [2026-10-07] 「换绑完成事件」被证伪：重启路径是新进程 + `--session`，不走会话替换 · **想做的事**：把 2026-10-06 那版"在 `session_start` 之后延后 600ms 再触发续跑回合"换成**正序事件**
+- `DECISIONS.md` · [2026-10-07] 角色扮演模式：精选 6 张形象参考图入库 + 按需 `read` 通路 · **背景**：要求从外部资料包（`标枪-图片/`，54 张）里挑代表图"加入角色扮演模式，给模型更丰富的扮演信息"。而此前记忆条目与本文档写的是"语音与图片**不入库**"（版权 + 体积）——所以要先说清改了什么、没改什么。 · 数字: 3.3 MB / 8 MB / 9 MB / 3.8 MB
+- `DECISIONS.md` · [2026-10-06] 续跑回合与 pi 会话替换的竞态：根因定位 + 延后触发（含证据边界） · > **2026-10-07 更正（重要）**：这条把"`session_start` 里同步触发回合会丢回复"归因为"跑在 rebind 之前的会话上"。该归因**对重启路径不成立**——my-pi 的重启是**新进程 + `--sess · 数字: 100%
+- `DECISIONS.md` · [2026-10-06] 场景稳定性两个实测发现：pi 把 process.title 改成 `pi`；极速响应会被 session_start 的初始化竞态丢掉 · 把"场景偶发失败"当 bug 查，得到两条值得写下来的事实（都不是场景自己的问题）：
+- `DECISIONS.md` · [2026-10-06] 文档"结构计数"硬化：把反复漂移的数字变成守门项 · `golden` 步数在 README/FAQ/STRUCTURE/VISION 各写一遍，历次改动只改了一部分（12→16→17→19 的 · 数字: 42 个 / 5 个
+- `DECISIONS.md` · [2026-10-06] 多实例的下半场：归属判定不能误伤 + 真多进程锁测试 + 实例数可见 · > **2026-10-07 续（真 pty 两实例场景落地后）**： · 数字: 4 个 / 3 条
+- `DECISIONS.md` · [2026-10-06] 并发与失败路径硬化：多实例隔离（ownerPid）、跨进程锁与多键防环、写盘失败不退出 · 历史事故多是"单实例假设"下的静默失效；实测**多实例是常态**（同一天出现过两个 supervisor 同时在跑，
+- `DECISIONS.md` · [2026-10-06] 场景自带假 provider：把"有没有产生模型请求"变成计数级事实 · **背景**：真 provider 让回合级断言变成概率事件——仓库既有实测：同一提示词响应 4.6s–145s（免费 provider 抖动，曾把"进程没写完就退出"误报成挂起，导致无头冒烟改成"失败重试一次"）。于是"切模式到底有没有白
+- `DECISIONS.md` · [2026-10-06] 把"重启链路"做透：行为异常进每日体检、崩溃恢复精确续接、无 autopilot 的模式补上兜底消费者 · 延续"使用层面错误的检测与预防"，这一批处理重启链路自己的三个洞： · 数字: 10 分钟 / 3 次 / 1 小时 / 3 轮
+- `DECISIONS.md` · [2026-10-06] 重启后"要不要继续执行任务"的判据：写入端声明意图 + 会话盘面尾部 + env 开关 · **背景**（用户反馈）：重启后注入"系统已重启，请从中断处继续当前任务"的初衷是**自动接上被打断的工作**，但它走的是 `sendUserMessage` —— **无条件触发一个模型回合**。于是切模式、换模型、切会话、模型自己刚收尾 · 数字: 256KB
+- `DECISIONS.md` · [2026-10-06] 使用层面错误的"检测与预防"：三层地基（状态不变量 / 轮次记录 / 真实生命周期场景） · **背景**：用户提问"代码层面的错误已经有各种检查，使用层面的错误除了实际使用中去发现，还有没有别的办法"。把历史事故摊开看逃逸面——`modes.json` 被 git 静默回退、`PI_AGENT_MODE_SOURCE` 翻转（第  · 数字: 3 轮 / 20 轮 / 4 分钟 / 7.5 分钟
+- `DECISIONS.md` · [2026-10-06] 修"模式切换导致的重启被吞掉（进程直接退出）"+"切换后的注入信息不适配模式" · **现象**（用户实测）：在角色扮演会话里 `/new` 正常；**从新会话重新加载角色扮演会话**时，进程直接退出，终端留下一串未被读走的终端查询应答（`10;rgb:…11;rgb:…64;1;2;6;…c`，即 OSC 10/11 与 · 数字: 10 分钟
+- `DECISIONS.md` · [2026-10-06] 模式"免重启"（方案 P）评估：**暂不实施**——记录三档划分、实测对价与触发条件 · **背景**：会话作用域化落地后，用户追问"方案 P 有什么代价"。P = 让扩展在**工厂期**就知道本次要加载哪个会话，从而把"模式 → 注册哪些功能"彻底按会话决定，`/new`、`/resume`、`/reload` 都不再需要重启 · 数字: 23MB / 4% / 2 次 / 4 个
+- `DECISIONS.md` · [2026-10-06] 模式改为**会话作用域**：`/mode` 只影响当前会话，新会话回 default；顺带修掉 bootstrap 的来源判据翻转 · **背景**：用户提问"模式切换能不能只在一个会话中生效——创建新会话或加载其他会话时，自动切换为默认模式或那个会话之前的模式"。旧设计里 `modes-state.json` 的 `current` 是**每台机器的全局选择**，所以新会 · 数字: 1 轮 / 2 轮 / 3 轮 / 23MB
+- `DECISIONS.md` · [2026-10-06] 上游同步 v0.99.1 → v1.0.4：补丁栈按真实中间态重新生成；fullscreen 采用默认；兼容面逐项实测 · **背景**：用户要求把 vendored pi 同步到上游最新（156 提交 / 837 文件 / `+42684 -116560`，删除量远大于新增，主体是 `packages/agent` 的实验 harness 整块移除），并明确" · 数字: 3 次 / 18 个 · 证据: 595ce1589 / 9dd28ff19
+- `DECISIONS.md` · [2026-10-05] 全面检查 MEDIUM 收口：记忆 RMW 加跨进程锁；link/voice/subagent 边界加固；runner 与 secrets 经实测维持原样 · **背景**：上一轮修完 pre-push 门禁分级、模式解析判据、压缩归因、failover 选型后，把 `pi-full-audit` 报告里剩下的 MEDIUM/LOW 逐条核实。结论是**真问题就修，伪问题给证据不动代码**（审计报 · 数字: 68 条 / 22KB / 47KB / 1MB
+- `DECISIONS.md` · [2026-10-05] 每日任务结果复盘：pre-push 门禁按改动范围分级；模式解析两侧同判据；压缩导致的前缀重放不算退化 · **背景**：用户手动跑完全部每日任务 + 一次全面检查技能后要求复盘并优化。执行结果里暴露三个实测缺陷： · 数字: 4 次 / 3 次 / 5 分钟 / 3 条 · 证据: 1791204702683
+- `DECISIONS.md` · [2026-10-05] 定时任务命令体验：手动执行走同一策略路径；补全项 value 必须是整段参数 · **背景**：用户反馈两点：(1) 每日任务只能等调度触发，想手动跑一次没有入口；(2) `/daily show|on|off` 与 `/schedule delete|enable|disable|edit|history` 的任务名要 · 数字: 50 次
+- `DECISIONS.md` · [2026-10-05] 任务执行流畅度（减少中断、批量决策）与会话标题工具 · **背景**：用户提出两项行为改进：(1) 执行任务时减少中途询问——把能做的先做完，再一次性汇报执行情况与集中待决策项，但影响任务正常推进的重要决策仍要及时问；(2) 会话要有简短标题，在合适时机设置且不影响缓存命中。 · 数字: 737B / 1793B / 2048B / 63 个
+- `DECISIONS.md` · [2026-10-04] 工具面收口：不激活 pi 刻意休眠的工具；角色扮演模式补上文件检索 · **背景**：回答"角色扮演模式启用了哪些工具"时用临时探针实测（挂 `custom/bootstrap.ts` 后 dump `pi.getActiveTools()`）：full 模式活跃 **72** 个，其中含 `codemode` · 数字: 1 次 / 18 个 / 3 KB / 11.2 KB · 证据: d2931ad3
+- `DECISIONS.md` · [2026-10-04] 角色扮演人设：状态固定「秘书舰·已誓约」，秘书舰职责对接私人助手 · **背景**：用户要求参照外部资料包「标枪.7z」（本地 265 MB：设定文档、全台词文本、百余条语音、wiki 页面存档、立绘与皮肤图）优化 `portable/agent/modes/roleplay.md`，"尽可能还原人物形象"， · 数字: 265 MB / 3 条 / 8.0 KB / 13.2 KB
+- `DECISIONS.md` · [2026-10-02] 书籍知识库框架落地（P0–P2 骨架），PC 为 worker · **背景**：用户明确"当前设备只有一小部分数据，大部分在另一台设备（**3070 Ti + 32 GB**），当前以**构建框架、验证可行性、做好记录**为主"。 · 数字: 32 GB / 1 MB / 1.54 GB / 1.4 GB
+- `DECISIONS.md` · [2026-10-01] 书籍知识库：复用 memory + 脚本 + 技能，不引入新栈 · **背景**：用户给出书籍知识库构想与一份通用方案（三层 L1/L2/L3、SQLite+向量库、LangChain、GPU 全量 OCR）。要求"根据当前项目情况优化方案"。实测本机：6 核 / 可用内存 ~1.4 GB / 可用磁盘 5 · 数字: 1.4 GB / 51 GB / 1.54 GB / 69 秒
+- `DECISIONS.md` · [2026-10-01] 稳定优先：冻结默认面，明确"不做清单" · **背景**：前几轮把若干"待你决定"的事项挂在台账上（输出侧校验器、VISION §5 阈值、Best-of-N 与记忆合并接线、工具外置）。用户指示："以稳定运行为主，由你决定"。 · 数字: 39%
+- `DECISIONS.md` · [2026-10-01] 死导出守门升级：测试引用不算接线 · **背景**：查"bash 碎调用"的度量落点时发现 `recordToolCallEvent` / `recordToolCall`（工具事件落盘）**只在单测里被调用**，生产从未接线——这正是"工具调用分布"长期为空的根因。而 `ch · 数字: 32 个 / 50% / 21 条
+- `DECISIONS.md` · [2026-10-01] 工具面前缀：加 `lean` 模式收窄，不改默认 · **背景**：`tools` 是请求前缀里最大的构件——`daily-health` 实测 payload `toolsBytes` **62.4 KB**（≈15.6K token），同模型下 DSH 只有它的 1/2.3。台账下一优先项 · 数字: 62.4 KB / 12 个 / 62 个 / 28.5 KB
+- `DECISIONS.md` · [2026-10-01] P4 升格通道第一批：6 条软引导硬化 + 原软引导降权 · **背景**：VISION §3.1 要求"反复有效的软引导必须逐步硬化、禁止永久滞留在软层"，§6 P4 是唯一未完成的路线阶段，判据是"软层条目不无限增长（注入预算受控）"。而「缓存纪律」「状态不入库」「代码规范」「禁止前台等待」这几条 · 数字: 11829 B / 767 B / 789 B / 11.8 KB · 证据: defaced
+- `DECISIONS.md` · [2026-10-01] 重试前删除失败的 assistant 投影：保持现状 · **背景**：复核"前缀缓存优先"是否该改动 pi 的重试语义——agent 层重试前会写一条 `context_edit` 删除失败的 assistant 投影，这会让投影从该点起分叉（缓存失效）；替代方案是"保留投影 + 标记重试"。 · 数字: 39 次 / 1436 条 / 2.72% / 29 次
+- `DECISIONS.md` · [2026-10-01] 子代理 fork 模式：显式 opt-in，而不是默认 · **背景**：DSH 区分 fork（继承历史、复用 KV）与 spawn（空上下文）；my-pi 的子代理只有 spawn。既然我们的成本模型里"暖前缀按 1/50 计价"，继承父会话历史理论上比从零开始更划算——尤其对"需要父上下文"的
+- `DECISIONS.md` · [2026-10-01] `bash` 前台硬上限 240s：把"长任务后台化"从软提示变成代码约束 · **背景**：为定位"顿挫感"，按工具拆解了 1101 个可归属步（deepseek、自动继续步）：工具执行占步墙钟 **63.6%**，请求处理占 36.4%；再按工具拆——`bash` 568 次占工具时间 **63%**（p50 44 · 数字: 1101 个 / 63.6% / 36.4% / 568 次
+- `DECISIONS.md` · [2026-10-01] 工作区指令移出 system 前缀（P1-1）：正文走尾部注入，不变量留在 system · **背景**：缓存差距的定量归因指向**静态前缀的可变性**：763 条指纹里 9 次 `system` 断裂全部是 system 消息被重渲染，而 system 正文里最大的一块正是 `AGENTS.md`（`project_contex · 数字: 763 条 / 9 次 / 11.8KB / 5 次 · 证据: 23e6fc3fa017
+- `DECISIONS.md` · [日期] [决策标题] · **背景**：
+- `DECISIONS.md` · [2026-09-29] 浏览器终端启动时回收孤儿 pty 会话（服务器被强杀后的自清理） · **背景**：`PtySession.dispose()` 只在正常退出时运行。服务器被 `SIGKILL`、崩溃或断电时，`script` → `pi-supervisor.sh` → `pi` 会被 reparent 到 PID 1 后 · 数字: 20 MB / 12 个 / 24 个
+- `DECISIONS.md` · [2026-09-29] 成本差距归因：前缀缓存的"前端变更"，而非命中率或上下文大小 · **背景**：加权缓存命中率 94.10%（逐请求中位数 99.65%），但实际费用约 ¥11/亿 token，而 DSH 为 ¥4/亿。用户要求查明原因。逐日拆解 667 次调用后发现：94.10% 被 **2026-09-26 单日** · 数字: 94.10% / 99.65% / 667 次 / 80.66% · 证据: 7b2a92ed9 / 68f9bafa9
+- `DECISIONS.md` · [2026-09-29] 注入序列改为 append-only（撤销"只保留最新一条注入"） · **背景**：`filterInjectedMessages` 每轮移除除最新一条外的全部 `my-pi-memory-injection` 消息，原意是防注入累积。 · 数字: 39%
+- `DECISIONS.md` · [2026-09-29] 自动切 thinking 档位默认关闭 + 运行时档位钳制到 `high` · **背景**：`thinking-level.ts` 原注释断言"档位是运行时 provider 设置、不进注入面，切换不破坏缓存前缀"，据此自动切档默认开启。实测该断言为假（见上条证据 4）。另：切换到 `deepseek-flash` 
+- `DECISIONS.md` · [2026-09-29] 成本度量改读每轮用量，并把"前缀前端变更"纳入每日告警 · **背景**：`daily-health.mjs` 读 `context/usage.jsonl`（工具级台账，只有 `outputTokens`），而每轮用量在 `context/.usage-diag.jsonl`。结果 2026-09 · 数字: 80.66%
+- `DECISIONS.md` · [2026-09-20] 允许 import type 作为隔离边界例外 · **背景**：修复方案 F-03 禁止在 adapters/ 之外 import vendor/pi。但 feature 的 index.ts 需要 ExtensionAPI 类型来注册工具/钩子。
+- `DECISIONS.md` · [2026-09-20] tsconfig paths 映射到 vendor/pi/dist 而非 src · **背景**：TypeScript 编译 custom/ 时，如果 paths 指向 vendor/pi/src，会把整个 vendor/pi 源码纳入编译，导致大量 TS6059 错误。
+- `DECISIONS.md` · [2026-09-20] 适配器层使用动态 import 且指向 dist · **背景**：agent-adapter.ts 需要调用 createAgentSession，原代码 import src/index，导致编译错误。
+- `DECISIONS.md` · [2026-09-20] check-isolation.sh 允许 import type · **背景**：原 check-isolation.sh 检查 F-03 时会误报 features/index.ts 中的 import type。
+- `DECISIONS.md` · [2026-09-20] tool-adapter.ts 适配新版 ToolDefinition 接口 · **背景**：vendor/pi 新版 ToolDefinition 要求 execute 函数签名包含 toolCallId、signal、onUpdate 等参数。
+- `DECISIONS.md` · [2026-09-20] hook-adapter.ts 扩展 HookEvent 类型覆盖所有使用的事件 · **背景**：各 feature 使用不同的钩子事件（session_start, before_agent_start, context 等），原 adapter 只定义了 5 个。 · 数字: 5 个
+- `DECISIONS.md` · [2026-09-20] web-search logic.ts 直接返回格式化字符串 · **背景**：原 web-search logic 返回 SearchResult[]，再由 formatResponse 格式化。上游工具 execute 要求返回字符串。
+- `DECISIONS.md` · [2026-09-20] 删除 custom/config/ 和 custom/prompts/ 目录 · **背景**：方案目标结构中 custom/ 仅包含 adapters、features、core、bootstrap.ts。
+- `DECISIONS.md` · [2026-09-20] my-pi.sh 使用构建产物而非 tsx · **背景**：方案阶段五要求便携启动脚本使用 node dist/cli.js。
+- `DECISIONS.md` · [2026-09-20] vendor/pi 保留由主仓库追踪（偏离独立 clone） · **背景**：第三轮方案要求 vendor/pi 作为独立 git clone 并由主仓库 .gitignore 排除。但当前环境 GitHub clone 超时（仅 ls-remote 元数据可用），且项目需在 Termux/Androi · 数字: 1689 个
+- `DECISIONS.md` · [2026-09-20] 品牌化仅保留在 patches/，vendor/pi/package.json 保持 pristine · **背景**：001-branding.patch 已应用于 vendor/pi/package.json（name=my-pi、piConfig），导致 `git apply --check` 失败；且运行时 piConfig 实际读取的
+- `DECISIONS.md` · [2026-09-20] vendor/pi 转为独立 git clone（取代前一决策） · **背景**：先前因 GitHub clone 超时选择保留 vendor/pi 由主仓库追踪。后确认网络可用（SSH 认证成功、clone 成功），且主仓库 `main` 就是 pi 源码（提交作者 Armin Ronacher），can · 证据: 71dca871b
+- `DECISIONS.md` · [2026-09-20] 删除 .pi/，配置收敛到 portable/agent（方案 B） · **背景**：第一轮方案的目标结构不含 `.pi/`，核心原则是"所有运行时数据收敛到 `portable/`"；但实际配置仍在 `.pi/`，而 `my-pi.sh` 已把 `PI_CODING_AGENT_DIR` 指向空的 `port
+- `DECISIONS.md` · [2026-09-20] pi-tools 迁移策略：优先纯逻辑 + 可测试模块，不整体搬运 · **背景**：pi-tools 的 12 个扩展实现约 4 万行，多数依赖旧扩展 API 与私有 services/lib；一次性整体移植无法逐个验证，违背原方案"逐个迁移、每步验证"的纪律，且有破坏当前可用项目的风险。 · 数字: 12 个
+- `DECISIONS.md` · [2026-09-20] 技能放到 portable/agent/skills/（而非 portable/skills/） · **背景**：迁移 pi-tools 的 `agent/skills/` 时需确定目标目录。my-pi 文档与 `my-pi.sh` 声明技能目录为 `portable/skills/`（`PI_SKILLS_DIR`），但需要确认 pi 
+- `DECISIONS.md` · [2026-09-20] packs 整目录迁移，skills/docs 精选改写后迁移 · **背景**：pi-tools 的 `packs/`（外部技能包）、`agent/skills/`（4 个内置技能）、`docs/`（18 篇）内容形态不同：packs 是自包含的按需技能包；skills 与 docs 大量引用 pi-to · 数字: 4 个
+- `DECISIONS.md` · [2026-09-20] 根目录文档收敛为 6 个，项目愿景置于 docs/design/VISION.md · **背景**：作为个人项目，根目录 9 个文档中混有上游/历史遗留：`CHANGELOG.md` 记录的是 pi-tools 迁移期日志（条目指向 my-pi 已不存在的 rebuild.sh/pi-wrapper.sh/setup-*.s · 数字: 9 个
+- `DECISIONS.md` · [2026-09-20] 删除 portable 下三个占位目录，运行时数据统一收敛到 agentDir · **背景**：`portable/{skills,extensions,sessions}/` 是骨架期创建的占位目录。核对 vendor/pi 源码后确认：pi 只识别 `PI_CODING_AGENT_DIR` 与 `PI_PACKAG
+- `DECISIONS.md` · [2026-09-20] agentDir 改名为 portable/agent，并修复 custom 层接线 · **背景**：上一决策把技能/会话/扩展统一收敛到 `agentDir` 后，目录名 `portable/config` 与实际内容（配置 + 技能 + 会话 + 扩展）不符，文档中"config 只放配置"的表述自相矛盾。同时在核对改动面 · 数字: 12 个 / 3 个 / 28 个 / 2 个
+- `DECISIONS.md` · [2026-09-20] 删除 custom 构建产物，custom/ 一律以 TypeScript 源码加载 · **背景**：`custom/dist/` 由 `scripts/build.sh` 编译产生，但运行路径从不使用它——`my-pi.sh` 与 `dev.sh` 都以 `--extension custom/bootstrap.ts` 加 · 数字: 12 个
+- `DECISIONS.md` · [2026-09-21] 度量/防退化/记忆治理的落点（VISION P1–P3） · **背景**：12 个功能迁移完成后，VISION §4 指出的最大缺口是度量层：干预率、token 成本、缓存命中率均无法测量；记忆治理只停留在目标设计；结构性改动缺少行为级回归网。pi-tools 以 `usage-stats`/`ta · 数字: 12 个
+- `DECISIONS.md` · [2026-09-21] 功能迁移的完成口径与 N.A. 边界 · **背景**：逐批迁移 pi-tools 12 个扩展时，部分能力与 my-pi 架构前提冲突，需要明确"完成"的口径，避免为对齐而引入不必要复杂度。 · 数字: 12 个
+- `DECISIONS.md` · [2026-09-21] 钩子事件名从 Pi 类型派生，杜绝手写清单漂移 · **背景**：全面审查发现 `custom/adapters/hook-adapter.ts` 的 `HookEvent` 是手写清单，含 `before_tool_call`/`after_tool_call` 两个 Pi 并不派发的事件
+- `DECISIONS.md` · [2026-09-21] 功能目录两层化：根层放 index/logic，实现按职责下沉子包 · **背景**：功能迁移完成后，部分功能目录堆积 10+ 个平铺文件（memory/voice/autopilot），可读性下降；但项目既有约定要求每个功能根目录必须有 `index.ts` 与 `logic.ts`（守门脚本 `check-
+- `DECISIONS.md` · [2026-09-22] 崩溃自愈重新引入 supervisor（推翻此前 N.A.） · **背景**：此前以"my-pi 直启无 wrapper"为由把 crash-recovery 标为 N.A.。用户澄清：最新 pi-tools 已改为「用 pi 修复 pi」，轻度崩溃（external）用屏蔽扩展/技能的当前 pi 自修
+- `DECISIONS.md` · [2026-09-22] 长期记忆只做精选迁移，不整库导入 · **背景**：pi-tools 记忆库 982 条含 PAT 泄露记录、Tailscale/SSH 主机信息与大量旧路径。 · 数字: 982 条 / 139 条
+- `DECISIONS.md` · [2026-09-22] 命令面去冗余与"少手动、多自动" · **背景**：顶层描述内联长 usage，子命令无说明；`/autopilot` 整体重复 `/auto`+`/schedule`，`/usage-diag` 重复 `/context`。
+- `DECISIONS.md` · [2026-09-22] web_search 端点解析与无 SearXNG 降级 · **背景**：web-search 迁移后仅认 `SEARXNG_URL`，而 my-pi 运行环境无该变量、且本机未装 SearXNG，导致 web_search 恒不可用。
+- `DECISIONS.md` · [2026-09-22] 不迁移 auto-compact 控制器与 task-summarizer 流水线（口径） · **背景**：pi-tools `pi-context/auto-compact-controller.ts` 与 `task-summarizer.mjs` 依赖 `.usage-diag.jsonl`、task-record、think
+- `DECISIONS.md` · [2026-09-22] web_search 三层端点解析 + 失败降级 · **背景**：本机无 docker，SearXNG 需原生部署；且所在网络对部分搜索引擎直连受限，SearXNG 可能返回空结果。
+- `DECISIONS.md` · [2026-09-22] 外部服务安装位置：SearXNG 用 /opt 而非 portable/ · **背景**：`check-isolation` 规定 `portable/` 不放运行时依赖（node/chromium/ffmpeg 等），且 `portable/` 禁符号链接。
+- `DECISIONS.md` · [2026-09-22] 压缩前快照落点迁移到 portable/memory/checkpoints · **背景**：pi-tools 快照写 `~/.pi/logs/compact-snapshots`；my-pi 已有 `portable/memory/checkpoints/`（memory 功能使用）且无 `portable/agen · 数字: 7 天
+- `DECISIONS.md` · [2026-09-22] task-record/task-summarizer 改为适配迁移（取代同日"不迁移"口径） · **背景**：先前以"依赖整条未迁移数据链"为由暂缓；实际 `task-record` 生产者可确定性重建（agent_settled 写结构化记录），总结层可去掉 spawn 强依赖。
+- `DECISIONS.md` · [2026-09-22] 网络搜索可用性修复（对齐 pi-tools 注意事项） · **背景**：本机 SearXNG 用默认引擎集，google/duckduckgo/brave/wikipedia 等全部 timeout 拖垮整次搜索（空结果）；`web_fetch`（Bing 直搜）因 HTML 结构变化（`<h2 
+- `DECISIONS.md` · [2026-09-22] 工具分层"常驻配置"同步 pi-tools，并按已注册工具过滤 · **背景**：需将 pi-tools `tool-groups.ts` 的常驻（CORE_TOOLS）与休眠组名单同步到 my-pi，但其中 `plan_*`/`ctx_*`/`admin_*`/`verify_*`/`ask_user`/
+- `DECISIONS.md` · [2026-09-22] 迁移 thinking 档位自适应切档（含模型建议 tool） · **背景**：pi-tools `thinking-level.ts` 是 auto-compact 控制器的一环：按真实窗口比例在 low/medium/high 间自动升降档（critical→降档省 token、回落→升回基准），并提
+- `DECISIONS.md` · [2026-09-22] 迁移工具失败熔断与错误脱水（tool-health） · **背景**：NEW 已有 token 预算截断（`budget.pruneToolOutput`），但缺 pi-tools `tool-truncation.ts` 的两项确定性健康逻辑：同一工具连续失败 3 次的熔断提示，以及错误输出的 · 数字: 3 次
+- `DECISIONS.md` · [2026-09-22] 迁移 autopilot 会话列表/切换与 admin 重启 · **背景**：pi-tools `pi-autopilot/sessions.ts` + `admin_*` 工具（列表/切换会话/重启）未迁移；NEW 的 admin state（`writeRestartRequest`）此前只写无人消
+- `DECISIONS.md` · [2026-09-22] 补全 auto-compact 门控（背景任务/环境阈值/上下文回退/重启提示） · **背景**：NEW 的自动压缩仅在 turn_end 按阈值 + 计划任务门判定；缺 pi-tools 控制器的背景任务门、环境比例/绝对阈值、真实 usage 缺失时的上下文回退与重启提示阈值。
+- `DECISIONS.md` · [2026-09-22] 自动化整理：子包化 web-search/link + 系统提示补全 + knowledge-ingest 可移植 · **背景**：用户授权持续迁移并按便携化/模块化要求整理目录；同时修掉此前引入的缓存不友好注入。 · 数字: 75% / 90% · 证据: d39c8bc94
+- `DECISIONS.md` · [2026-09-22] 深度检查：死代码清理、运行时数据归位、packs 索引补全 · **背景**：自主深度检查发现若干不一致：未用导入/死代码、`portable/memory/daily-results` 单文件被 force-add 与 `.gitignore`（运行时数据不入库）冲突、`packs/INDEX.md`
+- `DECISIONS.md` · [2026-09-22] 重建脚本优化与 pi 更新自动修复 · **背景**：用户要求对比本地环境与远程仓库，确保新设备能顺利重建、更新 pi 后能自动修复。审查发现多处“本地可用但新设备不可复现”的缺口：根依赖从未安装、补丁模型自相矛盾（本地为 commit，脚本按未提交处理，而 check-isol
+- `DECISIONS.md` · [2026-09-22] 更新 pi 上游至 v0.87.0 + sync/build 自愈式重建 · **背景**：用户要求“更新项目中的 pi”。基线为 v0.85.1（`71dca871b`），上游最新 `d201760ff`（v0.87.0，+134 commits）。旧 `sync-upstream.sh` 采用“merge 后再  · 证据: 71dca871b / d201760ff
+- `DECISIONS.md` · [2026-09-25] 成本审计：默认关闭压缩空闲门，并加运行时前缀指纹 · **背景**：用户反馈同一模型/同一思考档下，my-pi 的费用接近 deepseekharness 的 2 倍。实测对照（同一模型价目估算，harness 130 请求 vs my-pi 主会话 159 请求）：费用 $0.774 → $ · 数字: 65% / 33% / 2% / 10 分钟
+- `DECISIONS.md` · [2026-09-25] 上下文管理对比 DSH：让确定性擦除真正生效 · **背景**：对比 DeepSeek Harness（DSH，0.1.5-rc.2）的上下文管理后发现，my-pi 的多层擦除子系统**大半写了但没生效**。实测 10 小时 / 341K 上下文会话的构成：`assistant:think · 数字: 10 小时 / 50.1% / 46.3% / 0 次
+- `DECISIONS.md` · [2026-09-25] 长期维护基建：把"静默退化"变成"守门失败" · **背景**：审计发现本项目的主要风险不是设计，而是**缺少发现问题的手段**：① 死导出扫描出 **28 个无任何引用的导出**（context 的压力/紧急提示 API、watchdog 的 `isTurnBusy`/`isBackgr · 数字: 28 个 / 50% / 18 个 / 3 个
+- `DECISIONS.md` · [2026-09-25] 平台范围：Linux/Termux 为主，Windows 原生便携部署不再支持 · **背景**：pi-tools 在 `portable/` 下提供 Windows 单目录便携部署：`start.ps1`/`start.bat`、`bin/*.ps1|.js`（setup/verify/diag/sync/update-
+- `DECISIONS.md` · [2026-09-25] 语音服务脚本随仓库分发（修复迁移审计 G1） · **背景**：迁移审计把"语音 STT 服务脚本缺失"列为 P0：`config.ts` 的 `whisperScript`/`sherpaScript` 指向 · 数字: 4 个
+- `DECISIONS.md` · [2026-09-25] 补 G2 快照缺口 + G4 救援 playbook + 修 vitest 门抖动 · **背景**：迁移审计剩余项里挑出三项确定性收益：① 手动 `/compact` 不产生快照（`snapshotBeforeCompact` 只挂在自动阈值路径，pi-tools 挂在 `session_before_compact` 覆盖 · 数字: 4 个
+- `DECISIONS.md` · [2026-09-25] headless 定时任务的能力边界：种子提示词只走脚本，不走扩展工具 · **背景**：迁移审计 G5 追查 `daily-review` 提示词丢步骤时发现更深的问题：**定时任务的执行环境与交互会话不同**。
+- `DECISIONS.md` · [2026-09-25] 通知与入站通道：出站用 webhook、入站用 link（不迁移 notify.json / ntfy-relay） · **背景**：迁移审计 G6 指出 pi-tools 的两类配置在 my-pi 无对应物：① `agent/notify.example.json`——模板命令通道
+- `DECISIONS.md` · [2026-09-25] 不信任 dirent 的 d_type：守门与目录遍历一律以 stat 为准 · **背景**：文档校订时发现 `check-doc-links.mjs` 只扫到 **79 篇** md，而树内实际有 **88 篇**。
+- `DECISIONS.md` · [2026-09-25] 移除 wechatide-skill 与 repo-size-audit 两个技能包 · **背景**：`packs/` 原本整目录迁移 pi-tools 的 16 个技能包（863 文件，逐字节一致）。复核后确认其中两个对本项目无实用价值： · 数字: 16 个 / 28 个 / 13 个 / 837 个
+- `DECISIONS.md` · [2026-09-26] 每轮历史擦除默认关闭（缓存计费下的成本反转） · **背景**：用户报告 my-pi 的 API 消耗与 DSH 相比"明显不正常"（本机后台 ¥8.04 / 544 请求 / 42.3M tokens， · 数字: 1 次 / 16 个 / 50% / 75% · 证据: bash scripts/golden-tasks.sh --fast
+- `DECISIONS.md` · [2026-09-26] 重启续接参数跨轮保留 + 重启通知注入（对齐 pi-tools） · **背景**：用户报告"模型调用重启工具后回不到之前的会话，重启后也没有自动注入重启信息"。 · 数字: 2 轮
+- `DECISIONS.md` · [2026-09-26] 关闭工具按需加载，全部工具常驻 · **背景**：承接同日"每轮历史擦除默认关闭"。工具 schema 位于请求**最前处**，`enable_tool` 一改 · 数字: 3 次
+- `DECISIONS.md` · [2026-09-29] 浏览器接入通道选 pty + xterm.js，不移植 DSH WebUI · **背景**：需求是"能远程/移动端用 my-pi"。同时评估了"把 DSH 的 WebUI 移植过来"。先把 DSH 那套 · 数字: 4.71 MB / 55 个 / 10.6 MB / 15.3 MB
+- `DECISIONS.md` · [2026-09-29] xterm 锁 5.5.0：v6 移除了滚动占位元素，移动端滑不动 · **背景**：浏览器终端上线后用户反馈"滑动屏幕不顺畅"。先在真实触摸事件下量清楚，而不是按现象猜。 · 数字: 7 次
+- `DECISIONS.md` · [2026-10-01] footer 第一行的常驻模式标识：`badge:` 前缀（vendor 补丁 009） · **背景**：进入计划模式后，edit/write/非只读 bash 全部被拦截，但 TUI 底部**没有任何标识**。用户只能靠记忆或主动跑 `/plan status` 判断自己在不在这个模式里——而"误以为有写权限"的代价是白跑一轮，
+- `DECISIONS.md` · [2026-10-01] 每日任务用独立 `/daily` 命令，而不是给 `/schedule` 加子命令 · **背景**：用户要"查看每日任务的情况：有哪些、执行情况、关闭/开启"。现有 `/schedule list` 只输出一行原始信息（`● 名 [cron:…] next=… runs=… last=success`），没有今日进度、没有失 · 数字: 10 个 / 12 个
+- `DECISIONS.md` · [2026-10-01] 上游更新前必须体检；不想要的变更**不回退基线，而是加补丁** · **背景**：2026-09-30 把 vendored pi 从 v0.87.0 一次跳到 v0.99.1（130 提交 / 744 文件 / +90664-24881），**同步后**才发现默认主题改了 `system`、工具链换成 T · 数字: 9 个 / 1 个 / 40 条
+- `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
+- `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
+
+## 进度记录（141 条）
+
+- `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
+- `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
+- `PROGRESS.md` · 阶段二：清理 .pi/ 下扩展 · - 完成时间：2026-09-20
+- `PROGRESS.md` · 阶段三：构建适配器层 · - 完成时间：2026-09-20 · 数字: 3 个
+- `PROGRESS.md` · 阶段四：迁移第一个功能（web-search） · - 完成时间：2026-09-20
+- `PROGRESS.md` · 阶段五：迁移其余功能 · - 完成时间：2026-09-20
+- `PROGRESS.md` · 阶段六：便携化简化 · - 完成时间：2026-09-20
+- `PROGRESS.md` · 阶段七：上游同步设置 · - 完成时间：2026-09-20
+- `PROGRESS.md` · 阶段八：脚本精简 · - 完成时间：2026-09-20 · 数字: 4 个
+- `PROGRESS.md` · 阶段九：最终验证 · - 完成时间：2026-09-20 · 数字: 12 个 / 5 个
+- `PROGRESS.md` · 第三轮阶段零：准备与备份 · - 完成时间：2026-09-20 · 证据: 20260920
+- `PROGRESS.md` · 第三轮阶段一：清理 .pi/ 下的悬空链接与无关内容 · - 完成时间：2026-09-20 · 数字: 11个 / 620个 / 0个
+- `PROGRESS.md` · 第三轮阶段二：重建仓库骨架 · - 完成时间：2026-09-20 · 数字: 4 个 · 证据: 5afd80c65
+- `PROGRESS.md` · 第三轮阶段三：修复 portable/ 目录 · - 完成时间：2026-09-20 · 数字: 5 个
+- `PROGRESS.md` · 第三轮阶段四：文档清理与更新 · - 完成时间：2026-09-20
+- `PROGRESS.md` · 第三轮阶段五：最终验证（收尾修复） · - 完成时间：2026-09-20 · 数字: 4 个 / 27 个 / 16 个 / 2 个 · 证据: 1cdf55e64 / 71dca871b / bash scripts/golden-tasks.sh --smoke
+- `PROGRESS.md` · 追加：补齐运维操作文档（同日） · 复查"这些启动方式有没有写进文档"时发现两个缺口——**后台常驻（tmux）配方**与**停止方法** · 数字: 20 秒 / 39 次 / 1436 条 / 2.72%
+- `PROGRESS.md` · P3-1 自主度：归因完成，判定**非缺陷** · 98 个用户轮统计：步/轮 p50=11 / p90=29 / max=102 / 均值 14.7；工具调用/轮 p50=12。轮结束形态： · 数字: 98 个 / 92% / 8% / 42%
+- `PROGRESS.md` · P3-3 子代理 fork 模式（对齐 DSH 的 fork/spawn 之分） · - 新增纯函数 `buildSubagentArgs`（`subagent/core/runner.ts`）与 `subagent` 的 `context: spawn|fork` 参数：
+- `PROGRESS.md` · 按 ROI 关闭的两项（诚实收口） · - **P2-1 工具声明瘦身：不追。** 实测 62KB/15.6K token 是前缀最大构件，但剩下的便宜手段 · 数字: 62KB / 5% / 64KB / 80KB
+- `PROGRESS.md` · P3-2 拆解结果：墙钟的元凶是工具，不是缓存 · 口径：只取 deepseek、且"自动继续"的步（上一条 assistant 有工具调用、下一条仍是 assistant、中间无用户消息）， · 数字: 63.6% / 36.4% / 47.5% / 0.5%
+- `PROGRESS.md` · P3-6 已实施：`bash` 前台硬上限 240s · `AGENTS.md` 里"长任务后台化"是软提示、实测没被稳定遵守（才有 p90 36.4s / p99 164s），故按
+- `PROGRESS.md` · 实测：工具声明才是前缀的大头（比之前估的更准） · - 给指纹记录加 `toolsBytes`/`systemBytes`（请求体的真实字节数），一次真实会话实测： · 数字: 12 个 / 62 个 / 27 个
+- `PROGRESS.md` · 但 ROI 算下来要**下调** P2-1 的优先级（诚实修正） · 砍 20% ≈ 省 3K token，而且只省在**每次冷启动**一次；而实测冷启动的代价是 · 数字: 20%
+- `PROGRESS.md` · 顺带：把前缀体积做成日常可见指标 · `daily-health` 新增 `工具声明=<KB>KB/system=<KB>KB`（取窗口内最近一次实测），并设上限告警 · 数字: 80KB / 5 个 · 证据: bash scripts/golden-tasks.sh --fast
+- `PROGRESS.md` · 设计：把"变更代价"与"权威性"解耦 · - **system 层**保留：`APPEND_SYSTEM.md`（pi 原生）+ 新增 `HARD_RULES` 常量（五条不变量摘要： · 数字: 64KB
+- `PROGRESS.md` · 验证（临时工作区 A/B，不触碰真实文档） · 证据: 23e6fc3fa017
+- `PROGRESS.md` · 顺带（两处既有隐患） · - `check-injection-surface.sh` 的指纹源加入 `hard-rules.ts`（system 层新增内容必须被守门覆盖），基线已刷新。
+- `PROGRESS.md` · P1-2 旧压缩摘要去重改为默认关闭 · - 它是当前**唯一默认开启的删历史动作**（`context/index.ts` 的 `context` 钩子：≥2 条 · 数字: 2 条
+- `PROGRESS.md` · P1-3 断裂归因：口径修正 + 真实断裂数重算（本轮最有价值的发现） · - 实测发现**度量误报**：起一个真实的两次请求 headless 会话，第 2 次请求 `msgs 3→5` 被记为 · 数字: 2 次 / 6 条 / 7 次 / 4 次
+- `PROGRESS.md` · P1-4 冷启动代价量化（直接回答"my-pi 经常改自身"的代价） · - `daily-health` 把每个冷启动与**它之后的第一条每轮用量**配对（指纹写在请求发出前、用量写在响应结束后， · 数字: 5 次 / 21%
+- `PROGRESS.md` · P0-1 分段指纹：把"整段失效"从布尔量变成"失效起点" · - 旧口径的盲区：`head` 只覆盖**前 6 条消息**，而 `total` 兜底会被"条数变化"抢先命中 → · 数字: 6 条 / 60 条 / 37 条 / 50%
+- `PROGRESS.md` · P0-2 `daily-health` 新口径 + 守门 · - 输出新增 `首段分叉=` `中后段分叉=` `冷启动=`： · 数字: 98.1%
+- `PROGRESS.md` · P0-3 文档修正（已在 9b38b98a5 提交） · - 两份运行时审计入库；`CONTEXT-MANAGEMENT-COMPARISON.md` 顶部加更正块，改掉三处被代码与实测推翻的结论 · 数字: 6 次
+- `PROGRESS.md` · 台账 · - `pruneThinkingBudget`/`pruneToolResults` 的默认关闭状态、压缩阈值 ≈967K、重试会删失败投影等 · 数字: 2 个 / 1 个 · 证据: d2931ad3d
+- `PROGRESS.md` · 诊断（先证伪机制，再定位数据） · - supervisor 侧用临时 agent 目录实测 `apply_mode`：`--append-system-prompt …/modes/roleplay.md`
+- `PROGRESS.md` · 修复 · - **config/state 分离**：`modes.json` 只留 `default` + 模式定义（入库）；`current` 落
+- `PROGRESS.md` · 关于热重载的结论（写进 mode README） · 查实 `/reload` 会 `clearExtensionCache()` 重跑扩展工厂，所以**功能白名单可热切**；但 ① 人设是
+- `PROGRESS.md` · 验证 · - 新增 `custom/features/mode/__tests__/mode-switch.test.ts`（**27 例**）：状态分离（含"切模式不得
+- `PROGRESS.md` · 计划模式常驻标识（vendor 补丁 009） · - 现状：footer 第一行是硬编码的 `pwd (branch) • sessionName`，扩展的 `setStatus` 只能落到第三行；
+- `PROGRESS.md` · 每日任务命令 `/daily` · - 「每日任务」= `tasks.json` 里 `tags` 含 `daily` 的任务；当前 5 个（`golden-fast` 07:30、 · 数字: 5 个
+- `PROGRESS.md` · 上游 v0.87.0 → d2931ad3 变更报告 · - 子代理产出 `docs/operations/UPSTREAM-CHANGES-v0.87.0-to-d2931ad3.md`（126 行）：130 提交 / 744 文件 / · 数字: 19 个 · 证据: d2931ad3
+- `PROGRESS.md` · 更新前体检 `check-upstream.sh` + 补丁策略文档 · - 新增 `scripts/check-upstream.sh`（只读）：目标版本/区间提交数/各包 churn/新增包、changelog 新增版本段 · 数字: 9 个 / 1 个
+- `PROGRESS.md` · 跳版后暴露的两个本地隐患（顺手修掉） · 体检脚本的价值立刻体现了一次——顺着"上游删了什么"去查本地依赖，发现两处**只在换机/重新引导后才爆** · 数字: 26 个 · 证据: d201760ffee1 / d201760f / bash scripts/run-ts.sh scripts/memory-store.mjs
+- `PROGRESS.md` · 验证与文档 · - `npx tsc --noEmit -p custom/` 通过；新增单测 `autopilot/__tests__/daily.test.ts`（18 例，视图口径） · 数字: 6 条 · 证据: b2347bec2 / 143bf914
+- `PROGRESS.md` · 硬化（软 → 硬） · - **system 注入装配唯一入口**：新增 `custom/features/context/budget/system-prompt.ts`
+- `PROGRESS.md` · 降权（§3.1 要求的对价） · 删除 AGENTS.md 的「git 提交」「上游隔离」「接口隔离」三条重复条目（分别与开发规范、架构原则、HARD_RULES 重复， · 数字: 11829 B / 517 B / 767 B / 789 B
+- `PROGRESS.md` · 验证 · - `injection-stability.test.ts` 10 例；tmux 单测 29 例（新增 5 例边界）；`check-conventions.sh` 负数测试 · 证据: a09e666c
+- `PROGRESS.md` · 死导出守门：测试引用不算接线 · `recordToolCallEvent` / `recordToolCall` 等工具事件落盘函数**只在单测里被调用**，生产路径从未接线， · 数字: 32 个 / 10 个 / 3 个 / 9 个
+- `PROGRESS.md` · 注入面运行期体检 · 新增 `auditSystemInjection`，在 `context` 扩展注册时跑一次：超预算或出现日期/百分比等易变内容即
+- `PROGRESS.md` · 度量落点更正 · `portable/memory/context/usage.jsonl` 每行本就是一次工具调用（`ts`/`tool`/`ok`/`durationMs`，1784 行），
+- `PROGRESS.md` · 验证 · `injection-stability.test.ts` 14 例（新增 4 例运行期体检）；`check-dead-exports` 负数测试通过； · 数字: 3 条
+- `PROGRESS.md` · 先测量，再决定：`碎调用` 规则其实被稳定遵守 · 扫 6 个会话的**真实 bash 命令 1103 条**：单命令占比 **1.4%**（15/1103），每步 bash 调用数 · 数字: 6 个 / 1103 条 / 1.4% / 3 次
+- `PROGRESS.md` · 指标落地 · - `usage.jsonl` 的 bash 记录新增 `merged`/`segments`：`tool_result` 事件自带原始 `input`（pi · 数字: 25% / 1.4% / 10% / 100%
+- `PROGRESS.md` · 顺带修掉一个计时缺陷 · `toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具——一步内同名工具多次调用会互相覆盖，
+- `PROGRESS.md` · 降权 · APPEND_SYSTEM.md 那条从"优先合并…碎调用会显著推高 token 消耗"压缩成一句（去掉解释，保留规则）： · 数字: 737 B / 4 个 / 0 次 / 1 次 · 证据: 2ca79271
+- `PROGRESS.md` · B-3 整族删除：legacy 跨设备工具台账（同日续做） · - 删除 `diag.ts` 里 legacy 工具台账整族：15 个导出（`recordToolEnable`/`recordToolCallEvent`/ · 数字: 15 个 / 4 个 / 3 个 / 6 个
+- `PROGRESS.md` · B-3 收尾：剩余 21 项逐条判定（同日续做） · 判定标准：**是被活的实现取代的重复，还是未接线但保留的能力**——前者删，后者接线或写理由保留。 · 数字: 4 个 / 18 条
+- `PROGRESS.md` · 最后一批：C 段 18 条历史"零引用"条目（同日续做） · - **先复核再删**：allowlist 登记 ≠ 现在仍死。用守门口径（排除声明文件自身）重算引用数后发现 · 数字: 17 个 / 6 个 / 17 条 / 4 条
+- `PROGRESS.md` · 转正（§3.1/§5 升格通道） · - 机制核对：升格候选 = `solutions`/`fact` 且 recurrence ≥ 5（`promoteRecurrence` 默认值）；recurrence 由 · 数字: 61 条
+- `PROGRESS.md` · 审计与修复（流程 + 结构 + 文档） · - **流程合规复核**：本程序所有硬化项都有"守门/测试 + 文档 + 降权或理由"三件套（台账逐条可查）； · 数字: 12 个
+- `PROGRESS.md` · 优化效果复核（逐日实测） · - 修复前的事件日 **09-26：加权命中 80.66%**、未命中/轮均值 **31 833**（p90 191 396、max 253 095）—— · 数字: 80.66% / 96.40% / 98.74% / 98.27%
+- `PROGRESS.md` · 安全卫生：清理共享存储里的明文私钥副本（2026-10-02） · - 用户问："`我的文件` 里保存的是不是最新的私钥，如果是、已备份可清理。" · 证据: e6d6301abfaf2021
+- `PROGRESS.md` · 引导包已生成并校验（方案 A，2026-10-02） · 用户在本机执行 `bash scripts/bootstrap-key.sh pack`（口令模式）与 `verify`；我接手做无需口令的结构性校验： · 证据: 58a59e3dfbfed2e1 / bash scripts/bootstrap-key.sh pack
+- `PROGRESS.md` · 引导包：干净环境演练 + 轮换预案入档（2026-10-02） · - **演练**（临时目录 `/tmp/my-pi-bootstrap-rehearsal`，模拟新设备，公开 HTTPS 克隆、无任何凭据）： · 数字: 24 MB / 1082 B · 证据: 91f19d9 / 58a59e3d
+- `PROGRESS.md` · 角色扮演人设重写：标枪（忠于原作 + 秘书舰/已誓约状态，2026-10-04） · - 需求：参照外部资料包「标枪.7z」（`/storage/emulated/0/我的文件/`，265 MB：设定文档、全台词文本、132 条语音、 · 数字: 265 MB / 132 条 / 8.0 KB / 13.2 KB
+- `PROGRESS.md` · 角色扮演记忆种子：把「秘书舰·已誓约」写进隔离命名空间（2026-10-04） · - 动作（用户确认后执行）：向 `portable/memory/roleplay/`（角色扮演模式专用命名空间，gitignored）写入 3 条 · 数字: 3 条 / 60 天 / 61 条 · 证据: bash scripts/run-ts.sh scripts/memory-store.mjs
+- `PROGRESS.md` · 守门稳定性：工具面体积守门的超时放宽（2026-10-04） · - 现象：`pre-push` 全量 golden 在 vitest 步骤失败，唯一失败项是 · 数字: 62 个 / 28.5KB / 31KB / 12 个
+- `PROGRESS.md` · 加密同步清单去死路径（2026-10-04） · - `sync/manifest.txt` 的会话区有 4 条本机不存在的路径（3 条历史遗留，1 条 09-22 会话在更早的清理后消失）： · 数字: 4 条 / 3 条 / 1 条 / 2 条 · 证据: d22d5789f
+- `PROGRESS.md` · 工具面收口 + 角色扮演补文件检索（2026-10-04） · - **测量方法**：临时扩展探针（`--extension <bootstrap>` + 一个在 `before_agent_start` 里 `getAllTools()/getActiveTools()` · 数字: 18 个 / 69 个
+- `PROGRESS.md` · 任务执行流畅度 + 会话标题工具（2026-10-05） · - **提示词（任务一）**：`portable/agent/APPEND_SYSTEM.md` 新增「任务执行」一节——一次交付（先把能做的、该做的做完，再一次性汇报 + 集中待决策项）、收尾集中列出选项与建议、汇报按「已完成 / 未完成 · 数字: 120B / 29.0KB · 证据: node scripts/gen-registrations.mjs --update / bash scripts/check-injection-surface.sh --update
+- `PROGRESS.md` · /daily、/schedule 体验：手动执行 + 任务名自动补全（2026-10-05） · - **手动执行**：新增 `/daily run <名|all>`、`/schedule run <名>`。把 `runDueTasks` 的每任务体抽成
+- `PROGRESS.md` · 每日任务执行结果复盘与优化（2026-10-05） · - **复盘对象**：用户手动跑完全部每日任务（`scheduler/telemetry.json` 当天 4 次 tool-stats-daily：1 次成功但 push 被拦、3 次 1200s 超时） · 数字: 4 次 / 1 次 / 3 次 / 0 条 · 证据: 1791204702683
+- `PROGRESS.md` · 全面检查 MEDIUM 项收口（2026-10-05，第二批） · - **修（真问题）**： · 数字: 47KB / 1MB / 63B
+- `PROGRESS.md` · 上游同步 v0.99.1 → v1.0.4（2026-10-06） · - **规模**：156 提交 / 837 文件 / `+42684 -116560`（删除主体是 `packages/agent` 的实验 harness）；新增包 `env`（SSH 远程执行 + daemon），删除 `package · 数字: 9 个 / 18 个 / 3 次 · 证据: 28dcce2ba / 219e23255
+- `PROGRESS.md` · 模式会话作用域化（2026-10-06） · - **需求**：用户提问"模式切换能不能只在一个会话中生效——创建新会话或加载其他会话时，自动切换为默认模式或那个会话之前的模式"。旧设计 `modes-state.json.current` 是每台机器的全局选择，新会话/别的会话都继承 · 数字: 63 个 / 11 个 / 3 轮 / 23MB
+- `PROGRESS.md` · 方案 P（模式"免重启"）评估（2026-10-06，**仅记录，不动代码**） · - **结论：暂不实施**（含 P₀ / P₀+），保持 M（重启式切换 + 会话记录 + `session_start` 自愈）。用户决定"暂时先这样"，本次只落记录。 · 数字: 13 KB
+- `PROGRESS.md` · 修复：模式切换导致的重启被"通知消费"吞掉 / 切换后的注入不适配模式（2026-10-06） · - **现象**：在角色扮演会话里 `/new` 正常；**从新会话重新加载角色扮演会话**时进程直接退出（终端留下未被读走的 OSC 10/11 + DA1 应答乱码），模式没换，历史里却多了一条"系统已重启"的注入。 · 数字: 10 分钟
+- `PROGRESS.md` · 使用层面错误的检测与预防：状态体检 / 轮次记录 / 真实 pty 场景（2026-10-06） · - **需求**：用户提问"代码层面的错误已有各种检查，使用层面的错误除了实际使用中去发现，还有没有别的方法"。复盘逃逸面后分三层落地。 · 数字: 20 轮 / 4 分钟
+- `PROGRESS.md` · 重启后"要不要继续执行任务"的判据（2026-10-06） · - **需求**：用户指出重启后原意是"自动继续执行任务"，但有些重启并不需要执行任务，要求给出判据方案。 · 数字: 256KB
+- `PROGRESS.md` · 使用层面故障台账 `docs/BUG-REPLAYS.md`（2026-10-06） · - 把"实际使用中才发现"的 7 类事故（模式状态被 git 回退、来源判据翻转、通知消费吞掉重启请求、
+- `PROGRESS.md` · 重启链路做透：行为异常进每日体检 / 崩溃恢复精确续接 / 无 autopilot 模式的兜底消费者（2026-10-06） · - **① 行为异常每日兜底**：`state-audit` 读 `recovery/rounds.jsonl` 判 `lost-restart-recent`（error，24h 内"重启请求被吞"）、`restart-loop`（同会话 · 数字: 10 分钟 / 3 次 / 1 小时 / 3 轮
+- `PROGRESS.md` · 场景自带假 provider：回合级断言变成计数级事实（2026-10-06） · - 新增 `scripts/lib-fake-provider.mjs`（本地 OpenAI-compatible，零依赖，记录请求体）；场景把临时 `models.json` 指向它。
+- `PROGRESS.md` · 补上 `intent=auto`（缺省）路径的端到端验证（2026-10-06） · - 场景 26→**33 项**：假 provider `hangNext(1)` 让回合卡在模型调用里 → 真实输入触发回合 → 半途 `SIGTERM` pi → supervisor 重拉 → 盘面尾部=工作在途 → **自动续跑**
+- `PROGRESS.md` · 并发与失败路径硬化（2026-10-06） · - **多实例隔离**：重启请求带 `ownerPid`（pi 的 ppid），supervisor 只认自己的实例；无 ownerPid 的老请求照旧认领。
+- `PROGRESS.md` · 多实例下半场：归属判定不误伤 / 真多进程锁测试 / 实例数可见（2026-10-06） · - 修 `detect_lost_restart` 的误伤：别人的重启日志不再被记成 `lost_restart`（`read_admin_action` 多输出 `restartLog.ownerPid`，判定要求"日志是我的"）；stu · 数字: 4 个
+- `PROGRESS.md` · 文档结构计数硬化（2026-10-06） · - `check-conventions.sh` 新增 D 节：`STRUCTURE.md` 的脚本数、`scripts/README.md` 的 golden 步数必须与代码一致（只钉唯一措辞，避免误伤 DECISIONS/PROGRES
+- `PROGRESS.md` · 场景稳定性：把单点进程发现改成带重试（2026-10-06） · - 一次全量验证里场景 1/33 失败（其余全绿，重跑即过）→ 定位到 phase 3 的"待杀 pi 进程"是**单次**
+- `PROGRESS.md` · 场景稳定性：两个实测发现（2026-10-06） · - **pi 的 `process.title` = `pi`**：启动后 `/proc/<pid>/cmdline` 只剩 `pi`；而 supervisor 的 `node -e` 助手也满足"node + 同一 agent 目录" →
+- `PROGRESS.md` · 场景收尾改用 SIGTERM（确定性），不再依赖 TUI `/quit`（2026-10-06） · - 又一类假失败：用 `/quit` 收尾时，输入在"回合进行中/刚起来"会被吞掉或当成消息，导致 round 行迟迟不出现（实测一次等满 120s 超时）。
+- `PROGRESS.md` · 续跑回合 × pi 会话替换竞态：根因 + 延后触发（2026-10-06） · - 根因（vendor 代码顺序）：会话替换 = `teardownCurrent` → `createRuntime`（发 `session_start`）→ `finishSessionReplacement` → `rebindSes
+- `PROGRESS.md` · 角色扮演模式：6 张形象参考图入库 + 按需 `read`（2026-10-07） · - 从外部资料包的 54 张图里挑 6 张代表图，**按内容改名**后入库 `portable/agent/modes/assets/roleplay/`（3.3 MB）：常态立绘、官方画集三视图与舰装、誓约婚纱「幸福纯白」、改造后【强袭模 · 数字: 3.3 MB / 8 MB / 9 MB
+- `PROGRESS.md` · 全量门禁暴露的真缺陷：重启日志归属判据（2026-10-07） · - 触发：`PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh --smoke` 第 19 步真实 pty 场景 **17/33**（phase 1 全绿，phase 2 整段塌掉：`roun · 数字: 2 轮 · 证据: bash scripts/golden-tasks.sh --smoke
+- `PROGRESS.md` · 角色扮演资产：补两张日常风格图（2026-10-07） · - 用户点名补 `1257px-BLHX_biaoqiang_7.webp`（皮肤「枕头大战」，居家/抱枕）与 `700px-标枪换装8.jpg`（「礼服」黑色小礼服，室内沙发）→ 入库为 `07-皮肤-枕头大战.webp` / `08-皮 · 数字: 3.8 MB
+- `PROGRESS.md` · 两实例真 pty 场景 + pty 公共骨架（2026-10-07） · - 多实例此前只有 stub / 假进程证据：`test-supervisor.sh` 用 stub CLI 测 ownerPid 认领两侧，`test-state-audit.mjs` 用假 `cli.js` 进程测"实例数可见"。新增  · 证据: bash scripts/golden-tasks.sh --fast
+- `PROGRESS.md` · 两实例真实 pty 场景 + 两个多实例缺陷（2026-10-07） · - 新增 `scripts/lib-pty-harness.mjs`（真实 pty 场景公共骨架：pty spawn / 按 `/proc/<pid>/exe|environ` 找 pi 与 supervisor / waitFor / S
+- `PROGRESS.md` · 一次被证伪的修法：vendor「换绑完成事件」替代重启延时（2026-10-07） · - 初衷：把"`session_start` 后延后 600ms 再触发续跑"换成正序事件。写了补丁 010（`session_rebound`
+- `PROGRESS.md` · 相位实验：`session_start` 触发回合会被 pi 直接拒绝（2026-10-07） · - 搭了一个无头实验台（`--print` + 临时扩展按 `EXP_PHASE/EXP_DELAY_MS/EXP_DELIVER` 在指定相位注入，硬指标=会话文件里
+- `PROGRESS.md` · 相位实验第二组：排队不会起回合，"空闲才触发"才是正解（2026-10-07） · - `agent_settled` + `triggerTurn`（空闲）→ assistant=2 ✅；`agent_settled` + `followUp`/`steer` → assistant=1（**排队不起回合**）。
+- `PROGRESS.md` · 空闲门落地：忙时不发 triggerTurn，等 agent_settled（2026-10-07） · - `sendMessageAfterRebind()` 增加 `{ isIdle }` 参数：忙（或 `isIdle()` 抛错，保守当忙）→ 不发，挂一次性 · 数字: 3 次
+- `PROGRESS.md` · G3 定案：压缩暖前缀不补 vendor（2026-10-07） · - 逐行核对：回放分支确实不可达（主循环的 `onPayload` 在 `core/sdk.ts:414`，压缩走 `agent-session.ts:2722` · 数字: 2 次 / 0 次 / 55 个 / 929 条
+- `PROGRESS.md` · 进程内 system 漂移：定位到字节 + 补分段指纹 + daily-health 告警（2026-10-07） · - 真实会话核对（85 次调用）：累计命中 **96.97%**；但 **4 次调用 = 69.7% 的未命中**，其中两次是 system 翻转 · 数字: 85 次 / 96.97% / 4 次 / 69.7%
+- `PROGRESS.md` · 体验优化：默认关闭重功能 + 工具面去误导 + 提示词重排 + tmux 通知空闲门（2026-10-07） · - **默认关闭 voice/link**：新增 `DEFAULT_OFF_FEATURES`，`'*'` 不再包含它们（显式列出即可启用）； · 数字: 1426B / 4 条 / 85 次 · 证据: ebfa65e5 / 8493be6d
+- `PROGRESS.md` · 技能目录移出 system prompt（2026-10-07） · - 起因：pi 原生把 `<skills>` 段渲染进 system prompt，实测 4 个技能 **2269B**（占 system 约 29%）； · 数字: 4 个 / 2269B / 29% / 14 次
+- `PROGRESS.md` · 按实测分布把 browser 也默认关闭（2026-10-07） · - 拿到 30 天真实调用分布（1920 次 / 71 工具）后，browser 从"产品决策"变成"事实"： · 数字: 30 天 / 1920 次 / 28 次 / 1.0 天
+- `PROGRESS.md` · autopilot 工具面合并（2026-10-07） · - autopilot 是默认面里最大的单组（16 工具 / 约 6.8KB），但**真日常**（27 次跨 11.7 天）→ 不能关，只能合并。 · 数字: 6.8KB / 27 次 / 11.7 天 / 1.7KB
+- `PROGRESS.md` · 状态类工具描述去重（2026-10-07） · - 重复的**根源**：`admin_status` 的描述枚举"模型 / 会话文件 / 配置摘要"，而每一项都是**另一个工具的 · 数字: 30 天 / 3 次 / 0 次 / 6.8KB
+- `PROGRESS.md` · 调研："重型工具只给子代理"与 `deferred` + `tool_search`（2026-10-07，**暂不采用**） · - 前提纠正：工具声明**存在不会导致未命中**，只有**中途改变工具数组**才会整段重算 → · 数字: 6.3KB / 5 个 / 7 个 / 6 个
+- `PROGRESS.md` · browser 改走 `deferred`（注册但不声明）+ 补 patches/011 让 tool_search 认识中文（2026-10-07） · - 新增**第 11 个补丁** `011-tool-search-cjk.patch`：给 pi 的 `tokenize` 补 CJK 连续段 2 字 bigram · 数字: 11 个 / 7 个 / 6 个 / 5 个
+- `PROGRESS.md` · 接线 executionMode：工具并发语义（2026-10-07，编排优化第 1 项） · - 与 DSH 对比发现两边**默认相反**：DSH 默认独占（`isConcurrencySafe` 才进并发池）， · 数字: 61 个 / 115 轮 / 52 轮 / 2 个
+- `PROGRESS.md` · bash 超时转后台（2026-10-07，编排优化第 2 项） · - 现状差距：my-pi 给未写 timeout 的 bash 注入 240s 上限，而 pi 超时是**杀掉整个进程树**
+- `PROGRESS.md` · 子代理常驻 RPC 池 S2（2026-10-07） · - 前提已在 S1 用**确定性判据**验证：`new_session` 真隔离 + 纯冷启动 **19.1s**（池每次省掉的部分）。
+- `PROGRESS.md` · 子代理池 S3（2026-10-07）：修"从未复用" + 租借语义 + 进程回收 · - **修掉一个严重缺陷**：S2 的复用键用了每次新建的临时 prompt 文件路径 ⇒ **每个任务都是新 profile、
+- `PROGRESS.md` · 子代理优化收尾（2026-10-07） · - **S4 已完成**：`extensions` 逐次 opt-in、默认关闭；`pooledProfileKey` 纳入该旗标；定时任务派生的子代理
+- `PROGRESS.md` · 目标级自动续跑 goal（2026-10-07，编排优化第 4 项） · - 差距：my-pi 只有"tmux 完成通知"与"定时任务"，**没有朝一个目标连续推进**；DSH 有 `goal`（256 轮、 · 数字: 256 轮 / 3 轮 / 3 次
+- `PROGRESS.md` · 重复调用提醒 + 并发语义审计（2026-10-07，编排优化第 3 项） · - 判据定为**"工具名 + 参数（键序无关）都相同"**：只按名字计数在 my-pi 里是纯噪音——实测 `bash` 曾 · 数字: 1190 次 / 8 次 / 3 个 / 4 个
+- `PROGRESS.md` · SoL-Pi 借鉴 P1：目标完成语义三态（2026-10-08） · - 做法见 `docs/design/SOL-PI-BORROW.md` 的 P1 节（含设计理由与验收证据）。
+- `PROGRESS.md` · SoL-Pi 借鉴 P2：压缩"回本"估算（2026-10-08） · - 新增 `context/budget/compact-payback.ts`（纯逻辑）+ 11 项测试；观察点挂在 `session_before_compact` · 数字: 60 轮 / 2 轮
+- `PROGRESS.md` · SoL-Pi 借鉴 P5：golden 留出集纪律（2026-10-08） · - 第 19/20 步本来就默认跳过 ⇒ "留出"性质已存在；本项给它命名并把纪律写死（权威定义在 · 数字: 0 次
+- `PROGRESS.md` · SoL-Pi 借鉴 P7：按错误指纹的修复预算（2026-10-08） · - 侦察发现 `tool-health.ts` 已有按**工具名**的连续失败熔断与错误脱水 ⇒ P7 做成**互补不替换**
+- `PROGRESS.md` · SoL-Pi 借鉴 P9：子代理池复用度量（2026-10-08） · - `WorkerLease` 加 `reused` → 新 `core/pool-metrics.ts` 每次租借落一条 JSONL（fail-open）→ · 数字: 2 条 / 1 次
+- `PROGRESS.md` · SoL-Pi 借鉴 P3：工具输出归档对照审计（2026-10-08） · - 产出 [docs/design/OBSERVATION-PACK-AUDIT.md](design/OBSERVATION-PACK-AUDIT.md)（审计 + 四条提案）， · 数字: 0 次 / 3.4MB / 2 次
+- `PROGRESS.md` · SoL-Pi 借鉴 P4：休眠机制审计（2026-10-08） · - 产出 [docs/design/DORMANT-AUDIT.md](design/DORMANT-AUDIT.md)：清单 + 逐条建议，**不删东西、不改默认**。 · 数字: 18 条 / 10 条 / 56% / 8 次
+- `PROGRESS.md` · SoL-Pi 借鉴 P6：`edit_and_run` 融合工具（2026-10-08） · - 先量自己：my-pi 跨轮 编辑→运行 邻接 **6.4%（19/299）**（SoL-Pi 是 12.3%）⇒ 收益上限约 6% 回合数。 · 数字: 6.4% / 12.3% / 6%
+- `PROGRESS.md` · SoL-Pi 借鉴 P6：`edit_and_run` 融合工具（2026-10-08） · - 先量自己：my-pi 跨轮 编辑→运行 邻接 **6.4%（19/299）**（SoL-Pi 12.3%）⇒ 收益上限约 6% 回合数。 · 数字: 6.4% / 12.3% / 6% / 32000B
+- `PROGRESS.md` · SoL-Pi 借鉴 P8：编辑类子代理的 verifier 契约（2026-10-08，纯提案） · - 产出 [docs/design/SUBAGENT-VERIFIER-CONTRACT.md](design/SUBAGENT-VERIFIER-CONTRACT.md)。 · 数字: 9 次
+- `PROGRESS.md` · 用户批复第 1 项：工具面预算分桶（2026-10-08） · - 拆成 `PREFIX`(25_558B) / `NON_PREFIX`(6_446B) 两个**每桶上限**用于归因，而 **`TOTAL` 保持旧值 32_000** · 数字: 558B / 446B / 44 个 / 554B
+- `PROGRESS.md` · 用户批复第 5 项：临时探针处置（2026-10-08） · - `nested-probe.mjs`（`ctx.executeTool` 嵌套调用）→ **收进仓库**：`context/__tests__/nested-tools-e2e.test.ts`，
+- `PROGRESS.md` · 用户批复第 4 项：子代理 writeTools 可观测（2026-10-08 / P8-A） · - `usage-log.ts` 新增 `WRITE_TOOLS={write,edit,edit_and_run}` + `extractWriteTools()`（去重保序），
+- `PROGRESS.md` · 用户批复第 2 项：删除 TOOL_LAYERING（2026-10-08，我拍板） · - **决定：删除**（用户授权）。最硬的一条依据来自被删代码自己的注释：一次中途 wake 约 $0.0375， · 数字: 100 个 / 30 天 / 8 次 / 3 个
+- `PROGRESS.md` · 用户批复第 3 项：三个未迁移子系统都不迁移（2026-10-08） · - 报告：`docs/design/UNMIGRATED-SUBSYSTEMS-AUDIT.md`；理由逐条写进白名单对应行。 · 数字: 2KB / 99 个 / 0 个 / 30 天
+- `PROGRESS.md` · P8 后续（一）：P8-A 标完成 + 可运行查询（2026-10-08） · - `docs/design/SUBAGENT-VERIFIER-CONTRACT.md`：P8-A 标记为**已完成**（提交 `69c56f4f4`），补写**口径边界** · 数字: 10 条 / 0 条 · 证据: 69c56f4f4
+- `PROGRESS.md` · P8 后续（二）：`usage.jsonl` 加 `writePaths`（2026-10-08） · - 返工判定的前提：要知道子代理改过**哪些文件**（只记工具名不够）。
+- `PROGRESS.md` · P8 后续（三）：返工代理指标落地（2026-10-08，P8-A 第二步完成） · - `daily-health` 新字段 **`子代理返工=<返工>/<有改动数>(<比例>)`**，无样本记 `n/a`。 · 数字: 1 个 / 6 个 / 0 条 / 10 个
+- `PROGRESS.md` · 消除返工指标的残余误归属 + 顺带修掉 S4 的"参数漏传"缺陷（2026-10-08） · - `usage.jsonl` 新增 **`parentSession`**（`ctx.sessionFile` 一路透传到记录）；`daily-health` 的返工判定 · 数字: 0.0%
+- `PROGRESS.md` · 文档一致性审计（2026-10-08） · - 记录：[docs/development/DOC-AUDIT-2026-10-08.md](development/DOC-AUDIT-2026-10-08.md)。 · 数字: 60 轮
+- `PROGRESS.md` · `goal complete` 的第二校验来源：独立评审（2026-10-08） · - 用户指定"关于 verify_* 的那个"。**先更正我自己**：那 5 个导出是 **Best-of-N 候选打分**形状 · 数字: 5 个 / 5 条
+- `PROGRESS.md` · 第二校验来源的端到端探针（2026-10-08） · - `custom/features/autopilot/__tests__/goal-judge-e2e.test.ts`：**显式 opt-in**（`PI_GOAL_JUDGE_E2E=1`），
+- `PROGRESS.md` · 工具面预算决策分析（2026-10-08） · - 记录：[docs/design/TOOL-BUDGET-DECISION.md](design/TOOL-BUDGET-DECISION.md)。 · 数字: 773B / 30 天 / 3 次
+- `PROGRESS.md` · 执行预算决策 (B)：删除 verify_* 三工具（2026-10-08，用户批准） · - 删除 `verify_report`/`verify_config`/`verify_test`（整个 verify-tools.ts）+ 注册调用 + 只服务它们的测试块 · 数字: 773B / 44 个 / 558B / 41 个
+- `PROGRESS.md` · WikiSkill 借鉴 A：知识索引（2026-10-08） · - `scripts/gen-doc-index.mjs`（`--update`/`--check`，**确定性输出**）→ `docs/INDEX.md`，实测 **497 条** · 数字: 497 条 / 3 次 / 2 次
+
+## 缺陷回放（16 条）
+
+- `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
+- `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
+- `docs/BUG-REPLAYS.md` · #3 切模式/切回角色扮演会话时**进程直接退出**、模式没换、还注入了一条"系统已重启"（重启其实没发生） · 会话文件里有 `系统已重启` 注入但**后面没有 assistant 回复**；`rounds.jsonl` 里 `lostRestart: true`；终端留下未读的 OSC/DA1 应答乱码
+- `docs/BUG-REPLAYS.md` · #4 重启后**白跑一个模型回合**：没有在途任务（切模式/换模型/切会话）也被"请继续"唤醒，实测还会让模型凭空开工 · 会话文件在重启后多出 user/assistant 条目；`daily-health` 里冷启动与未命中异常 · 证据: npx vitest run custom/core/__tests__/restart-intent.test.ts
+- `docs/BUG-REPLAYS.md` · #5 入口漂移：`dev.sh` 不注入人设（supervisor 注入了），人设文件缺失时**静默**不注入 · 同一模式在 dev 与 my-pi.sh 下行为不同；人设文件被改名/删除
+- `docs/BUG-REPLAYS.md` · #6 重启后**没有任何提示**：`restartLog` 写了但没人读（消费端缺失） · 重启后模型完全不知道环境变了，继续用旧工具/旧假设 · 证据: npx vitest run custom/features/autopilot/__tests__/restart-log.test.ts
+- `docs/BUG-REPLAYS.md` · #7 功能名拼错（如 `websearch`）→ 该功能静默不注册，模式看起来"没生效" · 该模式下少了预期工具，但没有任何报错
+- `docs/BUG-REPLAYS.md` · #8 **多实例串扰**：两个 my-pi 同时跑（实测同日出现过两个 supervisor），A 写的重启请求被 B 的 supervisor 执行 → 会话被跨实例重启/续错 · `rounds.jsonl` 里出现不属于本实例的 session；用户"重启后跑到了别的会话" · 证据: npx vitest run custom/features/autopilot/__tests__/restart-log.test.ts
+- `docs/BUG-REPLAYS.md` · #9 **防环标记单槽互相覆盖**：两个会话/实例各自自愈时，后写的把先写的防环标记顶掉 → 双方反复放行、来回重启 · `mode-restart-guard.json` 里只剩一条 key；`rounds.jsonl` 同一会话短时间内多次 restart · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
+- `docs/BUG-REPLAYS.md` · #10 **写盘失败静默退出**：`admin_restart`/`admin_set_model`/`admin_switch_session` 请求写不下去仍 `shutdown` → 进程没了、配置/会话也没变 · 无 state.json 变化却退出了；下一次启动配置未生效 · 证据: npx vitest run custom/features/autopilot/__tests__/admin-tools.test.ts / npx vitest run custom/features/mode/__tests__/mode-autopilot-restart.test.ts
+- `docs/BUG-REPLAYS.md` · #11 **归属判定的误伤**：加了 ownerPid 隔离后，别人的重启日志在本实例退出时被记成 `lost_restart`（"请求被吞"）→ 每日体检假告警 · `rounds.jsonl` 里 `lostRestart:true` 而 `adminAction` 为空、且会话属于别的实例
+- `docs/BUG-REPLAYS.md` · #12 **续跑静默丢失 / 重启请求被抹掉**：外部写入端（看门狗、故障转移、另一实例、测试）在进程**启动过程中**写下重启请求时，那个即将被重启的进程先把 `restartLog` 吃掉并注入到自己（马上要死的）会话里 → 重拉起来的 · 真 pty 场景 round-3 的会话文件里没有 `my-pi-restart-resume`；`rounds.jsonl` 里该轮 `decision=exit` 且 `adminAction` 为空（但请求确实写过）；`state.j · 证据: npx vitest run custom/features/mode/__tests__/mode-autopilot-restart.test.ts
+- `docs/BUG-REPLAYS.md` · #13 **多实例不可见（静默失效）**：`state-audit` 数实例的判据是 `argv` 里含 `cli.js`，而真 pi 启动后 `process.title='pi'` 把 `/proc/<pid>/cmdline` 覆盖成 · 两个 my-pi 明明同时在跑，`node scripts/state-audit.mjs` 却没有 `multiple-instances` 发现（或实例数不对）
+- `docs/BUG-REPLAYS.md` · #14 **system 加固块静默丢失（进程内前缀漂移）**：`before_agent_start` 处理器返回的 `systemPrompt` 没生效——pi 会**静默吞掉**该处理器的异常（只发给内存 listener，不落盘）， · `portable/memory/logs/prefix-fingerprints.jsonl` 里**同一进程内**出现 `changed:["system",…,"messages@0-7"]` 且 `systemBytes` 差值 ≈ · 数字: 772B · 证据: npx vitest run custom/features/context/__tests__/system-prompt-total.test.ts / npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
+- `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
+- `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
+
+## 设计文档（69 条）
+
+- `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
+- `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
+- `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次
+- `docs/design/DORMANT-AUDIT.md` · 四、本次的实测数字（本项的"效率指标"） · - 未接线清单规模：**A 段 18 条 + B 段 4 条 + C 段 1 条（我误放的，已移正）**； · 数字: 18 条 / 4 条 / 1 条 / 5 条
+- `docs/design/DORMANT-AUDIT.md` · 五、执行结果（2026-10-08）：`TOOL_LAYERING` 已删除 · 用户授权"由你决定"。**判断：删除。** 依据（按分量排序）： · 数字: 100 个 / 18 个 / 442B / 60.8%
+- `docs/design/OBSERVATION-PACK-AUDIT.md` · 一、我们已有什么（实现事实，均注明落点） · **比 SoL-Pi 多的两处**：写盘前脱敏、内容哈希去重。后者恰好回答了它的核心论点——**同一个大输出重复出现时， · 数字: 14 天 / 200MB
+- `docs/design/OBSERVATION-PACK-AUDIT.md` · 二、审计清单逐条结论（含证据） · ### 1. 上下文里留的是句柄还是只有一句"已归档"？→ **是句柄，但缺摘录** · 数字: 4 个 / 2 次 / 1 个 / 0 次
+- `docs/design/OBSERVATION-PACK-AUDIT.md` · 三、决策提案（**均不改默认**，等用户点头） · **建议顺序**：先 **P3-D**（拿到可观测数据）→ 再决定要不要 **P3-A/B**（它们都是"改句柄内容"， · 数字: 0 次 / 2 次
+- `docs/design/OBSERVATION-PACK-AUDIT.md` · 四、本次审计的实测数字（能力地板之外的"效率指标"） · - 归档目录：**563 文件 / 3.4MB**（说明归档在真实使用中活跃，不是死代码）； · 数字: 3.4MB / 2 次 / 4 个 / 0 次
+- `docs/design/SOL-PI-BORROW.md` · 0. 全局纪律（每一项都必须满足，不是可选项） · 来自 SoL-Pi 的做法，也是我们这几轮已经在用的：
+- `docs/design/SOL-PI-BORROW.md` · 1. 自主推进的边界（用户已去休息，这条最重要） · **可以直接做**：
+- `docs/design/SOL-PI-BORROW.md` · P1 目标完成语义：区分 verified / declared / advisory ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：P 族发现——"Separate verified, declared, and advisory completion modes"、
+- `docs/design/SOL-PI-BORROW.md` · P2 压缩"回本"决策（Online Context Compact 最小版）✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：把**子任务完成**当作压缩触发的时钟，且**只在预期未来节省能还清重写成本时**才动作 · 数字: 60.8% / 2 次
+- `docs/design/SOL-PI-BORROW.md` · P3 ObservationPack 细节审计（保留访问、去掉重复）✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：大输出**本地归档**，上下文留 **handle + 短摘录**，需要时**分页精确召回**； · 数字: 2 个
+- `docs/design/SOL-PI-BORROW.md` · P4 休眠机制审计：启用或删除，二选一 ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：C13 "Disable dormant mechanisms at configuration time"、C24 "Gate ObservationPack by
+- `docs/design/SOL-PI-BORROW.md` · P5 golden 留出集：让"我按 golden 调好的"不再自动通过 golden ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：held-out 验证——"Held-out trajectories never enter subsequent analysis, and no agent
+- `docs/design/SOL-PI-BORROW.md` · P6 `edit_and_run`：编辑与其验证命令融合（Action Fusion 最小版）✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：编辑/写入 → 命令的相邻转场占**跨轮转场 12.3%**，后继动作中 **bash 占 85.1%**； · 数字: 12.3% / 85.1% / 10.8% / 11.5% · 证据: node scripts/gen-registrations.mjs --update
+- `docs/design/SOL-PI-BORROW.md` · P7 重复提醒升级为"按错误指纹的修复预算" ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：P15 "Budget repair per error fingerprint"、P23 "Break repeated diagnostic loops
+- `docs/design/SOL-PI-BORROW.md` · P8（提案）编辑类子代理的 verifier 契约 ✅ **已完成（2026-10-08，纯提案）** · **SoL-Pi 依据**：D6 "Avoid generative edit delegates without a verifier contract"。
+- `docs/design/SOL-PI-BORROW.md` · P9 父级复用度量（池化后可得）✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：D4 "Bound child work and measure parent reuse"。
+- `docs/design/SOL-PI-BORROW.md` · 执行顺序与理由 · 1. **P1**（最小、补最薄一环：goal 只信自述） · 数字: 3 轮 / 60 轮 / 84% / 2 轮 · 证据: bash scripts/golden-tasks.sh --fast
+- `docs/design/SUBAGENT-POOL.md` · 一、先纠正一个预设（靠实测，不靠印象） · **所以"缺并行 fan-out"不成立**——那是我的错误预设，实测推翻了它。真正的成本是**进程启动**，
+- `docs/design/SUBAGENT-POOL.md` · 二、DSH 赢在哪（两条，其余 my-pi 已有） · 1. **进程内子代理**：没有进程启动成本（my-pi 每次 35–45s）。
+- `docs/design/SUBAGENT-POOL.md` · 三、目标架构：常驻 RPC 子代理池 · ### 为什么可行（关键证据） · 数字: 30 分钟
+- `docs/design/SUBAGENT-POOL.md` · 四、分期（每期都是"能独立验证、能独立回退"的） · **S1 之前不要动产品代码**——因为整个方案押在"`new_session` 真的隔离"这一个假设上。 · 数字: 3 个 / 1 次
+- `docs/design/SUBAGENT-POOL.md` · 五、风险与已知代价 · - **隔离假设**（最大风险，S1 验证）。若不成立 → 见设计要点 1 的退化方案。
+- `docs/design/SUBAGENT-POOL.md` · 六、与本次会话其他改动的协同 · - **空闲门**（`tmux/watcher.ts` 的 `createIdleGate`）：池的"任务完成 → 唤醒主会话"直接复用同一套语义
+- `docs/design/SUBAGENT-POOL.md` · 七、S1 进展（2026-10-07，实测） · 探针脚本 `/tmp/rpc-probe.mjs`（临时件，不入库）：起 `pi --mode rpc --no-extensions --no-session`， · 数字: 63% / 101 个 / 1 条
+- `docs/design/SUBAGENT-POOL.md` · 八、S1 v2 结果：隔离**确定性验证通过**（2026-10-07） · 改用确定性判据（不依赖模型自述）：把 rpc 进程指向 `scripts/lib-fake-provider.mjs`（记录每个请求 body）， · 数字: 2 条 / 63%
+- `docs/design/SUBAGENT-POOL.md` · 九、S2 已落地（2026-10-07） · **实现**（两个文件 + 一处重构）：
+- `docs/design/SUBAGENT-POOL.md` · 十、S3 已落地（2026-10-07）—— 含一个**严重缺陷的修正** · ### 10.1 必须先说：S2 的池**从未真正复用**（已修）
+- `docs/design/SUBAGENT-POOL.md` · 十一、S3 收尾：端到端验证通过（2026-10-07） · **这一步是"池到底有没有生效"的唯一硬证据**——S2 的缺陷（键写成临时路径 ⇒ 从不复用）能溜过 14 项
+- `docs/design/SUBAGENT-POOL.md` · 十二、S4 的边界（未实施，需产品决策） · `--no-extensions` **不只是"省事"**：`scripts/check-seeds-headless.mjs` 整套守门建立在
+- `docs/design/SUBAGENT-POOL.md` · 十三、fork 池化：**实测不成立**（2026-10-07，负结果） · 原计划：让池化路径用 `new_session {parentSession}` 承担 `context: 'fork'`，从而把 fork 也纳入复用。
+- `docs/design/SUBAGENT-VERIFIER-CONTRACT.md` · 一、现状（实现事实） · `subagent` 的子代理**可以自由写文件**：`SubagentToolParams`（`core/types.ts`）里没有任何验收条件相关字段
+- `docs/design/SUBAGENT-VERIFIER-CONTRACT.md` · 二、证据（实测，本项的关键：**风险尚未发生**） · 真实会话（`portable/agent/sessions/**/*.jsonl`，4 个会话文件）里 `subagent` 的全部调用： · 数字: 4 个 / 8 次 / 1 次 / 3 次
+- `docs/design/SUBAGENT-VERIFIER-CONTRACT.md` · 三、提案 · ### P8-A ✅ **已完成（2026-10-08，提交 `69c56f4f4`）** · 数字: 10 条 / 0 条 / 9 次 / 0% · 证据: 69c56f4f4
+- `docs/design/SUBAGENT-VERIFIER-CONTRACT.md` · 四、风险与约束（若实施 P8-B）
+- `docs/design/SUBAGENT-VERIFIER-CONTRACT.md` · 五、本项的能力地板与交付性质 · **纯文档，无代码行为变更。** 能力地板：`tsc` / `vitest` / `check-features`（文档链接）/
+- `docs/design/SUBAGENT-VERIFIER-CONTRACT.md` · 附：加 `parentSession` 时暴露的一个真实缺陷与新的守门（2026-10-08） · **缺陷**：给 `runSubprocessAgent` 加 `parentSession` 时 `tsc` 报错，顺带暴露出**上一批（S4）留下的问题**——
+- `docs/design/SUBAGENT-VERIFIER-CONTRACT.md` · 附二：`goal complete` 的第二校验来源已实现（2026-10-08，用户指定） · 用户明确"我说的是关于 `verify_*` 的那个"，即把 LLM 评审接成 `goal` 的**第二校验来源**。 · 数字: 5 个 / 5 条
+- `docs/design/TOOL-BUDGET-DECISION.md` · 一、四个候选与各自的字节账 · **注**：`voice_*`（3 个）与 `link_*`（2 个）虽然也是低消费，但它们由 `DEFAULT_OFF_FEATURES` **根本不注册** · 数字: 1KB / 773 B / 769 B / 3 个
+- `docs/design/TOOL-BUDGET-DECISION.md` · 二、关键事实：`verify_test` **现在不可能成功** · 它的候选生成与评审都是**注入式**的（`VerifyTestDeps`），而生产路径**两者都没注入**： · 数字: 30 天 / 3 次 / 1 次
+- `docs/design/TOOL-BUDGET-DECISION.md` · 三、推荐：**(B) 删掉 `verify_*` 三工具** · 理由按分量排序： · 数字: 773 B / 10%
+- `docs/design/TOOL-BUDGET-DECISION.md` · 四、执行方式（若批准 (B)） · 一次提交完成：移除三个工具注册 → 连带清理 `verify-tools.ts` 中仅供它们使用的导出（保留 `verifier.ts` · 数字: 785 B / 773 B / 3% / 1.8 KB
+- `docs/design/TOOL-BUDGET-DECISION.md` · 五、执行结果（2026-10-08，用户批准 (B)） · **已执行**：删除 `verify_report` / `verify_config` / `verify_test` 三个工具（`tools/verify-tools.ts` 整个文件）、 · 数字: 44 个 / 558 B / 41 个 / 295 B
+- `docs/design/UNMIGRATED-SUBSYSTEMS-AUDIT.md` · 一、JSON 结构性压缩（`compactJson` / `jsonBytes` / `shrinkHalf`） · **现状**：**零生产调用点**。截断路径（`pruneToolOutput`）统一走 head+tail。曾留的接入前提是 · 数字: 563 个 / 2KB / 99 个 / 0 个
+- `docs/design/UNMIGRATED-SUBSYSTEMS-AUDIT.md` · 二、Best-of-N judge（`DEFAULT_JUDGE_PROMPT` / `parseJudgeScores` / `shouldVerify` / `ProgressTracker` / `recordVerification`） · **现状**：**一半是接了的**——`bestOfN`、`selectBest` 由 `verify-tools.ts:210` 调用； · 数字: 5 个 / 30 天 / 3 次
+- `docs/design/UNMIGRATED-SUBSYSTEMS-AUDIT.md` · 三、记忆合并（`resolveAndApply` / `mergeCandidates`） · **现状**：生产写路径只用 **确定性的 `jaccardSimilarity > 0.7`** 去重（`storage.ts:221`）； · 数字: 104 条
+- `docs/design/UNMIGRATED-SUBSYSTEMS-AUDIT.md` · 四、方法上的收获 · 这一项的价值有一半在**流程**：我先给第 3 个子系统编了一个听起来很合理的解释（共享来源样板）， · 数字: 3 个
+- `docs/design/UPGRADE-LEDGER.md` · 判据与预算基线（§6 P4：软层条目不无限增长、注入预算受控） · 守门：`custom/features/context/__tests__/injection-stability.test.ts`（10 例：装配契约 / 逐字节确定 / 易变内容拒绝 / 三项预算）。 · 数字: 767 B / 737 B / 789 B / 11829 B · 证据: 2ca79271
+- `docs/design/UPGRADE-LEDGER.md` · 已完成：第一批（2026-10-01） · **预备样本**（本轮之前已硬化、但当时未同步降权，随本批一并降权）：`bash` 前台 240s 上限（P3-6）、AGENTS.md 移出 system 前缀（P1-1）、headless 调度网关（P3-5）、工具面中途变更默认关闭（ · 数字: 430 个
+- `docs/design/UPGRADE-LEDGER.md` · 已完成：第二批（2026-10-01，同日续做） · 本批由第一批的"待评"项倒逼出来：要硬化"bash 优先合并碎调用"，先查度量落点，结果查出一个真实缺陷。 · 数字: 32 个 / 10 个
+- `docs/design/UPGRADE-LEDGER.md` · 已完成：第三批（2026-10-01，同日续做） · 顺带修掉一个计时缺陷：`toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具， · 数字: 6 个 / 1103 条 / 1.4% / 25%
+- `docs/design/UPGRADE-LEDGER.md` · 转正通道执行（§3.1/§5，2026-10-01） · **结论：当前无合格候选；治理动作已执行。** · 数字: 61 条 / 518 B / 5 次 · 证据: 63e8d109 / da6380d3 / bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
+- `docs/design/UPGRADE-LEDGER.md` · 效果复核（逐日实测，2026-10-01 取数） · 数据源：`portable/memory/context/.usage-diag.jsonl`（每轮用量）+ `portable/memory/logs/prefix-fingerprints.jsonl`（逐请求前缀指纹）。 · 数字: 97.21% / 0.3% / 80.66% / 0.9%
+- `docs/design/UPGRADE-LEDGER.md` · 待评（明确未硬化，附原因与前置条件） · 数字: 14.5 KB / 32 条 / 18 条
+- `docs/design/UPGRADE-LEDGER.md` · 下一批复核 · - 每次日报（`node scripts/daily-health.mjs --print`）顺带看四项注入字节数；接近上限即启动降权评估。 · 证据: node scripts/daily-health.mjs --print
+- `docs/design/VISION.md` · 元信息 · ---
+- `docs/design/VISION.md` · 目录 · - 一、终极目标
+- `docs/design/VISION.md` · 一、终极目标 · 构建可以自主进化的全能型私人助手。
+- `docs/design/VISION.md` · 二、三大核心功能（判据化） · ### 2.1 智能 — 执行任务时稳定、可靠、高效、契合用户的需求 · 数字: 100%
+- `docs/design/VISION.md` · 三、方法论：软硬结合 · - **软**：提示词、注入记忆、关键节点提示 —— 引导模型行为。概率性生效，成本低，可迭代快。 · 数字: 63.7% / 60.9%
+- `docs/design/VISION.md` · 四、度量体系与现状差距 · 结论：度量层已建成（P1/P2/P3 达成，且缓存口径已从"工具级台账"升级为"每轮用量 + 前缀断裂归因"）； · 数字: 7 天
+- `docs/design/VISION.md` · 五、记忆生命周期治理规则 v1 · > 本节规则已落地（2026-09-21 实现，2026-09-25 补齐垃圾嫌疑/聚合候选）：字段在 `custom/features/memory/store/types.ts`，报告在 `custom/features/memory/ · 数字: 180 天 / 3 条
+- `docs/design/VISION.md` · 六、落地路线 · 按依赖顺序推进；每阶段以"可验证"为完成判据。 · 数字: 12 个 / 6 条 / 11829 B
+- `docs/design/VISION.md` · 七、未来展望（受限于算力与技术，暂缓） · 1. **LoRA**：将要求、限制、记忆、经验、技能训练为适配器——行为更稳定 + 上下文消耗更低。
+- `docs/design/VISION.md` · 八、与现有文档的关系 · - 架构决策：`DECISIONS.md`
+- `docs/design/VISION.md` · 九、变更记录 · - 2026-08-26 v1：初稿。用户口述愿景整理 + 四大基建计划（P1 干预捕获 / P2 任务遥测 / P3 golden tasks / P4 记忆生命周期）。 · 数字: 1.4% / 62.4 KB / 28.5 KB / 14.5 KB
+
+## 开发文档（130 条）
+
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 0. 结论摘要：与原方案的关键差异 · 数字: 1 条 / 1 个 / 80 小时 / 69 秒
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 1. 实测事实（2026-10-01，本机） · ### 1.1 环境与容量 · 数字: 7.5 GB / 1.4 GB / 105 GB / 51 GB
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 2. 三层落点（复用 my-pi 既有组件） · L1 索引层（进上下文，极小） 每本书 1 条记忆条目（卡片）+ 每本书 1 个 index.jsonl（章节表，不进上下文） · 数字: 1 条 / 1 个
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 3. 数据契约 · **L1 卡片（一条记忆条目）**——控制在 ~200 字符，因为它每一轮都会被注入计价：
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 4. 关键设计决策（8 条） · 1. **目录优先，OCR 兜底**：先 `get_toc()`/EPUB nav → 23/36 本书零成本建索引；无 outline 才 OCR 目录页（每本 ≤20 页，约 10 分钟）。 · 数字: 10 分钟
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 5. 成本与工时模型（用量级说话） · **哪些书值得 OCR**：`有文字层` → 直接抽；`有 outline 无文字层` → 索引免 OCR、正文按需 OCR（本方案主路径）； · 数字: 1.5 GB / 200 GB / 4 小时 / 9 分钟
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 6. 分期路线（每阶段都有可验证判据） · - **P0 只读体检（0.5 天）**：`scripts/books-probe.mjs` 输出"每本书：页数/文字层/outline/体积/是否疑似扫描/建议策略"， · 数字: 0.5 天 / 2 天 / 1 条 / 80%
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 7. 风险与降级 · 数字: 1.4 GB / 51 GB
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 8. 需要你确认/提供的（其余我已按现状定好） · 1. **书库根路径**（本机 `/storage/emulated/0/我的文件/书籍` 只是 1.5 GB 的一部分；200 GB 那份在哪？外置盘/PC/网盘？） · 数字: 1.5 GB / 200 GB
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 9. 框架落地状态（2026-10-02 实测） · **已实现并可运行**（`scripts/books.py` + `scripts/test-books.mjs` + `packs/books/`）： · 数字: 1.54 GB / 4.0 秒 / 32 GB / 69 秒
+- `docs/development/CHECK-REPORT.md` · 一、修正说明（上一版报告的误报） · 上一版报告声称"所有问题已修复"，经与 pi-tools 原项目逐项比对，以下为**不实/未完成**项，本轮已修正： · 数字: 10个 / 5 个 / 12 个 / 14 个
+- `docs/development/CHECK-REPORT.md` · 二、修正后验证结果 · ### 2.1 隔离边界（`bash scripts/check-isolation.sh`） · 数字: 4 个
+- `docs/development/CHECK-REPORT.md` · 三、与原项目的真实差距（本轮未覆盖） · 本轮仅补"最近迁移波次"的注册面缺漏。以下为对照 pi-tools 后确认的**系统性差距**，属"全面移植 / 脚本编排"范围： · 数字: 12 个 / 9 个 / 6 个 / 3 条
+- `docs/development/CHECK-REPORT.md` · 四、结论 · **本轮（最近迁移波次补漏）**：✅ 完成
+- `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` · 一、结论摘要 · 一句话（**已按 2026-10-01 更正重写**）：两者的默认策略其实是**同一种**——"不压缩、不擦除、靠窗口 + 可恢复 spill"（DSH 靠 overflow 兜底压缩过 6 次，my-pi 一次没触发）。真正的差距不在上下 · 数字: 6 次 / 50KB
+- `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` · 二、实测：my-pi 那个 10 小时会话的上下文构成 · 关键事实： · 数字: 50.1% / 46.3% / 3.5% / 0.1%
+- `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` · 三、本轮已实施的优化（均已验证） · ### O1 — 接通 thinking 擦除（**已于后续默认关闭，见顶部更正**） · 数字: 67% / 29% / 90% / 2.8MB
+- `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` · 四、仍可优化项（按收益排序） · ### P1 — 压缩摘要的暖前缀重放仍是死代码（**2026-10-07 实测：收益≈0，定案不打补丁**） · 数字: 929 条 / 2 次 / 0 次 / 55 个
+- `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` · 五、设计取舍小结 · - **DSH**：把压缩当"安全网"（阈值 80% 窗口，实测不触发），靠大窗口 + 可恢复 spill + 缓存友好构造 · 数字: 80%
+- `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` · 六、价目修正与优先级重排（重要更正） · 前几轮的成本估算用了 `cacheRead = input/10` 的假设。核对 `portable/agent/models.json` 的 · 数字: 64% / 24% / 11% / 3 分钟
+- `docs/development/CONTEXT-MANAGEMENT-COMPARISON.md` · 相关 · - [DSH-CONTEXT-AUDIT.md](development/DSH-CONTEXT-AUDIT.md)：DSH 侧逐条证据
+- `docs/development/COST-LATENCY-OPTIMIZATION-PLAN.md` · 一、当前基线（同一模型 `deepseek-flash`，实测） · > **2026-10-01 口径修正（Phase 0 完成后）**：`head` 分不清「改写」与「头窗内追加」，旧口径把 19 次追加误报成断裂； · 数字: 0.55% / 4.98% / 2% / 9%
+- `docs/development/COST-LATENCY-OPTIMIZATION-PLAN.md` · 二、问题清单（全部有证据） · 数字: 6 条 / 763 条 / 0 次 / 60 条
+- `docs/development/COST-LATENCY-OPTIMIZATION-PLAN.md` · 三、分阶段执行 · ### Phase 0 — 度量闭合（先让尾巴可见；零行为风险） · 数字: 50% / 95% / 763 条 / 64KB
+- `docs/development/COST-LATENCY-OPTIMIZATION-PLAN.md` · 四、验证方法论（避免自欺） · 1. **口径固定**：所有对比都用 `deepseek-flash` 单模型子集 + 同一统计脚本（`/tmp/dsh-stats.py`、`/tmp/pi-stats.py` 的思路固化进 `scripts/`）。 · 数字: 3 个
+- `docs/development/COST-LATENCY-OPTIMIZATION-PLAN.md` · 五、需要用户决策的两处 · 1. **P1-1（AGENTS.md 迁出 system）**：这是收益最大的一条，但改变了提示注入的位置与形式，可能影响 agent 行为。建议做，但要 A/B + 人工抽查。→ 需你点头。
+- `docs/development/COST-LATENCY-OPTIMIZATION-PLAN.md` · 六、批次安排 · - **批次 65**：Phase 0（度量闭合 + 文档更正）→ 验证 → 提交推送
+- `docs/development/DOC-AUDIT-2026-10-08.md` · 一、发现并修复的 7 处缺口 · 另有两处**清单/口径**层面的修正： · 数字: 60 轮
+- `docs/development/DOC-AUDIT-2026-10-08.md` · 二、检查过但**不需要动**的（附理由）
+- `docs/development/DOC-AUDIT-2026-10-08.md` · 三、本轮验证 · - `check-features`（含**文档链接扫描 140 个 md**）✓ / `check-conventions`（第 D 节计数）✓ · 数字: 140 个
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 0. Executive answers (the five specific questions) · ### Q1. Does DSH compact automatically, and at what threshold relative to the model context window? · 数字: 80% / 36%
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 1. Where the mechanisms are wired (effective configuration) · **[YAML]** `dsh-base/cordis.patch.yml` mounts the host-plane rows; `dsh-web-app/cordis.patch.yml:427-434`
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 2. Mechanism: `dsh-compaction` (the seam) · **[CODE]** `dsh-compaction/package.json` — "Abstract compaction service seam (`ctx.compaction`)".
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 3. Mechanism: `dsh-compaction-basic` (the budget manager) · ### 3.1 Constants and trigger arithmetic · 数字: 20%
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 4. Mechanism: `dsh-token-meter` (what the thresholds are measured against) · - **[CODE]** `lib/index.js:16-18` `const CHARS_PER_TOKEN = 4; const BLOCK_OVERHEAD = 4;`
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 5. Mechanism: `dsh-compaction-tool-result-pruner` · - **[CODE]** `lib/index.js:8` `const PRUNE_MARKER = "\n\n[... tool result middle pruned ...]\n\n";`
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 6. Mechanism: `dsh-spill-policy` + `dsh-output-retention` (file offload) · - **[CODE]** `dsh-spill-policy/lib/index.js:74` `const Config = z.object({ maxInlineBytes: z.number() });`
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 7. Mechanism: `dsh-command-compact` (manual `/compact`) · - **[CODE]** `lib/index.js:7-9` name `"command-compact"`, `inject = ["commands", "compaction"]`,
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 8. Mechanism: `dsh-session-checkpoint-policy` · **Not a context/token mechanism.** A "checkpoint" here is a durability flush, not a context snapshot.
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 9. Mechanism: `dsh-fs-observation-policy` — **premise correction** · This package does **not** bound file reads or observations, and sets no line/byte limits.
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 10. Mechanism: bash / terminal output bounding · ### 10.1 One-shot `bash` (the tool in this session)
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 11. Mechanism: `dsh-agent-instructions` · ### Discovery · 数字: 536 B · 证据: 1048576
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 12. Mechanism: `dsh-agent-tool-presentation` — **premise correction** · It is a **presentation selector**, not an output truncator.
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 13. Mechanism: `dsh-agent-loop` (assembly, placement, usage recording) · - **[CODE]** no truncation and no context budget. The request is derived wholesale:
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 14. Mechanism: session persistence & usage accounting · - **[CODE]** one JSONL record per event; envelope keys are fixed
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 15. Mechanism: subagent context isolation (fork vs spawn) · ### Fork (`dsh-subagent-fork-in-process`)
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 16. Summary table of constants / limits · --- · 证据: 1048576
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 17. Notable design choices · 1. **Compaction is aggressive in mechanism but conservative in default threshold.** 0.8 of a 1e6-token
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 18. Premises corrected / not found · ---
+- `docs/development/DSH-CONTEXT-AUDIT.md` · 19. Open questions / residual uncertainty (all inference-labelled) · 1. **What exactly the UI displayed as "285K".** If it was `contextPressure.projectedTokens`, the
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 0. 包版本 · **全部 231 个 `@deepseek-ai/dsh-*` 包版本一致 = `0.1.5-rc.2`**（逐包读 `package.json` 统计：231 × `0.1.5-rc.2`）。 · 数字: 231 个
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.1 装配机制（谁拼、怎么拼） · 系统提示词**不是**写死的大模板，而是**注册表 + 每条目一个 section**，由 `dsh-system-prompt` 服务在**每个 step** 重新装配。
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.2 分段清单、顺序与规模（`[RUNTIME]` 实测 + `[CODE]` 来源） · 实测：整个会话只有 **1 条 `system/message`**，正文 **6 829 字符**，按 `\n\n` 切分得 **21 段**，与 `SECTION_ORDERS` 表逐项对齐。`[RUNTIME]` 会话 seq 7；字 · 数字: 1 条
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.3 每段的稳定性（对前缀缓存的意义） · - **进程内完全静态（绝大多数）**：1、4、10、15、18 为字面常量；2、21 只插值 `model`/`cwd`。 · 数字: 4 个 / 3 个 / 27 个 / 6 次 · 证据: 7c92c8ecbcb3 / ddb537ebe49a
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.4 指令文件（AGENTS.md / CLAUDE.md）的角色与位置 · 旧文档 §11 已覆盖发现/预算/去重，此处只**补充运行时证据与更新**： · 数字: 23 次 / 14 次 / 4 次 / 4 秒
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.5 skills 如何进入提示词 · - `[CODE]` **技能目录不进系统提示词**。`dsh-skill` 全包无 `systemPrompt` 引用（grep 零匹配 ⇒ 对「是否渲染进系统提示词」**未找到证据**，实为否定）。
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.6 工具声明（tool declarations）的规模与排序 · - `[RUNTIME]` **27 个工具**，整个 `tools` 数组 JSON = **27 285 字节**（含数组括号 27 313）；`description` 合计 **13 531 字符**，`parameters` JS · 数字: 27 个
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.7 工具很多时是否有裁剪 / 延迟暴露 · - `[CODE]` **`native` 模式下完全没有按数量/预算的裁剪，也没有延迟暴露。** `dsh-tools/lib/index.js:2730` — `schemas: [...view.visible.values()].m · 数字: 27 个
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 1.8 与旧文档的差异（第一部分） · --- · 数字: 23 次 / 285 B
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.1 一步（step）的精确结构 · `[CODE]` `dsh-agent-loop/lib/index.js:919` — `async turn() {`，`:1008` — `async step(decision) {`。展开为：
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.2 一次请求能产出几个工具调用 / 是否并行 · - **数量**：一次 assistant 消息可以带任意多个 `tool-call` block，全部在**同一个 step** 内执行。`[CODE]` `dsh-agent-loop/lib/index.js:1116-1118` — · 数字: 5 个 / 2162 条 / 82.1% / 1 个
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.3 工具结果如何回灌 · - `[CODE]` 每个结果作为独立事件追加并**引用 call 的 seq**：`:697-712` —
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.4 循环终止条件 · - **无工具调用 ⇒ 本 step 完成**：`[CODE]` `:1117` — `if (toolCalls.length === 0) return { kind: "completed" };`
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.5 重试 / 错误如何呈现给模型 · - **模型请求级重试**走 `agent/request-error` waterfall：`[CODE]` `:1088-1098` — · 数字: 5 次 / 54 次 / 2.5% / 3 个
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.6 是否有「必须验证 / 必须总结」的强制环节 · - 主循环**没有**。唯一强制的结构化总结出现在**子代理**（`provider: spawn` 且带 schema）：`[CODE]` `dsh-subagent-in-process-driver/lib/index.js:27` 
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.7 用户中断与追加指令（steering / queue）如何进入循环 · - `[CODE]` 三个入口（`dsh-agent-loop/lib/index.js:789-797`）： · 数字: 84 次
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.8 循环中是否有改写已发送历史/前部的动作 · **有，但是受条件门控的两处，且都在 `dsh-agent-loop` 内：** · 数字: 1 条 / 7 次 / 5 次
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 2.9 循环的实测节奏（`[RUNTIME]`） · --- · 数字: 82.1% / 1437 次 / 54 次 / 3 个
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.1 单步上下文规模（`[RUNTIME]`） · 每个 turn 的最大请求规模（`inputTokens + cacheReadTokens`，即真实 prompt token 数）：
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.2 工具粒度 · - 27 个工具，粒度**粗**（一个工具一件事，无通配/批量工具；`bash` 是唯一通用逃生口）。`[RUNTIME]` 调用分布：`edit` 541、`bash` 1437、`read` 311、`write` 84，其余 ≤54。 · 数字: 27 个 / 22 个 / 1437 次 / 198 次
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.3 一次回复的工具调用批处理策略 · - 机制上允许一次多调用 + 滚动池（上限 10），但**实测 82.1% 的步骤只有 1 个调用**（平均 1.16）。 · 数字: 82.1% / 1 个 / 42 轮
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.4 流式与 UI 节奏 · - 循环侧**不批处理**：每个 chunk 立即成帧并同步 emit（`dsh-agent-loop/lib/index.js:402` — `push(chunk) {`；`:1032` — `this.dispatch.emit("a
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.5 超时与重试 · - 重试默认值：`[CODE]` `dsh-llm/lib/index.js:232-235` — `const DEFAULT_MAX_RETRIES = 5;` / `DEFAULT_INITIAL_DELAY_MS = 500` /  · 数字: 5 次 / 54 次
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.6 沙箱与权限模型（是否阻塞交互） · - 三种模式与升级方向：`[CODE]` `dsh-sandbox/lib/index.js:31-32` — `"read-only": ["workspace-write", "danger-full-access"], "worksp · 数字: 2 次
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.7 让任务更快收敛的机制（确有实现） · 数字: 5 个 / 41 次 / 11 次 / 23 次
+- `docs/development/DSH-RUNTIME-AUDIT.md` · 3.8 让任务更慢/更容易跑偏的因素 · 1. **每轮 51.6 步、每步 4.9 s**：一次 turn 常常 4 分钟起步（p90 单步 24 s，含 bash）。 · 数字: 4 分钟 / 82% / 1 个 / 27 个 · 证据: 1048576 / 1049843
+- `docs/development/EXPERIMENT-FIRST.md` · 1. 为什么需要它（三条真实翻车） · 三次都是"读代码 + 合理推理"得出的错误结论。**代码顺序对，不等于运行时会那样走。**
+- `docs/development/EXPERIMENT-FIRST.md` · 2. 三条原则 · 1. **先定判别性指标**：这个指标必须能区分"改前/改后"，而且**不会因为宽容而假绿**。 · 数字: 2 次 / 0 次
+- `docs/development/EXPERIMENT-FIRST.md` · 3. 三档实验台（按成本选） · 判断取舍：**先 A，再 B，最后才 C**。C 的问题不是慢，而是它的软检查会让你得出假绿。 · 数字: 8 分钟
+- `docs/development/EXPERIMENT-FIRST.md` · 4. B 档配方（自包含，可 5 分钟重建） · 一次性脚本放 `/tmp`（**不入库**：它是实验，不是守门）。四件东西： · 数字: 10 分钟
+- `docs/development/EXPERIMENT-FIRST.md` · 5. 收尾纪律（结论要能被下一个人复核） · - **负结果也要入库**：证伪的修法写进 `DECISIONS.md`（含判别命令与数字），把结论作为注释留在改动过的 · 数字: 1 次
+- `docs/development/MIGRATION-AUDIT.md` · 一、结论摘要 · **总体迁移是成功的**：pi-tools 的核心能力（10 个扩展 → 12 个功能、packs 技能包（13 个，见 G9）、agent 配置、 · 数字: 10 个 / 12 个 / 13 个 / 9 个
+- `docs/development/MIGRATION-AUDIT.md` · 二、对比方法与范围 · - 文件清单：`git ls-files` 双向对比（pi-tools 2281 个跟踪文件，my-pi 1173 个）。 · 数字: 2281 个 / 1173 个
+- `docs/development/MIGRATION-AUDIT.md` · 三、分层对比结论 · 数字: 10 个 / 12 个 / 61 个 / 64 个
+- `docs/development/MIGRATION-AUDIT.md` · 四、完全迁移与有意适配 · ### 4.1 完全迁移（逐字节或全量） · 数字: 863 个 / 2 个 / 835 个 / 13 个
+- `docs/development/MIGRATION-AUDIT.md` · 五、真实缺口（未修，按优先级） · ### G1（P0，功能性）语音 STT/TTS 服务脚本缺失 → `voice_transcribe` 实际不可用 —— ✅ 已修复（2026-09-25） · 数字: 4 个 / 3 条 / 1 条 / 27 个 · 证据: 10322227c
+- `docs/development/MIGRATION-AUDIT.md` · 六、本轮修复明细（含验证） · 第二轮（G5/G6 语义与配置闭环）： · 数字: 6 个 · 证据: bash scripts/golden-tasks.sh
+  ✓ / bash scripts/golden-tasks.sh --smoke
+- `docs/development/MIGRATION-AUDIT.md` · 七、建议的后续行动顺序 · 1. ~~**G1**：移植语音服务脚本~~ ✅ 已完成（2026-09-25，4 个脚本入 `custom/features/voice/scripts/`）。 · 数字: 4 个
+- `docs/development/PI-EXT-DEV-NOTES.md` · 元信息 · ---
+- `docs/development/PI-EXT-DEV-NOTES.md` · 目录 · - 一、注册与加载
+- `docs/development/PI-EXT-DEV-NOTES.md` · 一、注册与加载 · - **my-pi 的功能模块在 `custom/features/<name>/`**（每个含 `index.ts` 注册入口 + `logic.ts` 纯逻辑；`logic.ts` 零 Pi 依赖），Pi API 只允许出现在 `cus
+- `docs/development/PI-EXT-DEV-NOTES.md` · 二、命令注册 · - **整合规范**：同一扩展 slash 命令 ≤2 个，功能用子命令参数（终端程序风格），支持 `help`/`-h`/`--help`；description 简短并附 `/xxx help` 提示；子命令补全用 `getArgume · 数字: 2 个
+- `docs/development/PI-EXT-DEV-NOTES.md` · 三、快捷键（踩坑重灾区） · - **`enter` 是保留键**：`tui.input.submit` 默认绑 enter，且在 `RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS` 列表（`vendor/pi/packages
+- `docs/development/PI-EXT-DEV-NOTES.md` · 四、参数补全语义 · - **`getArgumentCompletions(prefix)` 的 value 是整体替换参数前缀**（pi-tui `applyCompletion`：`beforePrefix + item.value`），不是追加当前单词！
+- `docs/development/PI-EXT-DEV-NOTES.md` · 五、UI API · - `ctx.ui.setStatus(key, text)` / `setWidget` / `setFooter`：**纯展示，无点击回调**，不能做可交互按钮
+- `docs/development/PI-EXT-DEV-NOTES.md` · 六、缓存友好（跨扩展约定） · - system prompt 注入禁止时间戳与精确数值；压力/效率提示用固定文案常量（如 `custom/features/context/logic.ts` 的 `EFFICIENCY_ADVICE`），同一档位对应同一段文本 · 数字: 15%
+- `docs/development/PI-EXT-DEV-NOTES.md` · 七、测试与验证 · # 全量单测（vitest，配置见 vitest.config.ts）
+- `docs/development/PI-EXT-DEV-NOTES.md` · 八、黑盒系统开发流程（上游 pi 扩展排障教训） · 涉及外部系统（硬件、Android API、daemon）时按 5 阶段走：
+- `docs/development/PI-EXT-DEV-NOTES.md` · 九、Git 约定 · - remote 含 token 时推送后立即恢复无凭证 URL；token 内联一次性使用不落盘 · 证据: bash scripts/sync-upstream.sh <commit>
+- `docs/development/PI-RUNTIME-AUDIT.md` · 0. 口径、材料与一个数据陷阱 · **实测数据源** · 数字: 10 个 / 2 条 / 924 条 / 0 条 · 证据: 1790262066891 / 1790262066902
+- `docs/development/PI-RUNTIME-AUDIT.md` · 1. 系统提示词构造（pi 侧） · ### 1.1 分段清单与顺序 · 数字: 10 个 / 4 条 / 1 个 / 4 个
+- `docs/development/PI-RUNTIME-AUDIT.md` · 2. agent 循环（pi 侧） · ### 2.1 主循环定位 · 数字: 5 个 / 2 个 / 0 次 / 3 次
+- `docs/development/PI-RUNTIME-AUDIT.md` · 3. my-pi 自定义层的每请求副作用 · ### 3.1 总表：每个 LLM 请求被自定义层改变了什么 · 数字: 2 条 / 67% / 4 个 / 10 个
+- `docs/development/PI-RUNTIME-AUDIT.md` · 4. 实测形状（真实运行数据） · ### 4.1 逐请求用量分布（`.usage-diag.jsonl`，924 条真实记录） · 数字: 924 条 / 6.2 天 / 38 条 / 10%
+- `docs/development/PI-RUNTIME-AUDIT.md` · 5. 与现有文档矛盾之处（以代码为准） · **另外发现的文档/注释不一致（非对比文档，属 my-pi 自身）**： · 数字: 67% / 3 分钟 / 10% / 924 条
+- `docs/development/PI-RUNTIME-AUDIT.md` · 6. 未找到证据清单 · 1. **主循环的 max steps / max turns / step 预算上限**：`未找到证据`（`agent/src`、`coding-agent/src` 内均无 `maxSteps`/`maxTurns` 类阈值）。
+- `docs/development/PI-RUNTIME-AUDIT.md` · 附：本次审计的两个副产物（可复用） · 1. **`/tmp/loop-findings.md`**（398 行）：pi 主循环逐条证据（10 问 + hook 时序全表 + 附加判定），路径相对 `vendor/pi/packages/`。
+- `docs/development/PI-SDK-EXTENSION.md` · 元信息 · ---
+- `docs/development/PI-SDK-EXTENSION.md` · 目录 · - 一、背景：扩展 API 与 SDK 的关系
+- `docs/development/PI-SDK-EXTENSION.md` · 一、背景：扩展 API 与 SDK 的关系 · Pi 的扩展系统有两层能力来源：
+- `docs/development/PI-SDK-EXTENSION.md` · 二、深度定制总览 · 浅（安全） 深（有风险）
+- `docs/development/PI-SDK-EXTENSION.md` · 三、方案详解 · ### 方案 A：导入 SDK 纯函数增强功能（✅ 安全）
+- `docs/development/PI-SDK-EXTENSION.md` · 四、不能做什么 · 以下操作即使结合 SDK 也无法在扩展中完成：
+- `docs/development/PI-SDK-EXTENSION.md` · 五、决策树：应该用哪个方案 · 你想做什么？
+- `docs/development/PI-SDK-EXTENSION.md` · 六、总结与注意事项 · ### 优先顺序
+- `docs/development/SKILLS-MAINTENANCE.md` · 元信息 · ---
+- `docs/development/SKILLS-MAINTENANCE.md` · 目录 · - 一、概述
+- `docs/development/SKILLS-MAINTENANCE.md` · 一、概述 · ### 1.1 解决的问题
+- `docs/development/SKILLS-MAINTENANCE.md` · 二、触发时机 · 技能流程完成（清理阶段/最终报告产出后）时，做一次清点：
+- `docs/development/SKILLS-MAINTENANCE.md` · 三、记录 · ### 3.1 记录位置
+- `docs/development/SKILLS-MAINTENANCE.md` · 四、合并 · ### 4.1 触发条件 · 数字: 3 条
+- `docs/development/SKILLS-MAINTENANCE.md` · 五、packs 外部技能包 · `packs/` 为按需加载的外部技能包，见 `packs/README.md`。使用方式为需要时手动读取 `packs/<name>/SKILL.md`，**不放入 `portable/agent/skills/`**（避免系统提示词膨胀
+- `docs/development/SKILLS-MAINTENANCE.md` · 六、边界 · - 本机制**不注入系统提示词**（技能文件按需读取，不膨胀）
+- `docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md` · 1. 判据：什么该留在工具面，什么可以外置 · 外置的收益 = 从 tools 段省下的字节 × 每 epoch 次数；代价 = 可靠性、状态连续性、错误语义、 · 数字: 2%
+- `docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md` · 2. 现状事实（可复现） · ### 2.1 体积与使用率 · 数字: 6.4 KB / 22% / 6.3 KB / 5.5 KB
+- `docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md` · 3. 候选逐个结论 · 数字: 6.3 KB / 1.6% / 5.9 KB / 1.0 KB
+- `docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md` · 4. 方案对比 · 数字: 6.3 KB / 0.45 KB / 5 个 / 3 KB
+- `docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md` · 5. 决策（稳定优先） · 1. **本轮不迁移任何工具到 skill/脚本**（方案 A + E）；`lean` 保持可选、默认仍 `full`。 · 数字: 39% / 2% / 32 KB
+- `docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md` · 6. 将来若要做：可复用的落地路径与前置条件 · 1. **先并存、后移除**：先加 `scripts/browser-cli.mjs` + `packs/browser/SKILL.md`，**保留全部现有工具**，
+- `docs/development/TOOL-EXTERNALIZATION-ANALYSIS.md` · 7. 复现命令 · # 工具面构成与预算（含模式收窄断言） · 证据: npx vitest run custom/features/context/__tests__/tools-payload.test.ts
