@@ -498,7 +498,7 @@ coding-agent 通过 5 个注入点把语义塞进循环（`agent-session.ts:474-
 |---|---|---|---|
 | 每轮工具输出擦除 `pruneToolResults` | `PI_CONTEXT_ERASE === 'on'` → **false** | 每请求改写靠前 toolResult → 前缀断裂 | `custom/features/context/budget/task-gate.ts:92` `export const PER_TURN_ERASE = process.env.PI_CONTEXT_ERASE === 'on';` |
 | 历史 thinking 擦除 `pruneThinkingBudget` | 同上 | 删除早期 thinking 块 → 前缀断裂 | `custom/features/context/index.ts:484` |
-| 工具按需分层 | `PI_CONTEXT_TOOL_LAYERING === 'on'` → **false** | 裁剪工具数组 → 整段失效 | `custom/features/context/budget/task-gate.ts:75` `export const TOOL_LAYERING = process.env.PI_CONTEXT_TOOL_LAYERING === 'on';` |
+| 工具集变化（原：按需分层） | **机制已于 2026-10-08 删除**；现存来源是激活 `deferred` 工具（`tool_search`） | 裁剪/扩充工具数组 → 整段失效 | 原实现 `custom/features/context/budget/tool-layering.ts`（已删）。结论仍有效：**工具段变化 = 整段前缀失效** |
 | 自适应切档 `tickThinkingLevel` | `PI_CONTEXT_THINKING_AUTO === 'on'` → **false** | 切档 → 整段失效 | `custom/features/context/index.ts:737` `if (thinkingAutoEnabled) {` |
 | 暖前缀重放 | 无开关，但**永不触发**（§2.8 证据） | 会替换 payload 的 messages 与 tools | `custom/features/context/budget/warm-prefix.ts:149` `messages: [` |
 

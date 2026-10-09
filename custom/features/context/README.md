@@ -5,17 +5,24 @@
 
 ## 注册面
 
-- 工具：`thinking_level`、`session_title`（写会话元数据，不进上下文）；`enable_tool` 仅在 `PI_CONTEXT_TOOL_LAYERING=on` 时注册（默认全部工具常驻，注册亦无操作）
-- 命令：`/context <usage|report|fingerprint|help>`、`/tools <list|enable <组>|help>`
+- 工具：`thinking_level`、`session_title`（写会话元数据，不进上下文）；`edit_and_run`（编辑+立即验证的融合工具，参数同 `edit`）
+- 命令：`/context <usage|report|fingerprint|help>`、`/tools <list|help>`
 - 钩子：`session_start`、`before_agent_start`、`input`、`turn_start`、`context`、`tool_call`、`tool_result`、`message_update`、`turn_end`、`before_provider_request`（前缀指纹）、`session_compact`、`session_before_compact`（快照）、`agent_settled`
 
 ## 工具常驻策略（2026-09-26 起默认常驻）
 
-全部工具 schema 常驻，不做休眠裁剪：工具 schema 位于请求最前处，会话中途 `enable_tool`
-改一次工具列表就让**整段**前缀缓存失效（实测单次 $0.01–0.04，重启后分层复位还需再 enable 一次）；
-而让休眠组 schema 常驻只按命中价（1/50）计费——按保守上限（休眠 schema 20K token、上下文 250K）
-算，常驻 100 个请求共约 $0.006，一次中途 enable 就是 $0.0375。分组定义与 `/tools`、`enable_tool`
-仍保留以便回溯，`PI_CONTEXT_TOOL_LAYERING=on` 可恢复休眠分层。
+全部工具 schema 常驻，不做休眠裁剪：工具 schema 位于请求最前处，会话中途改一次工具列表就让**整段**
+前缀缓存失效（实测单次 $0.01–0.04，重启后分层复位还需再改一次）；而让休眠组 schema 常驻只按命中价
+（1/50）计费——按保守上限（休眠 schema 20K token、上下文 250K）算，常驻 100 个请求共约 $0.006，
+一次中途 wake 就是 $0.0375，**约 6 倍**。这笔账说明这个方向本身不成立。
+
+**2026-10-08：分层/休眠组机制已整体删除**（`tool-groups.ts`、`tool-layering.ts`、`enable_tool`、
+`PI_CONTEXT_TOOL_LAYERING`，约 340 行 + 一份要持续与工具面同步的组名单）。理由：① 上面那笔账说明
+「中途 wake」永远亏（且现在前缀更小、上下文更大，亏得更多）；② 需要「不进前缀」的那部分已由
+**pi 原生的 `deferred`** 更好地解决——`browser` 18 个工具 **0 前缀字节**，由 `tool_search` 按需拉出，
+不需要组名单也不需要 `enable_tool`；③ 它默认关闭，30 天里 `enable_tool` 仅 8 次调用 ⇒ 按「按消费设门」
+的标准不该留着。**知识保留**：那笔盈亏平衡账与「工具集变化 = 整段前缀失效」仍然有效，只是现在指向
+激活 `deferred` 工具（`tool_search`）这条**依然存在**的断裂源。
 
 **基线是 pi 的激活决定（2026-10-04 修正）**：常驻策略只管"my-pi 要用的工具别休眠"，**不替 pi 打开
 它刻意休眠的工具**。`effectiveActiveTools` 的第一个参数是 `tool-layering.ts` 在首次动手前抓的
@@ -79,8 +86,8 @@
 - **system prompt 只追加静态常量** `EFFICIENCY_ADVICE`。易变运行时提示（压力档文案、休眠工具摘要、
   重启提示）**不再写入 system prompt**，而是在 `before_agent_start` 以 `my-pi-context-advice` 消息
   **仅在内容变化时追加**（append-only，不删除旧的）：变化点落在尾部，只影响其后的少量 token，
-  避免"前缀最前处变化 → 整段缓存失效"（实测单次 170K–316K 全价重算）。其中**休眠组摘要只在
-  `PI_CONTEXT_TOOL_LAYERING=on` 时出现**——默认全部工具常驻，再列"休眠组"只会误导模型去 enable。
+  避免"前缀最前处变化 → 整段缓存失效"（实测单次 170K–316K 全价重算）。（休眠组摘要随 2026-10-08
+  的分层机制删除而一并移除——它本来就是为那个机制服务的。）
 - 记忆注入同理（`shouldInjectMemory`：内容未变不重注）。**2026-09-29 更正**：旧实现在 `context`
   钩子里用 `filterInjectedMessages` 移除除最新一条外的全部注入（防累积），其注释认为位移点"通常是
   上一次请求的尾部 → 只影响尾部少量 token"，**实测不成立**：注入后的 83 次请求命中率仅 **61.1%**，
@@ -118,7 +125,7 @@
 
 ## 关键环境变量
 
-`PI_CONTEXT_THINKING_AUTO=on`（**开**自动切档，默认关）、`PI_THINKING_MAX_LEVEL`（运行时档位上限，默认 `high`）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_ERASE=on`（开每轮擦除，默认关）、`PI_CONTEXT_TOOL_LAYERING=on`（开休眠分层，默认关=全部工具常驻）、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
+`PI_CONTEXT_THINKING_AUTO=on`（**开**自动切档，默认关）、`PI_THINKING_MAX_LEVEL`（运行时档位上限，默认 `high`）、`PI_CONTEXT_TASK_GATE`、`PI_CONTEXT_ERASE=on`（开每轮擦除，默认关）、`PI_CONTEXT_WINDOW_FALLBACK`、`PI_CONTEXT_ABSOLUTE_TOKENS`、`PI_CONTEXT_IDLE_MS`（默认 0=关空闲门）、`PI_CONTEXT_COMPACT_COOLDOWN_MS`、`PI_CONTEXT_PRUNE_PROTECT_TOKENS`（默认 60K）、`PI_CONTEXT_PRUNE_MINIMUM_TOKENS`（默认 30K）、`PI_CONTEXT_KEEP_THINKING_TOKENS`（默认 64K）、`PI_CONTEXT_OUTPUT_BUDGET_TOKENS`（默认 20K）、`PI_PREFIX_FINGERPRINT=off`、`PI_DISABLE_LEVEL_AUDIT`、`PI_DISABLE_PRUNE_DUMP`、`PI_DISABLE_TASK_RECORD`、`PI_CONTEXT_RATIO_TEST`、`PI_SESSION_ID`。
 
 ## 确定性擦除（零 LLM 成本，默认关闭）
 

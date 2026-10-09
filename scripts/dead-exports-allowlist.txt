@@ -31,7 +31,6 @@ shouldVerify Best-of-N 验证未迁移（同上）
 ProgressTracker Best-of-N 验证未迁移（同上）
 #
 # ── B. 测试辅助（生产不需要接线，故不列为待清理） ──
-validateGroups 分组完整性校验（`tool-groups.ts` 注释即写明"测试用"）
 __resetSeedCache 测试专用重置钩子（缓存隔离）
 resetSendGuards 测试专用重置钩子（link 发送守卫）
 resetWhisperHealthCache 测试专用重置钩子（whisper 健康探测缓存）

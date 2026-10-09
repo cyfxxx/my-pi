@@ -30,8 +30,6 @@ import {
 } from './budget/compact-payback';
 import { normalizeSessionTitle, MAX_SESSION_TITLE_BYTES } from './budget/session-title';
 import { collectWorkspaceInstructions } from './budget/workspace-instructions';
-import { applyToolLayering, dormantToolsActive, enableGroup, buildToolsReport, buildSleepingSummary } from './budget/tool-layering';
-import { SLEEPING_GROUPS, groupsWithTools } from './budget/tool-groups';
 import {
   createToolLifecycleState,
   LOW_PRESSURE_DELEGATION,
@@ -94,7 +92,6 @@ import {
   PER_TURN_ERASE,
   DEDUP_SUMMARIES,
   BASH_TIMEOUT_CEIL_S,
-  TOOL_LAYERING,
   readEnvRatio,
   resolveContext,
   hasBackgroundTask,
@@ -201,7 +198,6 @@ export function register(pi: ExtensionAPI): void {
     return Number.isFinite(n) && n > 0 ? n : 1_000_000;
   })();
   let lastProviderContextTokens = 0;
-  let layeringApplied = false;
   let lastContextMessages: unknown[] | null = null;
   let compactedThisSettlement = false;
   // 自动阈值路径已写快照的标记：session_before_compact 据此避免重复快照，
@@ -293,26 +289,6 @@ export function register(pi: ExtensionAPI): void {
   // 两半都走 pi 自己的工具（ctx.executeTool('edit'|'bash')），不重写编辑逻辑。
   registerEditAndRunTool(pi);
 
-  // 注册工具：enable_tool —— 仅在按需加载开启时注册
-  // 默认（TOOL_LAYERING=false）全部工具 schema 常驻，工具本身无操作，注册只会造成模型空转，故不注册
-  if (TOOL_LAYERING) {
-    registerTool(pi, {
-      name: 'enable_tool',
-      description: `启用休眠工具组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）。启用后工具列表更新一次（前缀缓存重算），本会话内保持，重启恢复默认；已启用组再次启用无副作用。`,
-      parameters: {
-        group: {
-          type: 'string',
-          enum: SLEEPING_GROUPS.map((g) => g.name),
-          description: '要启用的休眠工具组名',
-        },
-      },
-      execute: async (args) => {
-        const group = typeof args.group === 'string' ? args.group : '';
-        return enableGroup(pi, group).message;
-      },
-    });
-  }
-
   // 注册工具：thinking_level —— 模型建议切档，规则审批（死区/压力方向）
   registerTool(pi, {
     name: 'thinking_level',
@@ -377,53 +353,41 @@ export function register(pi: ExtensionAPI): void {
 
   // 注册命令：/tools - 工具分层管理（list / enable <组> / help）
   registerCommand(pi, 'tools', {
-    description: '工具状态：list 查看分组/状态；按需加载开启时 enable <组> 可启用休眠组',
+    description: '工具状态：list 查看当前工具；help 显示用法',
     getArgumentCompletions: (prefix) => {
       const trimmed = prefix.trim();
       const first = trimmed.split(/\s+/)[0] ?? '';
       if (!trimmed.includes(' ')) {
         const items = [
-          { value: 'list', label: 'list - 查看分组/状态' },
-          ...(TOOL_LAYERING ? [{ value: 'enable ', label: 'enable - 启用休眠组' }] : []),
+          { value: 'list', label: 'list - 查看当前工具' },
           { value: 'help', label: 'help - 显示用法' },
         ];
         return filterCompletions(items, first) || null;
       }
-      if (first === 'enable' && TOOL_LAYERING) {
-        const arg = trimmed.split(/\s+/)[1] ?? '';
-        return groupsWithTools(new Set(getAllToolNames(pi)))
-          .filter((g) => g.name.startsWith(arg))
-          .map((g) => ({
-            value: 'enable ' + g.name,
-            label: g.name,
-            description: g.tools.join(', '),
-          }));
-      }
       return null;
     },
     handler: async (args, ctx) => {
-      const { sub: cmd, rest } = parseSubcommand(args);
-      if (cmd === 'enable' && rest[0]) {
-        const r = enableGroup(pi, rest[0]);
-        ctx.ui.notify(r.message, r.ok ? 'info' : 'warning');
-        return;
-      }
+      const { sub: cmd } = parseSubcommand(args);
       if (cmd === 'help') {
-        const enableLine = TOOL_LAYERING
-          ? `  enable <组>   启用休眠组（${SLEEPING_GROUPS.map((g) => g.name).join('/')}）\n`
-          : '  （按需加载已关闭：全部工具常驻，enable 无操作）\n';
         ctx.ui.notify(
-          `工具命令:\n\n用法: /tools <子命令>\n\n子命令:\n  list          查看分组/状态\n${enableLine}  help          显示此帮助`,
+          `工具命令:\n\n用法: /tools <子命令>\n\n子命令:\n  list          查看当前工具\n  help          显示此帮助`,
           'info',
         );
         return;
       }
-      const report = buildToolsReport(pi);
-      ctx.ui.notify(
-        TOOL_LAYERING ? `tools: ${SLEEPING_GROUPS.length} 个休眠组` : 'tools: 全部工具常驻',
-        'info',
+      // 工具分层（休眠组）已于 2026-10-08 删除：全部工具常驻，这里只报告当前工具集。
+      const active = getActiveTools(pi);
+      const all = getAllToolNames(pi);
+      ctx.ui.notify(`tools: 全部工具常驻（活跃 ${active.length} / 已注册 ${all.length}）`, 'info');
+      sendMessage(
+        pi,
+        {
+          customType: 'tools-report',
+          content: `活跃工具（${active.length}）：\n${active.join(', ')}`,
+          display: true,
+        },
+        { triggerTurn: false },
       );
-      sendMessage(pi, { customType: 'tools-report', content: report, display: true }, { triggerTurn: false });
     },
   });
 
@@ -496,18 +460,6 @@ export function register(pi: ExtensionAPI): void {
   registerHook(pi, {
     event: 'before_agent_start',
     handler: async (event, ctx) => {
-      // ── 可选增强 1：工具分层（按需加载关闭时是空操作）──
-      try {
-        if (!layeringApplied) {
-          applyToolLayering(pi);
-          layeringApplied = true;
-        } else if (dormantToolsActive(pi)) {
-          // 计划模式退出等会恢复全量工具，这里自愈回分层
-          applyToolLayering(pi);
-        }
-      } catch {
-        /* 增强失败：不影响本次 system 文本 */
-      }
       // ── 可选增强 2：统一本次渲染的工具顺序 ──
       // 重启恢复的首轮 options 可能仍是 transcript 顺序，而 pi 的 setActiveTools 会以
       // getActiveToolNames() 重建 _baseSystemPromptOptions；两者不一致时，system 的 tools 清单
@@ -573,12 +525,7 @@ export function register(pi: ExtensionAPI): void {
         // 它们位于前缀最前处，一旦变化就是整段缓存失效（实测单次 170K–316K 全价重算）。
         // 改为"内容变化时才追加一条消息"（append-only，不删除旧的）：变化点落在尾部，
         // 只影响其后的少量 token。对齐 DSH 的 change-only volatile context 做法。
-        // 休眠组摘要只在按需加载开启时出现：默认全部工具常驻，列休眠组只会误导模型。
-        const volatileText = [
-          advice,
-          TOOL_LAYERING ? buildSleepingSummary(new Set(getAllToolNames(pi))) : '',
-          restartHint,
-        ]
+        const volatileText = [advice, restartHint]
           .filter(Boolean)
           .join('\n\n');
         if (volatileText && volatileText !== lastVolatileContext) {

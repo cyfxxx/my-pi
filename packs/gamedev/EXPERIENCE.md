@@ -14,7 +14,7 @@
 - 环境: termux-ubuntu proot aarch64（chromium-browser headless 可用）
 - 场景/经验: 放置经营类数值验证不必真人试玩——sim.ts 与 DOM 解耦后，tools/simulate.ts 用策略 AI + 固定种子跑全流程即可断言通关时长/死锁/失败路径；第一轮模拟就抓出两个设计死锁（研究员优先级最低导致知识停摆、添丁成本 90 > 食物 cap 80）。数值修正后再上 UI，返工为零
 - 场景/经验: 拟真因果链要落进机制而非文案：泥壳窑改为由「一次失败的露天烧陶」flag 解锁后，玩家必然先经历 75% 失败 → 见识提示 → 建窑，比“窑 pottery1 后可建”的数值门槛叙事强得多
-- 场景/经验: vite preview 用 `(cmd &)` 分离后台会被子 shell 退出杀掉，nohup 才稳；chromium-browser --headless --screenshot 配 --virtual-time-budget 可快进 setInterval 截到“跑起来”的状态；browser 工具组（enable_tool）做真实点击流验证 UI（研究→见识卡弹层→开工→队列→存档恢复）一遍过
+- 场景/经验: vite preview 用 `(cmd &)` 分离后台会被子 shell 退出杀掉，nohup 才稳；chromium-browser --headless --screenshot 配 --virtual-time-budget 可快进 setInterval 截到“跑起来”的状态；browser 工具（当时经 `enable_tool` 拉出；该机制已于 2026-10-08 删除，现用 `tool_search` 拉出）做真实点击流验证 UI（研究→见识卡弹层→开工→队列→存档恢复）一遍过
 - 场景/经验: localStorage.clear()+reload 会被 beforeunload 的强制保存覆盖（旧档复活）；清档要走页面内“重新开始”确认流程，或 clear 后同步取消 unload 钩子
 
 ## 2026-08-28 网页 vs Godot 选型框架（代理环境视角）

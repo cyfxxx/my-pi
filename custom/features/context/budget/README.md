@@ -23,7 +23,6 @@
 | `session-title.ts` | 会话标题规范化（剥离 ANSI/控制字符、折叠空白、UTF-8 字节上限）：供 `session_title` 工具使用；标题只落 `session_info` 元数据、不进上下文 | `normalizeSessionTitle`、`MAX_SESSION_TITLE_BYTES` |
 | `prefix-fingerprint.ts` | 逐请求前缀指纹（system/tools/消息头/**全消息序列分段**/总量哈希） | `fingerprintRequest`、`formatFingerprint`、`systemTextOf`、`messageSegments`、`firstDivergentSegment`、`FINGERPRINT_HEAD_MESSAGES`、`FINGERPRINT_SEGMENT_MESSAGES` |
 | `thinking-level.ts` | 思考档位自动升降 | `tickThinkingLevel`、`proposeThinkingLevel`、`inferTaskType` |
-| `tool-groups.ts` / `tool-layering.ts` | 工具分层与休眠组 | `SLEEPING_GROUPS`、`buildSleepingSummary`、`applyToolLayering`、`enableGroup` |
 | `tool-health.ts` | 错误输出精简与失败熔断提示 | `dehydrateErrorOutput`、`updateFailStreak`、`FAIL_STREAK_LIMIT` |
 | `warm-prefix.ts` | 压缩摘要的暖前缀重放（**当前未生效**） | `needsWarmPrefix`、`isSummarizationMessage`、`buildReplayedPayload`、`saveMainRequestPayload`、`canReplayWarmPrefix` |
 | `task-record.ts` / `token-speed.ts` | 任务记录与出字速度统计 | `recordTaskRecord`、`createSpeedTracker`/`formatSpeedCompact` |
@@ -38,7 +37,6 @@
 | 空闲判定 | 关闭（0） | `PI_CONTEXT_IDLE_MS` |
 | 任务门总开关 | 开 | `PI_CONTEXT_TASK_GATE=off` |
 | 每轮擦除总开关 | **关** | `PI_CONTEXT_ERASE=on` |
-| 工具按需加载 | **关**（全部常驻） | `PI_CONTEXT_TOOL_LAYERING=on` |
 | 工具擦除保护带 | 60K | `PI_CONTEXT_PRUNE_PROTECT_TOKENS` |
 | 工具擦除最小回收 | 30K | `PI_CONTEXT_PRUNE_MINIMUM_TOKENS` |
 | thinking 保留量 | 64K | `PI_CONTEXT_KEEP_THINKING_TOKENS` |
@@ -63,10 +61,12 @@
   其中 `changed` 里的 `messages@<start>-<end>` 给出**前缀失效的起点消息下标**：`messages@0-7` 等价整段重放（最贵），
   起点越靠后代价越小；**尾部追加不算分叉**（只记 `messages`），否则正常追加会被误报成整段失效。
   2026-10-01 之前的记录没有 `segments` 字段，分叉统计只对新增记录有效。
-  已知断裂源按代价排序：每轮擦除（已关闭）> 会话中途 `enable_tool` 改工具集（已关闭：全部常驻）> system prompt 变化 > 记忆注入首次刷新。
-- **工具 schema 常驻 vs 休眠分层**：schema 在请求最前处，会话中途 enable 一次 = 整段重算（实测 $0.01–0.04，
-  重启后还要再 enable）；休眠组常驻只按命中价计费，一次 enable 的成本就超过整场会话的常驻成本。
-  故默认全部常驻（`TOOL_LAYERING=off`），分组定义保留但 `enable_tool` 无操作。
+  已知断裂源按代价排序：每轮擦除（已关闭）> **会话中途激活 `deferred` 工具**（`tool_search` 拉出 → 工具段变化；分层机制已于 2026-10-08 删除，这是当前唯一「工具集变化」来源）> system prompt 变化 > 记忆注入首次刷新。
+- **工具 schema 常驻 vs 休眠分层**：schema 在请求最前处，会话中途 wake 一次 = 整段重算（实测 $0.01–0.04，
+  重启后还要再来一次）；休眠组常驻只按命中价计费，一次 wake 的成本就超过整场会话的常驻成本（约 6 倍）。
+  **2026-10-08：分层机制已整体删除**（含 `enable_tool` 与组名单）——需要「不进前缀」的部分改由 pi 原生
+  `deferred` + `tool_search` 承担（`browser` 18 个工具 0 前缀字节）。这笔账的结论仍有效，
+  并已改指向 `deferred` 激活这条仍然存在的断裂源。
 
 ## 已知限制：warm-prefix 是死代码
 
@@ -76,20 +76,11 @@
 **有意延后**——见 [MIGRATION-AUDIT.md](../../../../docs/development/MIGRATION-AUDIT.md) 的 G3
 与 DECISIONS 的上下文优化条目。
 
-## 已知限制：分层档会裁掉 pi 中途激活的工具（2026-10-04 记录，不改）
+## 历史限制（已随机制删除，2026-10-08）
 
-`applyToolLayering`（仅在 `PI_CONTEXT_TOOL_LAYERING=on` 时动手）以"**首次动手前**抓到的 pi 基线"
-为基准做减法。若 pi 侧在**会话中途**激活了某个工具（典型：MCP 配成 `exposure: "deferred"` 时，
-MCP 扩展自己激活 `tool_search` / `codemode`），而分层自愈又被触发（有休眠组工具处于活跃 →
-`dormantToolsActive` 为真，例如 plan 模式退出），那一次 `applyToolLayering` 会拿**旧基线**重算，
-把这个中途激活的工具裁掉——延迟加载的 MCP 工具此后对模型不可见，直到重启或重新激活。
-
-- **为什么不修**：本项目基本不用 MCP（`portable/agent/mcp.json` 不存在），而分层档本身就是默认
-  关闭的考古开关；默认档 `applyToolLayering` 直接 `return`，完全不碰 pi 的工具集，不存在这个问题。
-- **将来真接 MCP 时的修法**（一处改动，且幂等）：把分层目标从"pi 基线 ∪ 显式 enable − 未启用休眠组"
-  改成"**当前活跃** ∪ 显式 enable − 未启用休眠组"——即把 `effectiveActiveTools` 的输入换成调用时的
-  `getActiveTools()`，同时删掉 `tool-layering.ts` 里的 `baseActiveToolNames` 模块状态。该式幂等
-  （`f(f(x)) = f(x)`），不会来回横跳，也仍然不会凭空激活 `defaultActive: false` 的工具。
+曾有一处已知限制：分层档自愈时会拿「首次动手前的 pi 基线」重算，从而把 pi 在会话中途激活的工具
+（典型：MCP 的 `tool_search`/`codemode`）裁掉。**该机制已整体删除，此限制随之消失**；记录保留是因为
+它说明了一个仍然通用的坑：**任何「以旧基线重算工具集」的做法都会吃掉中途激活**。
 
 ## 相关
 
