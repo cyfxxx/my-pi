@@ -35,7 +35,7 @@ function check(name, cond, detail = '') {
 }
 
 /** 造一个临时 memory 目录：每轮用量 + 工具级台账 + 前缀指纹。同时造空的 agent 目录，保证用例自洽 */
-function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null, appendLost = 0, appendMissingFlat = 0, poolLeases = null }) {
+function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes = null, bashCalls = null, appendLost = 0, appendMissingFlat = 0, poolLeases = null, rework = null }) {
   const root = mkdtempSync(join(tmpdir(), 'my-pi-usage-'));
   const mem = join(root, 'memory');
   const agent = join(root, 'agent');
@@ -156,6 +156,49 @@ function makeFixture({ frontChange, segChange = null, coldStarts = 0, toolsBytes
       rows.push({ ts: now - 1000 + i, profileKey: 'p', reused: i < poolLeases.reused, poolSize: 1 });
     }
     writeFileSync(join(mem, 'logs', 'subagent-pool.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  }
+
+  // 子代理返工夹具（P8-A 第二步）：usage.jsonl 里的子代理 + 父级会话里的写操作。
+  // 关键边界：父级写发生在**第 6 个助手回合**时**不算**返工（窗口默认 5）。
+  if (rework) {
+    mkdirSync(join(mem, 'subagent'), { recursive: true });
+    const rows = [];
+    for (const [i, c] of rework.children.entries()) {
+      rows.push({
+        ts: now - c.agoMs,
+        agent: c.agent ?? 'worker',
+        agentSource: 'user',
+        exitCode: 0,
+        turns: 1,
+        input: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        output: 0,
+        cost: 0,
+        task: 't',
+        writeTools: c.writePaths.length ? ['edit'] : [],
+        writePaths: c.writePaths,
+        __i: i,
+      });
+    }
+    writeFileSync(join(mem, 'subagent', 'usage.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+
+    const sessDir = join(agent, 'sessions', '--x--');
+    mkdirSync(sessDir, { recursive: true });
+    const lines = [];
+    const iso = (ms) => new Date(ms).toISOString();
+    lines.push(JSON.stringify({ type: 'session', version: 3, id: 's1', timestamp: iso(now - 200000), cwd: '/x' }));
+    const turn = (ms, path) =>
+      JSON.stringify({
+        type: 'message',
+        timestamp: iso(ms),
+        message: {
+          role: 'assistant',
+          content: path ? [{ type: 'toolCall', id: `c${ms}`, name: 'edit', arguments: { path } }] : [{ type: 'text', text: 'ok' }],
+        },
+      });
+    for (const s of rework.session) lines.push(turn(now - s.agoMs, s.path ?? null));
+    writeFileSync(join(sessDir, 's1.jsonl'), lines.join('\n') + '\n');
   }
 
   return { root, mem, agent };
@@ -476,6 +519,49 @@ if (failed > 0) {
     const out = runHealth(fixture);
     check('子代理池复用率由租借日志算出（4/5 = 80.0%）', out.includes('子代理池=复用80.0%(4/5)'), out.trim().split('\n')[0]);
     check('起进程次数 = 未复用次数（1 次）', out.includes('/起1次'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+
+// ── 用例：子代理返工（P8-A 第二步）──
+{
+  // child0 的改动在窗口内被父级再改（算返工）；child1 的改动在第 6 个回合才被再改（超窗，不算）；
+  // child2 没有 writePaths（只读，不进分母）。
+  const fixture = makeFixture({
+    frontChange: false,
+    rework: {
+      children: [
+        { agoMs: 60000, writePaths: ['/a.ts'] },
+        { agoMs: 40000, writePaths: ['/b.ts'] },
+        { agoMs: 20000, writePaths: [] },
+      ],
+      session: [
+        { agoMs: 55000, path: '/a.ts' }, // child0 之后第 1 个回合 ⇒ 返工
+        { agoMs: 38000 }, // child1 之后第 1–5 个回合：全是纯文本
+        { agoMs: 37000 },
+        { agoMs: 36000 },
+        { agoMs: 35000 },
+        { agoMs: 34000 },
+        { agoMs: 33000, path: '/b.ts' }, // 第 6 个回合 ⇒ **超出窗口，不算返工**
+      ],
+    },
+  });
+  try {
+    const out = runHealth(fixture);
+    check('子代理返工：只统计有改动的子代理（分母 2，不含只读的 child2）', out.includes('子代理返工=1/2(50.0%)'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+// ── 用例：没有带改动的子代理 ⇒ n/a（而不是假装 0%）──
+{
+  const fixture = makeFixture({ frontChange: false, rework: { children: [{ agoMs: 10000, writePaths: [] }], session: [] } });
+  try {
+    const out = runHealth(fixture);
+    check('子代理返工：无改动样本时记 n/a，不假装 0%', out.includes('子代理返工=n/a'), out.trim().split('\n')[0]);
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }

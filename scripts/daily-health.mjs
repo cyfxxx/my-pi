@@ -53,6 +53,16 @@ const COMPACT_PAYBACK = process.env.PI_COMPACT_PAYBACK_FILE || join(MEM, 'logs',
 // 子代理常驻池的复用度量（P9，features/subagent/core/pool-metrics.ts 产出）：每条记录 = 一次租借。
 // `reused=false` 即**新起了一个进程** ⇒ 复用率与"实际起进程次数"都能从这里数出来。
 const SUBAGENT_POOL = process.env.PI_SUBAGENT_POOL_LOG || join(MEM, 'logs', 'subagent-pool.jsonl');
+// 子代理返工（P8-A 第二步）：子代理改过的文件，**父级是否在随后的 N 个回合内又改了同一个文件**。
+// 口径写在 README 的"子代理返工"一节；由 test-usage-metrics.mjs 的合成夹具钉住。
+const SUBAGENT_USAGE = process.env.PI_SUBAGENT_USAGE_FILE || join(MEM, 'subagent', 'usage.jsonl');
+const SESSIONS_DIR = process.env.PI_SESSIONS_DIR || join(AGENT, 'sessions');
+/** 父级在其后的多少个助手回合内再改同一文件算"返工" */
+const REWORK_TURNS = Number(process.env.PI_HEALTH_REWORK_TURNS) || 5;
+/** 与 features/subagent/core/usage-log.ts 的 WRITE_TOOLS 保持同口径（catch-all 不算） */
+const WRITE_TOOL_NAMES = new Set(['write', 'edit', 'edit_and_run']);
+/** 与 usage-log.ts 的 WRITE_PATH_KEYS 同口径 */
+const WRITE_PATH_KEYS = ['path', 'file_path', 'filePath', 'file'];
 /** 缓存安全线：低于此命中率视为退化（日常应在 97% 以上；加权口径） */
 const HIT_FLOOR = Number(process.env.PI_HEALTH_HIT_FLOOR) || 0.97;
 /** 每次调用的未命中输入上限：超过说明存在整段重算 */
@@ -432,6 +442,106 @@ const singleCmdStr = singleCmd
   ? `${(singleRatio * 100).toFixed(1)}%(${singleCmd.single}/${singleCmd.total})`
   : 'n/a(旧记录无字段)';
 // 压缩回本分布：paybackTurns = "还要几轮才回本"（客观数，不依赖剩余轮次估计）
+// ── 子代理返工（P8-A 第二步）──
+// 口径：① 只统计 writePaths 非空的子代理（有改动才有"返工"可言）；
+//      ② 窗口按**父级助手回合数**（默认 5）而非时间——回合更贴近"这次委派是否被立刻返工"；
+//      ③ "又改同一文件"= 至少一个路径相同（同时给出匹配数，便于按更严口径重算）；
+//      ④ 只认**写类工具**（与 usage-log 同口径，bash 等 catch-all 不算）；
+//      ⑤ 只考虑**在子代理结束前就已开始**的会话（父级必须先存在）⇒ 降低跨会话误归属。
+function listJsonlFiles(dir) {
+  const out = [];
+  const walk = (d, depth) => {
+    if (depth > 4) return;
+    let entries = [];
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = join(d, e.name);
+      if (e.isDirectory()) walk(full, depth + 1);
+      else if (e.isFile() && e.name.endsWith('.jsonl')) out.push(full);
+    }
+  };
+  walk(dir, 0);
+  return out;
+}
+
+/** 每个会话：起始时间 + 助手回合序列（每回合带该回合写过的路径） */
+function readParentSessions() {
+  const sessions = [];
+  for (const file of listJsonlFiles(SESSIONS_DIR)) {
+    let firstTs = null;
+    const turns = [];
+    let lines = [];
+    try {
+      lines = readFileSync(file, 'utf8').split('\n');
+    } catch {
+      continue;
+    }
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let row;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const ts = typeof row?.timestamp === 'string' ? Date.parse(row.timestamp) : NaN;
+      if (Number.isFinite(ts) && (firstTs === null || ts < firstTs)) firstTs = ts;
+      const msg = row?.message;
+      if (!msg || msg.role !== 'assistant' || !Number.isFinite(ts)) continue;
+      const paths = [];
+      for (const block of Array.isArray(msg.content) ? msg.content : []) {
+        if (!block || block.type !== 'toolCall' || !WRITE_TOOL_NAMES.has(block.name)) continue;
+        const args = block.arguments && typeof block.arguments === 'object' ? block.arguments : block.input;
+        if (!args || typeof args !== 'object') continue;
+        for (const key of WRITE_PATH_KEYS) {
+          const v = args[key];
+          if (typeof v !== 'string') continue;
+          const p = v.trim();
+          if (p) paths.push(p);
+          break;
+        }
+      }
+      turns.push({ ts, paths });
+    }
+    if (firstTs !== null) sessions.push({ firstTs, turns });
+  }
+  return sessions;
+}
+
+const childRuns = [];
+for (const row of loadJSONL(SUBAGENT_USAGE)) {
+  if (!row || typeof row.ts !== 'number' || !Array.isArray(row.writePaths) || row.writePaths.length === 0) continue;
+  childRuns.push({ ts: row.ts, agent: typeof row.agent === 'string' ? row.agent : '?', paths: row.writePaths });
+}
+const parentSessions = readParentSessions();
+let reworked = 0;
+const reworkDetail = [];
+for (const child of childRuns) {
+  const wanted = new Set(child.paths);
+  let matched = 0;
+  let where = '';
+  for (const s of parentSessions) {
+    if (s.firstTs > child.ts) continue; // 父级必须先于子代理存在
+    const after = s.turns.filter((x) => x.ts > child.ts).slice(0, REWORK_TURNS);
+    for (const turn of after) {
+      const hit = turn.paths.filter((p) => wanted.has(p));
+      if (hit.length > 0) {
+        matched += hit.length;
+        where = where || `${hit[0]}（${after.indexOf(turn) + 1}/${REWORK_TURNS} 回合内）`;
+      }
+    }
+  }
+  if (matched > 0) reworked += 1;
+  if (reworkDetail.length < 5) reworkDetail.push({ agent: child.agent, matched, where });
+}
+const reworkStr = childRuns.length
+  ? `${reworked}/${childRuns.length}(${((reworked / childRuns.length) * 100).toFixed(1)}%)`
+  : 'n/a';
+
 // 子代理池：复用率 = 复用次数 / 租借次数；起进程次数 = 未复用次数
 const poolRows = loadJSONL(SUBAGENT_POOL).filter(inWindow);
 const poolReused = poolRows.filter((r) => r && r.reused === true).length;
@@ -449,7 +559,7 @@ const paybackStr = paybackRows.length
   ? `p50=${percentile(paybackTurnsArr, 50) ?? 'n/a'}/n=${paybackRows.length}`
   : 'n/a';
 
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);
