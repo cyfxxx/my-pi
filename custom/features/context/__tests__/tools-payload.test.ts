@@ -21,7 +21,17 @@ import { fileURLToPath } from 'node:url';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
 /** 我们的扩展工具总量上限（2026-10-01 实测 29 212 B；留 ~10% 余量） */
-const TOOLS_PAYLOAD_MAX_BYTES = 32_000;
+// ── 预算分桶（2026-10-08，按用户批复）────────────────────────────────────────
+// `deferred`/`codemode`/`hidden` 由 pi **不声明** ⇒ 前缀开销为 0（browser 的 18 个就靠它）。
+// 原来单一 32KB 预算把两类混在一起，于是"前缀的真实有效上限"其实是 32KB − 非前缀占用。
+// 现在拆成两个**每桶上限**用于归因，而 **TOTAL 原样保持旧值**、仍是真正的绑定约束
+// ⇒ 守门严格程度**一字节都没放宽**，只是失败时能直接看出是哪个桶在长。
+// 实测（拆分当时）：进前缀 44 个/25_554B，不进前缀 18 个/6_442B，合计 31_996B / 32_000B。
+// 结论：**声明面已几乎顶格**——要往声明面加工具，必须先做预算决策（而不是顺手调这个数）。
+const PREFIX_PAYLOAD_MAX_BYTES = 25_558; // = 旧的有效前缀上限（32_000 − 6_442 = 25_558）
+const NON_PREFIX_PAYLOAD_MAX_BYTES = 6_446; // = 旧的非前缀隐式上限（32_000 − 25_554）
+const TOTAL_PAYLOAD_MAX_BYTES = 32_000; // ← 旧阈值，未改：真正的绑定约束
+const TOOLS_PAYLOAD_MAX_BYTES = TOTAL_PAYLOAD_MAX_BYTES; // 兼容既有日志/断言用名
 /** 单个工具上限（当前最大 schedule_task 1 711 B） */
 const SINGLE_TOOL_MAX_BYTES = 2_048;
 /** 工具数量上限（当前 62） */
@@ -119,11 +129,34 @@ describe('工具面体积守门', () => {
       `工具面: ${sized.length} 个 / ${(total / 1024).toFixed(1)}KB（上限 ${(TOOLS_PAYLOAD_MAX_BYTES / 1024).toFixed(0)}KB）| ${featureLine}`,
     );
 
+    // ── 分桶（2026-10-08，按用户批复）：进前缀 vs 不进前缀 ──
+    // `deferred`/`codemode`/`hidden` 由 pi **不声明**，前缀开销为 0（browser 的 18 个就靠它）。
+    // 原来单一 32KB 预算把两类混在一起，于是"前缀的真实有效上限"其实是 32KB − 非前缀占用。
+    const NON_PREFIX = new Set(['deferred', 'codemode', 'hidden']);
+    const isNonPrefix = (t: { exposure?: string }) => NON_PREFIX.has(t.exposure ?? 'direct');
+    const prefixSized = sized.filter((t) => !isNonPrefix(t as { exposure?: string }));
+    const nonPrefixSized = sized.filter((t) => isNonPrefix(t as { exposure?: string }));
+    const sumExact = (a: { bytes: number }[]) => a.reduce((n, x) => n + x.bytes, 0);
+    // 精确字节（不四舍五入）：决定分桶预算要看真数，KB 取整会掩盖边界
+    console.log(
+      `工具面分桶(精确): 进前缀 ${prefixSized.length} 个/${sumExact(prefixSized)}B｜不进前缀 ${nonPrefixSized.length} 个/${sumExact(nonPrefixSized)}B｜合计 ${total}B`,
+    );
+
     const detail = sized
       .slice(0, 10)
       .map((t) => `${t.name}=${t.bytes}B(${t.feature})`)
       .join(' ');
-    expect(total, `总量超预算 | top10: ${detail}`).toBeLessThanOrEqual(TOOLS_PAYLOAD_MAX_BYTES);
+    // 每桶上限：用于**归因**（失败时立刻知道是"进前缀"还是"不进前缀"在长）
+    expect(sumExact(prefixSized), `进前缀(声明进 prompt)的工具声明超预算 | top10: ${detail}`).toBeLessThanOrEqual(
+      PREFIX_PAYLOAD_MAX_BYTES,
+    );
+    expect(sumExact(nonPrefixSized), `不进前缀(deferred 等)的工具声明超预算 | top10: ${detail}`).toBeLessThanOrEqual(
+      NON_PREFIX_PAYLOAD_MAX_BYTES,
+    );
+    // 总量：**旧阈值原样保留**，这才是绑定约束（拆桶不放宽任何一字节）
+    expect(total, `总量超预算（声明面已顶格；要加工具请先做预算决策）| top10: ${detail}`).toBeLessThanOrEqual(
+      TOTAL_PAYLOAD_MAX_BYTES,
+    );
     expect(sized.length, `工具数量超预算 | top10: ${detail}`).toBeLessThanOrEqual(TOOL_COUNT_MAX);
     for (const t of sized) {
       expect(t.bytes, `${t.name} 单项超预算（desc=${t.description?.length ?? 0} 字符）`).toBeLessThanOrEqual(
