@@ -577,9 +577,81 @@ const paybackStr = paybackRows.length
 const termRows = loadJSONL(GOAL_TERMINATIONS).filter(inWindow);
 const reviewCapped = termRows.filter((r) => r && r.stopReason === 'review-budget-exhausted').length;
 const envBlocked = termRows.filter((r) => r && r.blockedKind === 'environment').length;
+// ── 父子一条时间线（one clock，Humanize 借鉴）────────────────────────────────
+// **口径**（与"子代理返工"同一套 join：`parentSession` 精确归属 + 会话回合时间戳）：
+//   ① 只统计**带 `parentSession`** 的子代理运行；旧记录没有该字段 ⇒ **排除并计数**（不静默丢弃）。
+//   ② `parentSession` 指向的会话文件找不到 ⇒ 计入 `会话缺失`（**记 n/a，绝不当 0**）。
+//   ③ 该运行时刻**没有任何 `ts <= child.ts` 的父回合** ⇒ 计入 `回合外`
+//      ——这本身是有意义的信息（并发会话、或两侧时间戳口径不同），不是"0 次"。
+//   ④ 锚定成功 ⇒ 记 **父会话名 + 回合序号**（该时刻父会话已发生的回合数）+ 相对父会话起点的偏移分钟。
+// 输出形如：`父子时间线=父<name>#7←子3次(最早+3m/最晚+11m)`；多个父会话按会话名取前 3 个并标注总数；
+// 括号里追加被排除的条数。**无可用样本时整段为 `n/a(原因…)`**。
+const timelineRuns = [];
+let tlNoParent = 0;
+for (const row of loadJSONL(SUBAGENT_USAGE)) {
+  if (!row || typeof row.ts !== 'number') continue;
+  const ps = typeof row.parentSession === 'string' ? row.parentSession : '';
+  if (!ps) {
+    tlNoParent++;
+    continue;
+  }
+  timelineRuns.push({ ts: row.ts, parent: basename(ps) });
+}
+let tlMissing = 0;
+let tlOutside = 0;
+const tlAnchored = [];
+for (const run of timelineRuns) {
+  const s = parentSessions.find((x) => basename(x.file) === run.parent);
+  if (!s) {
+    tlMissing++;
+    continue;
+  }
+  const turn = s.turns.filter((x) => x.ts <= run.ts).length;
+  if (turn === 0) {
+    tlOutside++;
+    continue;
+  }
+  tlAnchored.push({
+    name: run.parent.replace(/\.jsonl$/, '').replace(/^--/, '').replace(/--$/, ''),
+    turn,
+    offsetMin: Math.round((run.ts - s.firstTs) / 60000),
+  });
+}
+let timelineStr;
+const tlExcluded = [
+  tlNoParent ? `无parentSession ${tlNoParent}` : null,
+  tlMissing ? `会话缺失 ${tlMissing}` : null,
+  tlOutside ? `回合外 ${tlOutside}` : null,
+].filter(Boolean);
+if (tlAnchored.length === 0) {
+  timelineStr = `n/a(${tlExcluded.length ? tlExcluded.join('/') : '无子代理记录'})`;
+} else {
+  const byName = new Map();
+  for (const a of tlAnchored) {
+    const cur = byName.get(a.name);
+    if (!cur) {
+      byName.set(a.name, { n: 1, minTurn: a.turn, maxTurn: a.turn, minOff: a.offsetMin, maxOff: a.offsetMin });
+    } else {
+      cur.n++;
+      cur.minTurn = Math.min(cur.minTurn, a.turn);
+      cur.maxTurn = Math.max(cur.maxTurn, a.turn);
+      cur.minOff = Math.min(cur.minOff, a.offsetMin);
+      cur.maxOff = Math.max(cur.maxOff, a.offsetMin);
+    }
+  }
+  const parts = [...byName.entries()]
+    .slice(0, 3)
+    .map(([name, v]) => {
+      const turnStr = v.minTurn === v.maxTurn ? `#${v.minTurn}` : `#${v.minTurn}-${v.maxTurn}`;
+      return `父${name}${turnStr}←子${v.n}次(最早+${v.minOff}m/最晚+${v.maxOff}m)`;
+    });
+  const more = byName.size > 3 ? ` 等${byName.size}个父会话` : '';
+  timelineStr = `${parts.join(' ')}${more}${tlExcluded.length ? `(${tlExcluded.join('/')})` : ''}`;
+}
+
 const termStr = `评审到界=${reviewCapped} 环境阻塞=${envBlocked}`;
 
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} ${termStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} 父子时间线=${timelineStr} ${termStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);

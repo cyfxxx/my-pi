@@ -585,6 +585,67 @@ if (failed > 0) {
   }
 }
 
+// ── 用例：父子一条时间线（one clock，Humanize 借鉴）——四个分支 ──
+// 口径：只统计带 parentSession 的运行；**无样本 ⇒ n/a（绝不当 0）**，并如实列出被排除的条数。
+{
+  const fixture = makeFixture({
+    frontChange: false,
+    rework: {
+      // 子运行落在父会话第 3 个回合（父会话 10 分钟前开始；回合在 9/8 分钟前）
+      children: [{ agoMs: 480000, writePaths: [], session: 's1' }],
+      sessions: [{ name: 's1', startAgoMs: 600000, turns: [{ agoMs: 540000 }, { agoMs: 480000 }] }],
+    },
+  });
+  try {
+    const out = runHealth(fixture);
+    const line = out.trim().split('\n')[0];
+    check('父子时间线：正常 join ⇒ 锚定到父会话回合坐标', out.includes('父子时间线=父s1#3←子1次'), line);
+    check('父子时间线：给出相对父会话起点的偏移', /父子时间线=父s1#3←子1次\(最早\+\d+m\/最晚\+\d+m\)/.test(line), line);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+{
+  const fixture = makeFixture({
+    frontChange: false,
+    rework: { children: [{ agoMs: 60000, writePaths: [] }], sessions: [] },
+  });
+  try {
+    const out = runHealth(fixture);
+    check('父子时间线：旧记录（无 parentSession）⇒ 排除并计数，不假装 0', out.includes('父子时间线=n/a(无parentSession 1)'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+{
+  const fixture = makeFixture({
+    frontChange: false,
+    rework: { children: [{ agoMs: 60000, writePaths: [], session: 'ghost' }], sessions: [] },
+  });
+  try {
+    const out = runHealth(fixture);
+    check('父子时间线：会话文件找不到 ⇒ 记 n/a 并标注"会话缺失"', out.includes('父子时间线=n/a(会话缺失 1)'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+{
+  const fixture = makeFixture({
+    frontChange: false,
+    rework: {
+      // 子运行比父会话**开始还早** ⇒ 落在任何回合之外（这本身是有意义的信息）
+      children: [{ agoMs: 900000, writePaths: [], session: 's2' }],
+      sessions: [{ name: 's2', startAgoMs: 600000, turns: [{ agoMs: 540000 }] }],
+    },
+  });
+  try {
+    const out = runHealth(fixture);
+    check('父子时间线：落在父会话回合之外 ⇒ 明确标注"回合外"', out.includes('父子时间线=n/a(回合外 1)'), out.trim().split('\n')[0]);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
 // ── 用例：旧记录没有 parentSession ⇒ 退回启发式（父级先于子代理存在即考虑）──
 {
   const fixture = makeFixture({

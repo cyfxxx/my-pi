@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（154 条）
+## 决策台账（155 条）
 
+- `DECISIONS.md` · [2026-10-08] 父子一条时间线（Humanize Runtime 层）：落地 + **一个明确记录的覆盖缺口** · **目标**：把父会话的回合与子代理的运行放在**同一个时钟**上，让日报能回答"这次子运行发生在父的第几回合"， · 数字: 5 条 / 0 条 / 3 次 · 证据: node scripts/daily-health.mjs --print
 - `DECISIONS.md` · [2026-10-08] 终止设计（Humanize §6）：只记录、不接管；以及两处指标污染的清理与一个诚实结论 · **来由**：Humanize（arXiv:2610.08900 §6）的发现"**迭代不保证收敛 ⇒ 终止必须被设计**"（有一例 87 轮 · 数字: 87 轮 / 8 条 / 3 轮 / 1MB
 - `DECISIONS.md` · [2026-10-08] 闭环最后一段：错误指纹接进知识编译器（第四来源）+ 两条诚实的负面记录 · **落地**（子代理，只有授权范围内的两个文件）：`scripts/knowledge-compile.mjs` 增加**第四来源** · 数字: 4 条 / 8 个
 - `DECISIONS.md` · [2026-10-08] 修 e2e 测试污染生产用量台账（并归档历史噪声） · **症状（实测）**：`pool-e2e.test.ts` 把 `agent:"e2e-worker"` 记录写进了**生产的** · 数字: 10 条 / 5 条 / 12 条 / 7 条
@@ -162,7 +163,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（152 条）
+## 进度记录（153 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -316,6 +317,7 @@
 - `PROGRESS.md` · 修 e2e 污染生产用量台账（2026-10-08） · - 根因：`pool-e2e.test.ts` 只改了 `PI_CODING_AGENT_DIR`、**没改 `PI_MEMORY_DIR`** ⇒ 用量台账写生产目录 · 数字: 10 条 / 5 条 / 12 条 / 7 条
 - `PROGRESS.md` · 错误指纹接进知识编译器（第四来源，2026-10-08） · - `knowledge-compile.mjs` 增加第四来源 `logs/error-fingerprints.jsonl`（`fp-<6hex>`），沿用写入侧
 - `PROGRESS.md` · 终止设计（只记录不接管）+ 两处指标污染清理（2026-10-08） · - 复用既有停止条件（`decideContinuation` 三条），只加**记录**：三个可选字段 + 评审界 6 轮（到界只写 · 数字: 6 轮 / 1MB / 18 条 / 399B
+- `PROGRESS.md` · 父子一条时间线（2026-10-08）+ 覆盖缺口 · - `daily-health.mjs` 新增 `父子时间线=`，**复用** `readParentSessions()`（`:477`/`:530`），未另写一套。 · 数字: 5 条
 
 ## 缺陷回放（16 条）
 
