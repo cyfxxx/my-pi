@@ -17,18 +17,18 @@ setTotalBudget budget 公共配置 API（当前只用 setContextWindow）
 recordCacheUsage budget 公共记账 API（缓存用量由 footer/usage-diag 直接统计）
 MIN_TAIL_LENGTH 暖前缀重放受上游事件限制暂为死代码（补丁点见 CONTEXT-MANAGEMENT-COMPARISON 第四节）
 createConcurrencyLimiter 并发限制原语（批量抓取/多引擎场景用）：当前搜索与抓取路径未接线，保留纯逻辑
-compactJson JSON 结构性压缩（超预算时按结构收缩而非硬切）：R4 截断目前统一走 head+tail，接入需先定"哪些工具输出按 JSON 压缩"并补测试
-jsonBytes 同上（JSON 字节数工具函数）
-shrinkHalf 同上（结构收缩算子）
+compactJson JSON 结构性压缩：**已判定不接（2026-10-08 实测）**——99 个被截断的 ≥2KB 输出里可解析为 JSON 的是 **0 个**，该优化没有服务对象（见 docs/design/UNMIGRATED-SUBSYSTEMS-AUDIT.md）
+jsonBytes 同上（JSON 字节数工具函数）；随 compactJson 判定不接
+shrinkHalf 同上（结构收缩算子）；随 compactJson 判定不接
 filterInjectedMessages 注入 append-only 不变量（2026-09-29）：生产路径**禁止**调用（回归测试断言 index.ts 不含该调用），保留纯逻辑供离线分析
 isInjectionBlock 同上（注入块识别）
-resolveAndApply 记忆合并的落地入口（迁移资产）：生产写路径目前只用 storage.ts 的 jaccard 去重；接线需产品决策
-mergeCandidates 记忆合并批处理（同上）
-DEFAULT_JUDGE_PROMPT Best-of-N LLM judge 未迁移（见 DECISIONS），常量与记录函数待接线
-recordVerification Best-of-N 验证记录未接线（同上）
-parseJudgeScores Best-of-N 验证未迁移（同上）
-shouldVerify Best-of-N 验证未迁移（同上）
-ProgressTracker Best-of-N 验证未迁移（同上）
+resolveAndApply 记忆合并入口：**已判定不接（2026-10-08 实测）**——104 条记忆里 jaccard>0.7 为 **0 对**（无重复问题），而 0.4–0.7 的 47 对经查是**不同 CVE**（同源公告词面天然相似）⇒ 相似度合并会合并掉不同条目
+mergeCandidates 记忆合并批处理；理由同上（会合并掉不同条目）
+DEFAULT_JUDGE_PROMPT Best-of-N 默认 judge 提示词：**不接（2026-10-08 实测）**——verify_* 30 天仅 3 次调用且验证器默认关闭；若将来要用，缺的正是这一半（prompt+解析），更高价值用法见 UNMIGRATED-SUBSYSTEMS-AUDIT
+recordVerification 验证记录：不接（理由同 DEFAULT_JUDGE_PROMPT）
+parseJudgeScores judge 输出解析：不接（同上；是默认 judge 的另一半）
+shouldVerify 按失败次数+配置决定是否验证：不接（同上）；若给 goal 当"第二校验来源"会用它
+ProgressTracker 验证进度追踪：不接（同上）
 #
 # ── B. 测试辅助（生产不需要接线，故不列为待清理） ──
 __resetSeedCache 测试专用重置钩子（缓存隔离）
