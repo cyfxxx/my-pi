@@ -81,7 +81,7 @@ sees the held-out results."*），理由是**如果我们按它调参，验收�
 | `memory-store.mjs` | 记忆入库（零 LLM，直调 memory 逻辑层 `storeEntry`，内置标题去重）；`--json`/`--file`/stdin，`--dry-run`，`--source manual`（人工写入，治理层受保护；默认 `auto`＝自动流程） |
 | `memory-lifecycle.mjs` | 记忆生命周期只读报告（零 LLM，调 `analyzeLifecycle`：淘汰/升格/冲突/垃圾/聚合候选）；`--json`/`--limit`；headless 下替代 `/memory lifecycle` |
 | `reseed-seeds.mjs` | 把 `scheduled-seeds.json` 的定义显式应用到已存在的同名任务（种子对账只补缺失不覆盖；改提示词后用它；保留 id/enabled/lastRun/runCount/history，默认预演，`--apply` 先备份） |
-| `daily-health.mjs` | 每日健康检查（**加权命中率/未命中每次/输出占比/前缀前端变更次数/首段分叉/中后段分叉/冷启动次数**/记忆库/种子失配/守门脏改/**运行时状态异常与警告**（调 `lib-state-audit.mjs`，error→alert、warning→留痕）/**重启与崩溃恢复轮次计数**（recovery/rounds.jsonl）；阈值 `PI_HEALTH_HIT_FLOOR`=0.97、`PI_HEALTH_UNCACHED_CEIL`=3000、`PI_HEALTH_COLDSTART_CEIL`=8。数据源是每轮用量 `.usage-diag.jsonl` 与 `prefix-fingerprints.jsonl`——**不要改用工具级台账 `usage.jsonl`**，它没有缓存字段，会让命中率恒为 n/a） |
+| `daily-health.mjs` | 每日健康检查（**加权命中率/未命中每次/输出占比/前缀前端变更次数/首段分叉/中后段分叉/冷启动次数**/**压缩回本**（p50 回本轮数，P2）/记忆库/种子失配/守门脏改/**子代理池**（复用率与起进程次数，P9）/**子代理返工**（父级在 N 个回合内是否又改同一文件，P8-A 第二步）/**运行时状态异常与警告**（调 `lib-state-audit.mjs`，error→alert、warning→留痕）/**重启与崩溃恢复轮次计数**（recovery/rounds.jsonl）；阈值 `PI_HEALTH_HIT_FLOOR`=0.97、`PI_HEALTH_UNCACHED_CEIL`=3000、`PI_HEALTH_COLDSTART_CEIL`=8。数据源是每轮用量 `.usage-diag.jsonl` 与 `prefix-fingerprints.jsonl`——**不要改用工具级台账 `usage.jsonl`**，它没有缓存字段，会让命中率恒为 n/a） |
 | `knowledge-fetch.py` | 知识源抓取（落 `portable/memory/knowledge/`） |
 | `knowledge-ingest.mjs` | 知识订阅入库（零 LLM，`storeEntry` 内置去重） |
 | `tool-stats-sync.mjs` | 工具使用统计汇总（`usage.jsonl` → 跨设备计数） |

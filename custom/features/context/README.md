@@ -7,6 +7,13 @@
 
 - 工具：`thinking_level`、`session_title`（写会话元数据，不进上下文）；`edit_and_run`（编辑+立即验证的融合工具，参数同 `edit`）
 - 命令：`/context <usage|report|fingerprint|help>`、`/tools <list|help>`
+- 模块：`edit_and_run` 实现在 [`tools/edit-and-run.ts`](tools/edit-and-run.ts)——两半都走 pi 自己的工具
+  （`ctx.executeTool('edit'|'bash')`），**不重写编辑逻辑**；适配器的 `executeTool` 透传在
+  [../../../adapters/tool-adapter.ts](../../adapters/tool-adapter.ts)。
+  **opt-in 端到端探针**：[`__tests__/nested-tools-e2e.test.ts`](__tests__/nested-tools-e2e.test.ts)
+  （`PI_NESTED_TOOLS_E2E=1` 才跑，dist 缺失时自跳过）——它真起一个 pi 进程、断言**因果级**事实
+  （命令输出必须是编辑后的内容）与失败保护（编辑失败时命令绝不许跑）。**单元测试用假 ctx，
+  结构上抓不到 pi 嵌套契约的漂移**，这个探针是唯一的哨兵
 - 钩子：`session_start`、`before_agent_start`、`input`、`turn_start`、`context`、`tool_call`、`tool_result`、`message_update`、`turn_end`、`before_provider_request`（前缀指纹）、`session_compact`、`session_before_compact`（快照）、`agent_settled`
 
 ## 工具常驻策略（2026-09-26 起默认常驻）

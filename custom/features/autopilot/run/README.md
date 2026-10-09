@@ -10,6 +10,7 @@
 | `watchdog.ts` | 忙闲标记、活动时间、挂起判定与触发恢复 | `setTurnBusy`、`setBackgroundBusy`、`touchActivity`、`isHanging`、`triggerHangRecovery` |
 | `verifier.ts` | Best-of-N 评分与选择（纯逻辑，外部编排未迁移） | `parseJudgeScores`、`selectBest`、`shouldVerify`、`bestOfN`、`recordVerification` |
 | `verifier-logger.ts` | 验证记录与聚合落盘 | `logVerification`、`readVerifications`、`summarize` |
+| `run-check.ts` | **只读检查命令执行器**（P1，2026-10-08）：`sh -c` 跑一条检查、默认 120s 超时（比 bash 前台 240s 短）、输出只留尾部 4000 字符、超时按失败且**不挂住调用方**、整段 fail-open。用途是让 `goal complete` 有**独立于模型叙述**的判据（`verified` 只能来自**由 harness 实际跑通**的检查） | `runCheckCommand`、`describeCheck`、`DEFAULT_CHECK_TIMEOUT_MS`、`CHECK_OUTPUT_TAIL_CHARS` |
 
 ## 说明
 

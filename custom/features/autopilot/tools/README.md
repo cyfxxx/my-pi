@@ -3,6 +3,23 @@
 `autopilot` 暴露给模型的工具实现。每个模块都是「纯逻辑 + 注册函数」：
 解析/格式化/读写逻辑零 Pi 依赖（可单测），只有 `register*` 经 `adapters/tool-adapter` 接触 Pi API。
 
+## `goal`：目标声明与**完成语义三态**（P1，2026-10-08）
+
+`action: set/status/complete/blocked/pause/resume`；声明后每轮结束自动续跑，直到完成、受阻或达轮次上限。
+
+**完成分三态**（`GoalCompletionMode`）——关键是 `verified` **不许模型自封**：
+
+| 态 | 怎么产生 | 含义 |
+|---|---|---|
+| `verified` | `complete` 带 `check`（一条**只读**检查命令）且**由 my-pi 实际跑通**（exit 0） | 有独立于模型叙述的判据 |
+| `declared` | `complete` 不带 `check`（可带 `evidence` 说明） | 只是**声称**完成，状态文案明写「未经校验」 |
+| `advisory` | `blocked` / `pause`，以及 **harness 自判的停止**（达轮次上限、连续无进展） | 判断性结论，不是证明 |
+
+- 带 `check` 但**没跑通**时：目标**不会被标记完成**，输出尾部回给模型（模型自己要求了判据，就按判据说话）。
+- 结构约束：`store/goal.ts` 只暴露 `declaredCompletion` / `advisoryCompletion` / `verifiedCompletion`
+  三个构造器，**只有第三个收得到「已跑通的检查结果」**——没有带 `mode` 参数的通用入口，故**不存在自封路径**。
+- 检查命令由 `run/run-check.ts` 执行（见其表行）；默认行为不变：不带 `check` 时与以前完全一致。
+
 ## 文件
 
 | 文件 | 工具 | 职责 | 主要导出 |

@@ -2725,3 +2725,12 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   可选参数漏传编译器看不见）。
 - 守门：`test-usage-metrics` **60 → 62 项**（别的会话改同一文件 ⇒ `0/1(0.0%)`；旧记录启发式回退）；
   `usage-write-tools.test.ts` +2 项；`scripts/README.md` 计数同步。
+
+### 文档一致性审计（2026-10-08）
+
+- 记录：[docs/development/DOC-AUDIT-2026-10-08.md](docs/development/DOC-AUDIT-2026-10-08.md)。
+- **修掉 9 处**：三个新模块没进模块表（compact-payback / run-check / pool-metrics）；usage-log 的三个新字段
+  与口径边界没文档化；源码级守门 wiring-args 无文档；opt-in 探针 nested-tools-e2e 在任何 .md 里都没有；
+  **goal 工具与三态从未进 autopilot 文档**；`daily-health.mjs` 自己的字段清单缺本轮三个新字段；
+  比较文档里"回本约 55 请求"与 P2 的 60 轮不一致（加对账，以可算的为准）。
+- **判据**：审计是"新产物是否在该出现的文档里"，不是"把所有文档改一遍"；历史台账与运行时数据**保持原样才对**。

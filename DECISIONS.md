@@ -2,6 +2,24 @@
 
 ## 格式
 
+### [2026-10-08] 文档一致性审计（用户要求）：9 处修正 + "哪些不需要动"的判据
+
+用户要求"检查一下在经过多次修改优化后，相关文档是否都更新了"。**方法**：grep 驱动、逐个产物核对
+"它有没有出现在**该出现的那个文档**里"。完整记录见 `docs/development/DOC-AUDIT-2026-10-08.md`。
+
+**修掉的 9 处**：新模块没进各自模块表（`compact-payback.ts` / `run/run-check.ts` / `core/pool-metrics.ts`）；
+`usage-log.ts` 的三个新字段（`writeTools`/`writePaths`/`parentSession`）与其**口径边界**没文档化；
+源码级守门 `wiring-args.test.ts` 无文档；opt-in 探针 `nested-tools-e2e.test.ts` **在任何 .md 里都没有**；
+**`goal` 工具与其三态从未进 autopilot 文档**（既有缺口 + 本轮新语义）；
+`scripts/README.md` 里 `daily-health.mjs` **自己的字段清单**缺本轮三个新字段（那是日报字段的权威清单）；
+`CONTEXT-MANAGEMENT-COMPARISON.md` 的"回本约 55 请求"与 P2 可算出的 60 轮不一致（加对账，以可算的为准）。
+
+**判据（比这 9 处修正更重要）**：审计的目标不是"把所有文档改一遍"，而是**新产物有没有在"该出现的文档"里**——
+模块表要全、日报字段清单要全、工具语义要进它所属 feature 的文档。
+反过来，**历史台账与运行时数据保持原样才是对的**：`DECISIONS`/`PROGRESS` 只追加不回改；
+`UPGRADE-LEDGER`/`PI-RUNTIME-AUDIT`/gamedev 经验已就地加注"机制已删除/被替代"，属历史记录；
+`portable/**` 是运行时数据不是文档；`STRUCTURE.md` 只钉脚本数与 golden 步数（本轮两者都没变）。
+
 ### [2026-10-08] 返工指标精确归属（`parentSession`）；顺带暴露并修掉 S4 的"参数漏传"缺陷
 
 **用户要求**：处理返工指标的残余误归属风险。
