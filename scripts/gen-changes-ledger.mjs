@@ -47,6 +47,22 @@ function changes() {
     { cwd: ROOT, encoding: 'utf8' },
   );
   const out = [];
+  // **硬校验（2026-10-08 修缺陷）**：块解析曾漏掉一条"自己碰过台账"的提交（实测提交 2d1741860
+  // 明明含 docs/CHANGES.jsonl 却被记入），后果是**每次提交后台账必漂移、要 amend 两次才收敛**。
+  // 故不再只依赖 split('\n\n') 的切块结果——**逐条**再问一次 git。
+  const touchesCache = new Map();
+  const commitTouchesLedger = (shortSha) => {
+    if (touchesCache.has(shortSha)) return touchesCache.get(shortSha);
+    let hit = true; // 查不到就当成碰过：宁可少记一条，也不制造漂移
+    try {
+      const names = execFileSync('git', ['show', '--name-only', '--pretty=format:', shortSha], {
+        cwd: ROOT, encoding: 'utf8',
+      });
+      hit = names.split('\n').some((l) => l.trim() === 'docs/CHANGES.jsonl');
+    } catch { hit = true; }
+    touchesCache.set(shortSha, hit);
+    return hit;
+  };
   for (const block of raw.split('\n\n')) {
     const lines = block.split('\n').filter(Boolean);
     if (lines.length === 0) continue;
@@ -57,6 +73,7 @@ function changes() {
     // 它一落盘就自我漂移（pre-commit 通过、pre-push 必失败）。故**不记录这些提交**。
     // 判定只看该提交改了哪些文件，与台账内容无关 ⇒ 不存在自指循环。
     if (files.includes('docs/CHANGES.jsonl')) continue;
+    if (commitTouchesLedger(hash.slice(0, 9))) continue; // 硬校验兜底（见上）
     out.push({
       kind: 'change',
       commit: hash.slice(0, 9),
@@ -113,6 +130,27 @@ function build() {
 }
 
 const want = build();
+if (process.argv.includes('--settle')) {
+  // 收敛助手：台账的输入含 git 历史，而"提交台账本身"又改变历史 ⇒ 需"重生成 → amend"若干轮才到不动点。
+  // 安全前提：**工作区除台账外必须干净**（否则 amend 会把别的改动一起吞进上一次提交）。
+  const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' })
+    .split('\n').filter((l) => l.trim());
+  if (!dirty.every((l) => l.includes('docs/CHANGES.jsonl'))) {
+    console.error('❌ --settle 拒绝执行：工作区还有台账以外的改动，拒绝 amend。');
+    process.exit(1);
+  }
+  for (let i = 1; i <= 4; i++) {
+    writeFileSync(OUT, build(), 'utf8');
+    execFileSync('git', ['add', 'docs/CHANGES.jsonl'], { cwd: ROOT });
+    execFileSync('git', ['commit', '-q', '--amend', '--no-edit'], { cwd: ROOT });
+    if (readFileSync(OUT, 'utf8') === build()) {
+      console.log(`✅ 台账已收敛（第 ${i} 轮；已 amend 进上一次提交）`);
+      process.exit(0);
+    }
+  }
+  console.error('❌ 4 轮仍未收敛，请人工查看');
+  process.exit(1);
+}
 if (process.argv.includes('--check')) {
   const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
   if (current !== want) {

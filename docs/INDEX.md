@@ -5,8 +5,10 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（146 条）
+## 决策台账（148 条）
 
+- `DECISIONS.md` · [2026-10-08] C 项落地（离线「经验→知识」编译器）+ 它暴露的两个真实缺陷 · **来自 WikiSkill 附录 E.2（本轮才拿到判据）**：输出 JSON（`create_patterns`/`update_patterns`/`update_index`）； · 数字: 18 条 / 1 条
+- `DECISIONS.md` · [2026-10-08] 修台账自指排除缺陷：不再依赖脆弱的块解析，改为**逐条硬校验** + 一条收敛命令 · **症状（实测）**：提交 `2d1741860` 明明包含 `docs/CHANGES.jsonl`，却被记入台账 ⇒ 台账在"提交之后"必然 · 数字: 4 次 / 3 条 / 4 轮 · 证据: 2d1741860 / node scripts/gen-changes-ledger.mjs --settle
 - `DECISIONS.md` · [2026-10-08] 验收判据前移到 `goal set`（Humanize 借鉴 ③） · **来自 Humanize**（arXiv:2610.08900 §3.1「计划即契约」）：**验收判据应当在动手前固定**，而不是做完再补
 - `DECISIONS.md` · [2026-10-08] 评审者换模型 + 必须能执行（Humanize 借鉴第 1 项） · **来自 Humanize**（arXiv:2610.08900）：§2.1 联合采样指出单模型的"提议"与"接受"共用同一盲区 · 数字: 399 B / 159 B
 - `DECISIONS.md` · [2026-10-08] 改动台账（WikiSkill 借鉴 B 项）+ 一次并发越界的复盘 · **来自论文**（arXiv:2608.27454）：`wiki/skill-impact.md` 由**外层 harness 程序化写入**， · 数字: 3 次 / 2 次 / 120 条 / 17 条
@@ -154,7 +156,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（144 条）
+## 进度记录（146 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -300,6 +302,8 @@
 - `PROGRESS.md` · WikiSkill 借鉴 B：改动台账（2026-10-08）+ 并发越界复盘 · - `docs/CHANGES.jsonl` 由 `scripts/gen-changes-ledger.mjs` **从 git 历史回溯生成**（`--update`/`--check`， · 数字: 2 个 / 510 条
 - `PROGRESS.md` · Humanize 借鉴 ①：评审者换模型 + 必须能执行（2026-10-08） · - `goal` 新增 opt-in `verifyModel`；评审固定派 `agent: reviewer`（**它的 tools 含 bash ⇒ 能自己跑测试**， · 数字: 399B / 159B
 - `PROGRESS.md` · Humanize 借鉴 ③：验收判据前移到 `goal set`（2026-10-08） · - `goal set {objective, check}` 把判据存进 `GoalState.check`；`complete` 未另给 `check` 则**自动采用**，
+- `PROGRESS.md` · 修台账自指排除缺陷（2026-10-08） · - 症状：含 `docs/CHANGES.jsonl` 的提交仍被记入 ⇒ 每次提交后台账必漂移、要 amend 两次（本批连续撞 4 次）。 · 数字: 4 次 / 4 轮
+- `PROGRESS.md` · WikiSkill 借鉴 C：离线「经验 → 知识」编译器（2026-10-08） · - `scripts/knowledge-compile.mjs`（`--update`/`--check`，确定性）→ `docs/knowledge/`（index + **16 页**）。
 
 ## 缺陷回放（16 条）
 
@@ -320,7 +324,7 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（95 条）
+## 设计文档（102 条）
 
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
@@ -329,7 +333,14 @@
 - `docs/design/DORMANT-AUDIT.md` · 五、执行结果（2026-10-08）：`TOOL_LAYERING` 已删除 · 用户授权"由你决定"。**判断：删除。** 依据（按分量排序）： · 数字: 100 个 / 18 个 / 442B / 60.8%
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ② 分材料明细 · ### 2.1 WikiSkill（arXiv:2608.27454） · 数字: 48.7% / 63.7% / 15.0% / 60.9%
-- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ③ 这些新信息改变了什么判断（只写确凿的） · 1. **WikiSkill：那条"读 wiki 有害"必须带条件引用。** 新数字显示它是**条件性**的：只有在 **Skill Proposer 也有 wiki 访问**时， · 数字: 10 个
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ③ 这些新信息改变了什么判断（只写确凿的） · 1. **WikiSkill：那条"读 wiki 有害"必须带条件引用。** 新数字显示它是**条件性**的：只有在 **Skill Proposer 也有 wiki 访问**时， · 数字: 10 个 / 204 个 / 46 个
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · 4.1 Humanize 的 72 道门：能从代码枚举到什么程度（**对不平，差在哪已说明**） · **论文的"门"计数定义（附录 A 原文）**：「We count as a gate **every point where the code of Humanize checks · 数字: 10 条 / 42 个 / 41 个 / 5 个
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · 4.2 Humanize 的评审 / 合规 / 漂移提示词（本轮新拿到） · 加上上一轮已拿到的 `agents/plan-compliance-checker.md`（3619B）与 `agents/plan-understanding-quiz.md`（5410B） · 数字: 4829B / 4917B / 2756B / 441B
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · 4.3 Humanize 附录 B codebook 与 §6/§7（本轮逐条） · **§6 的五条发现（标题原文照抄）**：① Independent review is trusted but expensive；② Iteration does not · 数字: 150 个 / 32 个 / 771 条
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · 4.4 WikiSkill 附录（本轮新拿到） · - **附录 C = Implementation Details**，其中含 **Statistical significance testing**：论文用的是 · 数字: 000 次 / 1 B
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · 4.5 Lean4Agent 附录（本轮新拿到，含成本与局限） · - **成本（附录 F）**：闭源模型走 **official API calls ≈ $4,000**；小模型（Qwen-3.5-27B、Gemma-4-31B） · 数字: 27B / 31B / 95% / 9.07%
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · 4.6 仍然拿不到（本轮结论） · 数字: 42 个 / 150 个
+- `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · 4.7 这些新信息改变了什么判断 · **改变（确凿三条）**： · 数字: 42 个 / 1000 次
 - `docs/design/HUMANIZE-BORROW.md` · 0. 阅读边界（先说清，免得把推断当事实） · ⇒ **代码一行未读到**。因此凡涉及实现细节（72 道门的清单、plan contract 的字段、评审者提示词、FlowBench 评分口径）**一律标"未读到"**，不做猜测。下方所有论文内容**均来自 HTML v2 的正文**，并
 - `docs/design/HUMANIZE-BORROW.md` · 1. 论文 / 项目页 / 两个代码仓是什么关系（依据论文自述，不是推测） · 论文自己写清了三代谱系与两条代码线：
 - `docs/design/HUMANIZE-BORROW.md` · 2. 机制（谁做什么、什么被度量） · ### 2.1 核心命题与四个原则（§2 Judgement Engineering） · 数字: 42 轮

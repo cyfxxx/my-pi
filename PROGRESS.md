@@ -2801,3 +2801,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - `goal set {objective, check}` 把判据存进 `GoalState.check`；`complete` 未另给 `check` 则**自动采用**，
   显式传入**优先**（新判据覆盖旧契约）。复用既有参数 ⇒ **声明面零字节变化**。
 - 守门：`goal.test.ts` +2 项源码级接线断言（含"显式优先"的顺序断言）。
+
+### 修台账自指排除缺陷（2026-10-08）
+
+- 症状：含 `docs/CHANGES.jsonl` 的提交仍被记入 ⇒ 每次提交后台账必漂移、要 amend 两次（本批连续撞 4 次）。
+- 根因：`split('\n\n')` 切块在某些形状下失配 ⇒ 该 predicate **不可靠**。改为**逐条硬校验**
+  （`git show --name-only` 再确认一次；查不到当成碰过）+ 结果缓存。
+- 新增 `--settle`：把"重生成 → amend"变成一条命令（≤4 轮），**且只在工作区除台账外干净时才动**。
+
+### WikiSkill 借鉴 C：离线「经验 → 知识」编译器（2026-10-08）
+
+- `scripts/knowledge-compile.mjs`（`--update`/`--check`，确定性）→ `docs/knowledge/`（index + **16 页**）。
+  实测：每页 **20 行**（10–30 内，内置断言）；`--check` 两次 rc=0；改证据 ⇒ `update_patterns` 且**页数不变**
+  （判据③"不建重复"**实测通过**）。`--check` 接进既有守门第 E 节，不新增 golden 步。
+- **暴露缺陷 1**：错误指纹**未落盘**（只在内存 `repairBudget`）⇒ 编译器**没有**为它产出 pattern（宁可少产出）。
+- **暴露缺陷 2**：台账 `rejected` 抽取是**误抽**（把 DECISIONS 普通条目当被否提案）⇒ 编译器**未采用**。
+- 脚本数 54 → **55**；STRUCTURE 与 scripts/README 同步。

@@ -209,6 +209,13 @@ done
 # ── E. 知识索引不漂移（WikiSkill 借鉴 A 项，2026-10-08）──
 # 索引是"找先例"的入口；它一旦与源文档不一致就会误导下一轮优化，所以按**确定性输出**逐字节比对。
 # 挂在既有守门里而不是新增 golden 步：步数被第 D 节钉住，加步会连带改好几处计数。
+if [ -f scripts/knowledge-compile.mjs ]; then
+  if node scripts/knowledge-compile.mjs --check >/dev/null 2>&1; then
+    ok "知识库与源证据一致（docs/knowledge/）"
+  else
+    bad "docs/knowledge/ 已漂移（跑 node scripts/knowledge-compile.mjs --update 后提交）"
+  fi
+fi
 if [ -f scripts/gen-doc-index.mjs ]; then
   if node scripts/gen-doc-index.mjs --check >/dev/null 2>&1; then
     ok "知识索引与源文档一致（docs/INDEX.md）"

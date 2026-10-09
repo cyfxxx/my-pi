@@ -2,6 +2,44 @@
 
 ## 格式
 
+### [2026-10-08] C 项落地（离线「经验→知识」编译器）+ 它暴露的两个真实缺陷
+
+**来自 WikiSkill 附录 E.2（本轮才拿到判据）**：输出 JSON（`create_patterns`/`update_patterns`/`update_index`）；
+每页写"是什么 / 根因(WHY) / **确切命令序列** / **含确切语法的解法**"；**不建重复、用新证据更新既有**；
+**10–30 行，不是论文**；索引条目 `- [name] (path): PROBLEM + ROOT CAUSE + FIX`。
+
+**落地**：`scripts/knowledge-compile.mjs`（`--update`/`--check`，确定性）→ `docs/knowledge/`
+（`index.md` + 16 页 pattern）。**实测**：16 页全部 **20 行**（脚本内置断言，越界即 exit 1）；
+`--check` **连续两次 rc=0**（幂等）；改一处源证据 ⇒ 产出 `update_patterns:[{name:bug-004,edits:["命令 更新"]}]`
+且**页数仍 16**（判据③"不建重复"**实测通过**）。**产物仅供人审阅、不进上下文、不改运行时行为**；
+`--check` 接进既有 `check-conventions.sh` 第 E 节（**不新增 golden 步**）。
+
+**它暴露的两个真实缺陷（都要单独修）**：
+1. **错误指纹根本没落盘** —— `errorFingerprint`/`observeRepairAttempt` 的状态只活在内存
+   （`custom/features/context/index.ts` 的 `repairBudget`）；`prefix-fingerprints.jsonl` 是**前缀缓存**指纹、
+   不是错误指纹。⇒ 按"证据不足宁可少产出"，**没有为它生成任何 pattern**。要让"经验→知识"真正吃上指纹，
+   必须先把指纹**持久化**（append-only）。
+2. **台账的 `rejected` 抽取是误抽** —— 18 条里只 1 条勉强过质量过滤，且那 1 条也是把 `DECISIONS.md` 的
+   **普通条目**当成了"被否提案"（proposal=标题、reason=正文首句、无证据）。⇒ 用它只会产出伪知识，
+   编译**没有采用**。修法：抽取判据必须要求**真负结果标记**或**非空证据**。
+
+### [2026-10-08] 修台账自指排除缺陷：不再依赖脆弱的块解析，改为**逐条硬校验** + 一条收敛命令
+
+**症状（实测）**：提交 `2d1741860` 明明包含 `docs/CHANGES.jsonl`，却被记入台账 ⇒ 台账在"提交之后"必然
+漂移 ⇒ `pre-push` 拦下 ⇒ 需**重生成 + amend 两次**才收敛。我这一批提交里**连续 4 次**都撞到它。
+
+**根因定位**：生成器靠 `raw.split('\n\n')` 把 `git log --name-only` 切成块，再用块内的文件列表判断
+"这条提交是否碰过台账"。复现时当前 3 条最新提交的判定都正确，说明**切块在某些形状下会失配**（边界/空行），
+也就是这个 predicate **不可靠**——而不是简单写错一个字符串。
+
+**修法（不再修补脆弱的解析）**：加**逐条硬校验**——对每条候选提交再单独跑一次
+`git show --name-only --pretty=format: <sha>`，只要含 `docs/CHANGES.jsonl` 就丢弃；
+**查不到就当成"碰过"**（宁可少记一条，也不制造漂移）。附 `Map` 缓存避免 N 次 git 调用。
+
+**顺带把摩擦消掉**：新增 `node scripts/gen-changes-ledger.mjs --settle` —— 把"重生成 → amend"这个
+我手工做过 4 次的循环变成一条命令（最多 4 轮，到不动点即止），**并有安全前提**：工作区除台账外必须干净，
+否则**拒绝 amend**（避免把别的改动一起吞进上一次提交）。
+
 ### [2026-10-08] 验收判据前移到 `goal set`（Humanize 借鉴 ③）
 
 **来自 Humanize**（arXiv:2610.08900 §3.1「计划即契约」）：**验收判据应当在动手前固定**，而不是做完再补

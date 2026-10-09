@@ -174,3 +174,141 @@ Lean4Agent 的 release 说明）⇒ 凡是依赖"读 issue 原文"的核对都�
 7. **操作性结论（对父代理最有用的一条）**：本环境里**读外部材料要靠"curl 落盘 + 本地抽取"与 jsdelivr 镜像**；
    直接 web_fetch 长文会被截断、GitHub 直连全挂。后续任何"读论文/读代码"的任务都应先用 ②.4 的取法，
    **不要**因为 web_fetch 截断或 GitHub 失败就判定"不可达"。
+
+---
+
+# 补充轮次（第二轮，2026-10-08）：72 道门的代码枚举 + 三篇附录正文
+
+> 本轮方法（在既有"可达路子"之上细化）：论文全文仍用 `curl -s https://arxiv.org/html/<id>v<N>` 落盘后本地抽取；
+> **代码仓改为全量克隆**——先用 `https://data.jsdelivr.com/v1/packages/gh/PolyArch/humanize@main` 拿到**文件树**
+> （204 个文件），再对 `hooks/`、`scripts/`、`agents/`、`skills/` 下 **46 个文本文件**逐个走
+> `https://cdn.jsdelivr.net/gh/PolyArch/humanize@main<path>` 下载后本地统计。
+
+## 4.1 Humanize 的 72 道门：能从代码枚举到什么程度（**对不平，差在哪已说明**）
+
+**论文的"门"计数定义（附录 A 原文）**：「We count as a gate **every point where the code of Humanize checks
+the loop and can block, end, or redirect it**」——即它是一个**人为的"检查点"定义**，**不是代码里的注册表**。
+
+**论文自身数字不自洽**（这是本轮最该记的一条）：附录 A 写 **29 道在 tool-call 与 prompt 校验器 + 32 道在 Stop hook
++ 1 道 fail-open = 62**，而附录 A 的 Table 1 十个类别合计 **72**（12+11+10+9+7+6+5+5+4+3=72）。**差 10 条**，
+论文没有解释这两组数字为何不同。
+
+**代码实测（`PolyArch/humanize@main`，204 文件）**：
+
+- `prompt-template/block/` 下有 **42 个具名阻断模板**；其中 **41 个**能在下载下来的代码里找到引用，
+  只有 `claude-eyes-timeout.md` 没找到引用（**存疑**：可能由动态路径引用，也可能是废弃模板——我没有下结论）。
+- 实现层的分布（我按"具名函数数 / 引用的模板数 / 顶层 `exit 1` 次数"统计）：
+
+| 实现文件 | 具名函数 | 引用模板 | 顶层 exit 1 | 归属层 |
+|---|---|---|---|---|
+| `hooks/loop-bash-validator.sh` | 0 | 3 | 4 | 工具调用 |
+| `hooks/loop-edit-validator.sh` | 0 | 2 | 3 | 工具调用 |
+| `hooks/loop-read-validator.sh` | 0 | 3 | 4 | 工具调用 |
+| `hooks/loop-write-validator.sh` | 0 | 5 | 5 | 工具调用 |
+| `hooks/loop-plan-file-validator.sh` | 1 | 1 | 1 | 提示提交 |
+| `hooks/loop-codex-stop-hook.sh` | 10 | 14 | 1 | Stop hook |
+| `hooks/lib/loop-common.sh` | 49 | 12 | 0 | 共享库（被上面两者调用） |
+| `scripts/rlcr-stop-gate.sh` | 1 | 0 | 1 | 收尾门 |
+| `scripts/bitlesson-validate-delta.sh` | 3 | 5 | 4 | 教训记忆校验 |
+
+- **42 个具名模板 → 实现层的完整归属**（这是本轮可交付的"名称 + 在哪一层"枚举）：
+  - **工具调用校验器（5 个 validator）**：`git-push`、`plan-backup-protected`、`round-contract-bash-write`、
+    `wrong-round-number`、`wrong-directory-path`、`wrong-file-location`、`wrong-round-file`、
+    `wrong-contract-location`、`wrong-summary-location`、`schema-outdated`
+  - **Stop hook 本体**：`codex-review-failed`、`git-not-clean`、`git-not-clean-humanize-local`、
+    `git-not-clean-untracked`、`git-status-failed`、`goal-tracker-not-initialized`、`incomplete-todos`、
+    `large-files`、`mainline-drift-stop`、`mainline-verdict-missing`、`plan-file-modified`、
+    `round-contract-missing`、`unpushed-commits`、`work-summary-missing`
+  - **共享库 `lib/loop-common.sh`**：`finalize-contract-access`、`finalize-state-file-modification`、
+    `git-add-humanize`、`git-tracked-humanize`、`goal-tracker-bash-write`、`goal-tracker-modification`、
+    `methodology-analysis-state-file-modification`、`prompt-file-write`、`state-file-modification`、
+    `stop-hook-direct-execution`、`summary-bash-write`、`todos-file-access`
+  - **教训记忆**：`bitlesson-delta-empty-kb`、`bitlesson-delta-inconsistent`、`bitlesson-delta-invalid`、
+    `bitlesson-delta-missing`、`bitlesson-delta-missing-notes`
+
+- **为什么对不平 72（三条原因，都确凿）**：① 论文自己就是 **62 vs 72**；② 代码**没有门的注册表**，
+  只能按"检查点"数，而粒度取决于数法（具名模板 = 42；顶层 `exit 1` 检查点 = 17（工具层）+ 其它；
+  共享库有 49 个函数但只有 12 个模板）；③ 还有大量**内联检查**（例如 bash 校验器里的命令白名单判定）
+  **不产生模板**，因此不进我那 42 条的计数。
+- **我没有做的**：论文**没给**"类别 ↔ 具体门"的映射，所以我没有硬把 42 个模板塞进那 10 个类别
+  （试过的对应会留下若干模板无类可归，这本身就是"两组数字不是同一总体"的旁证）。
+
+## 4.2 Humanize 的评审 / 合规 / 漂移提示词（本轮新拿到）
+
+| 文件 | 要点（我读到的） |
+|---|---|
+| `prompt-template/codex/regular-review.md`（4829B） | 四部分：实现审阅 / **Goal Alignment Check（MANDATORY）** / **Required Finding Classification** / goal tracker 更新段；输出含 `verdict:` |
+| `prompt-template/codex/full-alignment-review.md`（4917B） | 四小节：**验收判据状态** / 遗忘项检测 / **推迟项审计** / 目标完成总结（对应论文"每第五轮 Full Alignment Review"） |
+| `prompt-template/claude/drift-replan-prompt.md`（2756B） | **Drift Recovery Mode**：输入含 `stalled/regressed`，要求"必需恢复重锚 + Task Lane Rules"，输出 `verdict:` |
+| `prompt-template/block/round-contract-missing.md`（441B） | 回合契约缺失时的阻断消息 |
+| `prompt-template/block/mainline-drift-stop.md`（496B） | 主线漂移停机的阻断消息 |
+
+加上上一轮已拿到的 `agents/plan-compliance-checker.md`（3619B）与 `agents/plan-understanding-quiz.md`（5410B）
+和 `agents/bitlesson-selector.md`（1444B），**评审侧的提示词骨架基本齐了**（我未逐字读全这些文件的每一行）。
+
+## 4.3 Humanize 附录 B codebook 与 §6/§7（本轮逐条）
+
+**§6 的五条发现（标题原文照抄）**：① Independent review is trusted but expensive；② Iteration does not
+guarantee convergence；③ Plans and scope are judgement boundaries；④ Evidence and environment decide
+termination；⑤ The loop needs judgement around it。（§7 = Related Work：Coding agents and loops / Multi-agent
+orchestration / Models as judges。）
+
+**附录 B（Corpus Coding）**：语料 = 该仓的 **150 个 issue = 118 篇 postmortem + 32 个其它**
+（bug report / feature request / question 等）。逐篇编码内容与分布：
+- **回合数**：93 篇有陈述；
+- **退出方式**：complete 37 / **stagnation stop 21** / **maxiter 10** / cancel 7 / drift stop 1 / **未陈述 42**；
+- **按阶段拆分的回合**：27 篇；
+- **pressures**：Table 2；
+- **提议机制**：**771 条**编号建议；
+- 盲编复核：**κ = 0.93（回合数）/ 0.82（退出）/ 0.79（主压力）**；
+- 作者自注：**issue 内的计数是自述（self-reports）**。
+
+（作者与单位我也读到：Humanize 作者含 NVIDIA / UCLA / 清华 / MIT；这与"多供应商联合采样"的设计取向一致。）
+
+## 4.4 WikiSkill 附录（本轮新拿到）
+
+- **附录 C = Implementation Details**，其中含 **Statistical significance testing**：论文用的是
+  **paired bootstrap test，1,000 次迭代，p < 0.05**；正文并说明"**多个加粗结果代表与最优无显著差异**"
+  ⇒（读它的 Table 时**必须按这个口径**，否则会把"并列"误读成"更好"）。
+- **附录 D = Baseline Details and Optimizer API Call Analysis**（D.1 Baseline Methods：Trace2Skill、EvoSkill、
+  SkillOpt…；并提到对优化器 API 调用量的复杂度分析）。
+- 另确认存在包含 **Inference Agent System Prompt** 的附录（与上一轮拿到的 **Wiki Maintainer** 提示词同族）。
+- **未做**：附录 A/C/D 的**逐字全文**没抽（我只抽到标题与关键句）。
+
+## 4.5 Lean4Agent 附录（本轮新拿到，含成本与局限）
+
+- **成本（附录 F）**：闭源模型走 **official API calls ≈ $4,000**；小模型（Qwen-3.5-27B、Gemma-4-31B）
+  跑在 **4×GH200（vLLM）** 上，实验合计约 **1,500 GPU 小时**。（两条数字都是正文原话。）
+- **A.2（95% CI）**：ELAIP-Bench 子集上的平均增益 **9.07%，95% CI [5.66%, 13.07%]**（作者称统计显著）。
+- **附录 E 局限（三条，要点照抄）**：① 黑盒 LLM 行为**无法被完全检查**——框架只能把 agent 行为分解成
+  结构化步骤、把自然语言需求抽象成**可检查谓词**，因此**仍有语义模糊留在形式系统之外**；
+  ② 实验里的**谓词标注由 LLM 生成**，可能引入**误标**（即便随后的 Lean 检查本身是形式的）；
+  ③ 现代 LLM 生成的工作流**结构错误本来就少**，所以**部分组件难以定量评估**。
+- **附录 B 的结构（只到小节标题，正文未读）**：B.1.1 `BaseType` 全定义 / B.1.2 `StepType` /
+  B.1.3 `WorkflowNode` / B.1.4 `WorkflowEdge` / B.1.5 `WorkflowGraph` / B.1.6 Layer-1 能识别的错误案例 /
+  B.2.1 `PredicateType` / B.2.2 `SemanticWorkflowNode` / B.2.3 `SemanticWorkflowGraph`。
+  另有 C.1.1/C.1.2 失败验证案例、C.2 evolve 研究样例、D.1/D.2 Lean 验证示例、**G Broader Impacts**。
+
+## 4.6 仍然拿不到（本轮结论）
+
+| 目标 | 状态与原因 |
+|---|---|
+| Humanize **72 道门逐条清单** | **结构性拿不到**：论文只给类别计数、代码无注册表、且论文自身 62≠72。本轮给的是**42 个具名模板 + 层归属**（已是代码里可枚举的上限） |
+| `claude-eyes-timeout.md` 的归属 | **存疑**：42 个模板里唯一没在代码中找到引用者的一个 |
+| Humanize 的 150 个 issue 原文 | **不可达**（GitHub issues 页面与 API 不在本环境可达路径内）⇒ 语料级核对做不了 |
+| WikiSkill 附录 A/C/D 全文 | **未抽**（可同法再抽，说一声即可） |
+| Lean4Agent 附录 B/C/D 的**定义正文** | **未抽**（只到小节标题） |
+| 三个代码仓的**运行验证** | **未做**（本轮是只读代码与文档，没有安装/执行） |
+
+## 4.7 这些新信息改变了什么判断
+
+**改变（确凿三条）**：
+1. **"照搬 72 道门"从建议升级为有据的否**：论文自身 **62 vs 72 不自洽** + 代码**无注册表** + 我只枚举到 **42 个具名门**
+   ⇒ 正确做法是**按类别自建**（这条上一轮只是"判断"，现在是"证据"）。
+2. **不引入 Lean4 形式化的理由更硬**：**≈$4,000 + 1,500 GPU 小时**，且作者自承**谓词由 LLM 标注可能误标**、
+   **黑盒行为无法完全检查** ⇒ 与我们"断言 + 守门 + 留出集"的性价比路线相比，形式化的成本/收益不划算。
+3. **引用 WikiSkill 数字要带限定**：它的"最优"是 **paired bootstrap（1000 次，p<0.05）**口径下的，
+   **并列加粗 = 无显著差异**。
+
+**不改变**：Humanize §6 五条发现的方向性结论（写者非裁判 / 迭代不保证收敛 / 证据与环境决定终止）与我们既有取向
+一致；WikiSkill 的**写入判据**（上一轮拿到）仍是可操作的那一套。
