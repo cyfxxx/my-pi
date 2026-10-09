@@ -41,18 +41,48 @@ agent: {'scout': 5}
 
 ## 三、提案
 
-### P8-A（新增测量，可自行实施 —— 建议**先做这个**）
+### P8-A ✅ **已完成（2026-10-08，提交 `69c56f4f4`）**
 
-`usage-log.ts` 的 `buildUsageRecord` 增加一个字段：
+`usage-log.ts` 的 `buildUsageRecord` 已增加字段：
 
 ```ts
-/** 子代理调用过的写类工具名（去重；从 SingleResult.messages 的 toolCall 块提取） */
+/** 子代理调用过的**文件编辑类**工具名（去重、保序；只读子代理为 []） */
 writeTools: string[];   // 例如 ['write','edit']；只读子代理为 []
 ```
 
-有了它就能回答第一个问题：**"派出去的子代理到底改没改文件"**。
-后续（第二步）再加**返工代理指标**：父级在子代理返回后的 N 轮内，是否又对**同一批文件**发生写操作
-（可从父级自己的会话消息提取）。**两个指标合起来才是 D6 的证据**；没有它们，"要不要强制 verifier"只能靠感觉。
+**口径边界（重要，别当它是"改没改文件"的完备判据）**：
+- 只认**以编辑文件为主要目的**的工具：`write` / `edit` / `edit_and_run`；
+- **故意不含 `bash` / `ctx_exec` / `tmux_*`**——它们是 catch-all，含进来会让字段**恒为非空**
+  （几乎每个子代理都会跑一条命令），信息量归零；
+- 因此它是"**用过文件编辑工具**"的**下界**。测试里有一条**反向断言**（`WRITE_TOOLS` 里出现
+  `bash`/`ctx_exec`/`tmux_*`/`read`/`grep` 即失败），防止将来有人"顺手补全"把字段废掉。
+
+**当前样本状态（2026-10-08 实测）**：`usage.jsonl` 共 **10 条记录，带 `writeTools` 的 0 条**
+——字段落地前写的记录没有该字段，所以**要等下一次真实子代理派发才第一次有值**。
+这与"真实子代理使用共 9 次、agent 只用过 `scout`（只读）、从未派过编辑代理"是一致的：
+**问题还没发生，指标先就位。**
+
+**可直接运行的查询（三个都实测过）**：
+
+```bash
+# ① 有多少条记录带 writeTools（字段落地后才会有值）
+python3 -c "import json;rs=[json.loads(l) for l in open('portable/memory/subagent/usage.jsonl',encoding='utf-8') if l.strip()];print(sum(1 for r in rs if r.get('writeTools')),'/',len(rs))"
+
+# ② 按 agent 汇总：哪些子代理动过文件
+python3 -c "import json,collections;rs=[json.loads(l) for l in open('portable/memory/subagent/usage.jsonl',encoding='utf-8') if l.strip()];print(dict(collections.Counter(r.get('agent','?') for r in rs if r.get('writeTools'))) or '（无）')"
+
+# ③ 只读 vs 编辑 的比例
+python3 -c "import json;rs=[json.loads(l) for l in open('portable/memory/subagent/usage.jsonl',encoding='utf-8') if l.strip()];ed=[r for r in rs if r.get('writeTools')];print(f'编辑类 {len(ed)} / 全部 {len(rs)}')"
+```
+
+### P8-A 第二步：**返工代理指标**（进行中）
+
+P8-A 只回答了"**用过编辑类工具吗**"；要判改动质量，还需要第二步：
+**父级在子代理返回后的 N 轮内，是否又对同一批文件发生写操作**。
+- 数据来源：`usage.jsonl`（子代理的结束时间 + 它改过哪些文件）与**父级会话文件**
+  （`{type:'message', timestamp, message:{...}}`，实测**带逐条时间戳** ⇒ 可做时间窗 join）；
+- 现状：`usage.jsonl` 里还**没有**"子代理改过哪些文件"（只有工具名）⇒ 需要先补 `writePaths` 字段；
+- **两个指标合起来才是 D6 的证据**；没有它们，"要不要强制 verifier"只能靠感觉。
 
 ### P8-B（提案，需用户点头）：opt-in `verify` 契约
 
