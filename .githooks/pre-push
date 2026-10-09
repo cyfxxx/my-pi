@@ -72,7 +72,8 @@ if [ "$RC" -eq 124 ] || [ "$RC" -eq 137 ]; then
   echo "pre-push：golden **超时**（${GOLDEN_TIMEOUT}s）——这通常意味着某个测试挂死（不是失败）。"
   echo "完整输出：$LOG（另存了带时间戳的副本）"
   echo "注意：被 timeout 杀的是主进程，测试子进程可能残留成孤儿；可用下面这条找："
-  echo "  pgrep -af 'vitest|golden-tasks|test-' || true"
+  echo "  下面这些就是可能残留的孤儿（可直接 kill）："
+  pgrep -af 'vitest|golden-tasks|npm test' | head -10 || true
   echo "若要临时放宽：PI_GOLDEN_TIMEOUT=7200 git push（仍建议先查清挂死原因）。"
   exit 1
 fi

@@ -23,7 +23,8 @@ RC=${PIPESTATUS[0]}
 if [ "$RC" -eq 124 ] || [ "$RC" -eq 137 ]; then
   echo ""
   echo "pre-commit：golden --fast **超时**（${GOLDEN_TIMEOUT}s）——通常意味着某个测试挂死。"
-  echo "完整输出：$LOG；查找残留子进程：pgrep -af 'vitest|golden-tasks|test-'"
+  echo "完整输出：$LOG；可能残留的孤儿（可直接 kill）："
+  pgrep -af 'vitest|golden-tasks|npm test' | head -10 || true
   exit 1
 fi
 if [ "$RC" -ne 0 ]; then
