@@ -179,3 +179,26 @@ subagent { ..., verify: { command: "<只读验收命令>" } }
 调用处都带这两个参数、且两条路径在落用量记录前都写了 `currentResult.parentSession`。
 ③ **守门自证**：临时拿掉 `allowExtensions` 后守门**必须变红**（实测确实红了，且消息直指"漏传"），
 恢复后转绿——并且**在同一坏状态下 `tsc` 不报错**，印证了"可选参数漏传编译器看不见"。
+
+## 附二：`goal complete` 的第二校验来源已实现（2026-10-08，用户指定）
+
+用户明确"我说的是关于 `verify_*` 的那个"，即把 LLM 评审接成 `goal` 的**第二校验来源**。
+
+**先纠正一处我自己的说法**：我曾在 P3 审计里写"`verify_*` 那 5 个导出缺的那一半**正好是** `goal` 缺的
+第二来源"——**核实后不成立**：那套的形状是 **Best-of-N 候选打分**（`bestIndex`/`scores[]`/`nCandidates`/
+`selectedIndex`/`baselineCost`），回答"N 个候选里哪个最好"；而 `goal` 要的是"**目标是否真的达成**"的
+**二元判定 + 理由**。故**不复用**那套，另写提示词与解析器；5 条白名单理由也据此更正为"形状不匹配"。
+
+**通道（关键发现）**：pi **不给**扩展暴露调用模型的 API（`ExtensionContext` 只有 `sendMessage`（投递、
+不同步返回）、`setModel`/`getModel`/`getThinkingLevel`、`executeTool`）。故评审走
+**`ctx.executeTool('subagent', ...)`** 起一个**独立上下文**的评审子代理——顺带得到更强的一点：
+**评审看不到本会话的自我叙述**。
+
+**实现**：`run/goal-verdict.ts`（提示词 + 确定性解析 + `runGoalJudge` 通道封装，全部纯逻辑可测）+
+`store/goal.ts` 新增 `judgeVerifiedCompletion`（与 `verifiedCompletion` **并列的独立入口**，
+所以"模型自封 verified"依然结构上不可能）+ `goal` 工具新增 opt-in `verify` 参数。
+
+**硬约束（都有测试）**：`verify` 是 **opt-in**，不传时行为与以前**逐字节一致**；评审判定为达成 ⇒
+`verified` 且**标明来源是评审**（不冒充命令校验）；未通过/认不出/调用失败/超时/格式不符 **一律
+fail-open 退回 `declared`**（把基础故障说成"未达成"是错的）；确定性 `check` **优先级更高**。
+**通道接线**另有源码级守门（`tsc` 看不见这类"可选通道没接上"）。

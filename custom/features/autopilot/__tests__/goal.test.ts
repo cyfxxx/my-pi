@@ -12,6 +12,7 @@ import {
   BLOCKED_AFTER_NO_PROGRESS_ROUNDS,
   advisoryCompletion,
   declaredCompletion,
+  judgeVerifiedCompletion,
   verifiedCompletion,
   DEFAULT_GOAL_MAX_ROUNDS,
   FULL_MODE_GOAL_MAX_ROUNDS,
@@ -124,9 +125,10 @@ describe('完成语义三态（P1：模型不能自封 verified）', () => {
       declaredCompletion(base()).completionMode,
       advisoryCompletion(base(), 'blocked', '卡住了').completionMode,
       verifiedCompletion(base(), { command: 'npm test', outputTail: 'ok', at: '2026-10-08T00:00:00Z' }).completionMode,
+      judgeVerifiedCompletion(base(), { reason: '证据充分', at: '2026-10-08T00:00:00Z' }).completionMode,
     ];
-    // 这条同时是契约：没有第四个能产出 'verified' 的入口（结构上把"自封"堵死）
-    expect(outs).toEqual(['declared', 'advisory', 'verified']);
+    // 契约：只有**两个显式入口**能产出 'verified'（命令 / 评审），没有"带 mode 的通用入口"⇒ 自封不可能
+    expect(outs).toEqual(['declared', 'advisory', 'verified', 'verified']);
   });
 
   it('declared：状态文案必须点明"未经校验"，带证据时把证据带上', () => {
@@ -148,6 +150,7 @@ describe('完成语义三态（P1：模型不能自封 verified）', () => {
       at: '2026-10-08T00:00:00Z',
     });
     expect(g.completionMode).toBe('verified');
+    expect(g.verification?.source).toBe('command');
     expect(g.verification?.command).toContain('golden-tasks');
     const text = goalStatusText(g);
     expect(text).toContain('verified');
@@ -177,5 +180,28 @@ describe('完成语义三态（P1：模型不能自封 verified）', () => {
 
   it('新建的目标完成语义为空（未结束不该有完成态）', () => {
     expect(createGoal('x', 5).completionMode).toBeNull();
+  });
+});
+
+describe('第二来源：独立评审（judge）', () => {
+  it('judgeVerifiedCompletion 产出 verified 且**标明来源是评审**', () => {
+    const g = judgeVerifiedCompletion(createGoal('调研并给结论', 10), {
+      reason: '结论有证据支撑，且回答了原问题',
+      at: '2026-10-08T00:00:00Z',
+    });
+    expect(g.status).toBe('complete');
+    expect(g.completionMode).toBe('verified');
+    expect(g.verification?.source).toBe('judge');
+    expect(g.note).toContain('独立校验（评审）');
+  });
+
+  it('状态文案按来源区分：评审显示"独立评审：DONE（理由：…）"，命令显示校验命令', () => {
+    const judged = judgeVerifiedCompletion(createGoal('x', 5), { reason: '证据充分', at: 't' });
+    const text = goalStatusText(judged);
+    expect(text).toContain('独立评审：DONE');
+    expect(text).toContain('证据充分');
+    const byCmd = verifiedCompletion(createGoal('x', 5), { command: 'npm test', outputTail: 'ok', at: 't' });
+    expect(goalStatusText(byCmd)).toContain('校验命令：`npm test`');
+    expect(goalStatusText(byCmd)).not.toContain('独立评审');
   });
 });

@@ -24,11 +24,11 @@ filterInjectedMessages 注入 append-only 不变量（2026-09-29）：生产路�
 isInjectionBlock 同上（注入块识别）
 resolveAndApply 记忆合并入口：**已判定不接（2026-10-08 实测）**——104 条记忆里 jaccard>0.7 为 **0 对**（无重复问题），而 0.4–0.7 的 47 对经查是**不同 CVE**（同源公告词面天然相似）⇒ 相似度合并会合并掉不同条目
 mergeCandidates 记忆合并批处理；理由同上（会合并掉不同条目）
-DEFAULT_JUDGE_PROMPT Best-of-N 默认 judge 提示词：**不接（2026-10-08 实测）**——verify_* 30 天仅 3 次调用且验证器默认关闭；若将来要用，缺的正是这一半（prompt+解析），更高价值用法见 UNMIGRATED-SUBSYSTEMS-AUDIT
-recordVerification 验证记录：不接（理由同 DEFAULT_JUDGE_PROMPT）
-parseJudgeScores judge 输出解析：不接（同上；是默认 judge 的另一半）
-shouldVerify 按失败次数+配置决定是否验证：不接（同上）；若给 goal 当"第二校验来源"会用它
-ProgressTracker 验证进度追踪：不接（同上）
+DEFAULT_JUDGE_PROMPT Best-of-N **候选打分**提示词：**形状不匹配**（2026-10-08 核实）——它回答"N 个候选里哪个最好"，而 goal 验收要"目标是否达成"的二元判定；后者已另写 run/goal-verdict.ts，故本常量保持不接
+recordVerification 验证记录：**形状不匹配**（VerificationRecord 含 nCandidates/selectedIndex/scores[]/baselineCost，是 Best-of-N 口径）；goal 验收不走这套
+parseJudgeScores **候选分**解析：形状不匹配（解析 N 个候选分数），goal 验收的解析在 run/goal-verdict.ts
+shouldVerify 按失败次数+配置决定是否验证：思路可借鉴但未接（goal 的 verify 目前是显式 opt-in，不自动触发）
+ProgressTracker Best-of-N 验证进度追踪：不接（形状不匹配，同上）
 #
 # ── B. 测试辅助（生产不需要接线，故不列为待清理） ──
 __resetSeedCache 测试专用重置钩子（缓存隔离）

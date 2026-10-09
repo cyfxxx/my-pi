@@ -2,6 +2,35 @@
 
 ## 格式
 
+### [2026-10-08] `goal complete` 的第二校验来源（独立评审）+ 更正一处我自己的错说法
+
+**用户指定**：把 `verify_*` 那个（LLM 评审）接成 `goal` 的第二校验来源。
+
+**先纠正我自己**：我曾在 P3 审计里写"那 5 个导出缺的那一半**正好是** goal 缺的第二来源"——**不成立**。
+核实形状：`CandidateScore`/`VerificationResult`（`bestIndex`/`scores[]`）、`VerificationRecord`
+（`nCandidates`/`selectedIndex`/`scores[]`/`baselineCost`）、`DEFAULT_JUDGE_PROMPT`（"对 N 个候选评分"）、
+`parseJudgeScores(text, n)` —— 全都回答"**N 个候选里哪个最好**"，而 goal 验收要"**目标是否达成**"的
+**二元判定 + 理由**。**两者语义不同**，拿候选打分器去问完成与否是把工具用错地方。故**不复用**，
+另写提示词与解析器；白名单 5 条理由同步更正为"形状不匹配"。
+
+**通道（关键发现）**：pi **不给**扩展暴露"调用模型"的 API——`ExtensionContext` 只有 `sendMessage`
+（投递消息，**不同步返回**）、`setModel`/`getModel`/`getThinkingLevel`、`executeTool`。
+故评审走 **`ctx.executeTool('subagent', ...)`** 起**独立上下文**的评审子代理。这带来一个额外好处：
+**评审看不到本会话的自我叙述**，比在同会话里问模型自己更硬。（`executeTool` 通道是 P6 打通的。）
+
+**实现**：`run/goal-verdict.ts`（提示词 + 确定性解析 + 通道封装，纯逻辑、可测）；`store/goal.ts` 新增
+`judgeVerifiedCompletion`——与 `verifiedCompletion` **并列的独立入口**，因此"模型自封 verified"仍是
+**结构上不可能**；`goal` 工具新增 **opt-in `verify`** 参数。
+
+**硬约束（均有测试）**：不传 `verify` 时行为与以前**逐字节一致**；评审判为达成 ⇒ `verified` 且
+**标明来源是评审**（状态文案显示"独立评审：DONE（理由：…）"，不冒充命令校验）；**未通过/认不出/调用失败/
+超时/格式不符一律 fail-open 退回 `declared`**（把基础故障说成"未达成"是错的）；确定性 `check`
+**优先级更高**；解析**认不出就不猜**（`done: null`，"认不出"≠"未达成"）。
+
+**守门**：`goal-verdict.test.ts` 12 项（含 `NOT-DONE` 不得被误当 `DONE`、超时 fail-open、格式不符不猜）
++ `goal-judge.test.ts` 8 项（含**通道接线的源码级断言**——`tsc` 看不见"可选通道没接上"）。
+白名单 5 条理由更正。**总测试数 995 → 1015**。
+
 ### [2026-10-08] 文档一致性审计（用户要求）：9 处修正 + "哪些不需要动"的判据
 
 用户要求"检查一下在经过多次修改优化后，相关文档是否都更新了"。**方法**：grep 驱动、逐个产物核对

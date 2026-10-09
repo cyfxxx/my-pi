@@ -41,7 +41,21 @@ export interface GoalState {
   /** 完成语义（未结束前为 null）；见 GoalCompletionMode */
   completionMode: GoalCompletionMode | null;
   /** 独立校验的凭据（仅 `verified` 会有）：检查命令 + 输出尾部 + 时间 */
-  verification?: { command: string; outputTail: string; at: string };
+  /**
+   * 独立校验的凭据（仅 `verified` 会有）。**两种来源**：
+   * - `source: 'command'` —— P1 的确定性检查命令（由 my-pi 实际跑通）；
+   * - `source: 'judge'`   —— 2026-10-08 新增的**第二来源**：独立上下文的评审（见 `run/goal-verdict.ts`）。
+   * 优先级：命令 > 评审（两者都有时以命令为准）。
+   */
+  verification?: {
+    source: 'command' | 'judge';
+    /** source='command' 时有 */
+    command?: string;
+    outputTail?: string;
+    /** source='judge' 时有 */
+    reason?: string;
+    at: string;
+  };
 }
 
 /** 连续多少轮没有任何工具调用就判定受阻（对齐 DSH 的 blockedAfterConsecutiveRounds） */
@@ -167,8 +181,23 @@ export function verifiedCompletion(
     ...goal,
     status: 'complete',
     completionMode: 'verified',
-    note: `已通过独立校验：\`${check.command}\``,
-    verification: check,
+    note: `已通过独立校验（命令）：\`${check.command}\``,
+    verification: { source: 'command', ...check },
+  };
+}
+
+/**
+ * 第二来源的完成态：**独立上下文评审**判定达成（见 `run/goal-verdict.ts`）。
+ * 与 `verifiedCompletion` 并列的**独立入口**——同样没有"带 mode 参数的通用完成函数"，
+ * 所以"模型自封 verified"依然是结构上不可能的。
+ */
+export function judgeVerifiedCompletion(goal: GoalState, judge: { reason: string; at: string }): GoalState {
+  return {
+    ...goal,
+    status: 'complete',
+    completionMode: 'verified',
+    note: `已通过独立校验（评审）：${judge.reason}`,
+    verification: { source: 'judge', reason: judge.reason, at: judge.at },
   };
 }
 
@@ -185,7 +214,11 @@ export function goalStatusText(goal: GoalState | null): string {
     `目标：${goal.objective}`,
     `状态：${label[goal.status]}　轮次：${goal.roundsUsed}/${goal.maxRounds}　连续无进展：${goal.noProgressRounds}`,
     goal.completionMode ? `完成语义：${modeLabel[goal.completionMode]}` : '',
-    goal.verification ? `校验命令：\`${goal.verification.command}\`（输出尾部：${goal.verification.outputTail.slice(-160)}）` : '',
+    goal.verification
+      ? goal.verification.source === 'judge'
+        ? `独立评审：DONE（理由：${goal.verification.reason ?? ''}）`
+        : `校验命令：\`${goal.verification.command}\`（输出尾部：${(goal.verification.outputTail ?? '').slice(-160)}）`
+      : '',
     goal.note ? `说明：${goal.note}` : '',
   ]
     .filter(Boolean)

@@ -14,10 +14,12 @@ import { registerCommand } from '../../adapters/ui-adapter';
 import { sendMessage, sendMessageAfterRebind } from '../../adapters/ui-adapter';
 import { getEffectiveModeConfig, resolveEffectiveMode } from '../mode/logic';
 import { describeCheck, runCheckCommand } from './store/run-check';
+import { runGoalJudge } from './run/goal-verdict';
 import {
   advisoryCompletion,
   createGoal,
   declaredCompletion,
+  judgeVerifiedCompletion,
   verifiedCompletion,
   continuePrompt,
   decideContinuation,
@@ -942,7 +944,7 @@ export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
     name: 'goal',
     description:
-      '声明/查看/结束一个目标；声明后每轮结束会**自动续跑**，直到完成、受阻或达到轮次上限。action: set(objective 必填)/status/complete/blocked/pause/resume。**完成分三态**：带 `check`（只读检查命令）且由 my-pi 跑通 = verified；不带 check 只能是 declared（声称完成）；blocked/pause 是 advisory。上限按当前模式配置（full 256、其余默认 16、可被模式覆盖）；连续 3 轮无工具调用会自动判定受阻并停止。',
+      '声明/查看/结束一个目标；声明后每轮结束会**自动续跑**，直到完成、受阻或达到轮次上限。action: set(objective 必填)/status/complete/blocked/pause/resume。**完成分三态**：带 `check`（只读检查命令）且由 my-pi 跑通 = verified；`verify:true` 时由独立评审判定（第二来源，优先级低于 check）；两者都没有只能是 declared（声称完成）；blocked/pause 是 advisory。上限按当前模式配置（full 256、其余默认 16、可被模式覆盖）；连续 3 轮无工具调用会自动判定受阻并停止。',
     parameters: {
       action: {
         type: 'string',
@@ -950,22 +952,19 @@ export function register(pi: ExtensionAPI): void {
         description: '操作类型',
       },
       objective: { type: 'string', description: '目标描述（set 必填）', optional: true },
-      note: { type: 'string', description: '结论或受阻原因（complete/blocked 建议填）', optional: true },
-      evidence: {
-        type: 'string',
-        description: 'complete 时的结论/证据说明（自由文本）。**不带 check 时只能是"声称完成"**。',
-        optional: true,
-      },
+      note: { type: 'string', description: '结论或受阻原因', optional: true },
+      evidence: { type: 'string', description: 'complete 的结论/证据说明', optional: true },
+      verify: { type: 'boolean', description: '可选：由独立评审子代理判定是否真的完成（第二来源）', optional: true },
       check: {
         type: 'string',
         description:
-          'complete 时可选：一条**只读**的检查命令（能区分完成与否，如跑定向测试）。由 my-pi 实际执行，exit 0 才把目标记为"已独立校验"；非 0 则目标**不会被标记完成**，并把输出尾部回给你。',
+          '可选：一条**只读**检查命令。由 my-pi 实际执行，exit 0 才记为已校验；非 0 则**不标记完成**并把输出尾部回给你。',
         optional: true,
       },
     },
     // 目标状态是共享可变的：与其它工具并发会得到错误结果
     executionMode: 'sequential',
-    execute: async (args) => {
+    execute: async (args, ctx) => {
       const action = String(args.action ?? 'status');
       if (action === 'set') {
         const objective = typeof args.objective === 'string' ? args.objective.trim() : '';
@@ -993,6 +992,20 @@ export function register(pi: ExtensionAPI): void {
             // 不标记完成：模型自己要求了判据，就该按判据说话（这是新 opt-in 路径内的语义，不改旧默认）
             goal = { ...goal, note: `${describeCheck(check, r)}${evidence ? `｜结论：${evidence}` : ''}` };
             return `目标**未**标记完成——${describeCheck(check, r)}\n\n输出尾部：\n${r.outputTail.slice(-1200)}\n\n修好后重试 complete，或调用 goal blocked 说明卡点。`;
+          }
+        } else if (args.verify === true) {
+          // **第二校验来源**：独立上下文的评审子代理（见 run/goal-verdict.ts）。
+          // 判定由 harness 跑、且评审看不到本会话的自我叙述 ⇒ 比"问模型自己"硬。
+          const judged = await runGoalJudge(ctx?.executeTool, { objective: goal.objective, note: evidence });
+          if (judged.done === true) {
+            goal = judgeVerifiedCompletion(goal, { reason: judged.reason, at: new Date().toISOString() });
+          } else {
+            // 评审未通过 / 认不出 / 没跑成：**都退回 declared**，并把原因写清（fail-open，不阻塞完成）
+            goal = declaredCompletion(goal, evidence);
+            goal = {
+              ...goal,
+              note: `${goal.note}｜独立评审未通过：${judged.skipped ?? (judged.reason || '评审判为未达成')}`,
+            };
           }
         } else {
           // 没有判据 ⇒ 只能是"声称完成"。模型**无法自己升级到 verified**（结构上由构造器保证）

@@ -2734,3 +2734,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   **goal 工具与三态从未进 autopilot 文档**；`daily-health.mjs` 自己的字段清单缺本轮三个新字段；
   比较文档里"回本约 55 请求"与 P2 的 60 轮不一致（加对账，以可算的为准）。
 - **判据**：审计是"新产物是否在该出现的文档里"，不是"把所有文档改一遍"；历史台账与运行时数据**保持原样才对**。
+
+### `goal complete` 的第二校验来源：独立评审（2026-10-08）
+
+- 用户指定"关于 verify_* 的那个"。**先更正我自己**：那 5 个导出是 **Best-of-N 候选打分**形状
+  （`bestIndex`/`scores[]`/`nCandidates`），与 goal 要的**二元达成判定**语义不同 ⇒ **不复用**，
+  另写 `run/goal-verdict.ts`（提示词 + 确定性解析 + 通道封装）；白名单 5 条理由改为"形状不匹配"。
+- **通道**：pi 不给扩展调用模型的 API（只有 sendMessage/setModel/getModel/getThinkingLevel/executeTool）
+  ⇒ 评审走 **`ctx.executeTool('subagent', ...)`** 起**独立上下文**子代理（额外好处：看不到本会话自我叙述）。
+- `goal` 新增 opt-in `verify`；`goal.ts` 新增 `judgeVerifiedCompletion`（与 `verifiedCompletion` 并列入口
+  ⇒ 自封 verified 仍不可能）；不传时**行为逐字节不变**；未通过/认不出/失败/超时**一律 fail-open 退回 declared**；
+  命令优先级高于评审。
+- 守门：`goal-verdict.test.ts` 12 项 + `goal-judge.test.ts` 8 项（含通道接线的源码级断言）。
