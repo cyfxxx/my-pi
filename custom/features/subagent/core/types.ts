@@ -27,6 +27,14 @@ export interface SingleResult {
   stopReason?: string;
   errorMessage?: string;
   step?: number;
+  /**
+   * **派它的父会话文件**（来源 `ctx.sessionFile`；池化路径的 worker 自己是 `--no-session`，
+   * 所以这个字段记的是「谁派了它」）。
+   *
+   * 用途：返工指标必须知道去**哪个会话**里找「父级是否又改了同一文件」——
+   * 否则另一个并发会话改了同一文件会被误算成返工。
+   */
+  parentSession?: string;
 }
 
 export interface SubagentDetails {

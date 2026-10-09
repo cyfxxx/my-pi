@@ -30,7 +30,7 @@
 import { readFileSync, statSync, existsSync, appendFileSync, mkdirSync, readdirSync, openSync, readSync, closeSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { auditState, buildSnapshot } from './lib-state-audit.mjs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -507,7 +507,7 @@ function readParentSessions() {
       }
       turns.push({ ts, paths });
     }
-    if (firstTs !== null) sessions.push({ firstTs, turns });
+    if (firstTs !== null) sessions.push({ file, firstTs, turns });
   }
   return sessions;
 }
@@ -515,7 +515,12 @@ function readParentSessions() {
 const childRuns = [];
 for (const row of loadJSONL(SUBAGENT_USAGE)) {
   if (!row || typeof row.ts !== 'number' || !Array.isArray(row.writePaths) || row.writePaths.length === 0) continue;
-  childRuns.push({ ts: row.ts, agent: typeof row.agent === 'string' ? row.agent : '?', paths: row.writePaths });
+  childRuns.push({
+    ts: row.ts,
+    agent: typeof row.agent === 'string' ? row.agent : '?',
+    paths: row.writePaths,
+    parentSession: typeof row.parentSession === 'string' ? row.parentSession : null,
+  });
 }
 const parentSessions = readParentSessions();
 let reworked = 0;
@@ -524,8 +529,13 @@ for (const child of childRuns) {
   const wanted = new Set(child.paths);
   let matched = 0;
   let where = '';
+  // 归属：有 parentSession 就**只在那一个会话里**找（精确）；旧记录没有该字段时退回启发式
+  // （"父级必须先于子代理存在"）——启发式的残余风险是另一个并发会话改了同一文件会被误算成返工。
+  const parentBase = child.parentSession ? basename(child.parentSession) : null;
   for (const s of parentSessions) {
-    if (s.firstTs > child.ts) continue; // 父级必须先于子代理存在
+    if (parentBase) {
+      if (basename(s.file) !== parentBase) continue;
+    } else if (s.firstTs > child.ts) continue;
     const after = s.turns.filter((x) => x.ts > child.ts).slice(0, REWORK_TURNS);
     for (const turn of after) {
       const hit = turn.paths.filter((p) => wanted.has(p));

@@ -182,6 +182,7 @@ async function runPooledAgent(
   makeDetails: (results: SingleResult[]) => SubagentDetails,
   resolvedModel: string | undefined,
   allowExtensions?: boolean,
+  parentSession?: string,
 ): Promise<SingleResult> {
   let tmpPromptDir: string | null = null;
   let tmpPromptPath: string | null = null;
@@ -262,6 +263,7 @@ async function runPooledAgent(
     if (!worker.alive) throw new Error(`worker 在任务执行中退出：${worker.lastError}`);
     if (signal?.aborted) throw new Error('Subagent was aborted');
     currentResult.exitCode = 0;
+    currentResult.parentSession = parentSession;
     recordSubagentUsage(currentResult);
     return currentResult;
   } finally {
@@ -318,6 +320,7 @@ export async function runSubprocessAgent(
   overrideModel?: string,
   forkSession?: string,
   allowExtensions?: boolean,
+  parentSession?: string,
 ): Promise<SingleResult> {
   const resolvedModel = resolveModelId(agent.model, overrideModel, currentModel);
 
@@ -341,6 +344,8 @@ export async function runSubprocessAgent(
         onUpdate,
         makeDetails,
         resolvedModel,
+        allowExtensions,
+        parentSession,
       );
     } catch (e) {
       // 失败开放：池层的任何问题都退回已验证的 spawn 路径，但**要留下痕迹**
@@ -459,6 +464,7 @@ export async function runSubprocessAgent(
     });
 
     currentResult.exitCode = exitCode;
+    currentResult.parentSession = parentSession;
     // 子代理用量单独落盘：它既不在主会话 jsonl，也不在 .usage-diag.jsonl
     recordSubagentUsage(currentResult);
     if (wasAborted) throw new Error('Subagent was aborted');
@@ -495,6 +501,7 @@ export async function runSingleAgent(
   overrideModel?: string,
   forkSession?: string,
   allowExtensions?: boolean,
+  parentSession?: string,
 ): Promise<SingleResult> {
   const agent = agents.find((a) => a.name === agentName);
   if (!agent) {
@@ -517,7 +524,8 @@ export async function runSingleAgent(
       overrideModel,
       forkSession,
       allowExtensions,
+      parentSession,
     );
   }
-  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel, forkSession, allowExtensions);
+  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel, forkSession, allowExtensions, parentSession);
 }

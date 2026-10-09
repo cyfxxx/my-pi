@@ -147,3 +147,25 @@ describe('extractWritePaths：返工指标的前提（知道改了哪些文件�
     expect(r.writeTools).toEqual(['edit']);
   });
 });
+
+describe('parentSession：返工指标的归属依据', () => {
+  const base: SingleResult = {
+    agent: 'worker',
+    agentSource: 'user',
+    task: 't',
+    exitCode: 0,
+    messages: [],
+    stderr: '',
+    usage: { turns: 1, input: 1, cacheRead: 1, cacheWrite: 0, output: 1, cost: 0, contextTokens: 2 },
+  };
+
+  it('有父会话时记进去（返工判定据此只在真正的父会话里找窗口）', () => {
+    expect(buildUsageRecord({ ...base, parentSession: '/sessions/--p--/p.jsonl' }).parentSession).toBe(
+      '/sessions/--p--/p.jsonl',
+    );
+  });
+
+  it('没有父会话时**不写这个键**（旧记录形态；daily-health 会退回启发式）', () => {
+    expect('parentSession' in buildUsageRecord(base)).toBe(false);
+  });
+});

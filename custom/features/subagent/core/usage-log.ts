@@ -52,6 +52,13 @@ export interface SubagentUsageRecord {
    * 只记**路径**，不记内容（内容在工具输出/归档里，不在这个账本里）。
    */
   writePaths: string[];
+  /**
+   * 派它的**父会话文件**（`SingleResult.parentSession`；旧记录没有这个字段）。
+   *
+   * 返工判定用它把「父级是否又改了同一文件」限定在**真正的父会话**里；
+   * 缺这个字段时退回「父级必须先于子代理存在」的启发式（见 daily-health 的注释）。
+   */
+  parentSession?: string;
 }
 
 /** 落盘路径；可用 `PI_SUBAGENT_USAGE_FILE` 覆盖（测试用） */
@@ -151,6 +158,7 @@ export function buildUsageRecord(result: SingleResult, ts: number = Date.now()):
     task: result.task.slice(0, 200),
     writeTools: extractWriteTools(result.messages ?? []),
     writePaths: extractWritePaths(result.messages ?? []),
+    ...(result.parentSession ? { parentSession: result.parentSession } : {}),
   };
 }
 

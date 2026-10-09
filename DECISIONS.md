@@ -2,6 +2,32 @@
 
 ## 格式
 
+### [2026-10-08] 返工指标精确归属（`parentSession`）；顺带暴露并修掉 S4 的"参数漏传"缺陷
+
+**用户要求**：处理返工指标的残余误归属风险。
+
+**改动**：`usage.jsonl` 记录新增 **`parentSession`**（来源 `ctx.sessionFile`，从 `subagent/index.ts` →
+`runSingleAgent` → `runSubprocessAgent`/`runPooledAgent` → `SingleResult` → `buildUsageRecord`）。
+`daily-health` 的返工判定改为：**有 `parentSession` 就只在那一个会话文件里找窗口**；
+旧记录缺该字段时退回启发式「父级必须先于子代理存在」。⇒ 原先"另一个并发会话改了同一文件会被误算成
+返工"的风险**被消掉**（不再是"降低"）。
+
+**顺带发现并修掉一个真实缺陷（S4 遗留）**：给 `runSubprocessAgent` 加参数时 `tsc` 报错，暴露出
+**`runSubprocessAgent` 对 `runPooledAgent(...)` 的调用根本没传 `allowExtensions`** ⇒
+**池化路径（默认开启）静默忽略 `extensions` 选项**（spawn 路径正常、池化路径失效）。
+当时那些"测函数本身"的单元测试结构上测不到这条接线。
+
+**为什么编译器挡不住**：`allowExtensions`/`parentSession` 都是**可选参数**——漏传不报错，只是
+`undefined`。这类缺陷**编译通过、测试全绿、运行时静默降级**，是"接线"类缺陷里最难查的一种。
+
+**处置与新守门**：新增 **源码级守门** `subagent/__tests__/wiring-args.test.ts`（3 项，默认门禁里跑、毫秒级）：
+断言 `runPooledAgent` 与每个 `runSubprocessAgent` 调用处都带这两个参数、且两条路径落用量记录前都写了
+`currentResult.parentSession`。**守门已自证**：临时拿掉 `allowExtensions` 后守门变红（消息直指"漏传"）、
+恢复后转绿；**同一坏状态下 `tsc` 不报错**——印证了"可选参数漏传编译器看不见"。
+
+**守门**：`test-usage-metrics` 60 → **62 项**（新增：只有**别的会话**改同一文件时必须算出 `0/1(0.0%)`；
+旧记录退回启发式仍能算出返工）。`usage-write-tools.test.ts` 增加 2 项（有/无 `parentSession` 的落盘形态）。
+
 ### [2026-10-08] 返工代理指标落地（P8-A 第二步）：口径五条 + 一处实现形态偏离 + 基于数据的 P8-B/C 建议
 
 **回答的问题**：子代理改过文件后，**父级是否在随后的 N 个回合内又改回同一文件**——"改动质量"的代理信号。

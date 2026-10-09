@@ -92,6 +92,8 @@ export function register(pi: ExtensionAPI): void {
       const currentModel = ctx?.model;
       // fork 需要父会话文件；拿不到（headless/无会话）时静默退回 spawn（不报错，只是没有父上下文）
       const forkSession = params.context === 'fork' ? ctx?.sessionFile : undefined;
+      // 派它的父会话：返工指标据此把「父级是否又改同一文件」限定在真正的父会话里
+      const parentSession = ctx?.sessionFile;
       // 逐次 opt-in、默认关闭（见 runner.ts 的 buildPooledSpawnArgs 注释）
       const allowExtensions = params.extensions === true;
       const cwd = ctx?.cwd ?? process.cwd();
@@ -121,7 +123,7 @@ export function register(pi: ExtensionAPI): void {
         for (let i = 0; i < params.chain.length; i++) {
           const step = params.chain[i];
           const taskWithContext = applyPreviousPlaceholder(step.task ?? '', previousOutput);
-          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'), currentModel, step.model ?? params.model, forkSession, allowExtensions);
+          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'), currentModel, step.model ?? params.model, forkSession, allowExtensions, parentSession);
           results.push(result);
           if (isFailedResult(result)) {
             return `Chain stopped at step ${i + 1} (${step.agent ?? 'default'}): ${getResultOutput(result)}`;
@@ -136,7 +138,7 @@ export function register(pi: ExtensionAPI): void {
           return `Too many parallel tasks (${params.tasks.length}). Max is ${getMaxParallelTasks()}${isTermuxEnv() ? ' (Termux 环境限制)' : ''}.`;
         }
         const results = await mapWithConcurrencyLimit(params.tasks, getMaxConcurrency(currentProviderIsLocal(currentModel?.provider)), async (t, _index, internalSignal) =>
-          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel'), currentModel, t.model ?? params.model, forkSession, allowExtensions),
+          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel'), currentModel, t.model ?? params.model, forkSession, allowExtensions, parentSession),
         );
         const successCount = results.filter((r) => !isFailedResult(r)).length;
         const summaries = results.map((r) => {
@@ -150,7 +152,7 @@ export function register(pi: ExtensionAPI): void {
       if (params.task) {
         const riskLevel = classifyTaskRisk(params.task);
         const riskHint = riskLevel !== '1σ' ? ` [risk=${riskLevel}]` : '';
-        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'), currentModel, params.model, forkSession, allowExtensions);
+        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'), currentModel, params.model, forkSession, allowExtensions, parentSession);
         if (isFailedResult(result)) {
           return `Agent ${result.stopReason || 'failed'}${riskHint}: ${getResultOutput(result)}`;
         }

@@ -89,7 +89,13 @@ python3 -c "import json;rs=[json.loads(l) for l in open('portable/memory/subagen
    回合更贴近"这次委派是否被立刻返工"；
 3. "又改同一文件" = **至少一个路径相同**（同时统计匹配数，便于按更严口径重算）；
 4. 只认**写类工具**（与 `usage-log.ts` 的 `WRITE_TOOLS` 同口径，`bash` 等 catch-all 不算）；
-5. 只考虑**在子代理结束前就已开始**的会话（父级必须先存在）⇒ 降低跨会话误归属。
+5. **精确归属**：`usage.jsonl` 记录带 `parentSession`（来源 `ctx.sessionFile`；池化 worker 自己是
+   `--no-session`，所以它记的是「谁派了它」）⇒ 只在**那一个会话**里找返工窗口；
+   旧记录缺该字段时退回启发式「父级必须先于子代理存在」。
+
+   **这条把原先的残余误归属风险消掉了**（原风险：另一个并发会话改了同一文件会被误算成返工）。
+   守门里有专门的回归测试：夹具放**两个会话**，只有**别的会话**改了同一文件时必须算出 `0/1(0.0%)`；
+   另有一条测旧记录的启发式回退。
 
 **守门**：`scripts/test-usage-metrics.mjs` 新增 2 项（58 → **60 项**），其中一项专门钉住边界
 **"父级在第 6 个回合才改同一文件 ⇒ 不算返工"**，另一项钉住"无样本记 n/a"。
@@ -157,3 +163,19 @@ subagent { ..., verify: { command: "<只读验收命令>" } }
 `check-conventions`（第 D 节）/ `check-dead-exports` / `golden`。
 
 **建议顺序**：P8-A（测量，可自行实施）→ 看数据 → 再定 P8-B/C；**P8-D 不推荐**。
+
+## 附：加 `parentSession` 时暴露的一个真实缺陷与新的守门（2026-10-08）
+
+**缺陷**：给 `runSubprocessAgent` 加 `parentSession` 时 `tsc` 报错，顺带暴露出**上一批（S4）留下的问题**——
+`runSubprocessAgent` 里对 `runPooledAgent(...)` 的调用**根本没传 `allowExtensions`**
+⇒ **池化路径（默认开启）会静默忽略 `extensions` 选项**：spawn 路径正常、池化路径失效。
+而当时那些"测函数本身"的单元测试（`buildPooledSpawnArgs` / `pooledProfileKey`）**结构上测不到这条接线**。
+
+**为什么编译器挡不住**：`allowExtensions` 与 `parentSession` 都是**可选参数**——漏传不报错、只是取值
+`undefined`。所以这类缺陷**编译通过、测试全绿、运行时静默降级**。
+
+**处置**：① 修调用处（`allowExtensions` + `parentSession` 都传）；② 新增**源码级守门**
+`subagent/__tests__/wiring-args.test.ts`（3 项）：断言 `runPooledAgent` / 每个 `runSubprocessAgent`
+调用处都带这两个参数、且两条路径在落用量记录前都写了 `currentResult.parentSession`。
+③ **守门自证**：临时拿掉 `allowExtensions` 后守门**必须变红**（实测确实红了，且消息直指"漏传"），
+恢复后转绿——并且**在同一坏状态下 `tsc` 不报错**，印证了"可选参数漏传编译器看不见"。
