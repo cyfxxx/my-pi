@@ -4,7 +4,7 @@
 
 ## 注册面
 
-- 工具：`autopilot_status`、`autopilot_policy`、`schedule_task`、`verify_report`、`verify_config`、`verify_test`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model`（14 个，见 [tools/README.md](tools/README.md)）
+- 工具：`autopilot_status`、`autopilot_policy`、`schedule_task`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model`（11 个，见 [tools/README.md](tools/README.md)）
   - 2026-10-07 合并：原 `autopilot_stats` / `autopilot_failover` 收进 `autopilot_status` 的 `section` 参数
     （`summary` 默认 / `stats` / `failover`）——三个近义名字收敛为一个入口，工具数 −2、声明体积 −约 0.8KB。
     保留的 `autopilot_policy` 专管**策略配置**，描述里已点明它与 `autopilot_status`、`admin_status` 的边界
@@ -23,7 +23,7 @@
 | `completions.ts` | 命令参数补全纯逻辑（任务名前缀、`edit` 字段），单测见 `__tests__/completions.test.ts` |
 | `store/` | 任务存储/配置/策略/预算/遥测/会话/通知/种子，见 [store/README.md](store/README.md) |
 | `run/` | 执行/看门狗/验证器，见 [run/README.md](run/README.md) |
-| `tools/` | 工具组（策略/状态/配置/会话/模型、`schedule_task`、`verify_*`），见 [tools/README.md](tools/README.md) |
+| `tools/` | 工具组（策略/状态/配置/会话/模型、`schedule_task`、`goal`），见 [tools/README.md](tools/README.md) |
 
 ## 每日任务视图（`/daily`）
 

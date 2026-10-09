@@ -12,10 +12,7 @@
       "autopilot_policy",
       "autopilot_status",
       "goal",
-      "schedule_task",
-      "verify_config",
-      "verify_report",
-      "verify_test"
+      "schedule_task"
     ],
     "browser": [
       "browser_click",

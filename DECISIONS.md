@@ -2,6 +2,25 @@
 
 ## 格式
 
+### [2026-10-08] 执行预算决策 (B)：删除 `verify_*` 三工具，前缀多出 1 263 B（未动任何阈值）
+
+**用户批准 (B)**（分析见 `docs/design/TOOL-BUDGET-DECISION.md`）。
+
+**删除**：`verify_report` / `verify_config` / `verify_test`（整个 `tools/verify-tools.ts`）、其注册调用、
+只服务它们的测试块（`schedule-verify.test.ts` 三个 describe；**`schedule_task` 覆盖保留**）、
+`tools-payload.test.ts` 里 `STATUS_ROUTING` 的 `verify_config` 条目。
+
+**实测字节效果（优于估算的 773 B）**：进前缀 **44 个/25 558B → 41 个/24 295B** ⇒ **多出 1 263 B 余量**；
+合计 32 000 → 30 737。**没有动任何预算阈值**。注册面基线 **62 → 59 工具**（命令 12 / 快捷键 2 不变）。
+
+**理由（重述最硬的一条）**：这三个工具**不可能成功**——候选生成与评审都是注入式（`VerifyTestDeps`），
+生产路径两者都没注入（候选走占位实现、judge 缺失时 `bestOfN` 回退首个候选），还被默认关闭；
+30 天仅 3 次调用。它们占着**已顶格**的声明预算却不干活。需要"独立于模型叙述的判据"请用
+`goal complete {verify:true}` 的第二校验来源（真跑独立评审子进程，端到端已验证）。
+
+**连带**：`run/verifier.ts` 的 Best-of-N 纯逻辑**保留**；`bestOfN` 因失去唯一消费者，按白名单 **A 类**
+登记并注明"保留待将来用 `executeTool('subagent')` 接真 judge 再用"；既有 5 条白名单理由维持"形状不匹配"。
+
 ### [2026-10-08] 工具面顶格后的预算决策分析：推荐删掉 `verify_*` 三工具，不动预算
 
 **现状**：前缀 25 558/25 558、合计 32 000/32 000 —— **两条上限都是 0 余量**。完整分析见

@@ -38,3 +38,4 @@ __setPoolFactoryForTest  测试辅助：端到端验证池复用（数进程启�
 #
 # ── C. 待清理存量（逐条"接线或删除"，处理完即从清单移除；下列历史条目暂缺理由，
 #      清理时补齐或直接删除该行） ──
+bestOfN Best-of-N 纯逻辑/记录：随 verify_* 三工具删除（2026-10-08）失去唯一消费者；保留待将来用 executeTool(subagent) 接真 judge 再用（见 docs/design/TOOL-BUDGET-DECISION.md）

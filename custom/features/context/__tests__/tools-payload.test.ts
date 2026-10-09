@@ -226,7 +226,6 @@ const STATUS_ROUTING: Array<{ tool: string; owns: string[]; forbidden?: string[]
     pointers: ['autopilot_policy', 'admin_status', 'schedule_task'],
   },
   { tool: 'autopilot_policy', owns: ['策略配置'], pointers: ['autopilot_status'] },
-  { tool: 'verify_config', owns: ['配置'] },
 ];
 
 describe('状态类工具路由守门', () => {

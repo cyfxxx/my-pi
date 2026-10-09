@@ -26,14 +26,18 @@
 |------|------|------|----------|
 | `admin-tools.ts` | `autopilot_policy`、`admin_status`、`admin_get_config`、`admin_set_config`、`admin_list_sessions`、`admin_switch_session`、`admin_restart`、`admin_list_models`、`admin_set_model` | 策略展示、运行状态、配置读写（敏感键掩码 + 可写键白名单）、会话列表/切换、重启请求（`admin_restart` 支持 `resume=continue|none|auto` 声明"重启后是否继续执行任务"）、模型列表/切换 | `listProviders`、`formatPolicyText`、`formatAdminStatus`、`formatModelsList`、`isSensitiveKey`、`maskSensitive`、`readConfigField`、`safeConfigKeys`、`parseConfigValue` |
 | `schedule-tool.ts` | `schedule_task` | 定时任务增删改查/启停（`add/list/update/delete/enable/disable/pause/resume`） | `SCHEDULE_ACTIONS`、`parseScheduleAdd`、`collectScheduleUpdates`、`executeScheduleAction`、`registerScheduleTool` |
-| `verify-tools.ts` | `verify_report`、`verify_config`、`verify_test` | LLM-as-a-Verifier：验证记录统计报告、验证配置读写、Best-of-N 试跑（候选生成/评审可注入） | `computeVerifierReport`、`formatVerifierReport`、`buildVerifierReport`、`currentVerifierConfig`、`applyVerifierConfigPatch`、`runVerifyTest`、`registerVerifyTools` |
 
 ## 约定
 
 - **隔离**：不 `import` Pi 包类型，注册函数参数用 `Parameters<typeof registerTool>[0]` 推导
   （逻辑层零 Pi 依赖由 `scripts/check-isolation.sh` 守门）。
 - **配置安全**：`admin_get_config` 对敏感键做掩码；`admin_set_config` 只接受白名单键（`safeConfigKeys`）。
-- **验证器 fail-open**：`verify_test` 缺省用占位候选生成器，不实际调用 LLM
+- **`verify_*` 三工具已于 2026-10-08 删除**：它们**不可能成功**——候选生成与评审都是注入式
+  （`VerifyTestDeps`），而生产路径两者都没注入（候选走占位实现、judge 缺失时 `bestOfN` 回退首个候选），
+  还被 `verify_config(enabled=true)` 默认关着；30 天仅 3 次调用。它占着**已顶格**的工具声明预算却不干活。
+  需要"独立于模型叙述的判据"请用 `goal complete {verify:true}` 的**第二校验来源**（真跑独立评审子进程，
+  端到端已验证）。`run/verifier.ts` 的 Best-of-N 纯逻辑保留在库中（白名单注明），待将来接上真 judge 再用。
+  详见 docs/design/TOOL-BUDGET-DECISION.md。
   （pi-tools 的 Best-of-N LLM 集成未迁移，见 `DECISIONS.md`）。
 
 ## 相关

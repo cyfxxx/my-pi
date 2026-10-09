@@ -97,7 +97,6 @@ import { sendWebhook } from './store/webhook';
 import { acquireSessionLock, releaseSessionLock } from './store/storage';
 import { registerAdminTools } from './tools/admin-tools';
 import { registerScheduleTool } from './tools/schedule-tool';
-import { registerVerifyTools } from './tools/verify-tools';
 
 function fmtTask(t: Task): string {
   const flag = t.enabled ? '●' : '○';
@@ -110,7 +109,6 @@ export function register(pi: ExtensionAPI): void {
   // ── 工具：admin（状态/模型/配置）、autopilot_policy、schedule_task、verify_* ──
   registerAdminTools(pi);
   registerScheduleTool(pi);
-  registerVerifyTools(pi);
 
   // ── 工具：状态（只读诊断，合并为一个带 section 的工具）──────────────────────────
   //

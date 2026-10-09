@@ -7,21 +7,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { executeScheduleAction } from '../tools/schedule-tool';
-import {
-  applyVerifierConfigPatch,
-  buildVerifierReport,
-  computeVerifierReport,
-  currentVerifierConfig,
-  formatVerifierConfig,
-  runVerifyTest,
-} from '../tools/verify-tools';
 import { listTasks, readTasks } from '../store/storage';
-import type { VerificationRecord } from '../run/verifier-logger';
 
+// 2026-10-08：verify_config / verify_report / verify_test 三个工具已删除（见 DECISIONS 与
+// docs/design/TOOL-BUDGET-DECISION.md），本文件只保留 schedule_task 的覆盖。
 let dir: string;
 let cfgPath: string;
 
@@ -104,140 +97,5 @@ describe('schedule_task', () => {
 
   it('空列表输出', async () => {
     expect(await executeScheduleAction({ action: 'list' })).toBe('暂无定时任务');
-  });
-});
-
-describe('verify_config', () => {
-  it('未配置时返回默认（禁用、3 候选）', () => {
-    const cfg = currentVerifierConfig();
-    expect(cfg.enabled).toBe(false);
-    expect(cfg.nCandidates).toBe(3);
-    expect(cfg.logLevel).toBe('summary');
-  });
-
-  it('applyVerifierConfigPatch 钳制范围并持久化，保留其它配置字段', () => {
-    writeFileSync(cfgPath, JSON.stringify({ enabled: false, maxIdleMinutes: 42 }));
-    const out = applyVerifierConfigPatch({ enabled: true, nCandidates: 9, threshold: 1.7, logLevel: 'full' });
-    expect(out.enabled).toBe(true);
-    expect(out.nCandidates).toBe(5);
-    expect(out.threshold).toBe(1);
-    expect(out.logLevel).toBe('full');
-
-    const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Record<string, unknown>;
-    expect(raw.maxIdleMinutes).toBe(42);
-    expect((raw.verifier as Record<string, unknown>).nCandidates).toBe(5);
-    // 再次读取走 readAutopilotConfig 的校验路径
-    expect(currentVerifierConfig().enabled).toBe(true);
-  });
-
-  it('非法验证器字段被校验回退', () => {
-    writeFileSync(
-      cfgPath,
-      JSON.stringify({ verifier: { enabled: 'yes', nCandidates: 99, threshold: 'x', logLevel: 'verbose' } }),
-    );
-    const cfg = currentVerifierConfig();
-    expect(cfg.enabled).toBe(false);
-    expect(cfg.nCandidates).toBe(5);
-    expect(cfg.threshold).toBe(0.6);
-    expect(cfg.logLevel).toBe('summary');
-  });
-
-  it('formatVerifierConfig 输出关键字段', () => {
-    const text = formatVerifierConfig(
-      { enabled: true, nCandidates: 2, verifyAfter: 1, threshold: 0.5, maxCostPerVerify: 0.01, logLevel: 'none' },
-      '已更新验证配置',
-    );
-    expect(text).toContain('已更新验证配置:');
-    expect(text).toContain('enabled: true');
-    expect(text).toContain('nCandidates: 2');
-    expect(text).toContain('logLevel: none');
-  });
-});
-
-function record(over: Partial<VerificationRecord> = {}): VerificationRecord {
-  return {
-    ts: new Date().toISOString(),
-    epoch: Date.now(),
-    taskId: 't1',
-    taskName: 'task-a',
-    nCandidates: 3,
-    selectedIndex: 1,
-    scores: [0.5, 0.9, 0.6],
-    durationMs: 10,
-    estCost: 0.02,
-    baselineCost: 0.01,
-    costMultiplier: 2,
-    passed: true,
-    reasoning: '',
-    result: 'success',
-    judgeModel: 'm',
-    ...over,
-  };
-}
-
-describe('verify_report', () => {
-  it('无记录 → 暂无数据', () => {
-    expect(buildVerifierReport()).toBe('验证统计：暂无数据');
-  });
-
-  it('computeVerifierReport 聚合通过率/成本倍数/边际收益/任务分布', () => {
-    const stats = computeVerifierReport([
-      record(),
-      record({
-        taskId: 't2',
-        taskName: 'task-b',
-        passed: false,
-        result: 'failed',
-        scores: [0.4, 0.7, 0.5],
-        costMultiplier: 4,
-      }),
-    ]);
-    expect(stats.total).toBe(2);
-    expect(stats.passRate).toBe(0.5);
-    expect(stats.avgCostMultiplier).toBe(3);
-    expect(stats.avgScoreImprovement).toBeCloseTo(0.35, 5);
-    expect(stats.successRateWithVerification).toBe(0.5);
-    expect(stats.successRateWithoutVerification).toBe(0.5);
-    expect(stats.marginalGain).toHaveLength(1);
-    expect(stats.marginalGain[0]).toMatchObject({ n: 3, count: 2 });
-    expect(stats.marginalGain[0].avgGain).toBeCloseTo(0.35, 5);
-    expect(stats.byTask.map((t) => t.name).sort()).toEqual(['task-a', 'task-b']);
-  });
-
-  it('落盘 verifier.jsonl 后 buildVerifierReport 汇总', () => {
-    mkdirSync(join(dir, 'scheduler'), { recursive: true });
-    const lines = [record(), record({ passed: false, result: 'failed' })];
-    writeFileSync(join(dir, 'scheduler', 'verifier.jsonl'), lines.map((r) => JSON.stringify(r)).join('\n') + '\n');
-    const text = buildVerifierReport();
-    expect(text).toContain('总验证次数: 2');
-    expect(text).toContain('通过率: 50%');
-    expect(text).toContain('边际收益');
-    expect(text).toContain('按任务（Top 5）');
-  });
-});
-
-describe('verify_test', () => {
-  it('未启用 → 提示先启用', async () => {
-    expect(await runVerifyTest('hello', 3)).toContain('验证功能未启用');
-  });
-
-  it('启用后注入评审函数 → 展示候选评分与最优', async () => {
-    applyVerifierConfigPatch({ enabled: true, threshold: 0.6 });
-    const out = await runVerifyTest('写一个函数', 3, {
-      generate: async (p) => `候选:${p}`,
-      judge: async (_p, candidates) =>
-        candidates.map((_c, i) => ({ index: i, score: [0.3, 0.95, 0.6][i], reasoning: `理由${i + 1}` })),
-    });
-    expect(out).toContain('候选数: 3');
-    expect(out).toContain('候选 2: 95.0% ← 最优');
-    expect(out).toContain('通过: 是');
-    expect(out).toContain('理由2');
-  });
-
-  it('未提供评审函数 → fail-open 回退；nCandidates 钳制到 2-5', async () => {
-    applyVerifierConfigPatch({ enabled: true });
-    const out = await runVerifyTest('x', 99, { generate: async () => 'c' });
-    expect(out).toContain('候选数: 5');
-    expect(out).toContain('fail-open');
   });
 });
