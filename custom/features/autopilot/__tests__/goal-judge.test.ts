@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runGoalJudge, type ToolCaller } from '../run/goal-verdict';
+import { JUDGE_AGENT, runGoalJudge, type ToolCaller } from '../run/goal-verdict';
 
 const ok = (text: string) => async () => ({ text, isError: false });
 
@@ -78,5 +78,37 @@ describe('接线可见（tsc 看不见的那一半）', () => {
 
   it('判定为达成时用 judgeVerifiedCompletion（**标明来源是评审**，不冒充命令校验）', () => {
     expect(SRC).toContain('judgeVerifiedCompletion(goal, { reason: judged.reason');
+  });
+});
+
+describe('评审者：必须能执行 + 可换模型（Humanize §2.1/§7）', () => {
+  it('派的是 `reviewer` —— 它的 tools 里有 bash（**不能跑测试的跨模型评审是有害的**）', async () => {
+    let got: Record<string, unknown> = {};
+    const spy: ToolCaller = async (_name, args) => {
+      got = args;
+      return { text: '判定：DONE\n理由：ok', isError: false };
+    };
+    await runGoalJudge(spy, { objective: 'x' });
+    expect(JUDGE_AGENT).toBe('reviewer');
+    expect(got.agent).toBe('reviewer');
+  });
+
+  it('给了 model 就透传；没给就**不带该键**（默认行为逐字节不变）', async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const spy: ToolCaller = async (_n, args) => {
+      seen.push(args);
+      return { text: '判定：DONE\n理由：ok', isError: false };
+    };
+    await runGoalJudge(spy, { objective: 'x', model: 'other-model' });
+    expect(seen[0].model).toBe('other-model');
+    await runGoalJudge(spy, { objective: 'x' });
+    expect('model' in seen[1]).toBe(false);
+  });
+
+  it('接线可见：goal 工具把 verifyModel 传下去（tsc 看不见"可选参数没接上"）', () => {
+    // 就地读取（SRC 定义在另一个 describe 的作用域里，跨块不可见）
+    const src = readFileSync(join(__dirname, '..', 'index.ts'), 'utf8');
+    expect(src).toContain('args.verifyModel');
+    expect(src).toContain('model: args.verifyModel');
   });
 });

@@ -116,7 +116,6 @@
 {"kind":"change","commit":"db43e0359","ts":"2026-10-04","subject":"chore(sync): 清单去掉 4 条不存在的会话路径，注释说明跳过与告警行为","files":["PROGRESS.md","sync/manifest.txt"],"heldOut":false}
 {"kind":"change","commit":"d4377a4ff","ts":"2026-10-04","subject":"fix(test): 工具面体积守门放宽到 60s，避免手机端全量并发下的假性超时","files":["PROGRESS.md","custom/features/context/__tests__/tools-payload.test.ts"],"heldOut":false}
 {"kind":"change","commit":"e2afa0917","ts":"2026-10-04","subject":"chore(sync): 刷新加密记忆（含标枪 roleplay 命名空间 3 条 manual 条目）","files":["sync/memory.tar.age"],"heldOut":false}
-{"kind":"change","commit":"681ad5b24","ts":"2026-10-04","subject":"feat: 角色扮演记忆种子（秘书舰·已誓约）+ memory-store 支持 --source manual","files":["DECISIONS.md","PROGRESS.md","scripts/README.md","scripts/memory-store.mjs"],"heldOut":false}
 {"kind":"rejected","ts":"2026-10-08","proposal":"[2026-10-08] 改动台账（WikiSkill 借鉴 B 项）+ 一次并发越界的复盘","reason":"**来自论文**（arXiv:2608.27454）：`wiki/skill-impact.md` 由**外层 harness 程序化写入**，","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-08","proposal":"[2026-10-08] 工具面顶格后的预算决策分析：推荐删掉 `verify_*` 三工具，不动预算","reason":"**现状**：前缀 25 558/25 558、合计 32 000/32 000 —— **两条上限都是 0 余量**。完整分析见","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-08","proposal":"[2026-10-08] 返工代理指标落地（P8-A 第二步）：口径五条 + 一处实现形态偏离 + 基于数据的 P8-B/C 建议","reason":"**回答的问题**：子代理改过文件后，**父级是否在随后的 N 个回合内又改回同一文件**——\"改动质量\"的代理信号。","evidence":"","source":"DECISIONS.md"}

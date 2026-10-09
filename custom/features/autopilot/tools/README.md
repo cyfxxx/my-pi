@@ -11,7 +11,7 @@
 
 | 态 | 怎么产生 | 含义 |
 |---|---|---|
-| `verified` | ① `complete` 带 `check`（**只读**检查命令）且**由 my-pi 实际跑通**（exit 0）；或 ② `complete {verify:true}` 时由**独立上下文的评审子代理**判为达成（**第二来源**，见 `run/goal-verdict.ts`） | 有独立于模型叙述的判据。**优先级：命令 > 评审**；评审失败/超时/格式不符一律 fail-open 退回 `declared` |
+| `verified` | ① `complete` 带 `check`（**只读**检查命令）且**由 my-pi 实际跑通**（exit 0）；或 ② `complete {verify:true}` 时由**独立上下文的评审子代理**（固定 `agent: reviewer`——它有 `bash`，**能自己跑测试**；可用 `verifyModel` 换模型）判为达成（**第二来源**，见 `run/goal-verdict.ts`） | 有独立于模型叙述的判据。**优先级：命令 > 评审**；评审失败/超时/格式不符一律 fail-open 退回 `declared` |
 | `declared` | `complete` 不带 `check`（可带 `evidence` 说明） | 只是**声称**完成，状态文案明写「未经校验」 |
 | `advisory` | `blocked` / `pause`，以及 **harness 自判的停止**（达轮次上限、连续无进展） | 判断性结论，不是证明 |
 

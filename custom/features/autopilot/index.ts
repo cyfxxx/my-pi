@@ -953,6 +953,7 @@ export function register(pi: ExtensionAPI): void {
       note: { type: 'string', description: '结论或受阻原因', optional: true },
       evidence: { type: 'string', description: 'complete 的结论/证据说明', optional: true },
       verify: { type: 'boolean', description: '可选：由独立评审子代理判定是否真的完成（第二来源）', optional: true },
+      verifyModel: { type: 'string', description: 'verify 时评审用的模型（默认继承主会话）', optional: true },
       check: {
         type: 'string',
         description:
@@ -994,7 +995,11 @@ export function register(pi: ExtensionAPI): void {
         } else if (args.verify === true) {
           // **第二校验来源**：独立上下文的评审子代理（见 run/goal-verdict.ts）。
           // 判定由 harness 跑、且评审看不到本会话的自我叙述 ⇒ 比"问模型自己"硬。
-          const judged = await runGoalJudge(ctx?.executeTool, { objective: goal.objective, note: evidence });
+          const judged = await runGoalJudge(ctx?.executeTool, {
+            objective: goal.objective,
+            note: evidence,
+            ...(typeof args.verifyModel === 'string' && args.verifyModel ? { model: args.verifyModel } : {}),
+          });
           if (judged.done === true) {
             goal = judgeVerifiedCompletion(goal, { reason: judged.reason, at: new Date().toISOString() });
           } else {

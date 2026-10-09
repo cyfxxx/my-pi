@@ -26,6 +26,8 @@
  *
  * ## 解析原则：宽进严出，认不出就不猜
  *
+ * **评审者的代价（论文明写）**：reviewer 的假阳性会变成额外回合——所以这是 opt-in，且失败一律 fail-open。
+ *
  * 输出格式由提示词**强制**（第一行 `判定：DONE` / `判定：NOT-DONE`，第二行 `理由：…`），
  * 所以解析是**确定性**的；认不出标记时返回 `done: null`（**不猜**），由调用方 fail-open 保持 `declared`。
  */
@@ -48,7 +50,22 @@ export interface GoalJudgeInput {
   objective: string;
   /** 执行者自己的说明（`goal complete` 的 note/evidence） */
   note?: string;
+  /**
+   * 评审用的模型（可选，opt-in）。**为什么值得换模型**（Humanize arXiv:2610.08900 §2.1 的联合采样）：
+   * 同一个模型的"提议"与"接受"共用同一个盲区，缺陷存活概率 `b` 只在换了一个**独立**的评判者后才降到
+   * `b·m_R`。不传时继承主会话模型 ⇒ 行为与以前逐字节一致。
+   */
+  model?: string;
 }
+
+/**
+ * 派哪个 agent 做评审：`reviewer`。
+ *
+ * 选它的**决定性理由是它 `tools` 里有 `bash`**（见 `portable/agent/agents/reviewer.md`）——
+ * Humanize §7 的反面证据说得很明确：**评审者不能跑测试时，跨模型评审是有害的**。
+ * 所以"换模型"必须与"评审者能执行"同时成立，否则只是换了个复读机。
+ */
+export const JUDGE_AGENT = 'reviewer';
 
 /**
  * 为"目标是否真的达成"专门写的二元判定提示词。
@@ -117,7 +134,11 @@ export async function runGoalJudge(
   let res: { text: string; isError: boolean };
   try {
     res = await Promise.race([
-      call('subagent', { task: prompt }),
+      call('subagent', {
+        task: prompt,
+        agent: JUDGE_AGENT,
+        ...(input.model ? { model: input.model } : {}),
+      }),
       new Promise<{ text: string; isError: boolean }>((resolve) =>
         setTimeout(() => resolve({ text: '', isError: true }), timeoutMs).unref?.(),
       ),

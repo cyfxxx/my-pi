@@ -2,6 +2,20 @@
 
 ## 格式
 
+### [2026-10-08] 评审者换模型 + 必须能执行（Humanize 借鉴第 1 项）
+
+**来自 Humanize**（arXiv:2610.08900）：§2.1 联合采样指出单模型的"提议"与"接受"共用同一盲区
+（缺陷存活 `b` → 换独立评判者后 `b·m_R`）；而 §7 的反面证据限定了边界——**评审者不能跑测试时，
+跨模型评审是有害的**。
+
+**落地**：`goal` 新增 **opt-in `verifyModel`**；评审固定派 **`agent: 'reviewer'`**——它的 `tools` 里有
+**`bash`**（`portable/agent/agents/reviewer.md`）⇒ **"换模型"与"能执行"同时成立**。不传 `verifyModel` 时
+请求体里**没有 `model` 键** ⇒ 与以前逐字节一致。论文明写的代价（reviewer 假阳性→额外回合）由
+**opt-in + fail-open** 承担。
+
+**守门**：`goal-judge.test.ts` +3 项（派 reviewer / 有·无 model 两种请求体 / 源码级接线断言——
+`tsc` 看不见"可选参数没接上"，本会话已栽过）。**声明面前缀 24 295 → 24 399 B**，余量 1 159 B，**未顶破**。
+
 ### [2026-10-08] 改动台账（WikiSkill 借鉴 B 项）+ 一次并发越界的复盘
 
 **来自论文**（arXiv:2608.27454）：`wiki/skill-impact.md` 由**外层 harness 程序化写入**，
