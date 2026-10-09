@@ -2,6 +2,29 @@
 
 ## 格式
 
+### [2026-10-08] 错误指纹落盘（缺陷 1）：让"经验"可被离线消费，判定行为一行未动
+
+**缺陷**：`errorFingerprint`/`observeRepairAttempt` 的状态**只活在内存**（`repairBudget`）⇒ 知识层拿不到，
+C 项按"证据不足宁可少产出"没有为它生成任何 pattern。
+
+**查证后才动手（这次先问惯例、再定默认）**：前缀指纹是**默认写 + 可 opt-out**
+（`custom/features/context/index.ts:143`：`PI_PREFIX_FINGERPRINT !== 'off'`；路径 `:144`；整段 try ⇒ fail-open；
+`.gitignore:61` 的 `portable/memory/*` ⇒ 不入库）。⇒ **沿用同一惯例**，不另立一套。
+
+**落地**：`budget/fingerprint-log.ts`（纯函数 `buildErrorFingerprintRecord` + 注入式 `appendErrorFingerprintRecord`，
+异常一律吞掉返回 false）；记录点在 `observeRepairAttempt` **之后**、`if (o.remind)` **之前**；
+开关 `PI_ERROR_FINGERPRINT=off` 可关；路径 `getMemoryDir()/logs/error-fingerprints.jsonl`；同 1MB 轮转。
+字段**恰好 8 个**（`ts/fingerprint/tool/attempts/distinctArgs/windowMs/remind/excerpt`，有断言钉住），
+隐私：指纹已归一化（去路径/行号/耗时/哈希），`excerpt` 截断 160，**不写会话正文**。
+
+**实测**：tsc OK；新测试 **10 项**（含字段集合恰好 8、纯函数不改入参、append-only、**fail-open ×2**
+（EACCES/ENOSPC 都不抛）、真实 IO 冒烟、3 项接线守门）；判定回归 **25 项全绿**（文件未改动）；
+**工具面体积逐字节不变**（41 个/24 399B，未顶破）。
+
+**我裁定的那个判断（子代理留给我）**：**保持默认开**。理由：① 判定/熔断/提醒**一行未动**（行为不变）；
+② 这是**既有**可观测性惯例的同类延伸（同目录、同轮转上限、同隐私级别、同样 fail-open），不是新机制；
+③ 该目录不入库。**回退成本一行**（`!== 'off'` → `=== 'on'`，改默认关），已写在此处备查。
+
 ### [2026-10-08] 知识库补上"失败那一半"：把被否提案接进编译器（WikiSkill 判据②）
 
 **论文判据**（附录 E.2）：**成功与失败都记**。此前编译器只吃 `docs/BUG-REPLAYS.md`（16 条事故），

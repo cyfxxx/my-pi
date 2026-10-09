@@ -16,6 +16,10 @@ import { registerCommand, sendMessage, getAllToolNames, getActiveTools, getThink
 import { registerTool } from '../../adapters/tool-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { appendJSONLRotating, ensureDir } from '../../core/fs-json';
+import {
+  appendErrorFingerprintRecord,
+  buildErrorFingerprintRecord,
+} from './budget/fingerprint-log';
 import { getMemoryDir, getAgentDir } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
 import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
@@ -45,6 +49,7 @@ import {
   createRepairBudget,
   observeRepairAttempt,
   repairBudgetHint,
+  REPAIR_WINDOW_MS,
   dehydrateErrorOutput,
   rebuildTextContent,
   DEHYDRATE_HINT,
@@ -143,6 +148,14 @@ export function register(pi: ExtensionAPI): void {
   const fingerprintFile =
     process.env.PI_PREFIX_FINGERPRINT_FILE || join(getMemoryDir(), 'logs', 'prefix-fingerprints.jsonl');
   let lastFingerprint: PrefixFingerprint | null = null;
+  // P7 的错误指纹落盘（缺陷 1 修复，2026-10-08）：**与上面的前缀指纹同一惯例** —— 默认写、
+  // `PI_ERROR_FINGERPRINT=off` 可关、同一 `logs/` 目录、同样 append-only 与 fail-open。
+  // 为什么要落盘：错误指纹此前只活在内存 `repairBudget` 里，**离线知识层拿不到**（C 项编译器因此
+  // 按"证据不足宁可少产出"没有为它生成任何 pattern），而"哪类错误反复出现、换参数还是同一个错"
+  // 恰恰是"经验 → 知识"的第一原料。隐私边界见 budget/fingerprint-log.ts 的文件头。
+  const errorFingerprintEnabled = process.env.PI_ERROR_FINGERPRINT !== 'off';
+  const errorFingerprintFile =
+    process.env.PI_ERROR_FINGERPRINT_FILE || join(getMemoryDir(), 'logs', 'error-fingerprints.jsonl');
   // 加固块丢失的独立台账（量小、只在实际丢失时写）：这是"整段前缀作废"的直接证据。
   const appendLostFile = process.env.PI_SYSTEM_APPEND_LOST_FILE || join(getMemoryDir(), 'logs', 'system-append-lost.jsonl');
   // P2（只观察）：每次压缩前记一条"按回本算值不值"，供 daily-health 与后续决策使用
@@ -750,6 +763,15 @@ export function register(pi: ExtensionAPI): void {
             errorText: out,
             argKey: stableKey(e.input ?? e.toolCallId ?? name),
           });
+          // **只记录，不参与判定**：预算/熔断/提醒的行为逐字节不变（落盘 fail-open，失败也不影响下面）
+          if (errorFingerprintEnabled) {
+            appendErrorFingerprintRecord(
+              errorFingerprintFile,
+              buildErrorFingerprintRecord(o, name, REPAIR_WINDOW_MS, new Date().toISOString()),
+              { ensureDir, append: appendJSONLRotating },
+              dirname,
+            );
+          }
           if (o.remind) out += repairBudgetHint(o);
         } catch {
           /* fail-open */
