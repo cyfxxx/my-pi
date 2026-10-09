@@ -39,7 +39,44 @@ if [ "$SEEN" = "1" ] && [ "$ALL_FAST" = "1" ]; then
   echo "pre-push：本次推送仅含便携运行数据（scripts/prepush-scope.sh 判定），走快检 golden --fast。"
 fi
 
-if ! bash scripts/golden-tasks.sh $FAST_ARG 2>&1 | tee "$LOG"; then
+# ── 超时与日志留存（2026-10-08 事故驱动）──────────────────────────────────────
+# 事故：完整 pre-push golden 卡在一个 vitest fork worker 里**数小时**（实测累计 CPU 仅 ~0.02 秒
+# ⇒ 它在等，不是在算）。后果：`git push` 永不返回；以后台作业方式跑时**静默滞留**；而且它不是
+# 确定性失败（之后几次推送的 golden 都通过）⇒ 是偶发挂死。
+# 之前的第二个缺陷：日志固定写 `my-pi-golden-*.log`，**被下一次运行覆盖** ⇒ 挂死那次是哪个测试，
+# 事后无从查证。
+# 处置：① 给 golden 加**超时**（挂死变成可诊断的失败，而不是无限等待）；② 日志**按时间戳另存**并
+# 只保留最近 N 份（默认 10，`PI_GOLDEN_LOG_KEEP` 可调）；③ 超时用独立文案区分于普通失败。
+# 已知局限（如实记录）：`timeout` 只保证**钩子不再无限等待**，它杀的是 golden 主进程；golden 派生的
+# 测试子进程**可能成为孤儿**（本次事故里那个 vitest fork worker 就是这类）。故超时文案里附了
+# `pgrep` 提示，让人能一步找到并清理；彻底解法需要进程组/`setsid`，留待需要时再做。
+GOLDEN_TIMEOUT="${PI_GOLDEN_TIMEOUT:-2400}"
+golen_log_stamp() {
+  local dir="${TMPDIR:-/tmp}" keep="${PI_GOLDEN_LOG_KEEP:-10}" base="$1"
+  local stamped="$dir/${base%.log}-$(date +%Y%m%d-%H%M%S).log"
+  cp "$dir/$base" "$stamped" 2>/dev/null || true
+  # 只清理同一前缀的历史文件；先打印再删（可复核）
+  local old
+  old=$(ls -1t "$dir/${base%.log}"-*.log 2>/dev/null | tail -n +$((keep + 1)))
+  if [ -n "$old" ]; then echo "$old" | while read -r f; do echo "（清理旧日志：$f）"; rm -f "$f"; done; fi
+}
+
+if [ -n "$FAST_ARG" ]; then :; else GOLDEN_TIMEOUT="${PI_GOLDEN_TIMEOUT:-2400}"; fi
+[ -n "$FAST_ARG" ] && GOLDEN_TIMEOUT="${PI_GOLDEN_TIMEOUT:-600}"
+
+timeout -k 30 "$GOLDEN_TIMEOUT" bash scripts/golden-tasks.sh $FAST_ARG 2>&1 | tee "$LOG"
+RC=${PIPESTATUS[0]}
+golen_log_stamp "my-pi-golden-prepush.log"
+if [ "$RC" -eq 124 ] || [ "$RC" -eq 137 ]; then
+  echo ""
+  echo "pre-push：golden **超时**（${GOLDEN_TIMEOUT}s）——这通常意味着某个测试挂死（不是失败）。"
+  echo "完整输出：$LOG（另存了带时间戳的副本）"
+  echo "注意：被 timeout 杀的是主进程，测试子进程可能残留成孤儿；可用下面这条找："
+  echo "  pgrep -af 'vitest|golden-tasks|test-' || true"
+  echo "若要临时放宽：PI_GOLDEN_TIMEOUT=7200 git push（仍建议先查清挂死原因）。"
+  exit 1
+fi
+if [ "$RC" -ne 0 ]; then
   echo ""
   echo "pre-push：golden 未通过，推送已阻止。"
   echo "完整输出已保存：$LOG"

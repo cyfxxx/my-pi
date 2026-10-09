@@ -16,7 +16,17 @@ if [ ! -f scripts/golden-tasks.sh ]; then
   exit 0
 fi
 
-if ! bash scripts/golden-tasks.sh --fast 2>&1 | tee "$LOG"; then
+GOLDEN_TIMEOUT="${PI_GOLDEN_TIMEOUT:-600}"  # 提交只跑 --fast，给 10 分钟足够
+
+timeout -k 30 "$GOLDEN_TIMEOUT" bash scripts/golden-tasks.sh --fast 2>&1 | tee "$LOG"
+RC=${PIPESTATUS[0]}
+if [ "$RC" -eq 124 ] || [ "$RC" -eq 137 ]; then
+  echo ""
+  echo "pre-commit：golden --fast **超时**（${GOLDEN_TIMEOUT}s）——通常意味着某个测试挂死。"
+  echo "完整输出：$LOG；查找残留子进程：pgrep -af 'vitest|golden-tasks|test-'"
+  exit 1
+fi
+if [ "$RC" -ne 0 ]; then
   echo ""
   echo "pre-commit：golden --fast 未通过，提交已阻止。"
   echo "完整输出已保存：$LOG"
