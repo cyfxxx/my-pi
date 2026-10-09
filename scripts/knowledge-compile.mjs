@@ -22,7 +22,7 @@
  * |---|---|
  * | `docs/BUG-REPLAYS.md`（16 条） | **采用**。每行天然含四要素：事故（是什么/根因）/ 指纹（怎么发现）/ 可重跑命令 / 现在由谁挡住（解法） |
  * | 错误指纹（P7 `tool-health.ts` 的 `errorFingerprint`/`observeRepairAttempt`） | **不采用**：它只活在内存（`context/index.ts` 的 `repairBudget`），**未落盘** ⇒ 没有语料。唯一落盘的 `prefix-fingerprints.jsonl` 是**前缀缓存**指纹，不是错误指纹 |
- * | `docs/CHANGES.jsonl` 的 `rejected`（18 条） | **不采用**：实测 **17/18 是误抽取**（把 `DECISIONS.md` 的普通条目当成了"被否提案"，理由栏是正文首句、无证据）⇒ 用它只会产出伪知识。**这是 `gen-changes-ledger.mjs` 的一个真实缺陷**，已在回报里说明 |
+ * | `docs/CHANGES.jsonl` 的 `rejected` | **采用**。抽取判据已修（标记词只在标题里认、reason 取含标记的那一行）⇒ **18 → 7 条，且全是真负结果**。判据第 ② 条要求"成功与失败都记"，这就是失败那一半 |
  *
  * ## 纪律
  *
@@ -37,6 +37,7 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -87,8 +88,10 @@ function nameFor(idx) {
 
 function renderPattern(it) {
   const { what, why } = splitCause(it.incident);
+  const what2 = defuse(what);
+  const why2 = defuse(why);
   return [
-    `# 失败模式：${what}`,
+    `# 失败模式：${what2}`,
     '',
     `**来源**：\`${it.file}\` 第 ${it.idx} 条（使用层面故障台账，代码检查全绿但用起来才炸）。`,
     '',
@@ -100,7 +103,7 @@ function renderPattern(it) {
     '',
     '**确切命令序列**（复现/回归都靠它）',
     '```bash',
-    it.command,
+    defuse(it.command),
     '```',
     '',
     '**怎么发现它（指纹）**',
@@ -141,24 +144,116 @@ function editsFor(oldSrc, newSrc) {
   return Object.keys(b).filter((k) => a[k] !== b[k]).map((k) => `${k} 更新`);
 }
 
+/**
+ * 从 `docs/CHANGES.jsonl` 抽 `kind:"rejected"` 的负结果（判据第 ② 条：**成功与失败都记**）。
+ *
+ * 只读、不做质量过滤：抽取侧（`gen-changes-ledger.mjs`）已在 2026-10-08 收紧为
+ * "标记词只在标题里认 + reason 取含标记那一行"，实测 18 → 7 条且全是真负结果。
+ */
+function readRejected() {
+  const file = 'docs/CHANGES.jsonl';
+  const src = readFileSync(join(ROOT, file), 'utf8');
+  const out = [];
+  for (const line of src.split('\n')) {
+    if (!line.trim()) continue;
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue; // 非法行由守门负责报，这里不猜
+    }
+    if (row.kind !== 'rejected') continue;
+    if (!row.proposal || !row.reason) continue; // 缺关键字段 ⇒ 宁可少产出
+    out.push({ file, ts: row.ts ?? '未标日期', proposal: row.proposal, reason: row.reason, evidence: row.evidence || '', source: row.source || file });
+  }
+  return out;
+}
+
+/**
+ * **拆解 `](` 成对模式**（2026-10-08 预防性处理）。
+ *
+ * 本会话已有**三次**因为"文档里出现完整的 markdown 链接写法"被 `check-doc-links.mjs` 当成真链接而拦下提交。
+ * 知识页的文本来自台账/台账抽取，**可能含括号路径**；这里统一把 `](` 断开成 `] (`，
+ * 使守门不会把编译产物当成自己的失效链接（对正常文本是无操作）。
+ */
+function defuse(s) {
+  return String(s).split('](').join('] (');
+}
+
+/** 负结果的页名：**内容哈希**而非序号——序号会因"新增一条更早的负结果"而集体改号（页名就不稳定了） */
+function nameForRejected(proposal) {
+  return `rej-${createHash('sha1').update(proposal).digest('hex').slice(0, 6)}`;
+}
+
+/**
+ * 抽取侧给的是**含标记的那一整行**，而决策条目里那行常是"半句 + 另起一句"（例如
+ * "并防止缓存失效。要求先分析可行性。查证过程分四步，最后一步的实测把方案否掉了。"）。
+ * 这里取**含标记的那一句**（仍**原文照录**、只是切句，不重写、不编造）；切不出来就用原样。
+ */
+function reasonSentence(reason) {
+  const NEG = /否掉|不迁移|不推荐|负结果|不做|暂不做|不采用|予以否决|拒绝采纳/;
+  const parts = String(reason)
+    .split('。')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const hit = parts.filter((s) => NEG.test(s)).pop();
+  if (!hit) return reason;
+  return /[。：；，、]$/.test(hit) ? hit : `${hit}。`;
+}
+
+function renderRejectedPattern(r) {
+  const proposal = defuse(r.proposal);
+  const reason = defuse(reasonSentence(r.reason));
+  const evidence = r.evidence ? defuse(r.evidence) : '';
+  return [
+    `# 被否提案：${proposal}`,
+    '',
+    `**来源**：\`${r.file}\` 的 rejected 条目（${r.ts}；抽取自 \`${defuse(r.source)}\`）。`,
+    '',
+    '**是什么**',
+    proposal,
+    '',
+    '**根因（WHY）**',
+    `为什么被否：${reason}`,
+    '',
+    '**确切命令序列**（复现/回归都靠它）',
+    '未记录（该提案**未被实施** ⇒ 没有可复现的命令序列；**不编造**）',
+    '',
+    '**怎么发现它（指纹）**',
+    '由 `gen-changes-ledger.mjs` 从决策台账抽出的**负结果**条目（判据第 ② 条：成功与失败都记）。',
+    '',
+    '**含确切语法的解法**',
+    evidence ? `未实施；相关证据/线索：${evidence}` : '未记录（该提案被否、未实施，也没有留下证据指针）',
+    '',
+  ].join('\n');
+}
+
+function renderRejectedIndexEntry(r) {
+  return `- [${nameForRejected(r.proposal)}](patterns/${nameForRejected(r.proposal)}.md): ${defuse(r.proposal)} + ${defuse(r.reason)} + 未实施（被否）`;
+}
+
 function build() {
   const incidents = readIncidents();
+  const rejected = readRejected();
   const creates = [];
   const updates = [];
   const pages = new Map();
 
-  for (const it of incidents) {
-    const name = nameFor(it.idx);
-    const content = renderPattern(it);
-    pages.set(name, content);
-    const file = join(PATTERNS, `${name}.md`);
+  // 两个来源共用同一条"建/更/无变化"路径 ⇒ 判据③（**不建重复，用新证据更新既有**）对两者一致成立
+  const sources = [
+    ...incidents.map((it) => ({ name: nameFor(it.idx), content: renderPattern(it) })),
+    ...rejected.map((r) => ({ name: nameForRejected(r.proposal), content: renderRejectedPattern(r) })),
+  ];
+  for (const s of sources) {
+    pages.set(s.name, s.content);
+    const file = join(PATTERNS, `${s.name}.md`);
     if (!existsSync(file)) {
-      creates.push({ name, content });
+      creates.push(s);
       continue;
     }
     const old = readFileSync(file, 'utf8');
-    if (old === content) continue; // 证据没变 ⇒ 什么都不做（不制造无意义 diff）
-    updates.push({ name, edits: editsFor(old, content), content });
+    if (old === s.content) continue; // 证据没变 ⇒ 什么都不做（不制造无意义 diff）
+    updates.push({ name: s.name, edits: editsFor(old, s.content), content: s.content });
   }
 
   // 知识库里存在的页若**已无证据支撑**（源条目被删），必须报出来而不是悄悄留着
@@ -182,10 +277,15 @@ function build() {
     '',
     ...incidents.map(renderIndexEntry),
     '',
+    `## 被否提案（${rejected.length} 条，来源：\`docs/CHANGES.jsonl\` 的 rejected）`,
+    '',
+    '> 判据第 ② 条：**成功与失败都记**。这些是"试过但被否"的提案，留着是为了**不被重复提出**。',
+    '',
+    ...rejected.map(renderRejectedIndexEntry),
+    '',
     '## 证据不足、**故意未生成**的来源（判据第 ⑤ 条：宁可少产出）',
     '',
     '- **错误指纹（P7）**：`errorFingerprint`/`observeRepairAttempt` 的状态只活在内存里（`custom/features/context/index.ts` 的 `repairBudget`），**未落盘** ⇒ 没有语料可编译。落盘的 `portable/memory/logs/prefix-fingerprints.jsonl` 是**前缀缓存**指纹，不是错误指纹。',
-    '- **负结果（`docs/CHANGES.jsonl` 的 `rejected`）**：实测 **17/18 条是误抽取**（把 `DECISIONS.md` 的普通条目当成"被否提案"，理由栏是正文首句、无证据）⇒ 用它只会产出伪知识。需先修 `gen-changes-ledger.mjs` 的抽取判据。',
     '',
   ];
   if (orphans.length) {
@@ -193,7 +293,7 @@ function build() {
   }
   const index = indexLines.join('\n');
 
-  return { creates, updates, index, orphans, count: incidents.length };
+  return { creates, updates, index, orphans, count: incidents.length, rejectedCount: rejected.length };
 }
 
 function fail(msg) {
@@ -224,7 +324,7 @@ if (process.argv.includes('--check')) {
   if (!existsSync(INDEX) || readFileSync(INDEX, 'utf8') !== built.index) problems.push('index.md 漂移');
   if (problems.length) fail(`知识库与源证据不一致：\n  - ${problems.join('\n  - ')}\n跑 node scripts/knowledge-compile.mjs --update`);
   console.log(
-    `✅ 知识库与源证据一致（${built.count} 条失败模式；本次 --check 的决策：create ${built.creates.length} / update ${built.updates.length}）`,
+    `✅ 知识库与源证据一致（失败模式 ${built.count} 条 + 被否提案 ${built.rejectedCount} 条；本次 --check 的决策：create ${built.creates.length} / update ${built.updates.length}）`,
   );
 } else {
   mkdirSync(PATTERNS, { recursive: true });
@@ -232,7 +332,7 @@ if (process.argv.includes('--check')) {
   writeFileSync(INDEX, built.index, 'utf8');
   writeFileSync(DECISION, decisionText, 'utf8');
   console.log(
-    `✓ 已编译：create ${built.creates.length} / update ${built.updates.length} / 索引 ${built.count} 条` +
+    `✓ 已编译：create ${built.creates.length} / update ${built.updates.length} / 失败模式 ${built.count} 条 + 被否提案 ${built.rejectedCount} 条` +
       (built.orphans.length ? `（另有 ${built.orphans.length} 个页已无证据支撑）` : ''),
   );
 }

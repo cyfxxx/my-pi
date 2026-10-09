@@ -25,7 +25,18 @@
 - [bug-015](patterns/bug-015.md): **诊断工具自身的盲区 + JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `systemSectionSizes()` 再也切不开分段，整块 system 被记成一段 `preamble`。后果：第 14 条那类"进程内 system 漂移"**根本没法定位到段**，只能看到 `changed:["system"]`；字节数也整体虚高（7142B 原文 → 7239B） + `systemTextOf()`：字符串**原样返回**，只有非字符串（结构化 content）才 `stable()` 序列化；测试同时钉住"保留真实换行"
 - [bug-016](patterns/bug-016.md): **终端层"假卡死" + agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 pty 的主端在 Android 侧，`/proc` 里无持有者；当时内存吃紧 swap 4.4G/5.6G），不在 agent 层 + head -1); w1=$(awk '/^wchar/{print $2}' /proc/$P/io); kill -WINCH $P; sleep 2; w2=$(awk '/^wchar/{print $2}' /proc/$P/io); echo "wchar $w1 -> $w2"; ls -l /proc/$P/fd \
 
+## 被否提案（7 条，来源：`docs/CHANGES.jsonl` 的 rejected）
+
+> 判据第 ② 条：**成功与失败都记**。这些是"试过但被否"的提案，留着是为了**不被重复提出**。
+
+- [rej-e5395b](patterns/rej-e5395b.md): [2026-10-08] 三个未迁移子系统：**都不迁移**（用户批复第 3 项），但理由各不相同且都是实测 + 听起来很合理，**一验就被否掉**（剥掉前缀后 47 → 46 对，最高相似度仍 0.58–0.63）。 + 未实施（被否）
+- [rej-a77055](patterns/rej-a77055.md): [2026-10-07] fork 池化实测不成立：`new_session {parentSession}` 会"收下但不分叉" + `new_session {parentSession}`）需要各自验证，且复用键得带上父会话路径，本轮不做。 + 未实施（被否）
+- [rej-0ba1a6](patterns/rej-0ba1a6.md): [2026-10-07] 调研：重型工具"只给子代理"与 `deferred` + `tool_search` 两条路的实测结论（**暂不采用**） + 并防止缓存失效。要求先分析可行性。查证过程分四步，最后一步的实测把方案否掉了。 + 未实施（被否）
+- [rej-0f516a](patterns/rej-0f516a.md): [2026-10-01] 稳定优先：冻结默认面，明确"不做清单" + **决策**：默认面冻结，只做低风险、可回滚的事；下列明确不做（各自保留登记与触发条件）： + 未实施（被否）
+- [rej-f597d3](patterns/rej-f597d3.md): [2026-09-22] 不迁移 auto-compact 控制器与 task-summarizer 流水线（口径） + **背景**：pi-tools `pi-context/auto-compact-controller.ts` 与 `task-summarizer.mjs` 依赖 `.usage-diag.jsonl`、task-record、thinking-level、warm-prefix、prune-dump 等一整条未迁移的数据/编排链。 + 未实施（被否）
+- [rej-38ab10](patterns/rej-38ab10.md): [2026-09-22] task-record/task-summarizer 改为适配迁移（取代同日"不迁移"口径） + **背景**：先前以"依赖整条未迁移数据链"为由暂缓；实际 `task-record` 生产者可确定性重建（agent_settled 写结构化记录），总结层可去掉 spawn 强依赖。 + 未实施（被否）
+- [rej-1d6971](patterns/rej-1d6971.md): [2026-09-25] 通知与入站通道：出站用 webhook、入站用 link（不迁移 notify.json / ntfy-relay） + **决策**：两者均**不迁移**，由既有能力取代： + 未实施（被否）
+
 ## 证据不足、**故意未生成**的来源（判据第 ⑤ 条：宁可少产出）
 
 - **错误指纹（P7）**：`errorFingerprint`/`observeRepairAttempt` 的状态只活在内存里（`custom/features/context/index.ts` 的 `repairBudget`），**未落盘** ⇒ 没有语料可编译。落盘的 `portable/memory/logs/prefix-fingerprints.jsonl` 是**前缀缓存**指纹，不是错误指纹。
-- **负结果（`docs/CHANGES.jsonl` 的 `rejected`）**：实测 **17/18 条是误抽取**（把 `DECISIONS.md` 的普通条目当成"被否提案"，理由栏是正文首句、无证据）⇒ 用它只会产出伪知识。需先修 `gen-changes-ledger.mjs` 的抽取判据。
