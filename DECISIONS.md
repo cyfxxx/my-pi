@@ -2,6 +2,33 @@
 
 ## 格式
 
+### [2026-10-08] 临时探针处置（用户批复第 5 项）：有用的收进仓库、无用的清理
+
+两个探针都是长任务期间的一次性验证件（放在 `/tmp`，不入库）。逐个判：
+
+**① `nested-probe.mjs`（验 `ctx.executeTool` 的编辑/命令嵌套调用）→ 收进仓库**
+
+- 落点：`custom/features/context/__tests__/nested-tools-e2e.test.ts`，**显式 opt-in**（`PI_NESTED_TOOLS_E2E=1`，
+  与 `pool-e2e.test.ts` 的 `PI_SUBAGENT_POOL_E2E` 同型），dist 或 bootstrap 不存在时**自跳过**。
+- **为什么值得留**：`edit_and_run` **没有任何自己的编辑逻辑**，完全依赖 pi 的嵌套调用契约——
+  ① `executeTool('edit'|'bash')` 可用；② 嵌套调用**绕过 `prepareArguments`**，必须发规范 schema。
+  ② 正是当初探针第一次跑就抓到的真实缺陷。**单元测试用假 ctx 驱动，永远抓不到这类漂移**
+  （它们恰好是"假 ctx 与真 pi 不一致"的地方）。my-pi 是 pi 的硬分叉、按补丁跟进上游——
+  上游一改 `edit` 的 schema 或嵌套语义，单元测试会全绿而功能已坏。**这个探针是唯一的哨兵。**
+- 断言是**因果级**：命令是 `cat <目标文件>`，输出必须是编辑后的内容（`WORLD` 而非 `HELLO`）；
+  另含一次**故意失败**的编辑，用 `echo SHOULD-NOT-RUN` 断言命令**完全没跑**（失败保护）。
+- 实测：默认自跳过 ✓；`PI_NESTED_TOOLS_E2E=1` 下 **27.5s 通过**。
+- 移植时踩到一个坑并已修：**tool 消息在后续请求里是累积的**，跨请求 `flatMap` 会得到
+  `[失败, 失败, 成功]` 这种重复序列；只看**最后一次请求**的 tool 消息才是 `[失败, 成功]`。
+
+**② `fork-probe.mjs`（验 `new_session {parentSession}` 是否分叉）→ 清理**
+
+- 它的结论已归档（`docs/design/SUBAGENT-POOL.md` 第十三节：响应 `success:true` 但**分叉没发生**），
+  且**没有任何已发布功能依赖它**；按 P4 审计的同一标准（不为"将来可能用到"留休眠机制），**删除**。
+- 重建成本很低：那份文档记了确切的三步做法与期望输出（先用真 pi 造带暗号的父会话 → 在 `--no-session`
+  起的 rpc 进程里发 `new_session{parentSession}` → 在 provider 侧按任务标记归属请求检查内容），约 80 行。
+  若将来上游修好了这个行为、想重开 fork 池化，照文档重写即可。
+
 ### [2026-10-08] 工具面体积守门拆成两个桶（用户批复第 1 项）：TOTAL 未改，严格程度一字节没放宽
 
 **起因**：P6 新增 `edit_and_run` 时该守门红了（总量 32397 > 32000）。当时的处置是**不改预算**、
