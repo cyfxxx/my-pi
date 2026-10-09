@@ -318,7 +318,7 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（87 条）
+## 设计文档（95 条）
 
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
@@ -407,6 +407,14 @@
 - `docs/design/VISION.md` · 七、未来展望（受限于算力与技术，暂缓） · 1. **LoRA**：将要求、限制、记忆、经验、技能训练为适配器——行为更稳定 + 上下文消耗更低。
 - `docs/design/VISION.md` · 八、与现有文档的关系 · - 架构决策：`DECISIONS.md`
 - `docs/design/VISION.md` · 九、变更记录 · - 2026-08-26 v1：初稿。用户口述愿景整理 + 四大基建计划（P1 干预捕获 / P2 任务遥测 / P3 golden tasks / P4 记忆生命周期）。 · 数字: 1.4% / 62.4 KB / 28.5 KB / 14.5 KB
+- `docs/design/WORKFLOW-INVARIANTS.md` · 1. 重启续接 · 数字: 8 分钟 / 4 条
+- `docs/design/WORKFLOW-INVARIANTS.md` · 2. 模式切换 · > **注（重要）**：2.1 / 2.2 的等价守门**是留出集**（第 19/20 步默认跳过，`PI_GOLDEN_SCENARIO=1` 才跑）。
+- `docs/design/WORKFLOW-INVARIANTS.md` · 3. 子代理池
+- `docs/design/WORKFLOW-INVARIANTS.md` · 4. 压缩与擦除 · 数字: 80% / 85% / 60 轮 / 2 轮
+- `docs/design/WORKFLOW-INVARIANTS.md` · 5. goal 续跑
+- `docs/design/WORKFLOW-INVARIANTS.md` · 6. 本次实测得到的**关于守门本身**的发现 · **（1）两个常规守门确实会红（顺带自证，2026-10-08 复核）**——它们是"守门本身可信"的证据： · 数字: 54 个 / 53 个 / 1 个 / 4 个
+- `docs/design/WORKFLOW-INVARIANTS.md` · 7. 明确**没有自动守门**的不变量（缺口清单）
+- `docs/design/WORKFLOW-INVARIANTS.md` · 8. 覆盖度自评 · - **有自动守门**：1.1 1.2 1.3（留出集）｜2.1 2.2（留出集）2.3（常规）｜3.1 3.2（常规）3.3（opt-in）｜4.1–4.4（常规）｜5.1–5.4（常规 + 一条 opt-in e2e） · 数字: 3 条 / 2 条 / 5 个
 
 ## 开发文档（130 条）
 
