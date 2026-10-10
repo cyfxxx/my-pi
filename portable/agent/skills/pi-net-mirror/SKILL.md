@@ -5,6 +5,13 @@ version: v1.0
 更新日期: 2026-10-09
 ---
 
+## 便携化（Linux 主 / Windows 次）
+
+- 本技能里的 `curl` 命令**两端都有**（Win10+ 自带），但 **`-o /dev/null` 是 POSIX 写法**：Windows 用 `-o NUL`。
+- `-w '%{http_code} size=%{size_download}'` 两端一致 ✓；`git` 命令两端一致 ✓。
+- **不要**用 `find -printf`、`env VAR=x cmd`、硬编码 `/tmp` 之类 POSIX-only 写法。
+
+
 ## 实测补充（2026-10-10，父代理复核）
 
 **git clone 是可用的**（推翻本技能早前"无已验证通道"的说法；原结论来自单次探测）：

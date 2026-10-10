@@ -18,7 +18,7 @@ version: v1.0
 
 ## 标准流程（先便宜后昂贵）
 
-1. **哈希**：`sha256sum <file>`；若来源有官方校验和**必须比对**（模型权重尤其）。
+1. **哈希**：**优先用本仓库的跨平台脚本** `node scripts/security-scan.mjs --file <file>`（内部用 `node:crypto`，Linux/Windows 都能跑）。**手写命令才分平台**：Linux/macOS `sha256sum <file>` 或 `shasum -a 256 <file>`；**Windows** `certutil -hashfile <file> SHA256`。若来源有官方校验和**必须比对**（模型权重尤其）。
 2. **结构**：`node scripts/security-scan.mjs --file <path>`
    —— 扩展名与 magic 是否相符、是否命中 **EICAR 测试串**、**pickle 危险全局引用**、
    zip **路径穿越**与炸弹比率。
@@ -36,3 +36,10 @@ version: v1.0
 - **自证**：`--file` 的验证用 EICAR（`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`，
   68 字节公开测试文件）——**它必须报 suspicious，否则扫描器就是摆设**。
 - 本环境能升级的选项：装 **ClamAV**（若平台有包）/ **YARA + 社区规则** / 提供 **VirusTotal key**。
+
+## 便携化（Linux 主 / Windows 次）
+
+- **优先调用脚本，而不是手写 shell**：`node scripts/security-scan.mjs …` 两端一致（哈希用 `node:crypto`、
+  结构识别是纯 JS、无需 `file`/`strings`/`objdump`）✓。
+- **手写命令的分平台写法**：哈希 Linux/macOS = `sha256sum` / `shasum -a 256`；Windows = `certutil -hashfile <file> SHA256`。
+- **不要用** `file` / `strings` / `objdump` / `bwrap` / `firejail` 之类**本环境本来就没有**的工具（脚本会如实报"未扫描"）。

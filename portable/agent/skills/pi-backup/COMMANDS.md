@@ -393,3 +393,12 @@ pi-backup verify
 
 工作区状态：干净（无未提交变更）
 ```
+
+## 便携化（Windows / 无 `sha256sum`）
+
+本文件多处用了 `sha256sum`（Linux/Termux 有，**Windows 没有**）。跨平台等价写法：
+- **Windows（PowerShell）**：`Get-FileHash -Algorithm SHA256 <文件>`（逐个文件执行；批量可 `Get-ChildItem <目录> | Get-FileHash -Algorithm SHA256`）；
+- **任意平台、只要有 Node**：`node scripts/security-scan.mjs --file <文件>`（内部 `node:crypto`，输出即 `sha256=…`）；
+- **macOS**：`shasum -a 256 <文件>`。
+
+**基线对比**的做法不变（生成一份"路径+哈希"清单再 diff），只是**生成清单的命令按平台换掉**。
