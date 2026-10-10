@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（160 条）
+## 决策台账（161 条）
 
+- `DECISIONS.md` · [2026-10-08] 网络加速调研入库 + **一次被实测推翻的"更正"**（方法论教训） · **交付**：`docs/design/NET-ACCEL-RESEARCH.md`（子代理调研，我复核后入库）。**经我独立复核一致**的部分： · 数字: 8 个
 - `DECISIONS.md` · [2026-10-09] 网络加速与安全防护：先实测再设计（两份设计 + 一个零依赖扫描器 + 两个技能） · **用户两个需求**：① 国内网络受限导致访问/下载/GitHub 经常失败 ⇒ 整合公开镜像与加速；② 下载文件、 · 数字: 1159 B
 - `DECISIONS.md` · [2026-10-08] 用户批准四项待决事项：逐项定形态（其中两项**没有照字面执行**，理由如下） · 用户口径："同意执行，根据项目情况自行处理。" 以下是**我选择的形态**与该形态的理由——**有两条我判定 · 数字: 159 B
 - `DECISIONS.md` · [2026-10-08] 挂死猎捕的结果与三条遗留项的处置（含一次自我推翻） · **① 偶发挂死：一次完整 verbose run 没复现。** 用 `--reporter=verbose`（逐个打印已开始的测试， · 数字: 358B / 4285B / 7 个 / 0 次
@@ -168,7 +169,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（158 条）
+## 进度记录（159 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -328,6 +329,7 @@
 - `PROGRESS.md` · 挂死猎捕结果 + 三条遗留项处置 + 整体检查（2026-10-08） · - **偶发挂死未复现**（verbose 跑完整套正常收尾）⇒ 确认是偶发；根因未知，但危害已被超时兜住。 · 数字: 7 个
 - `PROGRESS.md` · 用户批准四项待决事项 + 我定的形态（2026-10-08） · - ① 终止设计**当闸门**：阈值可配置（默认评审 6 轮未过 ⇒ 记 stopReason 并按受阻停止）；**零样本**， · 数字: 6 轮 / 159B
 - `PROGRESS.md` · 网络加速 + 安全防护：实测选型与落地（2026-10-09） · - **先实测再设计**：GitHub 直连与 `ghproxy/gh-proxy/gitmirror` **全 000**，**只有 jsDelivr 200/0.40s**；
+- `PROGRESS.md` · 网络加速调研入库 + 被实测推翻的"更正"（2026-10-08） · - 入库 `docs/design/NET-ACCEL-RESEARCH.md`；我复核一致：ghproxy 全系不可达、包镜像全可用、反代全 000。
 
 ## 缺陷回放（16 条）
 
@@ -348,7 +350,7 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（119 条）
+## 设计文档（123 条）
 
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
@@ -379,6 +381,10 @@
 - `docs/design/LEAN4AGENT-BORROW.md` · 四、可借鉴的（按性价比排序） · **A. 给关键工作流写一份"前置/后置条件"清单，并挂到既有守门上（推荐，成本低，零运行时改动）** · 数字: 5 个 / 4 条 / 30 天 / 8 次
 - `docs/design/LEAN4AGENT-BORROW.md` · 五、明确不该照搬的，以及决定可不可照搬的关键缺口 · **不该照搬**： · 数字: 40 个 / 3 个
 - `docs/design/LEAN4AGENT-BORROW.md` · 六、可执行的下一步（≤3 条） · 1. **做 A：`docs/design/WORKFLOW-INVARIANTS.md` + 把可自动化的挂进既有守门**，每条不变量配坏样本并证明守门会红。**不改任何默认行为**、不新增 golden 步。这是三篇论文里**唯一不需要
+- `docs/design/NET-ACCEL-RESEARCH.md` · 一、实测总表（HTTP 码；`000`＝连接失败，`301`＝重定向**而重定向目标是不可达的 raw**） · ### 1.1 GitHub 加速（本次调研的核心结论）
+- `docs/design/NET-ACCEL-RESEARCH.md` · 二、可参考的现成项目（用户要求"不从零开始"） · > 说明：`chsrc` / `mirrors-china` / `Thanks-Mirror` 的**项目内容我读不到**（GitHub 直连与 jsDelivr `gh/`
+- `docs/design/NET-ACCEL-RESEARCH.md` · 三、落地到 my-pi 的候选设计 · ### 3.1 形态判定
+- `docs/design/NET-ACCEL-RESEARCH.md` · 四、明确未验证 / 不可达（诚实清单） · - **未验证**：Gitee 镜像**覆盖哪些仓库**（只测了 `redis` 成功；`Lean4Agent` 这类小众仓库**大概率没有**）；
 - `docs/design/NET-ACCEL.md` · 一、实测结果（2026-10-09，本环境） · curl -sS -o /dev/null -m 10 -w '%{http_code} %{time_total}s' <url>
 - `docs/design/NET-ACCEL.md` · 二、选定形态：**技能（知识）+ 一个探测脚本**，不新增声明工具 · **降级链（写进技能，按序尝试、每次只前进一步）**： · 数字: 1159 B
 - `docs/design/NET-ACCEL.md` · 三、落点文件清单 · **成本与风险**：脚本零依赖（node 内置 fetch/https）⇒ 无安装成本；风险是**镜像域名会变**（缓解：探测） · 证据: node scripts/net-mirror.mjs --probe

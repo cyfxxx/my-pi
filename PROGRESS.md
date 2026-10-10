@@ -2926,3 +2926,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   + 设计文档 `docs/design/NET-ACCEL.md`、`docs/design/SECURITY-SCAN.md`；脚本数 55 → **56**。
 - **自证**：EICAR ⇒ suspicious/rc=1 ✓、zip 穿越 ✓、扩展名不符 ✓、清单篡改 ⇒ tamper-changed ✓、
   无缓存 URL ⇒ not-scanned ✓、干净文件仍显示 L2=not-scanned ✓；顺手修掉自证抓出的 ESM `require` 崩溃。
+
+### 网络加速调研入库 + 被实测推翻的"更正"（2026-10-08）
+
+- 入库 `docs/design/NET-ACCEL-RESEARCH.md`；我复核一致：ghproxy 全系不可达、包镜像全可用、反代全 000。
+- **推翻两条**：① "jsDelivr /gh/ 不可用"错（实测 200/size=3808、tag 200/size=7088）⇒ 我既有的
+  "经 jsDelivr 读仓库"结论**不需要更正**；② "gitclone 502 不可用"不全面（首页 200 + git ls-remote
+  返回真实 SHA）。补充：Gitee 镜像同样可用（非唯一）。
+- 纪律：判"不可达"前换路径/协议复测；给**字节数**而非只看 HTTP 码；单样本推广必须标"推测"。
