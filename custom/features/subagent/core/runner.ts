@@ -314,6 +314,36 @@ async function runPooledAgent(
  * - **不丢**：只有 `worker.send` **成功后**才 `markConsumed` ⇒ 投递失败下一轮还会再试（宁可重复一次，也不静默丢）；
  * - **限速**：单轮最多 {@link MAX_PER_ROUND} 条，其余留到下一轮，并在 stderr 如实记录"还有未读"。
  */
+/**
+ * 构造"中途指令"的 prompt 帧。
+ *
+ * ★ **必须带 `streamingBehavior:'steer'`** —— 子进程在"正在处理"时**会拒绝**裸 prompt ✗
+ * （实测原文：`Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.`，
+ * 见 vendor `core/agent-session.ts:2002`）⇒ 不传就**从未入队**、注入永远不生效 ✓（本会话真的踩过 ✗）。
+ * 抽成纯函数是为了能被回归测试盯住 ✓（生产代码也用同一份 ⇒ 不会漂移 ✓）。
+ */
+export function buildSteerPrompt(seq: number, text: string): {
+  type: 'prompt';
+  message: string;
+  streamingBehavior: 'steer';
+} {
+  return { type: 'prompt', message: `[父会话中途指令 #${seq}] ${text}`, streamingBehavior: 'steer' };
+}
+
+/**
+ * 校验"子进程是否接受了这条 prompt"。
+ *
+ * ★ **必须检查 `success === false`** —— 否则**拒绝会被当成投递成功** ✗（本会话真的发生过：
+ * 父侧日志写着"已投递 #2"，而子进程回的是 `success:false` ⇒ 这是"**假装成功**"，本项目最忌的那种 ✗）。
+ * 抛错后自然走既有路径："**不消费、下次重试**" ✓（宁可重复一次，也不静默丢 ✓）。
+ * 注意 `undefined`（老协议/无响应体）**不视为拒绝** ✓ —— 保持向后兼容。
+ */
+export function assertPromptAccepted(res: { success?: boolean; error?: string } | undefined): void {
+  if (res && res.success === false) {
+    throw new Error(`子进程拒绝该指令：${res.error ?? '未知原因'}`);
+  }
+}
+
 async function forwardInboxWhileRunning(
   worker: RpcWorker,
   inboxIds: readonly string[],
@@ -336,15 +366,12 @@ async function forwardInboxWhileRunning(
         // ★ 必须传 `streamingBehavior:'steer'`：子进程在"正在处理"时**会拒绝**裸 prompt
         //   （实测原文：`Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')
         //   to queue the message.`，见 vendor `core/agent-session.ts:2002`）⇒ 不传就**从未入队** ✗。
-        const res = (await worker.send(
-          { type: 'prompt', message: `[父会话中途指令 #${m.seq}] ${m.text}`, streamingBehavior: 'steer' },
-          120_000,
-        )) as { success?: boolean; error?: string } | undefined;
+        const res = (await worker.send(buildSteerPrompt(m.seq, m.text), 120_000)) as
+          | { success?: boolean; error?: string }
+          | undefined;
         // ★ 也必须检查 `success:false`：否则**子进程的拒绝会被当成投递成功** ✗（本会话真的发生过：
         //   父侧日志写着"已投递 #2"，而子进程回的是 success:false ⇒ 这是"假装成功"，必须杜绝 ✗）。
-        if (res && res.success === false) {
-          throw new Error(`子进程拒绝该指令：${res.error ?? '未知原因'}`);
-        }
+        assertPromptAccepted(res);
         consumed.set(id, m.seq);
         markConsumed(id, m.seq);
         console.error(`[subagent-inbox] ${id}: 已投递 #${m.seq}（子进程将在下一个 turn 边界执行）`);
