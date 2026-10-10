@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（174 条）
+## 决策台账（175 条）
 
+- `DECISIONS.md` · [2026-10-10] 把"先探测再下结论"写成技能铁律 + 清理过期的"不可达"结论 · **为什么必须写成铁律（本会话有硬证据）**：同一天内实测到 · 数字: 577KB / 48MB
 - `DECISIONS.md` · [2026-10-10] L2 四态**全部确证**（含"只被 ClamAV 检出"与"两者都缺"） · 上一条我如实标了两处"尚未证明"。**现在都证明了**（方法：用环境变量**隔离**引擎，而不是靠猜）：
 - `DECISIONS.md` · [2026-10-10] ClamAV 装成且证明能检出；L2 接线已接回（**其中 ClamAV 路径尚待一个"只被它检出"的样本证明**） · **① 结论更正（必须留痕）**：我此前写"**ClamAV 病毒库在你这网络下拿不到、判定不通、不再重复试**"——
 - `DECISIONS.md` · [2026-10-10] 接上可选 L2 = YARA（并把"判决早于命中"这个 bug 一起修了） · **为什么现在能接**：上一轮用 apt 装上了 **YARA 4.5.0**（`python3-yara`）——**规则引擎、不需要病毒库** · 数字: 4 条
@@ -182,7 +183,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（172 条）
+## 进度记录（173 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -356,6 +357,7 @@
 - `PROGRESS.md` · 接上可选 L2 = YARA（2026-10-10） · - `security-scan.mjs` 的 L2 从"永远 not-scanned"变成真的会跑：有引擎+有规则才跑；命中⇒`hit`+规则名； · 数字: 4 条
 - `PROGRESS.md` · ClamAV 装成 + L2 接线接回（2026-10-10） · - **更正**：此前"库拿不到、判定不通"是错的 ✗ —— 真相是**网络波动（000）+ 库挑 UA（默认 curl 403、官方 ClamAV UA 200/48MB）**。 · 数字: 48MB
 - `PROGRESS.md` · L2 四态全部确证（2026-10-10） · - 隔离法证明：**关掉 YARA 后仍有 `clamav:Eicar-Test-Signature`** ⇒ ClamAV 确实在跑并检出 ✓；
+- `PROGRESS.md` · "先探测再下结论"写成技能铁律 + 更正过期结论（2026-10-10） · - 硬证据：同日 `github.com` 000→200→000、`database.clamav.net` 000→403→200(48MB) ⇒ **可达性波动**。 · 数字: 48MB
 
 ## 缺陷回放（16 条）
 
@@ -376,11 +378,12 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（137 条）
+## 设计文档（138 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
-- `docs/design/AV-INSTALL-ATTEMPTS.md` · ClamAV 的最终判定（写死，不再重复试） · - 引擎：本环境**未安装**；
+- `docs/design/AV-INSTALL-ATTEMPTS.md` · ClamAV：**更正**——之前写"判定不通、不再重复试"是**错的**（2026-10-10 当日推翻） · **正确结论（两次实测并列，都是真的）**：
+- `docs/design/AV-INSTALL-ATTEMPTS.md` · （历史段落，保留作对照）最初的"判定不通" · - 引擎：本环境**未安装**；
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 下一步（建议接成"可选 L3 层"） · 在 `scripts/security-scan.mjs` 里加 **可选 L3 = YARA**：有 `yara` 引擎 + 有规则文件才跑；
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
