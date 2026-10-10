@@ -106,22 +106,42 @@ node scripts/security-scan.mjs --baseline --tier2 --verify     # Tier2（进程�
 `my-pi-custom` 曾被我误报为"陌生 registry"（它是 workspace 本地链接）⇒ 已修，**本地链接单独跳过**。
 **口径**：只出 `clean` / `needs-review`，**不判恶意、不阻断**；用镜像是正当选择，脚本只负责指出偏离。
 
-## 九、第 ⑦ 层：系统级持久化点（**只收文件形态的**，缺口如实列出）
+## 九、第 ⑦ 层：系统级持久化点（**tier3 已实现**；缺口收窄为 2 项）
 
-攻击者落地后通常写这几处；本层**只收能用 Node 标准库读到的文件**，其余**如实标为缺口**：
+用户已**批准为此破一次"只用 Node 标准库"的约束**，但**只限本层**（Tier1/Tier2 仍是零依赖 —— 实测 Tier2 仍
+`重算哈希 0 个`、不调任何外部命令）。
 
-| 位置 | 收不收 | 为什么 |
+### 覆盖情况（2026-10-10 实测，本机 Linux）
+
+| 位置 | 状态 | 实测 |
 |---|---|---|
-| `~/.bashrc` / `~/.profile` / `~/.zshrc` | ✅ | 文件，`homedir()` 可达 |
-| `~/.ssh/authorized_keys` / `~/.ssh/config` | ✅ | 文件；改了＝**别人能登进来** |
-| `~/.config/autostart/**` | ✅ | Linux 桌面自启，文件形态 |
-| `~/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/**` | ✅ | **Windows 的自启文件夹也是文件** ⇒ 同一套机制即可覆盖（便携化不需要分平台代码） |
-| **Windows 注册表 `Run`/`RunOnce` 键** | ❌ **缺口** | 只能用 `reg query` 之类**外部命令**（违反"只用 Node 标准库"）；Node 读写注册表要第三方模块 ⇒ 宁可不做也不破约束 |
-| **Windows 任务计划（含 `C:\Windows\System32\Tasks\**`）** | ❌ **缺口** | 需要 `schtasks` 或管理员权限；且该目录常读不到 ⇒ 收了会变成"时有时无"的噪声 |
-| **`PATH` 目录里的可执行文件** | ❌ **缺口** | 体量巨大、且随安装常变 ⇒ 纳入即误报（违背"不把噪声纳入基线"的判据） |
-| `cron` 任务 | ❌ **缺口** | `crontab -l` 是外部命令；用户 crontab 文件位置因发行版而异 |
+| 用户级 `cron`（`crontab -l`） | ✅ **已覆盖** | Linux 上取到输出 ⇒ 记为 1 个环境源（`env:crontab`） |
+| Windows 注册表 `Run`（HKCU / HKLM） | ✅ **已实现**（本机不适用） | 如实输出 `not-scanned：平台不适用（要求 win32，当前 linux）` |
+| Windows 任务计划（`schtasks /query`） | ✅ **已实现**（本机不适用） | 同上，`not-scanned` 且写明原因 |
+| `PATH` 变量值本身 | ⚙️ **已实现但默认关** | 便宜方案（能发现 PATH 被改），按用户要求默认不收；要开就把 `tiers.json` 里 `enabled` 改 true |
+| `PATH` 目录内容 | ❌ **仍不收** | 体量巨大且随安装常变 ⇒ 纳入即误报（判据不变） |
+| `~/.bashrc` / `.profile` / `.zshrc` / `.ssh/*` / autostart / Windows 启动文件夹 | ✅ 已覆盖 | 这些是**文件**，在 **Tier2**（不需要外部命令） |
 
-**要不要补这些缺口？** 若你愿意**破一次"只用 Node 标准库"**（例如允许只读地调用 `schtasks /query /xml`、
-`reg query`），我可以把它们做成**可选层 tier3**（默认关，显式调用）；**否则**这些点就靠"**定期人工核对**"
-（或在系统层面用 Windows Defender / 系统自带工具）。**我不擅自破约束**——它是你这次明确给的三条硬要求之一。
+### 用法与实测耗时（本机 Linux）
 
+```
+node scripts/security-baseline.mjs --tier3 --init      # 58ms
+node scripts/security-baseline.mjs --tier3 --verify    # 71ms / 66ms（两次均 unchanged=1，稳定）
+```
+**默认关**：只有显式 `--tier3` 才跑；`--strict` 才在发现变更时非 0 退出。
+
+### 三条安全设计（都可复核）
+
+1. **只读白名单**：命令与参数都要过 `READ_ONLY_ALLOWLIST`（只允许 `reg query`、`schtasks /query`、
+   `crontab -l`）；**不在白名单 ⇒ 记 `not-scanned` 且不执行** ⇒ "写注册表/改任务"在结构上不可能发生。
+   自证里专门有一条：`reg add …` 必须被拒（实测输出 `写命令被拒⇒true`）。
+2. **如实缺席**：命令不存在（ENOENT）、非零退出、平台不适用 ⇒ 一律 `not-scanned` 并**写明原因**；
+   基线与输出里记录**实际执行的命令**（可复核跑了什么）。
+3. **注入式执行器**：`runEnvSources(sources, exec, platform)` 收一个 `exec` 函数 ⇒ 自证用**桩**覆盖
+   "命令不存在 / 有输出 / 非零退出 / 写命令 / 平台不匹配"五种情形，**不触真实系统**。
+
+### 增量说明（如实，别被"0 次重算"误导）
+
+env 源**没有 mtime 可依赖** ⇒ 每次都要运行命令并哈希其输出，**无法像文件那样跳过**。
+好在**源数量是常数级**（cron 1 条 + Windows 3 条）⇒ 成本与文件数无关，实测 **58~71ms**。
+**文件层的增量不受影响**（Tier1/Tier2 仍是"先比 size+mtime，只有不一致才重算哈希"）。

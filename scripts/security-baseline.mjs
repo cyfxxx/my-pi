@@ -37,6 +37,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir, stat, writeFile, mkdir, rm } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join, relative, sep } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 
@@ -72,10 +73,190 @@ function loadTiers() {
   const j = JSON.parse(readFileSync(TIERS_FILE, 'utf8'));
   return {
     tiers: j.tiers,
+    tier3: j.tier3,
     excludes: (j.exclude || []).map((p) => (p.startsWith('~/') ? toPosix(homedir()) + p.slice(1) : p)),
     excludeRes: (j.exclude || []).map(globToRe),
   };
 }
+/**
+ * ===== tier3：系统级持久化点（**本层是唯一允许调用外部命令的层**）=====
+ *
+ * 为什么单独成层：Tier1/Tier2 靠"读文件+哈希"就能覆盖，**零依赖**；而要覆盖注册表 Run 键、任务计划、
+ * cron 这类**非文件**的落地位置，只能调 `reg query` / `schtasks /query` / `crontab -l`。
+ * 用户为此**明确批准破一次"只用 Node 标准库"的约束**，但只限本层、并且：
+ *
+ * 1. **只读**：命令与参数都过 **READ_ONLY_ALLOWLIST** 白名单；不在白名单 ⇒ 直接记 `not-scanned`，
+ *    **绝不执行**（所以"写注册表/改任务"这类调用在结构上就不可能发生）。
+ * 2. **如实缺席**：命令不存在（ENOENT）、非零退出、平台不适用 ⇒ 一律记 `not-scanned` 并写明原因。
+ * 3. **默认关**：只有显式 `--tier3` 才跑。
+ * 4. **注入式执行器**：`runEnvSources` 收一个 `exec` 函数 ⇒ 自证可以用**桩**测三种情形，不触真实系统。
+ *
+ * 增量说明（如实）：env 源**没有 mtime 可依赖** ⇒ 每次都要运行命令并哈希其输出，无法像文件那样跳过；
+ * 好在源数量是常数级（cron 一条、Windows 三条）⇒ 成本与文件数无关。`sha256` 字段用于**比对**。
+ */
+const READ_ONLY_ALLOWLIST = [
+  { cmd: 'reg', ok: (a) => a[0] === 'query' },
+  { cmd: 'schtasks', ok: (a) => String(a[0] || '').toLowerCase() === '/query' },
+  { cmd: 'crontab', ok: (a) => a.length === 1 && a[0] === '-l' },
+];
+
+function assertReadOnly(cmd, args) {
+  const rule = READ_ONLY_ALLOWLIST.find((r) => r.cmd === cmd);
+  if (!rule) return `命令不在只读白名单：${cmd}`;
+  if (!rule.ok(args || [])) return `参数不在只读白名单：${cmd} ${(args || []).join(' ')}`;
+  return null;
+}
+
+function defaultExec(cmd, args) {
+  return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000 });
+}
+
+/** 跑 tier3 的所有来源：返回 {records, skipped}；skipped 分 disabled / not-scanned 两类 */
+function runEnvSources(sources, exec, platform) {
+  const records = [];
+  const skipped = [];
+  for (const s of sources || []) {
+    if (s.enabled === false) {
+      skipped.push({ key: s.key, kind: 'disabled', reason: s.note || '默认关' });
+      continue;
+    }
+    const plats = s.platforms || (s.platform ? [s.platform] : ['any']);
+    if (!plats.includes('any') && !plats.includes(platform)) {
+      skipped.push({ key: s.key, kind: 'not-scanned', reason: `平台不适用（要求 ${plats.join('/')}，当前 ${platform}）` });
+      continue;
+    }
+    const bad = assertReadOnly(s.cmd, s.args || []);
+    if (bad) {
+      skipped.push({ key: s.key, kind: 'not-scanned', reason: bad });
+      continue;
+    }
+    let out;
+    try {
+      out = exec(s.cmd, s.args || []);
+    } catch (e) {
+      const reason =
+        e && e.code === 'ENOENT'
+          ? `命令不存在：${s.cmd}（${platform}）`
+          : e && typeof e.status === 'number'
+            ? `命令非零退出（rc=${e.status}）：${s.cmd}`
+            : `命令执行异常：${s.cmd}`;
+      skipped.push({ key: s.key, kind: 'not-scanned', reason });
+      continue;
+    }
+    const text = String(out == null ? '' : out);
+    records.push({
+      kind: 'env',
+      path: s.key,
+      size: text.length,
+      mtimeMs: 0,
+      sha256: sha256(Buffer.from(text, 'utf8')),
+      cmd: `${s.cmd} ${(s.args || []).join(' ')}`.trim(),
+    });
+  }
+  return { records, skipped };
+}
+
+/** 比对 env 源（按合成键 + 输出哈希） */
+function verifyEnv(prev, curr, skipped = []) {
+  const p = new Map((prev || []).map((r) => [r.path, r]));
+  const unchanged = [];
+  const changed = [];
+  const added = [];
+  for (const r of curr || []) {
+    const old = p.get(r.path);
+    if (!old) added.push(r.path);
+    else if (old.sha256 === r.sha256) unchanged.push(r.path);
+    else changed.push(r.path);
+  }
+  const removed = [...p.keys()].filter((k) => !(curr || []).some((r) => r.path === k));
+  return {
+    unchanged,
+    changed,
+    added,
+    removed,
+    notScanned: skipped.filter((s) => s.kind === 'not-scanned'),
+    disabled: skipped.filter((s) => s.kind === 'disabled'),
+  };
+}
+
+async function tier3Main({ init, strict }) {
+  const { tier3 } = loadTiers();
+  if (!tier3 || !Array.isArray(tier3.sources) || tier3.sources.length === 0) {
+    console.log('not-scanned：tiers.json 里没有 tier3.sources');
+    return;
+  }
+  const baseFile = join(BASELINE_DIR, 'tier3-baseline.json');
+  const t0 = Date.now();
+  const { records, skipped } = runEnvSources(tier3.sources, defaultExec, process.platform);
+  const ms = Date.now() - t0;
+
+  if (init) {
+    await mkdir(dirname(baseFile), { recursive: true });
+    await writeFile(baseFile, JSON.stringify({ tier: 'tier3', ts: new Date().toISOString(), records, skipped }, null, 1));
+    console.log(`✅ tier3 基线已生成：${records.length} 个环境源，用时 ${ms}ms → ${baseFile}`);
+    for (const s of skipped) console.log(`  [${s.kind}] ${s.key} — ${s.reason}`);
+    return;
+  }
+  if (!existsSync(baseFile)) {
+    console.log('not-scanned：还没有 tier3 基线 ⇒ 先跑 --tier3 --init');
+    return;
+  }
+  const base = JSON.parse(await readFile(baseFile, 'utf8'));
+  const r = verifyEnv(base.records || [], records, skipped);
+  console.log(
+    `tier3 完整性：unchanged=${r.unchanged.length} changed=${r.changed.length} added=${r.added.length} removed=${r.removed.length}` +
+      `（环境源 ${records.length} 个；用时 ${ms}ms）`,
+  );
+  console.log('  说明（如实）：env 源没有 mtime 可依赖 ⇒ 每次都要运行命令并哈希其输出（数量是常数级，与文件数无关）；文件层的增量不受影响。');
+  for (const s of r.notScanned) console.log(`  [not-scanned] ${s.key} — ${s.reason}`);
+  for (const s of r.disabled) console.log(`  [disabled] ${s.key} — ${s.reason}`);
+  if (r.changed.length) console.log('  changed: ' + r.changed.join(', '));
+  if (r.added.length) console.log('  added: ' + r.added.join(', '));
+  if (r.removed.length) console.log('  removed: ' + r.removed.join(', '));
+  if (strict && (r.changed.length || r.added.length || r.removed.length)) process.exit(1);
+}
+
+/** tier3 自证：三桩 + 只读白名单 + 平台门控 + 反向 unchanged / 正向 changed（全用桩，不触真实系统） */
+function selfCheckEnv() {
+  const src = [{ key: 'env:stub', platforms: ['any'], cmd: 'crontab', args: ['-l'] }];
+  const missing = () => {
+    const e = new Error('nope');
+    e.code = 'ENOENT';
+    throw e;
+  };
+  const withOut = () => '0 3 * * * /usr/bin/backup\n';
+  const emptyOut = () => '';
+  const nonZero = () => {
+    const e = new Error('rc');
+    e.status = 1;
+    throw e;
+  };
+  const r1 = runEnvSources(src, missing, 'linux');
+  const r2 = runEnvSources(src, withOut, 'linux');
+  const r3 = runEnvSources(src, emptyOut, 'linux');
+  const r4 = runEnvSources(src, nonZero, 'linux');
+  const writey = [{ key: 'env:write', platforms: ['any'], cmd: 'reg', args: ['add', 'HKCU\\x', '/v', 'y'] }];
+  const r5 = runEnvSources(writey, withOut, 'linux');
+  const winSrc = [{ key: 'env:win', platforms: ['win32'], cmd: 'reg', args: ['query', 'HKCU\\x'] }];
+  const r6 = runEnvSources(winSrc, withOut, 'linux');
+
+  const v1 = verifyEnv(r2.records, r2.records, []);
+  const v2 = verifyEnv(r2.records, r3.records, []);
+  const pass =
+    r1.records.length === 0 && r1.skipped[0].kind === 'not-scanned' && /命令不存在/.test(r1.skipped[0].reason) &&
+    r2.records.length === 1 && r2.records[0].path === 'env:stub' && r2.records[0].sha256.length === 64 &&
+    r4.records.length === 0 && /rc=1/.test(r4.skipped[0].reason) &&
+    r5.records.length === 0 && /只读白名单/.test(r5.skipped[0].reason) &&
+    r6.records.length === 0 && /平台不适用/.test(r6.skipped[0].reason) &&
+    v1.unchanged.length === 1 && v1.changed.length === 0 &&
+    v2.changed.length === 1;
+  console.log(
+    `env 自证：不存在⇒${(r1.skipped[0] && r1.skipped[0].reason.slice(0, 14)) || '?'}…（${r1.records.length} 条）｜有输出⇒${r2.records.length} 条(sha256 长 ${r2.records[0] ? r2.records[0].sha256.length : 0})｜非零⇒${/rc=1/.test(r4.skipped[0] ? r4.skipped[0].reason : '')}｜写命令被拒⇒${/只读白名单/.test(r5.skipped[0] ? r5.skipped[0].reason : '')}｜平台不适用⇒${/平台不适用/.test(r6.skipped[0] ? r6.skipped[0].reason : '')}｜同输出两次⇒unchanged=${v1.unchanged.length}/changed=${v1.changed.length}｜输出变⇒changed=${v2.changed.length}`,
+  );
+  console.log(pass ? '✅ env 自证通过（三桩 + 只读白名单 + 平台门控 + 反向 unchanged + 正向 changed）' : '❌ env 自证失败');
+  return pass;
+}
+
 /**
  * 递归收集：命中 include 且不在 exclude 的文件。
  *
@@ -214,16 +395,21 @@ async function main() {
     console.error(`缺层定义：${TIERS_FILE}`);
     process.exit(2);
   }
-  if (argv.includes('--self-check')) return selfCheck();
+  if (argv.includes('--self-check')) {
+    if (!selfCheckEnv()) process.exit(1); // 先跑本层自证（桩，不触真实系统）
+    return selfCheck(); // 再跑既有的文件层四项自证（内部自己 exit）
+  }
 
-  const tier = argv.includes('--tier1') ? 'tier1' : argv.includes('--tier2') ? 'tier2' : null;
+  const tier = argv.includes('--tier1') ? 'tier1' : argv.includes('--tier2') ? 'tier2' : argv.includes('--tier3') ? 'tier3' : null;
   const init = argv.includes('--init');
   const verifyMode = argv.includes('--verify');
   if (!tier || (!init && !verifyMode)) {
-    console.error('用法：--tier1|--tier2 --init|--verify [--strict] ｜ --self-check');
+    console.error('用法：--tier1|--tier2|--tier3 --init|--verify [--strict] ｜ --self-check');
     process.exit(2);
   }
   const { tiers, excludeRes } = loadTiers();
+  // tier3 的唯一允许点：它要调外部命令（只读白名单），**Tier1/Tier2 仍是零依赖**
+  if (tier === 'tier3') return tier3Main({ init: argv.includes('--init'), strict: argv.includes('--strict') });
   const includes = tiers[tier]?.include;
   if (!includes) {
     console.error(`tiers.json 里没有 ${tier}`);

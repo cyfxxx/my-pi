@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（170 条）
+## 决策台账（171 条）
 
+- `DECISIONS.md` · [2026-10-10] tier3 落地（只读白名单）+ **用 apt 装上了 YARA 4.5.0**（突破口） · **① tier3 落地并验证**：可选层、**默认关**、只有 `--tier3` 才跑。**"只读"是结构性保证**——
 - `DECISIONS.md` · [2026-10-10] 把三层串成一条流程（否则"层再全"也只是散件） · **判断**：防御体系的价值不在"有多少个脚本"，而在**下载/引入外部东西时能不能被顺手用起来**。
 - `DECISIONS.md` · [2026-10-10] 第 ⑦ 层：系统级持久化点 —— **只收文件形态**，缺口如实列出（不破便携化约束） · **做了什么**：Tier2 补三类**文件形态**的持久化点 —— Linux 桌面自启 `~/.config/autostart/**`、
 - `DECISIONS.md` · [2026-10-10] 第 ⑤ 层供应链：离线审计 lockfile（两个高信号指标 + 一次自证抓出的假阳性） · **为什么是这一层**：对代码 agent 而言，命中率最高的不是"某个可执行文件带毒"，而是**依赖链被动手脚**。
@@ -178,7 +179,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（168 条）
+## 进度记录（169 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -348,6 +349,7 @@
 - `PROGRESS.md` · 第 ⑤ 层供应链：离线 lockfile 审计（2026-10-10） · - 新增 `scripts/supply-chain-check.mjs`：从 lockfile 判两类**离线**高信号（非预期 registry 的 `resolved`、带安装钩子的包）。
 - `PROGRESS.md` · 第 ⑦ 层：系统级持久化点（2026-10-10） · - 收（文件形态，跨平台同一套机制）：`~/.bashrc`/`.profile`/`.zshrc`、`~/.ssh/authorized_keys`+`config`、
 - `PROGRESS.md` · 把三层串成一条流程（2026-10-10） · - 写进 `pi-download-safety` 技能：**看是什么（三态）→ 比对官方校验和 → 依赖变更跑供应链 → 改动后跑基线 → 确认后刷新基线**。
+- `PROGRESS.md` · tier3 落地 + 用 apt 装上了 YARA（2026-10-10） · - tier3：默认关；**只读靠 `READ_ONLY_ALLOWLIST` 白名单结构性保证**（reg/query、schtasks /query、crontab -l）；
 
 ## 缺陷回放（16 条）
 
@@ -368,8 +370,12 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（133 条）
+## 设计文档（137 条）
 
+- `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
+- `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
+- `docs/design/AV-INSTALL-ATTEMPTS.md` · ClamAV 的最终判定（写死，不再重复试） · - 引擎：本环境**未安装**；
+- `docs/design/AV-INSTALL-ATTEMPTS.md` · 下一步（建议接成"可选 L3 层"） · 在 `scripts/security-scan.mjs` 里加 **可选 L3 = YARA**：有 `yara` 引擎 + 有规则文件才跑；
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
 - `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次

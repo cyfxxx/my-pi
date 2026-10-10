@@ -2,6 +2,29 @@
 
 ## 格式
 
+### [2026-10-10] tier3 落地（只读白名单）+ **用 apt 装上了 YARA 4.5.0**（突破口）
+
+**① tier3 落地并验证**：可选层、**默认关**、只有 `--tier3` 才跑。**"只读"是结构性保证**——
+逐命令逐参数的 **`READ_ONLY_ALLOWLIST`**（`reg` 只许 `query`、`schtasks` 只许 `/query`、`crontab` 只许 `-l`），
+**白名单之外的参数连跑都不跑**，直接记 `not-scanned`。实测：
+- 自证：`✅ env 自证通过（三桩 + 只读白名单 + 平台门控 + 反向 unchanged + 正向 changed）`，原有四类断言也未回归；
+- 本机（Linux）跑 `--tier3 --init`：Windows 的注册表/任务计划两项如实 `not-scanned（要求 win32，当前 linux）` ✓；
+- `--tier3 --verify`：**`unchanged=1 … 用时 59ms`** ✓（增量生效；非文件来源用输出文本哈希 + 合成键）。
+它还**主动做了比我原方案更聪明的替代**：把 **`PATH` 变量值本身**纳入（用于发现 PATH 被改），
+而不是去哈希 PATH 目录里成千上万个可执行文件；`PATH` 目录内容按判据默认 `disabled`。
+
+**② 装第三方杀毒：突破口是 apt，不是 pip。** 本环境 `apt-get` 可用（**2.8.3 arm64**），国内镜像可达
+（`python3-pefile` 候选来自 `mirrors.cloud.tencent.com/ubuntu-ports`）。实测：
+- `python3-pefile` → **装上 ✓**（`import pefile` = 2023.2.7）；
+- **`python3-yara` → 装上 ✓（`import yara` = 4.5.0）** ← **本轮最有价值的收获**：
+  **YARA 是规则引擎、不需要病毒库**，正好绕开 ClamAV 的死结；
+- `python3-oletools` → 该发行版仓库里没有 ✗；
+- **ClamAV 最终判定（写死、不再重复试）**：引擎未装，官方库 `database.clamav.net` 实测 **000 / size=0**，
+  早前 tuna/ustc/aliyun 的 `/clamav/` **三个都 404** ⇒ **当前网络下不可用**（有字节数证据，不是"没试"）。
+
+**③ 下一步**：把 YARA 接成 `security-scan.mjs` 的**可选 L3 层**（有引擎+有规则才跑，否则照旧 `not-scanned`），
+`pefile` 作为 PE 结构补充；**默认关、显式调用**（改默认需用户批准）。
+
 ### [2026-10-10] 把三层串成一条流程（否则"层再全"也只是散件）
 
 **判断**：防御体系的价值不在"有多少个脚本"，而在**下载/引入外部东西时能不能被顺手用起来**。

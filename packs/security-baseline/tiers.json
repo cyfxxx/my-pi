@@ -64,5 +64,87 @@
       "tier1_init_ms": 100,
       "tier1_verify_warm_ms": 100
     }
+  },
+  "tier3": {
+    "why": "系统级持久化点（Windows 注册表 Run 键 / 任务计划；Linux-macOS 的 cron）—— 它们不是文件，只能调只读查询命令。用户已批准为此破一次只用 Node 标准库的约束，但只限本层。",
+    "defaultOff": true,
+    "requiresExternalCommands": true,
+    "readOnlyOnly": true,
+    "allowlist": [
+      "reg query",
+      "schtasks /query",
+      "crontab -l"
+    ],
+    "sources": [
+      {
+        "key": "env:crontab",
+        "platforms": [
+          "linux",
+          "darwin"
+        ],
+        "cmd": "crontab",
+        "args": [
+          "-l"
+        ],
+        "note": "用户级 cron（只读）；没有 crontab 条目时可能非零退出 ⇒ not-scanned"
+      },
+      {
+        "key": "env:win-run-hkcu",
+        "platforms": [
+          "win32"
+        ],
+        "cmd": "reg",
+        "args": [
+          "query",
+          "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+        ],
+        "note": "当前用户自启（只读查询）"
+      },
+      {
+        "key": "env:win-run-hklm",
+        "platforms": [
+          "win32"
+        ],
+        "cmd": "reg",
+        "args": [
+          "query",
+          "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+        ],
+        "note": "全机自启（只读查询）"
+      },
+      {
+        "key": "env:win-tasks",
+        "platforms": [
+          "win32"
+        ],
+        "cmd": "schtasks",
+        "args": [
+          "/query",
+          "/fo",
+          "LIST"
+        ],
+        "note": "任务计划（只读查询；普通用户可能看不到全部）"
+      },
+      {
+        "key": "env:path-value",
+        "platforms": [
+          "any"
+        ],
+        "enabled": false,
+        "cmd": "-",
+        "args": [],
+        "note": "PATH 变量值本身（更便宜的替代方案，可用来发现 PATH 被改）；按用户要求 PATH 相关默认不收"
+      },
+      {
+        "key": "env:path-dirs",
+        "platforms": [
+          "any"
+        ],
+        "enabled": false,
+        "cmd": "-",
+        "args": [],
+        "note": "PATH 目录内容：体量巨大且随安装常变 ⇒ 纳入即误报，默认关"
+      }
+    ]
   }
 }

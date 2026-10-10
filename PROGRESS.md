@@ -3006,3 +3006,12 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 写进 `pi-download-safety` 技能：**看是什么（三态）→ 比对官方校验和 → 依赖变更跑供应链 → 改动后跑基线 → 确认后刷新基线**。
 - 口径一并写进去：`not-scanned ≠ 安全`、`needs-review ≠ 恶意`、默认只记录不阻断、Tier1 3.1s / Tier2 190ms、上传文件本体一律不做。
 - 定位：**文档即接线**——不新增工具、不动声明面、零运行时成本。
+
+### tier3 落地 + 用 apt 装上了 YARA（2026-10-10）
+
+- tier3：默认关；**只读靠 `READ_ONLY_ALLOWLIST` 白名单结构性保证**（reg/query、schtasks /query、crontab -l）；
+  自证三桩 + 平台门控 + 反向 unchanged 全过；Linux 上 Windows 项如实 `not-scanned`；`--tier3 --verify` **59ms、unchanged=1**。
+  它还把 `PATH` **变量值本身**纳入（比哈希 PATH 目录更省且够用）。
+- 杀毒：**突破口是 apt 不是 pip**（apt 2.8.3 arm64、腾讯 ubuntu-ports 镜像可达）⇒ **装上 `pefile` 2023.2.7 与 `yara` 4.5.0** ✓；
+  `oletools` 该发行版没有 ✗；**ClamAV 判定不通并写死**（官方库 000/size=0、国内三镜像 404）。
+- 下一步：YARA 接成可选 L3（缺失即 `not-scanned`），默认关。
