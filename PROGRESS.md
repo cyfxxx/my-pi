@@ -3084,3 +3084,13 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   `AV-INSTALL-ATTEMPTS.md`（表格+判断规则+四条注意）与 `pi-download-safety`（"扫描太慢怎么办"）。
 - 补跑全量测试（golden --fast 会跳过 vitest）：**93 files / 1052 passed / 4 skipped、37.8s、零回归** ✓。
 - 教训：**"我记下了" ≠ "该看到的人会看到"** —— 验证记录是否到位要在**目标读者会翻的地方 grep**。
+
+### 病毒库每日自动更新（2026-10-10）
+
+- 起因：`freshclam` 能拉库但**没有任何东西定期跑** ⇒ 库会过期、防护随时间衰减 ✗（整套体系里唯一"自己变差"的环节）。
+- 做法：用 my-pi 自带的跨设备定时任务机制（`portable/agent/scheduled-seeds.json`）加任务「每日更新 ClamAV 病毒库」，
+  **不用 cron**（proot 里没有 cron 守护 ✗）。
+- 提示词按 `--no-extensions` 约束写：只判断安装/跑 freshclam/如实报结果；**失败不反复重试**（网络波动是常态）；
+  **禁止**删除、改配置、启常驻（需用户批准）。
+- 验证：`✓ 每日更新 ClamAV 病毒库`（headless 守门通过）；无扩展工具/斜杠命令引用；任务总数 6。
+- 该机制的设计：同名任务**不会被覆盖** ⇒ 改定义需 `node scripts/reseed-seeds.mjs --apply`（先备份）。
