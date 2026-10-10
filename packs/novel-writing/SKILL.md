@@ -92,19 +92,28 @@ novel-writing/
 ├── craft.md           # 文风溯源 + 写作戒律 + 渲染技法 + 去 AI 指纹
 ├── engineering.md     # 工程机制：50章分批/上下文组装/事实锁/状态回证/伏笔追踪/双重审查/连续性账本
 ├── templates/         # 知识库模板（世界基石/世界观规则/角色档案/档案事件/文风样本/伏笔台账）
+│                        # 另含：章节意图卡（must-keep/must-avoid）、角色×信息矩阵、上下文编译轨迹
 └── scripts/
     └── count_chars.py # 审查字数统计（省略号加权口径，无依赖）
 ```
 
+另：`REFERENCES.md` 记录来源、许可与取证（含 2026-10-10 新增借鉴的 AGPL 处理）。
+
 ## 来源与许可
 
-本包为三个公开 GitHub 技能包的分析、优化与整合，整合版采用 **CC BY-NC-SA 4.0**（取三者中最严格的许可）：
+本包为三个公开 GitHub 技能包的分析、优化与整合（**另借鉴 Narcooo/inkos 的机制、未取其文本**，见下），
+整合版采用 **CC BY-NC-SA 4.0**（取三者中最严格的许可）：
 
 | 来源 | 许可 | 贡献部分 |
 |---|---|---|
 | [zy-zmc/tianming-skill](https://github.com/zy-zmc/tianming-skill)（134★） | CC BY-NC-SA 4.0 | 分层架构；六大协议；一致性法典；文风溯源/戒律/渲染/去AI指纹；知识库装配契约；冲突值量化 |
 | [xiaofeng-928/chinese-longnovel-skill](https://github.com/xiaofeng-928/chinese-longnovel-skill)（70★） | MIT | 50 章分阶段规划；上下文组装与事实锁；状态回证模型；伏笔追踪回收；双重审查+哈希绑定；工程化校验思路 |
 | [ExplosiveCoderflome/ani-book-skill](https://github.com/ExplosiveCoderflome/ani-book-skill)（53★） | Apache-2.0 | 连续性账本（fact/payoff/resource）；去 AI 味二稿方法；质量债与恢复工作流 |
+
+**2026-10-10 新增借鉴（只取机制）**：`github.com/Narcooo/inkos`（v2.0.0）—— 许可 **AGPL-3.0**（已读其 LICENSE，34,523 字节）。
+本轮据其提炼并自写：章节意图卡（must-keep / must-avoid / 冲突处理）、**上下文编译轨迹**（含保护层级）、
+**角色×信息矩阵**、**检索投影可重建且不作事实权威**、可选趋势扫描、审稿与完成态分离。
+**AGPL 是强 copyleft：未复制其任何代码或提示词原文**；若将来要复制，本包许可须重新评估 ✗。取证与"不采纳清单"见 `REFERENCES.md`。
 
 ## 整合时的优化
 
@@ -116,6 +125,7 @@ novel-writing/
 - **创作参数可配置**：上游写死的网文向常数收敛为 `rules.md` 末尾"可调参数"表
 - **补强**：新增 `engineering.md`（50 章分批/事实锁/状态回证/双重审查/连续性账本）与 `templates/`
 - **脚本独立**：`scripts/count_chars.py` 重写为无外部依赖的单文件
+- **借鉴来源分层**：新增来源只取**机制**并注明出处与许可（见 `REFERENCES.md`），不复制原文
 
 ## 使用后经验沉淀（必做）
 
