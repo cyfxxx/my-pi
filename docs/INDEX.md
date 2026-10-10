@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（171 条）
+## 决策台账（172 条）
 
+- `DECISIONS.md` · [2026-10-10] 接上可选 L2 = YARA（并把"判决早于命中"这个 bug 一起修了） · **为什么现在能接**：上一轮用 apt 装上了 **YARA 4.5.0**（`python3-yara`）——**规则引擎、不需要病毒库** · 数字: 4 条
 - `DECISIONS.md` · [2026-10-10] tier3 落地（只读白名单）+ **用 apt 装上了 YARA 4.5.0**（突破口） · **① tier3 落地并验证**：可选层、**默认关**、只有 `--tier3` 才跑。**"只读"是结构性保证**——
 - `DECISIONS.md` · [2026-10-10] 把三层串成一条流程（否则"层再全"也只是散件） · **判断**：防御体系的价值不在"有多少个脚本"，而在**下载/引入外部东西时能不能被顺手用起来**。
 - `DECISIONS.md` · [2026-10-10] 第 ⑦ 层：系统级持久化点 —— **只收文件形态**，缺口如实列出（不破便携化约束） · **做了什么**：Tier2 补三类**文件形态**的持久化点 —— Linux 桌面自启 `~/.config/autostart/**`、
@@ -179,7 +180,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（169 条）
+## 进度记录（170 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -350,6 +351,7 @@
 - `PROGRESS.md` · 第 ⑦ 层：系统级持久化点（2026-10-10） · - 收（文件形态，跨平台同一套机制）：`~/.bashrc`/`.profile`/`.zshrc`、`~/.ssh/authorized_keys`+`config`、
 - `PROGRESS.md` · 把三层串成一条流程（2026-10-10） · - 写进 `pi-download-safety` 技能：**看是什么（三态）→ 比对官方校验和 → 依赖变更跑供应链 → 改动后跑基线 → 确认后刷新基线**。
 - `PROGRESS.md` · tier3 落地 + 用 apt 装上了 YARA（2026-10-10） · - tier3：默认关；**只读靠 `READ_ONLY_ALLOWLIST` 白名单结构性保证**（reg/query、schtasks /query、crontab -l）；
+- `PROGRESS.md` · 接上可选 L2 = YARA（2026-10-10） · - `security-scan.mjs` 的 L2 从"永远 not-scanned"变成真的会跑：有引擎+有规则才跑；命中⇒`hit`+规则名； · 数字: 4 条
 
 ## 缺陷回放（16 条）
 

@@ -3015,3 +3015,12 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 杀毒：**突破口是 apt 不是 pip**（apt 2.8.3 arm64、腾讯 ubuntu-ports 镜像可达）⇒ **装上 `pefile` 2023.2.7 与 `yara` 4.5.0** ✓；
   `oletools` 该发行版没有 ✗；**ClamAV 判定不通并写死**（官方库 000/size=0、国内三镜像 404）。
 - 下一步：YARA 接成可选 L3（缺失即 `not-scanned`），默认关。
+
+### 接上可选 L2 = YARA（2026-10-10）
+
+- `security-scan.mjs` 的 L2 从"永远 not-scanned"变成真的会跑：有引擎+有规则才跑；命中⇒`hit`+规则名；
+  未命中⇒`ok`；规则缺失/引擎不可用⇒`not-scanned`（带"未扫描≠安全"）。只在本层破零依赖。
+- 规则集 `packs/security-baseline/yara/starter.yar`（4 条，**故意极窄**，避免假阳性）。
+- **修 bug**：`verdict` 原算在 L2 之前 ⇒ YARA 命中了结论仍是 clean ✗；已移到 L2 之后并排除信息性条目。
+- 三态实测：suspicious/hit（点名规则）、clean/ok、clean/not-scanned（无规则）。
+- 纠正记忆错误：`security-scan.mjs` **没有** `--self-check`（自证在 `security-baseline.mjs`）。

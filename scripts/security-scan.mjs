@@ -93,7 +93,49 @@ function scanFile(path) {
     if (unpacked > 0 && unpacked < 200) hits.push({ rule: 'zip-bomb-ratio', detail: '压缩体积极小但含大量条目头' });
   }
   if (hits.length) layers.L1_structure = 'hit';
-  const verdict = hits.length ? 'suspicious' : 'clean';
+  // L2：杀毒/特征层 —— **可选、缺失即如实 not-scanned**（2026-10-10 接上 YARA）
+  // 说明：YARA 是**规则引擎、不需要病毒库**，正好绕开 ClamAV 的死结（官方库实测 000、国内镜像 404）。
+  // 口径：① 有引擎 + 有规则才跑；② 引擎或规则缺失、或规则编译失败 ⇒ 一律 `not-scanned` 并写明原因；
+  //       ③ **只在本层破"零依赖"**（Tier1/Tier2 基线不受影响，那是 Node 标准库的零依赖）。
+  const yaraRulesDir = process.env.PI_YARA_RULES || join(dirname(new URL(import.meta.url).pathname), '..', 'packs', 'security-baseline', 'yara');
+  let yaraRules = [];
+  try {
+    yaraRules = existsSync(yaraRulesDir) ? readdirSync(yaraRulesDir).filter((f) => /[.](yar|yara)$/i.test(f)).map((f) => join(yaraRulesDir, f)) : [];
+  } catch {
+    yaraRules = [];
+  }
+  if (yaraRules.length === 0) {
+    layers.L2_antivirus = 'not-scanned';
+    hits.push({ rule: 'l2-not-scanned', detail: `无 YARA 规则文件（${yaraRulesDir}）⇒ 未做特征匹配；**未扫描不等于安全**` });
+  } else {
+    const py = [
+      '-c',
+      'import sys, yara\n' +
+        'rules = yara.compile(filepaths={p.split("/")[-1]: p for p in sys.argv[2:]})\n' +
+        'print("\\n".join(sorted({m.rule for m in rules.match(sys.argv[1])})))\n',
+      path,
+      ...yaraRules,
+    ];
+    try {
+      const out = execFileSync('python3', py, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      const matched = out.split('\n').map((s) => s.trim()).filter(Boolean);
+      if (matched.length) {
+        layers.L2_antivirus = 'hit';
+        for (const r of matched) hits.push({ rule: `yara:${r}`, detail: '命中 YARA 规则' });
+      } else {
+        layers.L2_antivirus = 'ok';
+      }
+    } catch (e) {
+      layers.L2_antivirus = 'not-scanned';
+      hits.push({ rule: 'l2-not-scanned', detail: `YARA 不可用（${e && e.status ? `rc=${e.status}` : '未安装/异常'}）⇒ **未扫描不等于安全**` });
+    }
+  }
+
+  // 判决必须在 **L2 之后**算（2026-10-10 修 bug）：原来它算在 L2 之前 ⇒ YARA 命中了结论却还是 clean ✗。
+  // 同时把**信息性条目**排除在外（"L2 未扫描"是**披露**，不是命中的恶意特征 ⇒ 不该翻转结论）。
+  const decisiveHits = hits.filter((h) => !String(h.rule).startsWith('l2-not-scanned'));
+  const verdict = decisiveHits.length ? 'suspicious' : 'clean';
+
   return { path, bytes: buf.length, sha256: digest, magic, layers, hits, verdict };
 }
 

@@ -90,7 +90,6 @@
 {"kind":"change","commit":"a0d659120","ts":"2026-10-06","subject":"fix(translate-zh): 补全双引号字符串翻译 + settings 同步版本/全屏滚轮","files":["portable/agent/settings.json","portable/agent/skills/pi-translate-zh/patch-all-zh.mjs"],"heldOut":false}
 {"kind":"change","commit":"c2d560712","ts":"2026-10-06","subject":"docs: 记录本次上游同步的决策与验证（DECISIONS/PROGRESS）","files":["DECISIONS.md","PROGRESS.md"],"heldOut":false}
 {"kind":"change","commit":"8a9ab17d9","ts":"2026-10-06","subject":"docs: 上游 v0.99.1→v1.0.4 跳版报告（含逐项实测的兼容面）","files":["docs/README.md","docs/development/PI-RUNTIME-AUDIT.md","docs/operations/UPSTREAM-CHANGES-v0.99.1-to-28dcce2ba.md","docs/operations/UPSTREAM-UPDATE.md"],"heldOut":false}
-{"kind":"change","commit":"112a92f84","ts":"2026-10-06","subject":"fix(golden): 无头冒烟改为失败重试一次（provider 抖动不再假红）","files":["scripts/golden-tasks.sh"],"heldOut":false}
 {"kind":"rejected","ts":"2026-10-08","proposal":"[2026-10-08] 三个未迁移子系统：**都不迁移**（用户批复第 3 项），但理由各不相同且都是实测","reason":"听起来很合理，**一验就被否掉**（剥掉前缀后 47 → 46 对，最高相似度仍 0.58–0.63）。","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-07","proposal":"[2026-10-07] fork 池化实测不成立：`new_session {parentSession}` 会\"收下但不分叉\"","reason":"`new_session {parentSession}`）需要各自验证，且复用键得带上父会话路径，本轮不做。","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-07","proposal":"[2026-10-07] 调研：重型工具\"只给子代理\"与 `deferred` + `tool_search` 两条路的实测结论（**暂不采用**）","reason":"并防止缓存失效。要求先分析可行性。查证过程分四步，最后一步的实测把方案否掉了。","evidence":"","source":"DECISIONS.md"}

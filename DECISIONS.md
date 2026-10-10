@@ -2,6 +2,36 @@
 
 ## 格式
 
+### [2026-10-10] 接上可选 L2 = YARA（并把"判决早于命中"这个 bug 一起修了）
+
+**为什么现在能接**：上一轮用 apt 装上了 **YARA 4.5.0**（`python3-yara`）——**规则引擎、不需要病毒库**
+⇒ 正好绕开 ClamAV 的死结（官方库 000、国内镜像 404）。
+
+**落地**：`scripts/security-scan.mjs` 的 `L2_antivirus` 从"永远 not-scanned"变成**真的会跑**：
+- **有引擎 + 有规则**才跑（规则目录默认 `packs/security-baseline/yara/`，可用 `PI_YARA_RULES` 覆盖）；
+- 命中 ⇒ `L2_antivirus=hit` 并把**规则名**列进 hits（`yara:reverse_shell_bash_tcp` 之类）；
+- 未命中 ⇒ `L2_antivirus=ok`；**规则缺失/引擎不可用/规则编译失败** ⇒ **`not-scanned` 并写明原因**
+  （附一句"**未扫描不等于安全**"）；
+- **只在本层破"零依赖"**（Tier1/Tier2 基线仍是纯 Node 标准库，不受影响）。
+
+**规则集**：`packs/security-baseline/yara/starter.yar`（4 条，**故意写得极窄**：EICAR 测试串、bash 反弹 shell
+的典型写法、挖矿指示串、PowerShell 隐藏窗口 + base64 组合）。窄的理由是本会话的教训：
+**会狼来了的检查必然被无视** ⇒ 宁可漏报也不制造假阳性。
+
+**修掉的 bug（实测抓出）**：`verdict` 原本算在 **L2 之前**（`hits.length ? 'suspicious' : 'clean'`）
+⇒ **YARA 命中了、结论却还是 `clean`** ✗。已把判决**移到 L2 之后**，并把**信息性条目**
+（`l2-not-scanned`：那是"披露"，不是恶意特征）**排除**在翻转条件之外。
+
+**三态实测（可重跑）**：
+```
+含反弹 shell 特征 ⇒ 结论：suspicious ｜ L2_antivirus=hit  ｜ ⚠ yara:reverse_shell_bash_tcp
+干净文件        ⇒ 结论：clean       ｜ L2_antivirus=ok
+无规则（PI_YARA_RULES 指向不存在的目录） ⇒ 结论：clean ｜ L2_antivirus=not-scanned（带"未扫描≠安全"披露）
+```
+
+**顺带纠正我自己的一处记忆错误**：`security-scan.mjs` **没有** `--self-check`（自证在
+`security-baseline.mjs` 里）；所以这次的证据是**直接三态验证**，而不是我去跑一个不存在的自证入口。
+
 ### [2026-10-10] tier3 落地（只读白名单）+ **用 apt 装上了 YARA 4.5.0**（突破口）
 
 **① tier3 落地并验证**：可选层、**默认关**、只有 `--tier3` 才跑。**"只读"是结构性保证**——
