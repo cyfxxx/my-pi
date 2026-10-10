@@ -3024,3 +3024,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **修 bug**：`verdict` 原算在 L2 之前 ⇒ YARA 命中了结论仍是 clean ✗；已移到 L2 之后并排除信息性条目。
 - 三态实测：suspicious/hit（点名规则）、clean/ok、clean/not-scanned（无规则）。
 - 纠正记忆错误：`security-scan.mjs` **没有** `--self-check`（自证在 `security-baseline.mjs`）。
+
+### ClamAV 装成 + L2 接线接回（2026-10-10）
+
+- **更正**：此前"库拿不到、判定不通"是错的 ✗ —— 真相是**网络波动（000）+ 库挑 UA（默认 curl 403、官方 ClamAV UA 200/48MB）**。
+- 实测：clamav **1.5.4**、`Known viruses: 3,628,144`、EICAR ⇒ **FOUND(rc=1)**、无害 ⇒ **OK(rc=0)**；未装 daemon（内存取舍）。
+- L2 接回时踩了**形参遮蔽**陷阱（函数形参就叫 `path`）⇒ 正解是块内不引用 `path`，用具名导入 `join`/`pathDelimiter`/`pathBasename`。
+- 四态：EICAR⇒suspicious、YARA 命中⇒suspicious+点名、干净⇒clean/ok；**"只被 ClamAV 检出"与"两者都缺⇒not-scanned"两态仍待证**（后者是我测试写错）。

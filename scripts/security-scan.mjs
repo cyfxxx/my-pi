@@ -28,7 +28,7 @@
 import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { join, dirname, extname } from 'node:path';
+import { join, dirname, extname, delimiter as pathDelimiter, basename as pathBasename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -128,6 +128,52 @@ function scanFile(path) {
     } catch (e) {
       layers.L2_antivirus = 'not-scanned';
       hits.push({ rule: 'l2-not-scanned', detail: `YARA 不可用（${e && e.status ? `rc=${e.status}` : '未安装/异常'}）⇒ **未扫描不等于安全**` });
+    }
+  }
+
+  // L2-b：ClamAV（可选；与 YARA 并存）。**缺失即如实 not-scanned**，绝不假装扫过。
+  // ⚠ 陷阱（本会话踩过）：本函数**形参就叫 `path`**（是文件路径字符串）⇒ 块内**不能**写 `path.join` 之类，
+  //    那是被遮蔽的形参、不是 node:path 模块（表现是 `path.join is not a function`，且**加 import 也无效**）。
+  //    所以这里只用具名导入：`join` / `pathDelimiter` / `pathBasename`；传文件时用的 `path` 才是形参（正是所需）。
+  // 探测二进制用**纯 Node 扫 PATH**（不调外部命令；Windows 用 PATHEXT 近似）。
+  // 成本如实说明：`clamscan` 每次载库，本机实测约 **10 秒**；`clamdscan` 亚秒级但需常驻 daemon（默认不装）。
+  const findBin = (name) => {
+    const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+    for (const dir of String(process.env.PATH || '').split(pathDelimiter)) {
+      if (!dir) continue;
+      for (const ext of exts) {
+        const full = join(dir, name + ext);
+        if (existsSync(full)) return full;
+      }
+    }
+    return null;
+  };
+  const clamBin = findBin('clamdscan') || findBin('clamscan');
+  if (!clamBin) {
+    if (layers.L2_antivirus === 'not-scanned') {
+      hits.push({ rule: 'l2-not-scanned', detail: 'ClamAV 未安装（PATH 里没有 clamscan/clamdscan）⇒ **未扫描不等于安全**' });
+    }
+  } else {
+    const binName = pathBasename(clamBin);
+    const digestSig = (text) =>
+      String(text).split('\n').filter((l) => /FOUND/.test(l)).map((l) => (l.split(':').pop() || '').replace(/\s*FOUND\s*$/, '').trim());
+    try {
+      const out = execFileSync(clamBin, ['--no-summary', '--stdout', path], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 300000 });
+      const sigs = digestSig(out);
+      if (sigs.length) {
+        layers.L2_antivirus = 'hit';
+        for (const sig of sigs) hits.push({ rule: `clamav:${sig || 'unknown'}`, detail: `ClamAV(${binName}) 检出` });
+      } else if (layers.L2_antivirus === 'not-scanned') {
+        layers.L2_antivirus = 'ok';
+      }
+    } catch (e) {
+      const sigs = digestSig((e && e.stdout) || '');
+      if (sigs.length) {
+        layers.L2_antivirus = 'hit'; // rc=1 = 检出（execFileSync 会抛）
+        for (const sig of sigs) hits.push({ rule: `clamav:${sig || 'unknown'}`, detail: `ClamAV(${binName}) 检出` });
+      } else if (layers.L2_antivirus === 'not-scanned') {
+        hits.push({ rule: 'l2-not-scanned', detail: `ClamAV 运行失败（${e && e.status ? `rc=${e.status}` : '异常'}）⇒ **未扫描不等于安全**` });
+      }
     }
   }
 

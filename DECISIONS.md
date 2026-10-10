@@ -2,6 +2,31 @@
 
 ## 格式
 
+### [2026-10-10] ClamAV 装成且证明能检出；L2 接线已接回（**其中 ClamAV 路径尚待一个"只被它检出"的样本证明**）
+
+**① 结论更正（必须留痕）**：我此前写"**ClamAV 病毒库在你这网络下拿不到、判定不通、不再重复试**"——
+**作为永久结论是错的** ✗。实测还原了真相：
+- `www.clamav.net` + 浏览器 UA ⇒ **200**；`database.clamav.net/main.cvd` + **默认 curl UA** ⇒ **403**（Cloudflare 边缘），
+  而 + **官方 `ClamAV/1.4.0 (OS: linux-gnu)` UA** ⇒ **200 / 48 052 692 字节** ⇒ **库是能拿的，只是挑客户端身份**；
+- 早前那次 **`000`** 是**路径/隧道不通**（与 403 是两回事）；本机会话内 `github.com` 也在 **000↔200** 之间反复
+  ⇒ **网络波动 + UA 敏感**，而不是"域名被封"。
+
+**② 装成并验证（实测原文）**：`clamav` **1.5.4**；`freshclam` 更新成功（bytecode 339、daily-28148）；
+**`Known viruses: 3,628,144`**；`clamscan` 对 EICAR ⇒ **`Eicar-Test-Signature FOUND`（rc=1）**，对无害文件 ⇒ **`OK`（rc=0）**。
+**未装 `clamav-daemon`**（`clamdscan` 更快但要常驻内存，手机上代价与"别影响效率"冲突；本轮按此取舍）。
+
+**③ L2 接线接回（修掉一个我自己踩的陷阱）**：把 ClamAV 逻辑写进 `scanFile(path)` 时，我用了 `path.join(...)`——
+而**这个函数的形参就叫 `path`（文件路径字符串）** ⇒ 打到被遮蔽的形参上，表现是 `path.join is not a function`；
+**更坑的是：加 `import path from 'node:path'` 也无效**（导入同样被形参遮蔽）⇒ 我第一次误判成"导入缺失"，白花一轮 ✗。
+**正解**：块内**完全不引用 `path` 这个名字**，改用具名导入 `join` / `pathDelimiter` / `pathBasename`；
+只有"传文件给 clamscan"那一处用形参 `path`（这次遮蔽反而正好）。
+
+**④ 四态验证（如实标注边界）**：EICAR ⇒ `suspicious`（`L1_structure=hit` **+ `L2_antivirus=hit`**）；
+反弹 shell ⇒ `suspicious` + `yara:reverse_shell_bash_tcp`；干净文件 ⇒ `clean` + `L2_antivirus=ok`。
+**⚠ 尚未证明的部分**：EICAR 会被 **L1 内置字符串检查先拦住** ⇒ 现有用例**无法单独证明 ClamAV 那条路真在跑**
+（YARA 的 hit 也可能来自我写的 EICAR 规则）。**记为待证**：需要一个**只被 ClamAV 检出**的样本（或临时禁用 YARA+内置检查）才能确证。
+"两个都缺 ⇒ not-scanned"那一态也**尚未跑通**（我那次模拟把 PATH 清空，连 `timeout` 都没了 ⇒ **是我的测试写错**）。
+
 ### [2026-10-10] 接上可选 L2 = YARA（并把"判决早于命中"这个 bug 一起修了）
 
 **为什么现在能接**：上一轮用 apt 装上了 **YARA 4.5.0**（`python3-yara`）——**规则引擎、不需要病毒库**
