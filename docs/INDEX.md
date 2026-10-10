@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（194 条）
+## 决策台账（195 条）
 
+- `DECISIONS.md` · [2026-10-10] 立项前评估：**把基座从 pi 换成 DSH**（已记录、**未排期**） · **用户要求**："做一下记录，后续我再决定什么时候测试" ✓ ⇒ 落成可查阅文档 `docs/design/BASE-SWITCH-DSH.md` ✓ · 数字: 11 个 / 223 个 / 4 个 / 847 个
 - `DECISIONS.md` · [2026-10-10] ★ 中途注入的真根因：**子进程拒绝了 prompt，而父侧把"拒绝"当成功** ✗✓ —— 修好后功能**真的交付了** ✓ · **上一轮我把状态写成"未交付"** ✗ —— 现在**可以改口**：**功能已交付** ✓（有客观证据 ✓）。过程与根因值得完整记下。 · 数字: 4 轮 / 24552B / 6442B / 30994B
 - `DECISIONS.md` · [2026-10-10] 中途注入实验：**"改变行为"仍未观察到** ✗ —— 但拿到了决定性证据（病因收窄） · **必须先把话说清**：**"子代理中途通信"这个功能的用户价值（中途纠偏）目前*尚未交付*** ✗。 · 数字: 3 个 / 1 个 / 2 个 / 4 个
 - `DECISIONS.md` · [2026-10-10] **BUG-REPLAYS 的"静默跳过"缺陷**：守门只查"有没有命令"、不查列数 ✗✓（+ 知识库 16 → 25 条） · **发现经过（很值得记）**：我让子代理把 `CODING-TRAPS` 的教训收进知识库 ⇒ 它查证后回报： · 数字: 6 条 / 25 条 / 5 条 · 证据: node scripts/knowledge-compile.mjs --update
@@ -202,7 +203,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（192 条）
+## 进度记录（193 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -396,6 +397,7 @@
 - `PROGRESS.md` · BUG-REPLAYS 静默跳过缺陷 + 知识库 16 → 25（2026-10-10） · - 查证：知识库**没有输入口**（`create_patterns` 是编译器输出；它只读 BUG-REPLAYS / CHANGES rejected / 既有页） · 数字: 6 条 / 25 条
 - `PROGRESS.md` · 中途注入实验：改变行为仍未观察到（2026-10-10） · - **用户价值尚未交付** ✗：已证的是"投递链路"（t+19s 投递、未读 1→0、consumed:2）与"并行不再被池 bug 打断"； · 数字: 2 个 / 4 个
 - `PROGRESS.md` · ★ 中途注入已交付：根因是"拒绝被当成成功"（2026-10-10） · - 仪表定性（非推断）：Q1 父侧**确实写了** prompt 帧 ✓；Q2 子进程**直接拒绝** ✗ · 数字: 5 次
+- `PROGRESS.md` · 换基座评估（pi → DSH）：已记录、未排期（2026-10-10） · - 新增 `docs/design/BASE-SWITCH-DSH.md`：实测耦合面（11 补丁多为 UI / 223 TS 只用 4 原语 / 运行时绑定）
 
 ## 缺陷回放（26 条）
 
@@ -426,7 +428,7 @@
 - `docs/BUG-REPLAYS.md` · #25 **测试把 bug 当契约**：既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） · 修池 bug 时发现原测试 expect(a.worker.alive).toBe(false) 正是 bug 行为
 - `docs/BUG-REPLAYS.md` · #26 **RPC 的 prompt 被拒、父侧却当成功**：缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolv · 帧证据：`dir=in {"success":false,"error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')…"}` · 数字: 4 轮 · 证据: node scripts/subagent-inbox.mjs post
 
-## 设计文档（146 条）
+## 设计文档（152 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -434,6 +436,12 @@
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · （历史段落，保留作对照）最初的"判定不通" · - 引擎：本环境**未安装**；
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 下一步（建议接成"可选 L3 层"） · 在 `scripts/security-scan.mjs` 里加 **可选 L3 = YARA**：有 `yara` 引擎 + 有规则文件才跑；
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 常驻（`clamd`）vs 瞬时（`clamscan`）：实测数字与判断规则（2026-10-10） · **本机基准**：`MemTotal 7718 MB / MemAvailable 2544 MB / Swap 5768 MB`。 · 数字: 10 秒 / 966 MB / 1 GB / 7718 MB
+- `docs/design/BASE-SWITCH-DSH.md` · 一、结论先行 · **这不是"换一个依赖"，而是"换一个平台"** ✓： · 数字: 11 个
+- `docs/design/BASE-SWITCH-DSH.md` · 二、my-pi 对 pi 的耦合面（**本仓库实测** ✓） · 数字: 11 个 / 223 个 / 4 个
+- `docs/design/BASE-SWITCH-DSH.md` · 三、DSH 的扩展模型（**从它自己的 README 与 `lib/types/` 实测** ✓） · - **不是单一 CLI，而是"启动器 + profile"**：profile 由**多个插件组合包（bundles）按 patch 层顺序叠加** ✓；
+- `docs/design/BASE-SWITCH-DSH.md` · 四、工程量分块 · > **D 为什么最危险**：它**不产生新功能**，却决定"**改完还能不能证明自己是好的**" ✓ —— · 数字: 4 个 / 223 个 / 11 个 / 6 个
+- `docs/design/BASE-SWITCH-DSH.md` · 五、建议的 spike（**用户决定测试时，照此执行即可** ✓） · **目标**：把上面最大的未知（B 的契约）**量出来**，让估算从"拍脑袋"变成"有系数" ✓。**不碰 my-pi 仓库** ✓（零风险 ✓）。 · 数字: 4 个
+- `docs/design/BASE-SWITCH-DSH.md` · 六、风险与前提（如实） · 1. **对标的是 RC 版本**（`0.2.0-rc.2` ✗）⇒ **接口可能变动** ✓；换基座前应锁定一个**稳定版**或接受跟随成本 ✗； · 数字: 11 个
 - `docs/design/CODING-TRAPS.md` · 1. 注释里出现"两个星号紧跟斜杠"⇒ 块注释被提前关闭 · - **症状**：`ReferenceError: xxx is not defined`，而报错行**看起来完全正常**（因为它是被"挤出注释"的普通文本）。 · 数字: 3 轮
 - `docs/design/CODING-TRAPS.md` · 2. 形参名与导入的模块名同名 ⇒ 块内引用模块会打到形参上 · - **症状**：`path.join is not a function`；**而且"补一个 import"完全无效**（导入同样被形参遮蔽）。 · 数字: 1 轮
 - `docs/design/CODING-TRAPS.md` · 3. `pkill -f <模式>` 可能杀掉自己 · - **症状**：命令自己被打断（`[killed by signal: SIGTERM]`），后续步骤静默不执行。
