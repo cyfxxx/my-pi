@@ -1,9 +1,33 @@
 ---
 name: pi-net-mirror
-description: 国内网络受限时的访问与下载加速：GitHub 文件走 jsDelivr、模型走 hf-mirror、包管理走国内镜像；含降级链与实测表。用户说"下载失败""访问不了""GitHub 打不开""超时""镜像""加速""clone 慢""pip/npm 装不上"时触发。不适用：需要 Release 二进制或 git clone（本环境无已验证通道，见技能内说明）。
+description: 国内网络受限时的访问与下载加速：GitHub 文件走 jsDelivr、模型走 hf-mirror、包管理走国内镜像；含降级链与实测表。用户说"下载失败""访问不了""GitHub 打不开""超时""镜像""加速""clone 慢""pip/npm 装不上"时触发。不适用：需要 GitHub Release 二进制（本环境仍无已验证通道）。**git clone 是可用的**：走 gitclone.com 或 Gitee 镜像，见技能内实测。
 version: v1.0
 更新日期: 2026-10-09
 ---
+
+## 实测补充（2026-10-10，父代理复核）
+
+**git clone 是可用的**（推翻本技能早前"无已验证通道"的说法；原结论来自单次探测）：
+
+```
+$ git ls-remote https://gitclone.com/github.com/git/git HEAD
+d38352cd43ab9745686d697872408bc3249a153f	HEAD        # ✓ 真实 refs
+$ git ls-remote https://gitee.com/mirrors/redis.git HEAD
+e8726d18e5bab24cbfcb0a0c36f21ce5a1140471	HEAD        # ✓ Gitee 镜像同样可用
+```
+
+**jsDelivr 的 `/gh/` 通道给的是真实内容**（不是"只能当数据 API"，也不是 0 字节）：
+
+```
+$ curl -m 12 -sL -o /dev/null -w '%{http_code} size=%{size_download}' https://cdn.jsdelivr.net/gh/git/git@master/README.md
+200 size=3808
+$ curl -m 12 -sL -o /dev/null -w '%{http_code} size=%{size_download}' https://cdn.jsdelivr.net/gh/vuejs/vue@v2.7.16/README.md
+200 size=7088          # 不可变 tag 同样给内容
+```
+
+**仍然不可用**（我实测，与网上常见推荐相反）：`ghproxy` 全系（ghproxy.com / gh-proxy.com / mirror.ghproxy.com /
+ghproxy.net / ghfast.top / ghproxy.cc / gh.llkk.cc / gh-proxy.net）**全部 000**；`github.com` 与
+`raw.githubusercontent.com` 亦不可达。**判"不可达"前请换路径/协议复测，并给出字节数**——单次探测不足以判死。
 
 # pi-net-mirror 技能
 
