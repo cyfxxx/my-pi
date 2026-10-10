@@ -35,10 +35,10 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readFile, readdir, stat, writeFile, mkdir, rm } from 'node:fs/promises';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFile, readdir, stat, writeFile, mkdir, rm, chmod } from 'node:fs/promises';
+import { existsSync, readFileSync, statSync, accessSync, constants as fsConstants } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { dirname, join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep, delimiter as pathDelimiter } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 
 const HERE = import.meta.dirname;
@@ -309,53 +309,159 @@ async function collect(root, includes, excludeRes) {
   return { files: out };
 }
 
+/**
+ * PATH 中**当前用户可写**的目录 —— 为什么只取可写目录（判据，2026-10-10 用户批准）：
+ * 攻击者要**植入假命令**必须有该目录的**写权限** ⇒ 可写目录是**小而高信号**的子集 ✓；
+ * 全量 PATH 目录体量大、随安装/更新常变 ⇒ **天天误报** ✗（且本机文件系统慢：Tier1 才 939 文件就 ~3 秒）。
+ * 与既有 `env:path-value`（PATH **变量值**的哈希）**互补**：值变了 vs 目录里的文件变了 —— 不重复 ✓。
+ *
+ * 可写判据 = **权限位有写位** 且 `accessSync(W_OK)` 通过。**必须带权限位**，否则以 root 运行时
+ * `access()` 对一切目录都返回可写（root 无视权限 ✗）⇒ "不可写目录"根本区分不出来。
+ */
+function writablePathDirs() {
+  const seen = new Set();
+  const out = [];
+  for (const raw of String(process.env.PATH || '').split(pathDelimiter)) {
+    if (!raw) continue;
+    const dir = raw.startsWith('~') ? join(homedir(), raw.slice(1)) : raw;
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    try {
+      const st = statSync(dir);
+      if (!st.isDirectory()) continue;
+      if ((st.mode & 0o222) === 0) continue; // 无写权限位 ⇒ 不是植入面（root 下也照样排除 ✓）
+      accessSync(dir, fsConstants.W_OK);
+    } catch (e) {
+      // 只忽略**文件系统层面**的失败；其它异常（例如拼错标识符）必须**冒出来**，
+      // 否则会被静默吞掉 —— 本函数第一版就把 `W_OK`（未导入）吞成了"所有目录都不可写" ✗。
+      const code = e && e.code;
+      if (code === 'ENOENT' || code === 'EACCES' || code === 'EPERM' || code === 'ENOTDIR') continue;
+      throw e;
+    }
+    out.push(dir);
+  }
+  return out;
+}
+
+/** 上限护栏：防某个可写目录塞进几万个文件把验证拖慢。到上限**如实记 truncated**，绝不假装扫全 ✓ */
+// 取值依据（2026-10-10 实测）：本机 stat 极慢（proot/Android）⇒ 2422 个 PATH 文件让 Tier2 热验证从
+// 190ms 涨到 **1946ms**（超 1 秒 ✗）⇒ 收紧到 300/900 后热验证回到 ~0.7s ✓。
+// **代价如实说明**：这是**部分覆盖**（到上限就停）⇒ 不是完整的 PATH 完整性检查 ✗；
+// 且被包管理器更新的目录（如 Termux 的 $PREFIX/bin）**装包后本来就会变** ⇒ 那时出现 changed 属**预期信号**，
+// 处理方式是**装完包重新 `--init`** ✓（而不是把它当噪声忽略）。
+const PATH_DIR_MAX_FILES = 300;
+const PATH_TOTAL_MAX_FILES = 900;
+
+/** 只取 PATH 目录的**顶层文件**：PATH 查找命中的就是顶层 ✓（不下潜 ⇒ 便宜且信号准 ✓） */
+async function collectPathFiles() {
+  const dirs = writablePathDirs();
+  const files = [];
+  const truncated = [];
+  for (const dir of dirs) {
+    if (files.length >= PATH_TOTAL_MAX_FILES) {
+      truncated.push(dir);
+      continue;
+    }
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    // **确定性截断**：先按文件名排序（`readdir` 的顺序是任意的 ⇒ 任意截断会让"覆盖哪些文件"不可复现 ✗）
+    const names = entries.filter((e) => e.isFile()).map((e) => e.name).sort();
+    if (names.length > Math.max(0, PATH_DIR_MAX_FILES)) truncated.push(dir);
+    let n = 0;
+    for (const name of names) {
+      if (n >= PATH_DIR_MAX_FILES || files.length >= PATH_TOTAL_MAX_FILES) {
+        if (!truncated.includes(dir)) truncated.push(dir);
+        break;
+      }
+      files.push(join(dir, name));
+      n++;
+    }
+  }
+  return { dirs, files, truncated };
+}
+
 async function scan(root, includes, excludeRes) {
   const { files } = await collect(root, includes, excludeRes);
+  const pathCol = await collectPathFiles();
   const recs = [];
   for (const f of files) {
     const st = await stat(f);
     recs.push({
       path: toPosix(relative(root, f)),
+      source: 'repo',
+      size: st.size,
+      mtimeMs: Math.round(st.mtimeMs),
+      sha256: sha256(await readFile(f)),
+    });
+  }
+  for (const f of pathCol.files) {
+    const st = await stat(f);
+    recs.push({
+      path: toPosix(f), // 绝对路径当键：不会与仓库相对路径冲突 ✓
+      source: 'path-writable',
       size: st.size,
       mtimeMs: Math.round(st.mtimeMs),
       sha256: sha256(await readFile(f)),
     });
   }
   recs.sort((a, b) => (a.path < b.path ? -1 : 1));
-  return recs;
+  return { records: recs, pathDirs: pathCol.dirs, pathTruncated: pathCol.truncated };
 }
 
 async function verify(root, includes, excludeRes, baselineFile) {
   const base = JSON.parse(await readFile(baselineFile, 'utf8'));
   const byPath = new Map(base.records.map((r) => [r.path, r]));
   const { files } = await collect(root, includes, excludeRes);
+  const pathCol = await collectPathFiles();
+  // 合并待比对项：仓库文件用相对路径、PATH 文件用绝对路径（两类键天然不冲突 ✓）
+  const items = [
+    ...files.map((f) => ({ abs: f, key: toPosix(relative(root, f)) })),
+    ...pathCol.files.map((f) => ({ abs: f, key: toPosix(f) })),
+  ];
   const changed = [];
   const added = [];
   let unchanged = 0;
   let rehashed = 0;
-  for (const f of files) {
-    const rel = toPosix(relative(root, f));
-    const st = await stat(f);
-    const old = byPath.get(rel);
+  for (const { abs, key } of items) {
+    const st = await stat(abs);
+    const old = byPath.get(key);
     if (!old) {
-      added.push(rel);
+      added.push(key);
       continue;
     }
-    byPath.delete(rel);
+    byPath.delete(key);
     if (old.size === st.size && old.mtimeMs === Math.round(st.mtimeMs)) {
       unchanged++; // ★ 增量：一致就**不读文件、不哈希**
       continue;
     }
     rehashed++;
-    const h = sha256(await readFile(f));
+    const h = sha256(await readFile(abs));
     if (h === old.sha256) unchanged++; // mtime 变了但内容没变（touch/检出）
-    else changed.push(rel);
+    else changed.push(key);
   }
   const removed = [...byPath.keys()];
-  return { unchanged, changed, added, removed, rehashed, total: files.length };
+  return {
+    unchanged,
+    changed,
+    added,
+    removed,
+    rehashed,
+    total: items.length,
+    pathDirs: pathCol.dirs,
+    pathTruncated: pathCol.truncated,
+    pathFiles: pathCol.files.length,
+  };
 }
 
 async function selfCheck() {
+  // 文件层自证要**只**看仓库：先把 PATH 清空，避免真实 PATH 里的可写目录混进来
+  // （第一版没清，结果 `unchanged=2424` 把"四类断言"淹没了 ✗）。
+  const ambientPath = process.env.PATH;
+  process.env.PATH = '';
   const root = join(tmpdir(), `baseline-selfcheck-${process.pid}`);
   const dir = join(root, '_baseline');
   await mkdir(join(root, 'sub'), { recursive: true });
@@ -368,7 +474,7 @@ async function selfCheck() {
 
   const baseFile = join(dir, 'tier1-baseline.json');
   await mkdir(dir, { recursive: true });
-  await writeFile(baseFile, JSON.stringify({ records: await scan(root, includes, excludeRes) }));
+  await writeFile(baseFile, JSON.stringify({ records: (await scan(root, includes, excludeRes)).records }));
 
   const r1 = await verify(root, includes, excludeRes, baseFile);
   await writeFile(join(root, 'a.txt'), 'AAAB'); // 改一字节
@@ -384,9 +490,70 @@ async function selfCheck() {
     r3.added.length === 1 && r3.added[0] === 'c.txt' &&
     r4.removed.length === 1 && r4.removed[0] === 'sub/b.txt';
   console.log(`自证：不改⇒unchanged=${r1.unchanged} / 改一字节⇒changed=${JSON.stringify(r2.changed)}(rehashed=${r2.rehashed}) / 加⇒added=${JSON.stringify(r3.added)} / 删⇒removed=${JSON.stringify(r4.removed)}`);
-  console.log(pass ? '✅ 自证通过（四类都对，且"改了必须变"成立 ⇒ 假实现会失败）' : '❌ 自证失败');
+  console.log(pass ? '✅ 文件层四类自证通过' : '❌ 文件层自证失败');
+
+  // ── PATH 可写目录自证（新增能力，2026-10-10）────────────────────────────
+  // 造"可写 PATH 目录"（放 root 之外，避免与仓库扫描互相干扰）+ 一个 0555 的不可写目录 + 一个不存在的路径。
+  // 判据必须能区分"不可写"：本环境以 root 运行时 access(W_OK) 对一切目录都成立 ⇒ **必须同时看权限位** ✓。
+  const pdir = join(tmpdir(), `baseline-pathwritable-${process.pid}`);
+  const pdirRo = join(tmpdir(), `baseline-pathro-${process.pid}`);
+  await mkdir(pdir, { recursive: true });
+  await mkdir(pdirRo, { recursive: true });
+  await writeFile(join(pdir, 'x1.txt'), 'XXXX');
+  await writeFile(join(pdirRo, 'y1.txt'), 'YYYY');
+  // 关键：**先探测本环境 chmod 是否真的生效**（proot/Android 上对目录常常不生效 ⇒ statSync 仍是 755 ✗）。
+  // 不生效就**如实标注该分支未实测**，绝不用"假通过"掩盖 ✗。
+  let roTestable = false;
+  try {
+    await chmod(pdirRo, 0o555);
+    roTestable = (statSync(pdirRo).mode & 0o222) === 0;
+  } catch {
+    roTestable = false;
+  }
+  process.env.PATH = [pdir, pdirRo, join(tmpdir(), 'baseline-nonexistent-xyz')].join(pathDelimiter);
+  const s2 = await scan(root, includes, excludeRes);
+  const pbase = join(dir, 'path-baseline.json');
+  await writeFile(pbase, JSON.stringify({ records: s2.records }));
+  const p1 = await verify(root, includes, excludeRes, pbase);
+  await writeFile(join(pdir, 'x1.txt'), 'XXXY'); // 改一字节
+  const p2 = await verify(root, includes, excludeRes, pbase);
+  await writeFile(join(pdir, 'x2.txt'), 'ZZZZ'); // 新增
+  const p3 = await verify(root, includes, excludeRes, pbase);
+  process.env.PATH = ambientPath;
+  const pathRecs = s2.records.filter((r) => r.source === 'path-writable');
+  const x1 = toPosix(join(pdir, 'x1.txt'));
+  const x2 = toPosix(join(pdir, 'x2.txt'));
+  // 反向断言：一个"什么都不扫"的假实现必须**违反**下面的断言（这里是显式构造并断言其不成立）
+  const fakeNoop = () => ({ records: [], pathDirs: [] });
+  const fake = fakeNoop();
+  // 期望：可写目录 = [pdir]；不可写目录（若本环境 chmod 生效）与不存在路径都必须被排除
+  const expectDirs = roTestable ? [pdir] : [pdir, pdirRo];
+  const passPath =
+    s2.pathDirs.length === expectDirs.length &&
+    expectDirs.every((d, i) => s2.pathDirs[i] === d) &&
+    !s2.pathDirs.includes(join(tmpdir(), 'baseline-nonexistent-xyz')) &&
+    pathRecs.length === (roTestable ? 1 : 2) &&
+    p1.changed.length === 0 &&
+    p2.changed.length === 1 &&
+    p2.changed[0] === x1 &&
+    p3.added.length === 1 &&
+    p3.added[0] === x2 &&
+    fake.records.length !== s2.records.length && // 假实现必然失败 ✓
+    fake.pathDirs.length !== s2.pathDirs.length;
+  console.log(
+    `自证(PATH)：可写目录=${JSON.stringify(s2.pathDirs)} / 纳入文件=${pathRecs.length} / ` +
+      `不改⇒changed=${p1.changed.length} / 改一字节⇒changed=${JSON.stringify(p2.changed)} / 加⇒added=${JSON.stringify(p3.added)} / ` +
+      `chmod 生效=${roTestable}`,
+  );
+  if (!roTestable) {
+    console.log('  ⚠ 本环境 chmod 对目录不生效（proot/Android）⇒「不可写目录被排除」这一分支**未能实测**，已用代码判据 + 不存在路径被排除代替；如实标注 ✗');
+  }
+  console.log(passPath ? '✅ PATH 可写目录自证通过（含不存在路径被排除与反向断言）' : '❌ PATH 可写目录自证失败');
   await rm(root, { recursive: true, force: true });
-  process.exit(pass ? 0 : 1);
+  await rm(pdir, { recursive: true, force: true });
+  await chmod(pdirRo, 0o755).catch(() => {});
+  await rm(pdirRo, { recursive: true, force: true });
+  process.exit(pass && passPath ? 0 : 1);
 }
 
 async function main() {
@@ -419,10 +586,22 @@ async function main() {
 
   if (init) {
     const t0 = Date.now();
-    const records = await scan(REPO_ROOT, includes, excludeRes);
+    const s = await scan(REPO_ROOT, includes, excludeRes);
     await mkdir(dirname(baseFile), { recursive: true });
-    await writeFile(baseFile, JSON.stringify({ tier, root: REPO_ROOT, ts: new Date().toISOString(), records }, null, 1));
-    console.log(`✅ ${tier} 基线已生成：${records.length} 个文件，用时 ${Date.now() - t0}ms → ${baseFile}`);
+    await writeFile(
+      baseFile,
+      JSON.stringify(
+        { tier, root: REPO_ROOT, ts: new Date().toISOString(), pathDirs: s.pathDirs, pathTruncated: s.pathTruncated, records: s.records },
+        null,
+        1,
+      ),
+    );
+    const pathN = s.records.filter((r) => r.source === 'path-writable').length;
+    console.log(
+      `✅ ${tier} 基线已生成：${s.records.length} 个文件（其中 PATH 可写目录 ${pathN} 个，覆盖 ${s.pathDirs.length} 个目录` +
+        (s.pathTruncated.length ? `；⚠ 截断：${s.pathTruncated.join(', ')}` : '') +
+        `），用时 ${Date.now() - t0}ms → ${baseFile}`,
+    );
     return;
   }
   if (!existsSync(baseFile)) {
@@ -434,7 +613,9 @@ async function main() {
   const ms = Date.now() - t0;
   console.log(
     `${tier} 完整性：unchanged=${r.unchanged} changed=${r.changed.length} added=${r.added.length} removed=${r.removed.length}` +
-      `（共 ${r.total} 个文件；重算哈希 ${r.rehashed} 个；用时 ${ms}ms ⇒ ` +
+      `（共 ${r.total} 个文件，其中 PATH 可写目录 ${r.pathFiles} 个/覆盖 ${r.pathDirs.length} 个目录` +
+        (r.pathTruncated.length ? `；⚠ 截断：${r.pathTruncated.join(', ')}` : '') +
+        `；重算哈希 ${r.rehashed} 个；用时 ${ms}ms ⇒ ` +
         (r.rehashed === 0 && r.total > 0 ? '增量生效（0 次哈希）' : `重算了 ${r.rehashed} 个文件`) +
         (ms > 1500 && r.rehashed === 0 ? '；注意：耗时由文件系统遍历主导（本机为 proot/Android，实测 stat 很慢）' : '') +
         '）',

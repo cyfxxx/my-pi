@@ -146,5 +146,24 @@
         "note": "PATH 目录内容：体量巨大且随安装常变 ⇒ 纳入即误报，默认关"
       }
     ]
+  },
+  "pathWritable": {
+    "enabled": true,
+    "why": "只覆盖 PATH 中**当前用户可写**的目录：攻击者要植入假命令必须有写权限 ⇒ 可写目录是小而高信号的子集；全量 PATH 目录体量大、随安装常变 ⇒ 天天误报（且本机 stat 极慢）。",
+    "writableRule": "权限位有写位（mode & 0o222 != 0）**且** accessSync(W_OK) 通过。必须带权限位：以 root 运行时 access() 对一切目录都成立，只看它会把不可写目录也算进来。",
+    "scope": "只取每个目录的**顶层文件**（PATH 查找命中的就是顶层），不下潜。",
+    "caps": {
+      "perDir": 300,
+      "total": 900,
+      "note": "确定性截断：先按文件名排序再截断；到上限记 pathTruncated，绝不假装扫全。"
+    },
+    "costMeasured": {
+      "note": "本机 proot/Android 实测",
+      "tier2VerifyBefore": "190ms",
+      "tier2Verify2422Files": "1946ms",
+      "tier2Verify900Files": "763ms"
+    },
+    "complement": "与既有 env:path-value（PATH 变量值的哈希）互补：值变了 vs 目录里的文件变了。",
+    "caveat": "部分覆盖（截断）⇒ 不是完整的 PATH 完整性检查；被包管理器更新的目录装包后会自然 changed ⇒ 装完包应重新 --init。"
   }
 }
