@@ -2904,3 +2904,25 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 钩子超时时**直接打印孤儿进程列表**（不再只给 pgrep 命令）⇒ 一眼看到 PID 可直接 kill。
 - **整体检查全绿**：本地==远端；索引/台账/知识库三者 `--check` 一致；tsc 干净；
   **vitest 92 文件 / 1041 例 + 3 skipped**；7 个守门脚本全过；日报度量诚实性正确（率 n/a、计数 0）。
+
+### 用户批准四项待决事项 + 我定的形态（2026-10-08）
+
+- ① 终止设计**当闸门**：阈值可配置（默认评审 6 轮未过 ⇒ 记 stopReason 并按受阻停止）；**零样本**，
+  是按原则给的宽界，不是实测调参。
+- ② C 产物**不做自动注入**，改为 **`kb-lookup` 技能按需检索**（`docs/INDEX.md` + `docs/knowledge/`）；
+  理由：WikiSkill §5.1 实证（演化期给执行者 wiki：63.7→60.9）+ 前缀成本 + my-pi 既有"按需注入"纪律。
+- ③ 新能力默认值：**记录默认开**（来源+sha256+大小，零依赖可回溯）、**拦截/扫描默认关**（clamscan/yara
+  本环境实测未安装）；**"未扫描"绝不显示成"干净"**。
+- ④ 声明面预算**不改**：两能力按"技能+脚本"落地=0 字节；余量 1 159B 保留；将来要工具先提提案。
+
+### 网络加速 + 安全防护：实测选型与落地（2026-10-09）
+
+- **先实测再设计**：GitHub 直连与 `ghproxy/gh-proxy/gitmirror` **全 000**，**只有 jsDelivr 200/0.40s**；
+  包镜像 USTC/npmmirror/goproxy.cn/hf-mirror/清华 全 200 ⇒ 技能写成"**先探测 + 降级链**"而不是死清单
+  （照抄流行清单会让模型逐个失败并误判"网络不通"）。
+- **安全侧能力实测**：ClamAV/YARA/file/gpg/沙箱**全未装**，pip 受 PEP 668 限制；**URLhaus 免费可用**，
+  MalwareBazaar/VT 需 key ⇒ 设计成**零依赖四层 + 三态**（clean/suspicious/**not-scanned**）。
+- 新增 `scripts/security-scan.mjs`（零依赖）+ 技能 `pi-net-mirror`、`pi-download-safety`
+  + 设计文档 `docs/design/NET-ACCEL.md`、`docs/design/SECURITY-SCAN.md`；脚本数 55 → **56**。
+- **自证**：EICAR ⇒ suspicious/rc=1 ✓、zip 穿越 ✓、扩展名不符 ✓、清单篡改 ⇒ tamper-changed ✓、
+  无缓存 URL ⇒ not-scanned ✓、干净文件仍显示 L2=not-scanned ✓；顺手修掉自证抓出的 ESM `require` 崩溃。

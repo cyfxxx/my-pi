@@ -5,8 +5,10 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（158 条）
+## 决策台账（160 条）
 
+- `DECISIONS.md` · [2026-10-09] 网络加速与安全防护：先实测再设计（两份设计 + 一个零依赖扫描器 + 两个技能） · **用户两个需求**：① 国内网络受限导致访问/下载/GitHub 经常失败 ⇒ 整合公开镜像与加速；② 下载文件、 · 数字: 1159 B
+- `DECISIONS.md` · [2026-10-08] 用户批准四项待决事项：逐项定形态（其中两项**没有照字面执行**，理由如下） · 用户口径："同意执行，根据项目情况自行处理。" 以下是**我选择的形态**与该形态的理由——**有两条我判定 · 数字: 159 B
 - `DECISIONS.md` · [2026-10-08] 挂死猎捕的结果与三条遗留项的处置（含一次自我推翻） · **① 偶发挂死：一次完整 verbose run 没复现。** 用 `--reporter=verbose`（逐个打印已开始的测试， · 数字: 358B / 4285B / 7 个 / 0 次
 - `DECISIONS.md` · [2026-10-08] 钩子加超时与日志留存：一次"静默挂死数小时"事故的处置 · **事故（用户发现的）**：一个后台作业**运行了几个小时**。查证结果不是推测，是进程树： · 数字: 1 个 / 0.02 秒 / 5 个 · 证据: bash scripts/golden-tasks.sh        ←
 - `DECISIONS.md` · [2026-10-08] 【更正】上一条的"覆盖缺口"不成立：四条分支都有覆盖且守门全绿 · **上一条我记了**："`父子时间线` 的**正常 join** 分支缺 fixture 覆盖"——**这个记录是错的**，现予更正。 · 数字: 1次
@@ -166,7 +168,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（156 条）
+## 进度记录（158 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -324,6 +326,8 @@
 - `PROGRESS.md` · 【更正】父子时间线的缺口不成立（2026-10-08） · - 上一条据"被中断子代理的截断自述"记了"正常 join 分支缺 fixture" ⇒ **错**。
 - `PROGRESS.md` · 钩子加超时与日志留存（2026-10-08，事故驱动） · - 事故：完整 pre-push golden 卡在 `vitest/dist/workers/forks.js`（**CPU ≈0.02s ⇒ 在等不是在算**）， · 数字: 5 个
 - `PROGRESS.md` · 挂死猎捕结果 + 三条遗留项处置 + 整体检查（2026-10-08） · - **偶发挂死未复现**（verbose 跑完整套正常收尾）⇒ 确认是偶发；根因未知，但危害已被超时兜住。 · 数字: 7 个
+- `PROGRESS.md` · 用户批准四项待决事项 + 我定的形态（2026-10-08） · - ① 终止设计**当闸门**：阈值可配置（默认评审 6 轮未过 ⇒ 记 stopReason 并按受阻停止）；**零样本**， · 数字: 6 轮 / 159B
+- `PROGRESS.md` · 网络加速 + 安全防护：实测选型与落地（2026-10-09） · - **先实测再设计**：GitHub 直连与 `ghproxy/gh-proxy/gitmirror` **全 000**，**只有 jsDelivr 200/0.40s**；
 
 ## 缺陷回放（16 条）
 
@@ -344,7 +348,7 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（102 条）
+## 设计文档（119 条）
 
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
@@ -375,10 +379,27 @@
 - `docs/design/LEAN4AGENT-BORROW.md` · 四、可借鉴的（按性价比排序） · **A. 给关键工作流写一份"前置/后置条件"清单，并挂到既有守门上（推荐，成本低，零运行时改动）** · 数字: 5 个 / 4 条 / 30 天 / 8 次
 - `docs/design/LEAN4AGENT-BORROW.md` · 五、明确不该照搬的，以及决定可不可照搬的关键缺口 · **不该照搬**： · 数字: 40 个 / 3 个
 - `docs/design/LEAN4AGENT-BORROW.md` · 六、可执行的下一步（≤3 条） · 1. **做 A：`docs/design/WORKFLOW-INVARIANTS.md` + 把可自动化的挂进既有守门**，每条不变量配坏样本并证明守门会红。**不改任何默认行为**、不新增 golden 步。这是三篇论文里**唯一不需要
+- `docs/design/NET-ACCEL.md` · 一、实测结果（2026-10-09，本环境） · curl -sS -o /dev/null -m 10 -w '%{http_code} %{time_total}s' <url>
+- `docs/design/NET-ACCEL.md` · 二、选定形态：**技能（知识）+ 一个探测脚本**，不新增声明工具 · **降级链（写进技能，按序尝试、每次只前进一步）**： · 数字: 1159 B
+- `docs/design/NET-ACCEL.md` · 三、落点文件清单 · **成本与风险**：脚本零依赖（node 内置 fetch/https）⇒ 无安装成本；风险是**镜像域名会变**（缓解：探测） · 证据: node scripts/net-mirror.mjs --probe
+- `docs/design/NET-SECURITY-MEASUREMENTS.md` · 一、本环境实测证据（这是本设计最重要的部分） · ### 1.1 网络可达性（`curl -m 8 -o /dev/null -w '%{http_code}'`，000＝连接失败） · 数字: 8 个
+- `docs/design/NET-SECURITY-MEASUREMENTS.md` · 二、需求一：网络加速 · ### 2.1 形态判定：技能为主 + 一个数据表 + 一个探测回退脚本 · 数字: 1159 B
+- `docs/design/NET-SECURITY-MEASUREMENTS.md` · 三、需求二：下载 / 搜索 / 浏览器 的安全防护 · ### 3.1 形态判定：**必须是 feature（带钩子）** · 数字: 1 MB
+- `docs/design/NET-SECURITY-MEASUREMENTS.md` · 四、风险与边界（必须让用户看到） · ### 4.1 免费公开代理：作为最后手段，且默认关闭 · 数字: 8 个
+- `docs/design/NET-SECURITY-MEASUREMENTS.md` · 五、可参考的现成项目（用户要求"不要从零开始"） · --- · 证据: 2129769
+- `docs/design/NET-SECURITY-MEASUREMENTS.md` · 六、MVP 与下一步实现清单 · **MVP（可先做、且不触碰声明面预算）** · 数字: 1159 B / 1MB
+- `docs/design/NET-SECURITY-MEASUREMENTS.md` · 七、诚实标注：本设计**没有**做的事 · - **未实现任何代码**：本文只是设计与实测证据（含 MVP 清单与字段设计），没有新增脚本/feature/技能，
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 一、我们已有什么（实现事实，均注明落点） · **比 SoL-Pi 多的两处**：写盘前脱敏、内容哈希去重。后者恰好回答了它的核心论点——**同一个大输出重复出现时， · 数字: 14 天 / 200MB
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 二、审计清单逐条结论（含证据） · ### 1. 上下文里留的是句柄还是只有一句"已归档"？→ **是句柄，但缺摘录** · 数字: 4 个 / 2 次 / 1 个 / 0 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 三、决策提案（**均不改默认**，等用户点头） · **建议顺序**：先 **P3-D**（拿到可观测数据）→ 再决定要不要 **P3-A/B**（它们都是"改句柄内容"， · 数字: 0 次 / 2 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 四、本次审计的实测数字（能力地板之外的"效率指标"） · - 归档目录：**563 文件 / 3.4MB**（说明归档在真实使用中活跃，不是死代码）； · 数字: 3.4MB / 2 次 / 4 个 / 0 次
+- `docs/design/SECURITY-SCAN.md` · 一、本环境能力实测（2026-10-09） · **一句话**：**这台机器上没有任何杀毒/签名/沙箱能力**，只有哈希、python、node 与一条免费的 URL 黑名单。
+- `docs/design/SECURITY-SCAN.md` · 二、选定形态：**脚本（零依赖） + 技能（流程） + 未来钩子（默认只记录）** · 数字: 1159 B
+- `docs/design/SECURITY-SCAN.md` · 三、分层与顺序（**先便宜后昂贵、先确定后模糊**） · **判据顺序**：L0/L1 **每次必跑**（零成本）→ L2/L3 **按需/按开关**（慢或需网络）→ 结论取**最严的那一层**，
+- `docs/design/SECURITY-SCAN.md` · 四、策略（这几条是安全设计的要害） · 1. **默认只记录、不阻断**（阻断＝改默认行为，需用户批准）；一律 **fail-open**（扫描器自身出错不得卡住主流程）。
+- `docs/design/SECURITY-SCAN.md` · 五、落点文件清单
+- `docs/design/SECURITY-SCAN.md` · 六、怎么验证（**含自证**，这是必须的） · 1. **自证（恶意样本必须红）**：用业界标准测试串 **EICAR**
+- `docs/design/SECURITY-SCAN.md` · 七、诚实的局限（写清，避免给人虚假安全感） · - **必然漏报**：L0/L1 是**结构性检查**，不是病毒特征库；**没有 ClamAV/YARA 就没有真正的"杀毒"**。
 - `docs/design/SOL-PI-BORROW.md` · 0. 全局纪律（每一项都必须满足，不是可选项） · 来自 SoL-Pi 的做法，也是我们这几轮已经在用的：
 - `docs/design/SOL-PI-BORROW.md` · 1. 自主推进的边界（用户已去休息，这条最重要） · **可以直接做**：
 - `docs/design/SOL-PI-BORROW.md` · P1 目标完成语义：区分 verified / declared / advisory ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：P 族发现——"Separate verified, declared, and advisory completion modes"、
