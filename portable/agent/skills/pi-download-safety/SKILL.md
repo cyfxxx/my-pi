@@ -43,3 +43,27 @@ version: v1.0
   结构识别是纯 JS、无需 `file`/`strings`/`objdump`）✓。
 - **手写命令的分平台写法**：哈希 Linux/macOS = `sha256sum` / `shasum -a 256`；Windows = `certutil -hashfile <file> SHA256`。
 - **不要用** `file` / `strings` / `objdump` / `bwrap` / `firejail` 之类**本环境本来就没有**的工具（脚本会如实报"未扫描"）。
+
+## 一条可执行流程（把三层串起来用）
+
+下载/引入外部东西时，**按顺序**跑下面这几条（都是本仓库脚本，**跨平台、零外部依赖**）：
+
+1. **看这个东西是什么**（哈希 + 结构 + 三态结论；`L2_antivirus=not-scanned` 是**如实**的，不是"干净"）：
+   `node scripts/security-scan.mjs --file <文件>`
+   —— 结果只有 `clean` / `suspicious` / **`not-scanned`**；**"未扫描"绝不等于"安全"**。
+2. **如果来源给了官方校验和/签名**：**必须比对**（模型权重、安装包尤其）：
+   Linux/macOS `sha256sum <文件>` 或 `shasum -a 256 <文件>`；**Windows** `certutil -hashfile <文件> SHA256`。
+3. **如果引入了新依赖**（改了 `package.json`/`package-lock.json`）：
+   `node scripts/supply-chain-check.mjs`
+   —— 只判两件**离线可判**的事：`resolved` 指向非预期 registry、包是否带**安装钩子**；
+   结论 `needs-review` **只是"请人确认"**，不是"恶意"（**用镜像是正当的**）。
+4. **改完之后**（尤其动了 `.githooks`/`scripts`/`patches`/`AGENTS.md`/`APPEND_SYSTEM.md`/技能/packs）：
+   `node scripts/security-baseline.mjs --tier1 --verify`
+   —— **增量**（一致就不重算哈希）；**默认只记录不阻断**，要非 0 退出加 `--strict`。
+   注意：Tier1 在本机（proot/Android）约 **3.1s**（文件系统遍历主导），**要快用 `--tier2`（约 190ms）**。
+5. **改完基线并确认是有意修改后**，再 `--init` 刷新基线；否则下次 verify 会一直报变更。
+
+**姿态（三条都是刻意的）**：
+- **只记录、不阻断**——任何自动拦截/自动扫描默认都是关的（要开需用户批准）；
+- **不假装安全**——能力缺失时如实报 `not-scanned`；
+- **不引入噪声**——免 key 的在线查询优先"拉本地黑名单"（URLhaus），**上传文件本体一律不做**。

@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（169 条）
+## 决策台账（170 条）
 
+- `DECISIONS.md` · [2026-10-10] 把三层串成一条流程（否则"层再全"也只是散件） · **判断**：防御体系的价值不在"有多少个脚本"，而在**下载/引入外部东西时能不能被顺手用起来**。
 - `DECISIONS.md` · [2026-10-10] 第 ⑦ 层：系统级持久化点 —— **只收文件形态**，缺口如实列出（不破便携化约束） · **做了什么**：Tier2 补三类**文件形态**的持久化点 —— Linux 桌面自启 `~/.config/autostart/**`、
 - `DECISIONS.md` · [2026-10-10] 第 ⑤ 层供应链：离线审计 lockfile（两个高信号指标 + 一次自证抓出的假阳性） · **为什么是这一层**：对代码 agent 而言，命中率最高的不是"某个可执行文件带毒"，而是**依赖链被动手脚**。
 - `DECISIONS.md` · [2026-10-10] 分层完整性基线：**实现落地**（换路成功：独立小脚本 + 先证明能跑） · **换路的原因**：上一次把基线塞进 440 行的 `security-scan.mjs` 会崩 ⇒ 改为**职责分离**： · 数字: 0 个
@@ -177,7 +178,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（167 条）
+## 进度记录（168 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -346,6 +347,7 @@
 - `PROGRESS.md` · 分层完整性基线：实现落地（2026-10-10） · - 换路：**独立小脚本** `scripts/security-baseline.mjs`（不塞进 440 行扫描器）；层定义仍是数据 `tiers.json`。 · 数字: 0 个
 - `PROGRESS.md` · 第 ⑤ 层供应链：离线 lockfile 审计（2026-10-10） · - 新增 `scripts/supply-chain-check.mjs`：从 lockfile 判两类**离线**高信号（非预期 registry 的 `resolved`、带安装钩子的包）。
 - `PROGRESS.md` · 第 ⑦ 层：系统级持久化点（2026-10-10） · - 收（文件形态，跨平台同一套机制）：`~/.bashrc`/`.profile`/`.zshrc`、`~/.ssh/authorized_keys`+`config`、
+- `PROGRESS.md` · 把三层串成一条流程（2026-10-10） · - 写进 `pi-download-safety` 技能：**看是什么（三态）→ 比对官方校验和 → 依赖变更跑供应链 → 改动后跑基线 → 确认后刷新基线**。
 
 ## 缺陷回放（16 条）
 
