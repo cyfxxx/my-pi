@@ -95,3 +95,13 @@ node scripts/security-scan.mjs --baseline --tier2 --verify     # Tier2（进程�
    并保证"永远返回未变"的假实现会**失败**；
 4. 交付**实测耗时**（Tier1 init / 热 verify），写回本文件；
 5. 不许调用任何外部命令（便携化）——重做后要再自查一次。
+
+## 八、第 ⑤ 层：供应链（`scripts/supply-chain-check.mjs`，离线）
+
+`--init` 已把 `package.json` / `package-lock.json` / `custom/package.json` 纳入 Tier1（**lockfile 被改 = 依赖被换**）。
+此外用 `node scripts/supply-chain-check.mjs` 做**离线**审计，两个指标都是**不需要联网、不需要装任何东西**：
+① `resolved` 指向**非预期 registry**（镜像劫持 / typosquat 的迹象）；② **带安装钩子的包**
+（`hasInstallScript` ⇒ `npm install` 时就执行别人的代码）。
+**实测（本机）**：`needs-review 2 项` —— `esbuild`（下载自身二进制）与 `fsevents`（macOS 专用），**都是已知正常**；
+`my-pi-custom` 曾被我误报为"陌生 registry"（它是 workspace 本地链接）⇒ 已修，**本地链接单独跳过**。
+**口径**：只出 `clean` / `needs-review`，**不判恶意、不阻断**；用镜像是正当选择，脚本只负责指出偏离。

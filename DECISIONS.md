@@ -2,6 +2,28 @@
 
 ## 格式
 
+### [2026-10-10] 第 ⑤ 层供应链：离线审计 lockfile（两个高信号指标 + 一次自证抓出的假阳性）
+
+**为什么是这一层**：对代码 agent 而言，命中率最高的不是"某个可执行文件带毒"，而是**依赖链被动手脚**。
+所以做 `scripts/supply-chain-check.mjs`，只用 `package-lock.json` 里**本来就有的字段** ⇒ **离线、零依赖、跨平台**：
+1. **`resolved` 指向非预期 registry**（镜像劫持 / typosquat / 私有代理注入的迹象）；
+2. **带安装钩子的包**（`hasInstallScript` ⇒ `npm install` 时执行别人的代码）。
+
+**实测（本机）**：`needs-review 2 项` —— `esbuild`（安装时下载自身二进制）与 `fsevents`（macOS 专用），
+**都是已知正常**；而 `my-pi-custom` 被**误报**为"陌生 registry" ✗ —— 它是 **workspace 本地链接**
+（`resolved: "custom"`，非 URL）。**自证/实跑抓出后已修**：非 URL 的 `resolved` 单独跳过并计数。
+
+**这条修正值得单独记**：**会狼来了的检查必然被无视**（本会话已在别处写过同一句）。一个把本地链接报成
+"陌生 registry"的检查，第一次用就会让人学会忽略它的输出 ⇒ **假阳性的代价不是噪声，而是让整个检查失效**。
+
+**口径**：只出 `clean` / `needs-review`，**不判恶意、不阻断**（`用镜像是正当选择`，脚本只指出偏离）。
+
+**自证（双向）**：合成三个 lockfile —— 干净 ⇒ **0 项**；混入陌生 registry ⇒ **点名 `evil`**；混入安装钩子 ⇒
+**点名 `hooker`** ⇒ 三条全对才 exit 0（只断言"干净时为 clean"的假实现会在后两条失败）。
+
+**顺带把 lockfile 纳入 Tier1**：`package.json`/`package-lock.json`/`custom/package.json`
+（**lockfile 被改 = 依赖被换**，属"改了会执行代码"那一类）。
+
 ### [2026-10-10] 分层完整性基线：**实现落地**（换路成功：独立小脚本 + 先证明能跑）
 
 **换路的原因**：上一次把基线塞进 440 行的 `security-scan.mjs` 会崩 ⇒ 改为**职责分离**：

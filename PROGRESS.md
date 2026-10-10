@@ -2984,3 +2984,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 自证四项全对（不改/改一字节/加/删）+ `rehashed=1` 证明增量 ✓。
 - 性能：剪枝后 **Tier2 190ms（13×↑）**、Tier1 verify 3.1s（**遍历主导**，脚本如实打印）；**剪枝第一版剪错被自证抓到**（无字面前缀不得剪枝）。
 - 脚本数 58 → 59；STRUCTURE 与 scripts/README 同步。
+
+### 第 ⑤ 层供应链：离线 lockfile 审计（2026-10-10）
+
+- 新增 `scripts/supply-chain-check.mjs`：从 lockfile 判两类**离线**高信号（非预期 registry 的 `resolved`、带安装钩子的包）。
+- 实测：`needs-review 2 项`（esbuild / fsevents，均已知正常）；**`my-pi-custom` 曾被误报**（workspace 本地链接）⇒ 已修（非 URL 跳过）。
+- 教训：**假阳性的代价不是噪声，而是让整个检查失效**（会狼来了的检查必然被无视）。
+- 双向自证：干净⇒0；陌生 registry⇒点名 evil；安装钩子⇒点名 hooker。
+- lockfile 纳入 Tier1（`package.json`/`package-lock.json`/`custom/package.json`）；脚本数 59 → 60。

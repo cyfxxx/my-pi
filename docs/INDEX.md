@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（167 条）
+## 决策台账（168 条）
 
+- `DECISIONS.md` · [2026-10-10] 第 ⑤ 层供应链：离线审计 lockfile（两个高信号指标 + 一次自证抓出的假阳性） · **为什么是这一层**：对代码 agent 而言，命中率最高的不是"某个可执行文件带毒"，而是**依赖链被动手脚**。
 - `DECISIONS.md` · [2026-10-10] 分层完整性基线：**实现落地**（换路成功：独立小脚本 + 先证明能跑） · **换路的原因**：上一次把基线塞进 440 行的 `security-scan.mjs` 会崩 ⇒ 改为**职责分离**： · 数字: 0 个
 - `DECISIONS.md` · [2026-10-10] 修非法 `tiers.json` + **补上"JSON 语法合法性"这个守门缺口** · **发现**：上一版提交里的 `packs/security-baseline/tiers.json` 是**非法 JSON**（`JSONDecodeError: line 70`）——
 - `DECISIONS.md` · [2026-10-10] 分层完整性基线：**设计落地、实现未落地**（一次会崩的尝试，已回退） · **目标**（用户："尽可能全面的防御体系，但别影响效率，且要便携化"）：分层防篡改基线。 · 数字: 90% / 14MB / 939 次 / 4 轮
@@ -175,7 +176,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（165 条）
+## 进度记录（166 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -342,6 +343,7 @@
 - `PROGRESS.md` · 分层完整性基线：设计落地、实现未落地（2026-10-10） · - 落地：`packs/security-baseline/tiers.json`（层定义走数据文件）+ `BASELINE.md`（判据/清单/排除/效率目标/重做清单）。 · 数字: 90% / 4 轮
 - `PROGRESS.md` · 修非法 tiers.json + 补 JSON 语法守门（2026-10-10） · - 发现：`packs/security-baseline/tiers.json` 是**非法 JSON**，而**所有守门都放它过去**（md 检查不管 json）⇒ 真实守门缺口。
 - `PROGRESS.md` · 分层完整性基线：实现落地（2026-10-10） · - 换路：**独立小脚本** `scripts/security-baseline.mjs`（不塞进 440 行扫描器）；层定义仍是数据 `tiers.json`。 · 数字: 0 个
+- `PROGRESS.md` · 第 ⑤ 层供应链：离线 lockfile 审计（2026-10-10） · - 新增 `scripts/supply-chain-check.mjs`：从 lockfile 判两类**离线**高信号（非预期 registry 的 `resolved`、带安装钩子的包）。
 
 ## 缺陷回放（16 条）
 

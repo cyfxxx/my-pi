@@ -18,7 +18,10 @@
         "portable/agent/modes.json",
         "portable/agent/trust.json",
         "portable/agent/scheduled-seeds.json",
-        "sync/**"
+        "sync/**",
+        "package.json",
+        "package-lock.json",
+        "custom/package.json"
       ]
     },
     "tier2": {
