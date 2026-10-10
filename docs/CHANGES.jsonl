@@ -84,7 +84,6 @@
 {"kind":"change","commit":"91276e780","ts":"2026-10-06","subject":"docs: 记录方案 P（模式免重启）评估结论——暂不实施","files":["DECISIONS.md","PROGRESS.md","custom/features/mode/README.md"],"heldOut":false}
 {"kind":"change","commit":"eefb4c4fe","ts":"2026-10-06","subject":"docs: 用实测数字替换模式重启成本的估算（1–3 秒 → ≈40s / 热重载 ≈1s）","files":["DECISIONS.md","PROGRESS.md"],"heldOut":false}
 {"kind":"change","commit":"d12711741","ts":"2026-10-06","subject":"fix(mode): 自愈重启的原因写成\"按会话模式自愈\"，别沿用 /mode 的措辞","files":["custom/features/mode/__tests__/mode-switch.test.ts","custom/features/mode/index.ts"],"heldOut":false}
-{"kind":"change","commit":"f4c67dda3","ts":"2026-10-06","subject":"fix(mode): 会话不落盘时不做自愈重启（没有可精确续接的目标）","files":["custom/features/mode/__tests__/mode-switch.test.ts","custom/features/mode/index.ts"],"heldOut":false}
 {"kind":"rejected","ts":"2026-10-08","proposal":"[2026-10-08] 三个未迁移子系统：**都不迁移**（用户批复第 3 项），但理由各不相同且都是实测","reason":"听起来很合理，**一验就被否掉**（剥掉前缀后 47 → 46 对，最高相似度仍 0.58–0.63）。","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-07","proposal":"[2026-10-07] fork 池化实测不成立：`new_session {parentSession}` 会\"收下但不分叉\"","reason":"`new_session {parentSession}`）需要各自验证，且复用键得带上父会话路径，本轮不做。","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-07","proposal":"[2026-10-07] 调研：重型工具\"只给子代理\"与 `deferred` + `tool_search` 两条路的实测结论（**暂不采用**）","reason":"并防止缓存失效。要求先分析可行性。查证过程分四步，最后一步的实测把方案否掉了。","evidence":"","source":"DECISIONS.md"}

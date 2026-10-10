@@ -2,6 +2,27 @@
 
 ## 格式
 
+### [2026-10-10] 收尾审计：把"常驻取舍"写进**面向使用**的文档 + 补跑全量测试
+
+**用户问"常驻有记录到文档中吗"——grep 实证：没有（只在内部门台账里）** ✗。核实命令与结果：
+`grep -c "常驻\|clamd"` ⇒ `packs/security-baseline/BASELINE.md` **0**、`docs/design/AV-INSTALL-ATTEMPTS.md` **0**、
+`portable/agent/skills/pi-download-safety/SKILL.md` **0**；只有 `DECISIONS.md`/`PROGRESS.md` 有 ✓
+⇒ **"写进了台账" ≠ "记进了会被人翻到的地方"** ✗。已补：
+- `AV-INSTALL-ATTEMPTS.md` 新增"**常驻 vs 瞬时**"一节（近 1 行表格 + 判断规则 + 四条注意 + 当前状态）；
+- `pi-download-safety` 技能新增"**扫描太慢怎么办**"（指向上面那节；并写明"缺能力/内存不足 ⇒ 如实 `not-scanned`/`skipped-low-mem`，绝不显示成 clean"）。
+
+**用户问"所有任务都完成了吗"——同样用证据回答**：`golden --fast` **跳过 tsc/vitest** ⇒ 最近改动后
+**全量测试其实没跑过** ✗。本轮补跑：
+```
+Test Files  93 passed | 4 skipped (97)
+Tests       1052 passed | 4 skipped (1056)       ← 比改动前 1041 多 11 项（钩子新增）
+Duration    37.78s
+```
+⇒ **零回归** ✓。
+
+**教训（与"状态文案"那条同源）**：**"我记下了"不等于"该看到的人会看到"** ——
+验证"记录是否到位"的方法不是"我记得写过"，而是**在目标读者会翻的地方 grep** ✗✓。
+
 ### [2026-10-10] "下载后自动扫描"钩子：**第二次尝试成功**（复用 WIP + 接线 + 能证伪的反证）
 
 **为什么第一次失败、这次成功**（差异是可复用的经验）：
