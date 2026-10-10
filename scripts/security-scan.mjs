@@ -249,6 +249,10 @@ else {
   if (out.layers) console.log(`  分层：${Object.entries(out.layers).map(([k, v]) => `${k}=${v}`).join(' ')}`);
   for (const h of out.hits ?? []) console.log(`  ⚠ ${h.rule}: ${h.detail}`);
   if (out.note) console.log(`  注：${out.note}`);
-  if (out.verdict === 'not-scanned') console.log('  ⚠ 未扫描 ≠ 安全：本机没有 ClamAV/YARA，请勿据此外推');
+  if (out.error) console.log(`  原因：${out.error}`);
+  // 2026-10-10 修误导文案：原来这里写死「本机没有 ClamAV/YARA」——既不成立（两者现在都已安装），
+  // 又掩盖真实原因（not-scanned 也可能是文件不存在、只有一边引擎缺、没有 URLhaus 缓存）。
+  // 现在不断言原因，指向上面已打印的「注」与「⚠」行（那里才是真实原因）。
+  if (out.verdict === 'not-scanned') console.log('  ⚠ 未扫描 ≠ 安全（真实原因见上面的「注」或「⚠」行）——不要据此外推');
 }
 process.exit(out.verdict === 'suspicious' ? 1 : 0);
