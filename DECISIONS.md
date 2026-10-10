@@ -2,6 +2,37 @@
 
 ## 格式
 
+### [2026-10-10] L2 四态**全部确证**（含"只被 ClamAV 检出"与"两者都缺"）
+
+上一条我如实标了两处"尚未证明"。**现在都证明了**（方法：用环境变量**隔离**引擎，而不是靠猜）：
+
+**① "只被 ClamAV 检出"** —— 把 YARA 关掉（`PI_YARA_RULES` 指向不存在的目录）后扫 EICAR：
+```
+结论：suspicious
+  分层：L0_hash=ok L1_structure=hit L2_antivirus=hit
+  ⚠ eicar-test-file: 命中业界标准杀毒测试串（EICAR）      ← L1 内置
+  ⚠ l2-not-scanned: 无 YARA 规则文件（/tmp/nope）…        ← 证明 YARA 这次没跑
+  ⚠ clamav:Eicar-Test-Signature: ClamAV(clamscan) 检出   ← **只有 ClamAV 能产生这条** ✓
+```
+⇒ 关掉 YARA 后仍出现 `clamav:` 命中 ⇒ **ClamAV 那条路确实在跑并检出** ✓。
+
+**② "两者都缺 ⇒ not-scanned"** —— 给 node **只注入受限 PATH**（去掉 `/usr/bin`，`clamscan` 就在那里）
+且 YARA 无规则：
+```
+结论：clean ｜ 分层：L0_hash=ok L1_structure=ok L2_antivirus=not-scanned
+  ⚠ l2-not-scanned: 无 YARA 规则文件（/tmp/nope）⇒ 未做特征匹配；**未扫描不等于安全**
+  ⚠ l2-not-scanned: ClamAV 未安装（PATH 里没有 clamscan/clamdscan）⇒ **未扫描不等于安全**
+```
+⇒ **缺能力时如实报 not-scanned 并给出两个原因**，绝不当成"干净" ✓✓（这正是本会话反复守的那条纪律）。
+
+**方法论留痕**：我两次测试都因为**清空 PATH 把 `timeout`/`grep` 自己弄没了**而失败 ✗
+⇒ 正确做法是**只给被测进程注入受限 PATH**（`env PATH=… node …`），自己的工具用**绝对路径** ✓。
+
+**"扫描默认开"的现状（如实）**：① **显式扫描**（`--file`）**现在就跑 L1+L2**（含 ClamAV、YARA）✓
+⇒ 这一条**已经是默认行为** ✓；② **"下载后自动扫描"** —— 目前**没有**这样的钩子 ✗，
+要做成"开关 + 默认开"需要先设计钩子（可在 bash 工具调用后观察 `curl -o` / `wget -O` 的落点并扫描，
+类似既有的错误指纹记录点）；**尚未实现**，记为下一步（用户已批准默认开，但钩子得先存在）。
+
 ### [2026-10-10] ClamAV 装成且证明能检出；L2 接线已接回（**其中 ClamAV 路径尚待一个"只被它检出"的样本证明**）
 
 **① 结论更正（必须留痕）**：我此前写"**ClamAV 病毒库在你这网络下拿不到、判定不通、不再重复试**"——

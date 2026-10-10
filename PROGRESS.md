@@ -3031,3 +3031,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 实测：clamav **1.5.4**、`Known viruses: 3,628,144`、EICAR ⇒ **FOUND(rc=1)**、无害 ⇒ **OK(rc=0)**；未装 daemon（内存取舍）。
 - L2 接回时踩了**形参遮蔽**陷阱（函数形参就叫 `path`）⇒ 正解是块内不引用 `path`，用具名导入 `join`/`pathDelimiter`/`pathBasename`。
 - 四态：EICAR⇒suspicious、YARA 命中⇒suspicious+点名、干净⇒clean/ok；**"只被 ClamAV 检出"与"两者都缺⇒not-scanned"两态仍待证**（后者是我测试写错）。
+
+### L2 四态全部确证（2026-10-10）
+
+- 隔离法证明：**关掉 YARA 后仍有 `clamav:Eicar-Test-Signature`** ⇒ ClamAV 确实在跑并检出 ✓；
+  **受限 PATH（去掉 /usr/bin）+ 无规则** ⇒ `L2_antivirus=not-scanned` + 两条原因（未扫描≠安全）✓。
+- 方法学留痕：两次测试因**清空 PATH 把自己的 timeout/grep 弄没** ✗ ⇒ 正解是**只给被测进程注入受限 PATH**、自己用绝对路径。
+- "扫描默认开"现状：**显式 `--file` 已默认跑 L1+L2** ✓（这条已是默认行为）；**"下载后自动扫描"仍无钩子** ✗ ⇒ 待设计（已批准默认开）。
