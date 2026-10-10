@@ -56,7 +56,8 @@ function subagentDir(env: NodeJS.ProcessEnv = process.env): string {
 /** id 只允许安全字符（防路径穿越：id 可能来自 agent 名） */
 function safeId(id: string): string {
   const s = String(id ?? '').trim();
-  if (!s || !/^[A-Za-z0-9._-]+$/.test(s) || s === '.' || s === '..') return '';
+  // `#` 是运行级 id 的分隔符（`<agent>#<序号>`）⇒ 白名单要含它；仍禁 `/`、`\`、`..`（防穿越）
+  if (!s || !/^[A-Za-z0-9._#-]+$/.test(s) || s === '.' || s === '..') return '';
   return s;
 }
 

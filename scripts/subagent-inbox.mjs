@@ -57,7 +57,7 @@ export function statePath(id, env = process.env) {
 export function safeId(id) {
   const s = String(id ?? '').trim();
   if (!s) throw new Error('缺少 id');
-  if (!/^[A-Za-z0-9._-]+$/.test(s) || s === '.' || s === '..') {
+  if (!/^[A-Za-z0-9._#-]+$/.test(s) || s === '.' || s === '..') {
     throw new Error(`id 不合法（只允许字母数字点下划线连字符）：${s}`);
   }
   return s;

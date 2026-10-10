@@ -12,7 +12,7 @@
  */
 
 import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil-works/pi-coding-agent';
-import { Type, type TSchema } from 'typebox';
+import { Null, Type, type TSchema } from 'typebox';
 
 /** 简化的参数声明：features 只描述类型与说明，由适配器编译成 TypeBox schema */
 export interface ToolParameter {
@@ -125,7 +125,10 @@ function buildParameterSchema(parameters: Record<string, ToolParameter>): TSchem
     } else if (spec.type === 'string|null') {
       // pi-ai validateToolArguments 的 normalizeOptionalNulls 会删除「可选 + null
       // 不被 schema 接受」的字段；联合 Null 让 null 通过校验直达 execute。
-      base = Type.Union([Type.String(), Type.Null()], { description: spec.description });
+      // 注意：必须用 typebox 的 `Null` 常量，不能用 `Type.Null()` —— 后者在
+      // typebox 1.3.x 里不存在（只有 `Null`、`TNull`），写成 Type.Null() 会在
+      // 编译期直接炸（ReferenceError），而它恰好是最常用的可选 null 路径。
+      base = Type.Union([Type.String(), Null], { description: spec.description });
     } else if (spec.enum && spec.enum.length > 0) {
       base = Type.Union(
         spec.enum.map((v) => Type.Literal(v)),

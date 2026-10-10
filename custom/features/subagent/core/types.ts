@@ -35,6 +35,12 @@ export interface SingleResult {
    * 否则另一个并发会话改了同一文件会被误算成返工。
    */
   parentSession?: string;
+  /**
+   * 本次运行可投递的收件箱 id（**运行级在前、agent 名在后**）。
+   * 运行级 id 形如 `<agent>#<序号>`（**可预测**：调用方不必等结果就能投递 ✓）；agent 名保留 ⇒ **向后兼容** ✓。
+   * 两者各有独立已读偏移 ⇒ 并行运行互不串箱 ✓。
+   */
+  inboxIds?: string[];
 }
 
 export interface SubagentDetails {
@@ -52,6 +58,8 @@ export interface SubagentTaskItem {
   agent?: string;
   task: string;
   cwd?: string;
+  /** 该子任务的收件箱 id（覆盖调用级 inboxId）；不传则自动取 `<agent>#<序号>` */
+  inboxId?: string;
   /** 本次子任务显式使用的模型（provider/model 或 provider/id），覆盖 agent/会话默认 */
   model?: string;
 }
@@ -79,4 +87,11 @@ export interface SubagentToolParams {
    * "定时任务派生的子代理"天然仍是裸 pi，前提不被破坏；开启后子代理**能改状态**，属于显式承担风险。
    */
   extensions?: boolean;
+  /**
+   * 本次调用的默认收件箱 id（**可选**）。不传时每次运行自动取 `<agent>#<序号>`；
+   * 无论传不传，**agent 名这条通道始终保留**（向后兼容 + 便于"给某角色的所有运行发"）。
+   *
+   * 并行/链式可在 `tasks[]`/`chain[]` 的单项里用 `inboxId` 覆盖（不改顶层 schema）。
+   */
+  inboxId?: string;
 }

@@ -184,6 +184,7 @@ async function runPooledAgent(
   resolvedModel: string | undefined,
   allowExtensions?: boolean,
   parentSession?: string,
+  inboxId?: string,
 ): Promise<SingleResult> {
   let tmpPromptDir: string | null = null;
   let tmpPromptPath: string | null = null;
@@ -197,6 +198,7 @@ async function runPooledAgent(
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
     model: resolvedModel,
     step,
+    inboxIds: [],
   };
   const emitUpdate = (): void => {
     onUpdate?.({
@@ -257,8 +259,13 @@ async function runPooledAgent(
       await worker.send({ type: 'prompt', message: task }, 120_000);
       // 可发现性（2026-10-10）：inbox 的 id 就是 agent 名，但调用方**看不到**这个名字 ⇒ 起任务时打印一次，
       // 否则主会话只能靠猜（本轮 E2E 就因此投错了箱子 ✗）。
-      console.error(`[subagent-inbox] 本任务收件箱 id = "${agent.name}"（投递：node scripts/subagent-inbox.mjs post ${agent.name} "…"）`);
-      await forwardInboxWhileRunning(worker, agent.name, settled);
+      const inboxIds = resolveInboxIds(agent.name, inboxId);
+      currentResult.inboxIds = inboxIds;
+      console.error(
+        `[subagent-inbox] 本任务收件箱 id = ${inboxIds.map((s) => `"${s}"`).join(' | ')}` +
+          `（投递：node scripts/subagent-inbox.mjs post "${inboxIds[0]}" "…"）`,
+      );
+      await forwardInboxWhileRunning(worker, inboxIds, settled);
     } finally {
       off();
       lease.release();
@@ -307,36 +314,66 @@ async function runPooledAgent(
  * - **不丢**：只有 `worker.send` **成功后**才 `markConsumed` ⇒ 投递失败下一轮还会再试（宁可重复一次，也不静默丢）；
  * - **限速**：单轮最多 {@link MAX_PER_ROUND} 条，其余留到下一轮，并在 stderr 如实记录"还有未读"。
  */
-async function forwardInboxWhileRunning(worker: RpcWorker, inboxId: string, settled: Promise<void>): Promise<void> {
-  let consumed = readConsumed(inboxId);
+async function forwardInboxWhileRunning(
+  worker: RpcWorker,
+  inboxIds: readonly string[],
+  settled: Promise<void>,
+): Promise<void> {
+  // 去重 + 去掉空 id；**每个 id 各有独立已读偏移** ⇒ 运行级箱子与 agent 名箱子互不影响，
+  // 并行运行也只读自己的运行级箱子（这就是"每运行实例独立收件箱"的落点 ✓）。
+  const ids = [...new Set(inboxIds.map((s) => String(s ?? '').trim()).filter((s) => s.length > 0))];
+  const consumed = new Map<string, number>(ids.map((id) => [id, readConsumed(id)]));
   let done = false;
   const waiter = settled.then(() => {
     done = true;
   });
+
+  const deliverOne = async (id: string): Promise<void> => {
+    const { messages, note } = drainInbox(id, { consumed: consumed.get(id) ?? 0 });
+    if (note) console.error(`[subagent-inbox] ${id}: ${note}`);
+    for (const m of messages) {
+      try {
+        await worker.send({ type: 'prompt', message: `[父会话中途指令 #${m.seq}] ${m.text}` }, 120_000);
+        consumed.set(id, m.seq);
+        markConsumed(id, m.seq);
+        console.error(`[subagent-inbox] ${id}: 已投递 #${m.seq}（子进程将在下一个 turn 边界执行）`);
+      } catch (e) {
+        console.error(
+          `[subagent-inbox] ${id}: 投递 #${m.seq} 失败，保留未读（下次重试）：${e instanceof Error ? e.message : String(e)}`,
+        );
+        return; // 该 id 本轮到此为止；**不消费** ⇒ 下次重试（宁可重复，也不静默丢）
+      }
+    }
+    const left = unreadTotal(id);
+    if (left > 0) {
+      console.error(`[subagent-inbox] ${id}: 还有 ${left} 条未读，留到下一轮（单轮上限 ${MAX_PER_ROUND}）`);
+    }
+  };
+
   try {
     while (!done) {
       await Promise.race([waiter, new Promise<void>((r) => setTimeout(r, POLL_MS))]);
       if (done) break;
-      const { messages, note } = drainInbox(inboxId, { consumed });
-      if (note) console.error(`[subagent-inbox] ${inboxId}: ${note}`);
-      for (const m of messages) {
-        try {
-          await worker.send({ type: 'prompt', message: `[父会话中途指令 #${m.seq}] ${m.text}` }, 120_000);
-          consumed = m.seq;
-          markConsumed(inboxId, m.seq);
-          console.error(`[subagent-inbox] ${inboxId}: 已投递 #${m.seq}（子进程将在下一个 turn 边界执行）`);
-        } catch (e) {
-          console.error(`[subagent-inbox] ${inboxId}: 投递 #${m.seq} 失败，保留未读（下次重试）：${e instanceof Error ? e.message : String(e)}`);
-          break;
-        }
-      }
-      const left = unreadTotal(inboxId);
-      if (left > 0) console.error(`[subagent-inbox] ${inboxId}: 还有 ${left} 条未读，留到下一轮（单轮上限 ${MAX_PER_ROUND}）`);
+      for (const id of ids) await deliverOne(id);
     }
   } catch (e) {
-    console.error(`[subagent-inbox] ${inboxId}: 轮询异常，已忽略（fail-open）：${e instanceof Error ? e.message : String(e)}`);
+    console.error(`[subagent-inbox] 轮询异常，已忽略（fail-open）：${e instanceof Error ? e.message : String(e)}`);
   }
   await waiter; // 语义与改动前一致：等待 settled 被兑现
+}
+
+/**
+ * 解析某次运行的收件箱 id 列表（**运行级在前、agent 名在后**）。
+ *
+ * - **运行级 id**（`<agent>#<序号>`，由 `index.ts` 按任务序号生成 ⇒ **可预测**）：调用方不必等结果
+ *   就能投递 ✓，并行运行各收各的 ✓；
+ * - **agent 名**：**始终保留** ⇒ ① 向后兼容（老用法继续有效 ✓）；② 便于"给某角色的所有运行都发" ✓。
+ *
+ * 防御性默认：调用方没给运行级 id 时退化为 `<agent>#0`（不至于"无箱可投" ✗，也不与 agent 名冲突 ✓）。
+ */
+export function resolveInboxIds(agentName: string, explicit?: string): string[] {
+  const runId = (explicit ?? '').trim() || `${agentName}#0`;
+  return [...new Set([runId, agentName].filter((s) => s.length > 0))];
 }
 
 /** 该 worker 是否已经跑过至少一个任务（决定复用前是否需要 `new_session`） */
@@ -362,6 +399,8 @@ export function buildSubagentArgs(opts: {
   return args;
 }
 
+// 回退路径（一次性 `pi --mode json -p`）**没有可用的投递通道** ⇒ 本次运行不支持中途投递 ✗。
+// 这里只打印一条如实提示（**不假装支持** ✗）；池化路径才支持（见 forwardInboxWhileRunning）。
 export async function runSubprocessAgent(
   agent: AgentConfig,
   defaultCwd: string,
@@ -376,6 +415,7 @@ export async function runSubprocessAgent(
   forkSession?: string,
   allowExtensions?: boolean,
   parentSession?: string,
+  inboxId?: string,
 ): Promise<SingleResult> {
   const resolvedModel = resolveModelId(agent.model, overrideModel, currentModel);
 
@@ -401,6 +441,7 @@ export async function runSubprocessAgent(
         resolvedModel,
         allowExtensions,
         parentSession,
+        inboxId,
       );
     } catch (e) {
       // 失败开放：池层的任何问题都退回已验证的 spawn 路径，但**要留下痕迹**
@@ -557,6 +598,7 @@ export async function runSingleAgent(
   forkSession?: string,
   allowExtensions?: boolean,
   parentSession?: string,
+  inboxId?: string,
 ): Promise<SingleResult> {
   const agent = agents.find((a) => a.name === agentName);
   if (!agent) {
@@ -580,7 +622,8 @@ export async function runSingleAgent(
       forkSession,
       allowExtensions,
       parentSession,
+      inboxId,
     );
   }
-  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel, forkSession, allowExtensions, parentSession);
+  return runSubprocessAgent(agent, defaultCwd, task, cwd, step, signal, onUpdate, makeDetails, currentModel, overrideModel, forkSession, allowExtensions, parentSession, inboxId);
 }

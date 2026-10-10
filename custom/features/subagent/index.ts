@@ -79,6 +79,11 @@ export function register(pi: ExtensionAPI): void {
         description: '本次调用的默认模型（provider/model 或 provider/id）；单个 task/chain 项的 model 优先于此',
         optional: true,
       },
+      inboxId: {
+        type: 'string',
+        description: '收件箱 id（可选）：不传则自动取 <agent>#<序号>；agent 名始终可投递；tasks/chain 单项可覆盖',
+        optional: true,
+      },
       context: {
         type: 'string',
         enum: ['spawn', 'fork'],
@@ -109,6 +114,17 @@ export function register(pi: ExtensionAPI): void {
           results,
         });
 
+      // 把"可投递的收件箱 id"直接给调用方（可发现性：本会话曾因只能靠猜 id 而投错箱 ✗）
+      const inboxNote = (results: SingleResult[]): string => {
+        const withIds = results.filter((r) => (r.inboxIds?.length ?? 0) > 0);
+        if (withIds.length === 0) return '';
+        const lines = withIds.map((r) => `${r.agent}: ${(r.inboxIds ?? []).join(' | ')}`);
+        return (
+          `\n\n[收件箱] ${lines.join('; ')}` +
+          `\n中途投递：node scripts/subagent-inbox.mjs post "<id>" "<追加指令>"（运行级 id = <agent>#<序号>，可预测）`
+        );
+      };
+
       const hasChain = (params.chain?.length ?? 0) > 0;
       const hasTasks = (params.tasks?.length ?? 0) > 0;
       const hasSingle = Boolean(params.task);
@@ -123,14 +139,14 @@ export function register(pi: ExtensionAPI): void {
         for (let i = 0; i < params.chain.length; i++) {
           const step = params.chain[i];
           const taskWithContext = applyPreviousPlaceholder(step.task ?? '', previousOutput);
-          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'), currentModel, step.model ?? params.model, forkSession, allowExtensions, parentSession);
+          const result = await runSingleAgent(cwd, agents, step.agent, taskWithContext, step.cwd, i + 1, undefined, undefined, makeDetails('chain'), currentModel, step.model ?? params.model, forkSession, allowExtensions, parentSession, step.inboxId ?? params.inboxId ?? `${step.agent ?? 'default'}#${i + 1}`);
           results.push(result);
           if (isFailedResult(result)) {
             return `Chain stopped at step ${i + 1} (${step.agent ?? 'default'}): ${getResultOutput(result)}`;
           }
           previousOutput = getFinalOutput(result.messages);
         }
-        return truncateParallelOutput(getFinalOutput(results[results.length - 1].messages) || '(no output)');
+        return truncateParallelOutput(getFinalOutput(results[results.length - 1].messages) || '(no output)') + inboxNote(results);
       }
 
       if (params.tasks && params.tasks.length > 0) {
@@ -138,7 +154,7 @@ export function register(pi: ExtensionAPI): void {
           return `Too many parallel tasks (${params.tasks.length}). Max is ${getMaxParallelTasks()}${isTermuxEnv() ? ' (Termux 环境限制)' : ''}.`;
         }
         const results = await mapWithConcurrencyLimit(params.tasks, getMaxConcurrency(currentProviderIsLocal(currentModel?.provider)), async (t, _index, internalSignal) =>
-          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel'), currentModel, t.model ?? params.model, forkSession, allowExtensions, parentSession),
+          runSingleAgent(cwd, agents, t.agent, t.task, t.cwd, undefined, internalSignal, undefined, makeDetails('parallel'), currentModel, t.model ?? params.model, forkSession, allowExtensions, parentSession, t.inboxId ?? params.inboxId ?? `${t.agent ?? 'default'}#${_index + 1}`),
         );
         const successCount = results.filter((r) => !isFailedResult(r)).length;
         const summaries = results.map((r) => {
@@ -146,17 +162,17 @@ export function register(pi: ExtensionAPI): void {
           const status = isFailedResult(r) ? `failed${r.stopReason && r.stopReason !== 'end' ? ` (${r.stopReason})` : ''}` : 'completed';
           return `### [${r.agent}] ${status}\n\n${output}`;
         });
-        return `Parallel: ${successCount}/${results.length} succeeded\n\n${summaries.join('\n\n---\n\n')}`;
+        return `Parallel: ${successCount}/${results.length} succeeded\n\n${summaries.join('\n\n---\n\n')}` + inboxNote(results);
       }
 
       if (params.task) {
         const riskLevel = classifyTaskRisk(params.task);
         const riskHint = riskLevel !== '1σ' ? ` [risk=${riskLevel}]` : '';
-        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'), currentModel, params.model, forkSession, allowExtensions, parentSession);
+        const result = await runSingleAgent(cwd, agents, params.agent, params.task, params.cwd, undefined, undefined, undefined, makeDetails('single'), currentModel, params.model, forkSession, allowExtensions, parentSession, params.inboxId ?? `${params.agent ?? 'default'}#1`);
         if (isFailedResult(result)) {
           return `Agent ${result.stopReason || 'failed'}${riskHint}: ${getResultOutput(result)}`;
         }
-        return `${riskHint ? riskHint + ' ' : ''}${truncateParallelOutput(getFinalOutput(result.messages) || '(no output)')}`;
+        return `${riskHint ? riskHint + ' ' : ''}${truncateParallelOutput(getFinalOutput(result.messages) || '(no output)')}` + inboxNote([result]);
       }
 
       const available = agents.map((a: AgentConfig) => `${a.name} (${a.source})`).join(', ') || 'none';
