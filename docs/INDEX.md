@@ -350,7 +350,7 @@
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
 
-## 设计文档（123 条）
+## 设计文档（133 条）
 
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
@@ -399,6 +399,16 @@
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 二、审计清单逐条结论（含证据） · ### 1. 上下文里留的是句柄还是只有一句"已归档"？→ **是句柄，但缺摘录** · 数字: 4 个 / 2 次 / 1 个 / 0 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 三、决策提案（**均不改默认**，等用户点头） · **建议顺序**：先 **P3-D**（拿到可观测数据）→ 再决定要不要 **P3-A/B**（它们都是"改句柄内容"， · 数字: 0 次 / 2 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 四、本次审计的实测数字（能力地板之外的"效率指标"） · - 归档目录：**563 文件 / 3.4MB**（说明归档在真实使用中活跃，不是死代码）； · 数字: 3.4MB / 2 次 / 4 个 / 0 次
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 0. 本环境实测（`command -v` / `import` / `curl`，2026-10-09）
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 1. 哈希校验（**唯一现在就能做好的**） · - 工具：`sha256sum`（✓）/ `openssl dgst -sha256`（✓，两者互为独立实现，可交叉验证）。
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 2. 杀毒 / 恶意软件扫描 · **受限网络下 ClamAV 病毒库怎么更新（本环境实测，结论不乐观）**：
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 3. 特征识别 / 规则引擎（零依赖可做的部分） · - **轻量分类**：`strings`（✓）+ `objdump`（✓）+ 自备**极小 magic 表**（PNG/JPEG/ZIP/GZIP/ELF/PE/PDF），
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 4. 在线信誉服务（**免 key 的只有一家**；隐私代价必须写清） · ⇒ **推荐顺序**：**URLhaus 本地黑名单（隐私最佳、免 key）> urlscan.io（免 key、查域名）> VT（需 key、只传哈希）**；
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 5. 防篡改 / 完整性 · - **文件基线哈希**：首次记录 `path → sha256`（清单），之后 `--verify` 比对；**改动/新增/删除分别报**
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 6. 浏览器侧 · - **URL 信誉**：导航前用 URLhaus 本地表 + urlscan.io 查**域名**（不要上传完整含 token 的 URL）。
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 7. 落地形态建议（结合 my-pi 既有结构） · **推荐：技能 + 脚本 + 默认只记录的钩子；不新增声明工具。** · 数字: 1159 B
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 8. 需要用户决策或安装的点 · 1. **是否安装 ClamAV/YARA**（并解决**病毒库更新通道**：本环境官方库 000、国内镜像 404 ⇒ 需离线搬运或换网络）；
+- `docs/design/SECURITY-GUARD-RESEARCH.md` · 附：引用的开源项目（名 / 仓库 / 许可）
 - `docs/design/SECURITY-SCAN.md` · 一、本环境能力实测（2026-10-09） · **一句话**：**这台机器上没有任何杀毒/签名/沙箱能力**，只有哈希、python、node 与一条免费的 URL 黑名单。
 - `docs/design/SECURITY-SCAN.md` · 二、选定形态：**脚本（零依赖） + 技能（流程） + 未来钩子（默认只记录）** · 数字: 1159 B
 - `docs/design/SECURITY-SCAN.md` · 三、分层与顺序（**先便宜后昂贵、先确定后模糊**） · **判据顺序**：L0/L1 **每次必跑**（零成本）→ L2/L3 **按需/按开关**（慢或需网络）→ 结论取**最严的那一层**，
