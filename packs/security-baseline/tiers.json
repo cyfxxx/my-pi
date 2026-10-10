@@ -33,9 +33,12 @@
         "~/.bashrc",
         "~/.profile",
         "~/.zshrc",
-        "~/.ssh/authorized_keys"
+        "~/.ssh/authorized_keys",
+        "~/.config/autostart/**",
+        "~/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/**",
+        "~/.ssh/config"
       ],
-      "note": "以 ~ 开头的路径走 os.homedir()，**存在才纳入**；Windows 上换成计划任务/启动项（本层留待扩展）"
+      "note": "以 ~ 开头的路径走 os.homedir()，**存在才纳入**（Windows 启动文件夹即按此形态覆盖）。**覆盖不到的（如实）**：Windows 注册表 Run 键与任务计划——两者都需要外部命令（reg/schtasks）或管理员权限，违反\"只用 Node 标准库\"的便携化硬约束 ⇒ 本层不收；PATH 目录内容体量巨大且常变 ⇒ 也不收。详见 BASELINE.md 第九节。"
     }
   },
   "exclude": [

@@ -2992,3 +2992,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 教训：**假阳性的代价不是噪声，而是让整个检查失效**（会狼来了的检查必然被无视）。
 - 双向自证：干净⇒0；陌生 registry⇒点名 evil；安装钩子⇒点名 hooker。
 - lockfile 纳入 Tier1（`package.json`/`package-lock.json`/`custom/package.json`）；脚本数 59 → 60。
+
+### 第 ⑦ 层：系统级持久化点（2026-10-10）
+
+- 收（文件形态，跨平台同一套机制）：`~/.bashrc`/`.profile`/`.zshrc`、`~/.ssh/authorized_keys`+`config`、
+  `~/.config/autostart/**`、**Windows 启动文件夹**（`~/AppData/.../Startup/**`）。
+- **缺口（如实）**：Windows 注册表 Run 键、任务计划、`PATH` 目录内容、`cron` —— 都要外部命令或第三方模块
+  ⇒ 与"只用 Node 标准库"的硬约束冲突 ⇒ **不硬做**；要补需用户同意破约束（可做可选 tier3，默认关）。
+- 表与理由写进 `BASELINE.md` 第九节。纪律同 `not-scanned`：**宁可显示缺口，也不显示虚假的绿色**。

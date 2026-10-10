@@ -105,3 +105,23 @@ node scripts/security-scan.mjs --baseline --tier2 --verify     # Tier2（进程�
 **实测（本机）**：`needs-review 2 项` —— `esbuild`（下载自身二进制）与 `fsevents`（macOS 专用），**都是已知正常**；
 `my-pi-custom` 曾被我误报为"陌生 registry"（它是 workspace 本地链接）⇒ 已修，**本地链接单独跳过**。
 **口径**：只出 `clean` / `needs-review`，**不判恶意、不阻断**；用镜像是正当选择，脚本只负责指出偏离。
+
+## 九、第 ⑦ 层：系统级持久化点（**只收文件形态的**，缺口如实列出）
+
+攻击者落地后通常写这几处；本层**只收能用 Node 标准库读到的文件**，其余**如实标为缺口**：
+
+| 位置 | 收不收 | 为什么 |
+|---|---|---|
+| `~/.bashrc` / `~/.profile` / `~/.zshrc` | ✅ | 文件，`homedir()` 可达 |
+| `~/.ssh/authorized_keys` / `~/.ssh/config` | ✅ | 文件；改了＝**别人能登进来** |
+| `~/.config/autostart/**` | ✅ | Linux 桌面自启，文件形态 |
+| `~/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/**` | ✅ | **Windows 的自启文件夹也是文件** ⇒ 同一套机制即可覆盖（便携化不需要分平台代码） |
+| **Windows 注册表 `Run`/`RunOnce` 键** | ❌ **缺口** | 只能用 `reg query` 之类**外部命令**（违反"只用 Node 标准库"）；Node 读写注册表要第三方模块 ⇒ 宁可不做也不破约束 |
+| **Windows 任务计划（含 `C:\Windows\System32\Tasks\**`）** | ❌ **缺口** | 需要 `schtasks` 或管理员权限；且该目录常读不到 ⇒ 收了会变成"时有时无"的噪声 |
+| **`PATH` 目录里的可执行文件** | ❌ **缺口** | 体量巨大、且随安装常变 ⇒ 纳入即误报（违背"不把噪声纳入基线"的判据） |
+| `cron` 任务 | ❌ **缺口** | `crontab -l` 是外部命令；用户 crontab 文件位置因发行版而异 |
+
+**要不要补这些缺口？** 若你愿意**破一次"只用 Node 标准库"**（例如允许只读地调用 `schtasks /query /xml`、
+`reg query`），我可以把它们做成**可选层 tier3**（默认关，显式调用）；**否则**这些点就靠"**定期人工核对**"
+（或在系统层面用 Windows Defender / 系统自带工具）。**我不擅自破约束**——它是你这次明确给的三条硬要求之一。
+
