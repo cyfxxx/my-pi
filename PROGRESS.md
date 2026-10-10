@@ -2952,3 +2952,10 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **首次探测两个真信号**：① `jsDelivr /gh/` 此刻 **0 字节**（此前 200/3808）⇒ **间歇性**，只看状态码会说谎；
   ② **`github.com` 对照项现在 200/577KB**（此前 000）⇒ **网络环境变了**，旧结论不能当永久事实。
 - 脚本数 57 → 58；STRUCTURE 与 scripts/README 同步。
+
+### 技能瘦身：判据留正文、清单搬 packs（2026-10-10）
+
+- 查清两个目录角色：`skills/` 进 catalog（只注入一行描述）；`packs/` 不进 catalog、按需 read（已有 15 个 pack + INDEX）。
+- `pi-net-mirror` 正文 **74 → 39 行**；细节（实测表/命令模板/便携化/事实核查）→ `packs/net-mirror/MEASUREMENTS.md`（52 行），
+  并在 `packs/INDEX.md` 登记；描述改为指向细节层（描述进 catalog，必须准确）。
+- 顺带修掉我前两轮把两节插到 frontmatter 与标题之间的失误，正文顺序归位。

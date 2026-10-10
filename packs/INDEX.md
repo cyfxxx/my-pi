@@ -32,3 +32,4 @@
 > | `pdf-toolkit` | `pdf_core`：提取文本/表格/图片/元数据；合并/拆分/旋转/加密/解密；加水印；`skills/pdf-forms`：PDF 表单填写；`skills/pdf-ocr`：扫描件 OCR | PDF 全场景处理 |
 >
 > _注：二级索引列出核心子技能路径，完整列表请读对应 `SKILL.md` 文件。_
+| `net-mirror` | 网络加速的实测表与命令模板（技能 `pi-net-mirror` 的细节层） |
