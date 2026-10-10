@@ -132,11 +132,12 @@ function scanFile(path) {
   }
 
   // L2-b：ClamAV（可选；与 YARA 并存）。**缺失即如实 not-scanned**，绝不假装扫过。
-  // ⚠ 陷阱（本会话踩过）：本函数**形参就叫 `path`**（是文件路径字符串）⇒ 块内**不能**写 `path.join` 之类，
-  //    那是被遮蔽的形参、不是 node:path 模块（表现是 `path.join is not a function`，且**加 import 也无效**）。
-  //    所以这里只用具名导入：`join` / `pathDelimiter` / `pathBasename`；传文件时用的 `path` 才是形参（正是所需）。
-  // 探测二进制用**纯 Node 扫 PATH**（不调外部命令；Windows 用 PATHEXT 近似）。
-  // 成本如实说明：`clamscan` 每次载库，本机实测约 **10 秒**；`clamdscan` 亚秒级但需常驻 daemon（默认不装）。
+  // ⚠ 陷阱（本会话踩过）：本函数**形参就叫 path**（文件路径字符串）⇒ 块内**不能**写 `path.join`，
+  //    那是被遮蔽的形参、不是 node:path 模块（加 import 也无效）。故只用具名导入：join/pathDelimiter/pathBasename。
+  // **候选按序回退（2026-10-10 修缺口）**：先 `clamdscan`（常驻守护，亚秒级），失败**必须回退**到 `clamscan`；
+  //    两者都不行才 `not-scanned`。原因：`clamdscan` 存在但 `clamd` 没跑时会失败，若不回退就会**假阴性**
+  //    （明明能扫却报"未扫描"）。探测二进制用纯 Node 扫 PATH（Windows 用 PATHEXT 近似）。
+  // 成本如实说明：`clamscan` 每次载库，本机实测约 **10 秒、峰值 RSS ≈966 MB**；`clamdscan` 亚秒级但要常驻 ≈1GB。
   const findBin = (name) => {
     const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
     for (const dir of String(process.env.PATH || '').split(pathDelimiter)) {
@@ -148,32 +149,42 @@ function scanFile(path) {
     }
     return null;
   };
-  const clamBin = findBin('clamdscan') || findBin('clamscan');
-  if (!clamBin) {
+  const clamCands = ['clamdscan', 'clamscan'].map(findBin).filter(Boolean);
+  const sigsOf = (text) =>
+    String(text || '').split('\n').filter((l) => /FOUND/.test(l)).map((l) => (l.split(':').pop() || '').replace(/\s*FOUND\s*$/, '').trim());
+  if (clamCands.length === 0) {
     if (layers.L2_antivirus === 'not-scanned') {
-      hits.push({ rule: 'l2-not-scanned', detail: 'ClamAV 未安装（PATH 里没有 clamscan/clamdscan）⇒ **未扫描不等于安全**' });
+      hits.push({ rule: 'l2-not-scanned', detail: 'ClamAV 未安装（PATH 里没有 clamdscan/clamscan）⇒ **未扫描不等于安全**' });
     }
   } else {
-    const binName = pathBasename(clamBin);
-    const digestSig = (text) =>
-      String(text).split('\n').filter((l) => /FOUND/.test(l)).map((l) => (l.split(':').pop() || '').replace(/\s*FOUND\s*$/, '').trim());
-    try {
-      const out = execFileSync(clamBin, ['--no-summary', '--stdout', path], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 300000 });
-      const sigs = digestSig(out);
-      if (sigs.length) {
-        layers.L2_antivirus = 'hit';
-        for (const sig of sigs) hits.push({ rule: `clamav:${sig || 'unknown'}`, detail: `ClamAV(${binName}) 检出` });
-      } else if (layers.L2_antivirus === 'not-scanned') {
-        layers.L2_antivirus = 'ok';
+    const failures = [];
+    let settled = false;
+    for (const bin of clamCands) {
+      const binName = pathBasename(bin);
+      try {
+        const out = execFileSync(bin, ['--no-summary', '--stdout', path], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 300000 });
+        const sigs = sigsOf(out);
+        if (sigs.length) {
+          layers.L2_antivirus = 'hit';
+          for (const sig of sigs) hits.push({ rule: `clamav:${sig || 'unknown'}`, detail: `ClamAV(${binName}) 检出` });
+        } else if (layers.L2_antivirus === 'not-scanned') {
+          layers.L2_antivirus = 'ok';
+        }
+        settled = true;
+        break;
+      } catch (e) {
+        const sigs = sigsOf((e && e.stdout) || '');
+        if (sigs.length) {
+          layers.L2_antivirus = 'hit'; // rc=1 = 检出
+          for (const sig of sigs) hits.push({ rule: `clamav:${sig || 'unknown'}`, detail: `ClamAV(${binName}) 检出` });
+          settled = true;
+          break;
+        }
+        failures.push(`${binName}:rc=${(e && e.status) !== undefined ? e.status : '异常'}`); // 回退到下一个候选
       }
-    } catch (e) {
-      const sigs = digestSig((e && e.stdout) || '');
-      if (sigs.length) {
-        layers.L2_antivirus = 'hit'; // rc=1 = 检出（execFileSync 会抛）
-        for (const sig of sigs) hits.push({ rule: `clamav:${sig || 'unknown'}`, detail: `ClamAV(${binName}) 检出` });
-      } else if (layers.L2_antivirus === 'not-scanned') {
-        hits.push({ rule: 'l2-not-scanned', detail: `ClamAV 运行失败（${e && e.status ? `rc=${e.status}` : '异常'}）⇒ **未扫描不等于安全**` });
-      }
+    }
+    if (!settled && layers.L2_antivirus === 'not-scanned') {
+      hits.push({ rule: 'l2-not-scanned', detail: `ClamAV 全部候选失败（${failures.join(' / ')}）⇒ **未扫描不等于安全**` });
     }
   }
 

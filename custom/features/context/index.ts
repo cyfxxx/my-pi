@@ -20,7 +20,7 @@ import {
   appendErrorFingerprintRecord,
   buildErrorFingerprintRecord,
 } from './budget/fingerprint-log';
-import { getMemoryDir, getAgentDir } from '../../core/config';
+import { getMemoryDir, getAgentDir, getProjectRoot } from '../../core/config';
 import { fingerprintRequest, formatFingerprint, type PrefixFingerprint } from './budget/prefix-fingerprint';
 import { auditSystemInjection, buildSystemPrompt, EFFICIENCY_ADVICE } from './budget/system-prompt';
 import { buildSkillsCatalog, skillsCatalogKey, SKILLS_CATALOG_TAG, type SkillLike } from './budget/skills-catalog';
@@ -81,6 +81,7 @@ import {
 } from './budget/budget';
 import { pruneToolResults, pruneThinkingBudget, sweepPruneRefs } from './budget/prune';
 import { sweepArchive } from './budget/output-archive';
+import { createDefaultAutoscan } from './budget/autoscan';
 import type { PruneMessage } from './budget/prune';
 import { makeCompactDecider, makeAutoContinueGate, computeCompactThreshold } from './budget/auto-compact';
 import { createSpeedTracker, formatSpeedCompact } from './budget/token-speed';
@@ -161,6 +162,10 @@ export function register(pi: ExtensionAPI): void {
   // P2（只观察）：每次压缩前记一条"按回本算值不值"，供 daily-health 与后续决策使用
   const compactPaybackFile =
     process.env.PI_COMPACT_PAYBACK_FILE || join(getMemoryDir(), 'logs', 'compact-payback.jsonl');
+  // 下载后自动扫描（2026-10-10，用户已批准**默认开**）：`PI_AUTOSCAN=off` 可关。
+  // **异步**发起（`clamscan` 每次载库约 10 秒 ⇒ 同步会拖慢每一轮下载），结果落运行时日志，
+  // 并在**下一次工具结果**里给一句提示。**只提示、不阻断**；`not-scanned` 原样透出。
+  const autoscan = createDefaultAutoscan(getMemoryDir(), getProjectRoot());
   // 上一次追加的易变运行时提示内容（仅变化时追加，避免每轮重插导致的消息序列位移）
   let lastVolatileContext: string | null = null;
   // 上一次注入的技能目录内容键（同上：仅变化时追加一份完整替换）
@@ -727,6 +732,16 @@ export function register(pi: ExtensionAPI): void {
       // tool_result 事件自带原始 input（见 pi `ToolResultEvent`），故无需配对表。
       const bashCmd = name === 'bash' && typeof e.input?.command === 'string' ? (e.input.command as string) : undefined;
       const bashInfo = bashCmd !== undefined ? analyzeBashCommand(bashCmd) : undefined;
+      // 下载后自动扫描：只看 bash 命令里明确的下载输出目标（`curl -o` / `wget -O` / `--output=`）。
+      // 整段 fail-open：解析/发起任何一步出错都不许影响工具结果本身。
+      if (bashCmd !== undefined) {
+        try {
+          const cwd = typeof e.input?.workdir === 'string' ? (e.input.workdir as string) : process.cwd();
+          autoscan.maybeStart(bashCmd, cwd);
+        } catch {
+          /* fail-open */
+        }
+      }
       // 度量：记录 token/缓存（用量统计度量基建；无 usage 时以输出估算兜底）
       // provider 未返回 usage 时记一条 usage-missing（/usage-diag 会显示它，用于判断"命中率是否可信"）
       if (!e.usage) recordUsageMissing();
@@ -746,10 +761,24 @@ export function register(pi: ExtensionAPI): void {
       } catch {
         /* fail-open */
       }
-      if (!text) return;
+      const takeAutoscanNotice = (): string | undefined => {
+        try {
+          return autoscan.takeNotice();
+        } catch {
+          return undefined;
+        }
+      };
+      if (!text) {
+        // 工具没有文本输出时，若有待发的自动扫描提示，就让它作为唯一文本块出现
+        const onlyNotice = takeAutoscanNotice();
+        if (!onlyNotice) return;
+        return { content: [{ type: 'text' as const, text: onlyNotice.replace(/^\n/, '') }], details: e.details };
+      }
       // 熔断：同一工具连续失败达阈值时追加提示；错误输出先确定性脱水
       const { hint } = updateFailStreak(failStreak, name, !!e.isError);
       let out = text;
+      const autoscanNotice = takeAutoscanNotice();
+      if (autoscanNotice) out += autoscanNotice;
       const dehy = dehydrateErrorOutput(out);
       if (dehy !== undefined) out = dehy + DEHYDRATE_HINT;
       if (hint) out += hint;

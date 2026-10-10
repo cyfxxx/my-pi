@@ -2,6 +2,63 @@
 
 ## 格式
 
+### [2026-10-10] "下载后自动扫描"钩子：**第二次尝试成功**（复用 WIP + 接线 + 能证伪的反证）
+
+**为什么第一次失败、这次成功**（差异是可复用的经验）：
+1. **第一次**：子代理写出了 288 行 `autoscan.ts` 但**没接线** ⇒ `check-dead-exports` 判红 ⇒ **卡住整个仓库的提交** ✗
+   （我那时只能把文件移出仓库、WIP 存 `/tmp` ✓）。
+2. **第二次**：我在**开工那一刻**就把方法写死（**先读 `/tmp/autoscan.wip.ts`**、落点、护栏、默认值、
+   **"做不完就把文件放回 /tmp，不要留在 custom/ 里"**）⇒ 它**复用了原设计**（判断"结构是对的，重写=扔掉可用设计" ✓），
+   补齐缺的三样（**内存护栏**、**nice**、去掉 `void dirname` 那类补丁式 hack），并**接线** ✓。
+   ⇒ **教训：给"方法 + 收尾纪律"比给"目标"更能决定成败** ✓（本会话已在 apt 那次吃过反例 ✗）。
+
+**交付与验证（实测原文）**：
+- 新增 `custom/features/context/budget/autoscan.ts` + `__tests__/autoscan.test.ts`（**11/11**）+ `__tests__/autoscan-e2e.test.ts`
+  （**`PI_AUTOSCAN_E2E=1` 才跑**，默认跳过 ⇒ 不拖慢日常 ✓）；改 `index.ts` 接线（既有 `tool_result` 观测点的 `bashCmd` 之后，
+  并处理了**空输出时不丢提示**这条边界 ✓）。
+- **零回归**：整个 `custom/features/context/__tests__/` ⇒ **318 passed / 2 skipped** ✓；`tsc --noEmit -p custom/` 干净 ✓。
+- **`check-dead-exports` 干净** —— 且它**删掉了**无引用的 `autoscanLogPath`，**而不是写 allowlist 掩盖** ✓✓
+  （这正是我在意的做法：**让守门通过的方式应当是修好，而不是让它闭嘴**）。
+- **声明面一字不差**：`进前缀 41 个/24399B｜不进前缀 18 个/6442B｜合计 30841B` ✓（**未新增工具** ✓）。
+- **端到端真跑（14.6 秒）**：真 HTTP 服务 + 真 `curl` 下载含**反弹 shell 特征**的载荷 ⇒ `verdict=suspicious`、
+  提示**原样**含 `suspicious` 与**真实日志绝对路径**且**不含**"结论：clean" ✓；同内容二次 ⇒ `skipped: dupe` ✓；
+  `PI_AUTOSCAN=off` ⇒ **日志零新增** ✓。
+- **反向断言（关键）**：除断言真实现外，**构造两个假实现**并断言其**必然违反**"`not-scanned` 必须原样透出"：
+  `fakeAlwaysClean()` 在 `not-scanned` 输出上被判失败、`fakeAlwaysNotScanned()` 在 `clean` 输出上被判失败 ✓
+  —— 即**这条断言真的能抓住"把 not-scanned 改写成 clean"这个 bug** ✓✓（不是"看起来对"，是"错了必然红"）。
+
+**如实标注的未验证项**：① 未跑全量 golden（由我补跑 ✓）；② **"pi 进程真的每次 bash 结果都调用它"未做进程级验证** ✗
+（验到的是 `createDefaultAutoscan(...).maybeStart(...)` 真链路 + `tsc` 保证装配类型正确）；
+③ 内存护栏只有单测覆盖（造"低内存"需改 `/proc` ✗ 不现实），`nice` 缺失时的降级也**未实测**（逻辑上 fail-open 且记日志 ✓）；
+④ 钩子**刻意异步**：结果落日志、提示在**下一次工具结果**出现（同步会让每轮下载 **+约 10 秒** ✗）。
+
+### [2026-10-10] ClamAV 候选**按序回退**（修掉一个假阴性）+ 常驻 vs 瞬时的取舍（有实测数字）
+
+**缺口（我自己代码里的）**：L2 原本"先探测 `clamdscan`，有就用"。但 `clamdscan` 存在 ≠ 守护在跑——
+**`clamd` 没跑时 `clamdscan` 会失败** ⇒ 原实现会把**本可以扫的**文件报成 **`not-scanned`** ✗（**假阴性**：
+"没扫"和"扫不了"是两回事，但用户看到的是同一句话）。
+
+**修法**：改成 **候选按序回退** —— `clamdscan` → 失败就 `clamscan` → 两个都不行才 `not-scanned`，
+并在"全部失败"时把每个候选的失败原因一并列出（`clamdscan:rc=2 / clamscan:rc=…`）✓。
+
+**三态验证（可重跑）**：
+1. 本机无 `clamdscan` ⇒ 走 `clamscan` ⇒ `L2_antivirus=ok` ✓；
+2. **造一个"存在但 exit 2"的假 `clamdscan`**（正是那个假阴性场景）⇒ **自动回退** ⇒ `L2_antivirus=ok` ✓（修前会报 not-scanned ✗）；
+3. 假 `clamdscan` + EICAR ⇒ **`clamav:Eicar-Test-Signature: ClamAV(clamscan) 检出`** ✓ —— 命中名标明是 **`clamscan`**，
+   证明**回退路径真的执行到了** ✓。
+
+**顺带的实测事实**：装上 `clamav-daemon` **并不会带来 `clamdscan`**（本机实测 `command -v clamdscan` 为空 ✗）
+⇒ 想走常驻快速路线，还得另外补齐 `clamdscan` 与 socket 配置 ✓。
+
+**常驻 vs 瞬时（实测数字，供决策）**：本机 **MemTotal 7718 MB / MemAvailable 2544 MB / Swap 5768 MB**；
+`clamscan` **峰值 RSS ≈ 966 MB**（瞬时、用完即释）✗；`clamd` 预期 **≈1 GB 常驻** ✗。
+**判断规则**：**内存 ≥ 8 GB 且平时可用 ≥ 4 GB，且每天要扫很多次/想下载即扫 ⇒ 上常驻 ✓；否则保持瞬时** ✓
+（本机属后者）。另注：ClamAV 1.x 用 **mmap** 载库 ⇒ 那 ~1 GB 里**有部分是可回收的只读页**，
+实际压力比"硬占 1 GB"要软 —— **这是推断，未实测**（我量的是 RSS，没量不可回收部分）✗。
+
+**用户决定（已确认）**：`clamav-daemon` **留着备用**（已装、**未启动** ⇒ **不占内存** ✓）；
+自动扫描的**内存护栏阈值 1.5 GB** 批准 ✓（低于则 `skipped-low-mem`，绝不假装扫过 ✓）。
+
 ### [2026-10-10] "下载后自动扫描"钩子：**尝试失败，已如实收尾**（WIP 无损保留）
 
 **结果：未交付** ✗。派出的子代理写出了 `custom/features/context/budget/autoscan.ts`（**288 行、16 个导出**），

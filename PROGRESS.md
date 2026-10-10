@@ -3059,3 +3059,21 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 处置：WIP 无损保留 `/tmp/autoscan.wip.ts` → 核对路径/untracked 后**移出仓库** ⇒ pre-commit golden 恢复全绿 ✓
   ⇒ 我那笔"修误导文案"的提交才得以落地（此前被它卡住）。**没有用 --no-verify 绕过守门** ✓。
 - 下次起点：读 `/tmp/autoscan.wip.ts` + 已定设计（落点/触发/护栏/默认开/只提示不阻断）。
+
+### L2 候选按序回退 + 常驻取舍实测（2026-10-10）
+
+- 修假阴性：`clamdscan` 存在但 `clamd` 没跑时会失败 ⇒ 原实现报 not-scanned ✗ ⇒ 改为**按序回退**
+  （clamdscan → clamscan → 才 not-scanned，并列出各候选失败原因）。
+- 三态验证：无 clamdscan⇒ok ✓；**假 clamdscan(exit 2)⇒自动回退⇒ok** ✓；假 clamdscan+EICAR⇒**clamscan 检出** ✓。
+- 实测：装 clamav-daemon **不带 clamdscan** ✗；MemTotal 7718MB / Available 2544MB；clamscan 峰值 RSS **966MB**（瞬时）、clamd 预期 **≈1GB 常驻**。
+- 规则：内存 ≥8GB 且可用 ≥4GB 且扫得频繁 ⇒ 常驻；否则瞬时（本机属后者）。
+- 用户已定：daemon **留着备用**（未启动、不占内存）；内存护栏阈值 **1.5GB** ✓。
+
+### "下载后自动扫描"钩子：第二次尝试成功（2026-10-10）
+
+- 复用 `/tmp/autoscan.wip.ts` 的结构（纯逻辑/IO 分离、依赖注入、去重、not-scanned 透传都在）+ 补内存护栏/nice/去 hack + **接线** ✓。
+- 验证：11/11 单测；`context` 套件 **318 passed/2 skipped 零回归**；tsc 干净；**dead-exports 干净（删掉无引用导出而非写 allowlist）**；
+  **声明面 30841B 一字不差**；E2E 真下载 ⇒ `suspicious` 且提示含真实日志路径、不含"结论：clean"；去重 ✓；`=off` 零新增 ✓。
+- **反向断言**：构造两个假实现断言其必然违反 ⇒ 能真正抓住"not-scanned 被改写成 clean" ✓。
+- 未验证（如实）：pi 进程级装配未验、内存护栏仅单测、nice 降级未实测、异步设计（提示下一轮出现）。
+- 教训：**给"方法 + 收尾纪律"（做不完就放回 /tmp）比只给目标更能决定成败**。
