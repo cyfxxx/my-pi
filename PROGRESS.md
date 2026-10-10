@@ -3094,3 +3094,12 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   **禁止**删除、改配置、启常驻（需用户批准）。
 - 验证：`✓ 每日更新 ClamAV 病毒库`（headless 守门通过）；无扩展工具/斜杠命令引用；任务总数 6。
 - 该机制的设计：同名任务**不会被覆盖** ⇒ 改定义需 `node scripts/reseed-seeds.mjs --apply`（先备份）。
+
+### 钩子接线独立复核（2026-10-10）
+
+- 静态证据：`index.ts` 中 `event: 'tool_result'`(704) → `autoscan.maybeStart(bashCmd, cwd)`(740) →
+  `takeNotice()`(766) → 注入输出(780-781) ⇒ **调用点在 tool_result 分支内**（比"tsc 类型装配"强）。
+  常量核对：MAX_AGE=120s、MAX_BYTES=200MB、TIMEOUT=120s、**MIN_MEM_KB=1,572,864 = 1.5GB** ✓、默认开仅 `PI_AUTOSCAN=off` 关。
+- 独立重跑 E2E：`1 passed`、真链路 **14.1s**（含 suspicious/日志/提示/去重/开关）✓。
+- 剩余未验证仅剩 **pi 是否派发 tool_result**（pi 核心行为，同一观测点已被错误指纹记录器生产使用 ⇒ 风险低），
+  以及内存护栏仅单测、nice 降级未实测（低风险）。

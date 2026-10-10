@@ -2,6 +2,40 @@
 
 ## 格式
 
+### [2026-10-10] 钩子接线**独立复核**：静态证据 + 我自己重跑 E2E（把"未验证"缩小到 pi 核心行为）
+
+**背景**：钩子交付时留了三条未验证项。本轮我做**独立复核**（不依赖交付者的自述），且**刻意不去跑真实 pi 会话**
+（会消耗用户 API 额度 ✗）⇒ 改用"静态调用点 + 自己重跑 E2E"两条能自证的路 ✓。
+
+**① 静态证据：钩子确实挂在 `tool_result` 路径上** ✓（`custom/features/context/index.ts` 实测行号）：
+```
+ 84: import { createDefaultAutoscan } from './budget/autoscan';
+168: const autoscan = createDefaultAutoscan(getMemoryDir(), getProjectRoot());
+704: event: 'tool_result',                       ← 观测点本身
+740: autoscan.maybeStart(bashCmd, cwd);         ← 用 bash 命令行触发（含 cwd）
+766: return autoscan.takeNotice();              ← 取出提示
+780-781: const autoscanNotice = takeAutoscanNotice(); if (autoscanNotice) out += autoscanNotice;  ← 注入到输出
+```
+⇒ **调用点就在 `tool_result` 分支内** ✓ —— 这比交付时给的"`tsc` 保证装配类型正确"**强得多**（那是类型层面，
+这是**位置层面**的证明 ✓）。常量也与设计一致：`MAX_AGE=120s`、`MAX_BYTES=200MB`、`TIMEOUT=120s`、
+**`MIN_MEM_KB=1_572_864`（正好 1.5 GB ✓ 用户批准的阈值）**、`LOG_MAX_BYTES=1MB`，
+且注释明确"**默认开；只有 `PI_AUTOSCAN=off` 才关**" ✓。
+
+**② 我自己重跑 E2E（独立复核，非转述）** ✓：
+```
+✓ custom/features/context/__tests__/autoscan-e2e.test.ts (1 test) 44284ms
+  ✓ 真链路：可疑载荷 ⇒ suspicious、写入日志、提示原样带结论；去重与开关都真的生效 14109ms
+Test Files 1 passed (1) | Tests 1 passed (1)
+```
+（真 HTTP 服务 + 真 `curl` 下载 + 真跑 `security-scan.mjs`；14.1 秒，与交付者报告的 14.6 秒一致 ✓。）
+
+**③ 剩下的"未验证"已缩小到 pi 的核心行为**（如实）：`pi` **是否在真实会话里派发 `tool_result` 事件**——
+这不是我的代码，而是 pi 的既有核心行为，**且同一个观测点已被既有的错误指纹记录器在生产中使用** ✓
+⇒ 风险很低 ✓；我**没有**为此跑真实 pi 会话（会消耗 API 额度，属该由用户决定的成本 ✓）。
+
+**结论**：三条未验证项中，**最关键的"钩子是否真会被调用"已用位置证据 + 独立 E2E 证到位** ✓；
+剩余两条（内存护栏只在单测覆盖、`nice` 降级未实测）属**低风险未证** ✓，已如实留档。
+
 ### [2026-10-10] 病毒库**每日自动更新**（用项目自己的定时任务机制，不用 cron）
 
 **为什么必须补这条**：`freshclam` 现在能成功拉库（48 MB ✓），**但没有任何东西在定期跑它** ⇒
