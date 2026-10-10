@@ -1,13 +1,8 @@
 {
-  "version": 1,
-  "updated": "2026-10-10",
-  "comment": "分层完整性基线的层定义（数据，不硬编码进代码）。改这个文件本身也会被 tier1 覆盖到（它在 packs/** 下）⇒ 篡改层定义会立刻被 --verify 抓到。",
-  "skipLargeBytes": 2097152,
-  "skipLargeReason": "超过 2MB 的文件不纳入（只计数不哈希）。基线的价值在'改动会执行代码 / 改变行为'的小文件；大二进制哈希会拖慢 --init 且意义有限。跳过数量会在输出里如实报出（skippedLarge）。",
+  "_comment": "分层完整性基线的层定义（数据，不是代码）。判据见 BASELINE.md：按'改了会怎样'分优先级选目录，按'本来就在变'排除噪声。",
   "tiers": {
     "tier1": {
-      "name": "必选（小、价值最高）",
-      "why": "四类都是'改了就会执行代码 / 改变我的行为或权限'：执行面（每次提交推送都跑）、提示面（改它等于直接给我下指令）、控制面（凭据与信任边界）、引导/密钥（换掉等于交出身份）。共同点：文件总量小、平时几乎不变 ⇒ 增量校验几乎零成本。",
+      "why": "改了＝任意代码执行 / 直接给我下指令 / 改信任边界 / 换身份 —— 价值最高且体量可控",
       "include": [
         ".githooks/**",
         "scripts/**",
@@ -27,47 +22,41 @@
       ]
     },
     "tier2": {
-      "name": "建议（更大、含仓库外的系统级持久化点）",
-      "why": "进程内代码入口（比整个 custom/** 小得多，且是真正被加载的那些）+ 攻击者真正会落地的系统级位置。系统点一律'存在才纳入'：不存在就跳过并如实计入 missing，绝不假装覆盖。",
+      "why": "进程内代码入口（真正的加载点，比整个 custom/** 小得多）+ 系统级持久化点（仓库基线管不到）",
       "include": [
         "custom/bootstrap.ts",
         "custom/adapters/**",
         "custom/core/**",
         "~/.bashrc",
-        "~/.bash_profile",
         "~/.profile",
         "~/.zshrc",
-        "~/.ssh/authorized_keys",
-        "~/.ssh/config",
-        "~/.config/autostart/**",
-        "~/.local/bin/**"
-      ]
+        "~/.ssh/authorized_keys"
+      ],
+      "note": "以 ~ 开头的路径走 os.homedir()，**存在才纳入**；Windows 上换成计划任务/启动项（本层留待扩展）"
     }
   },
   "exclude": [
-    "packs/drafts/**",
     "**/node_modules/**",
-    "node_modules/**",
-    ".git/**",
-    "portable/memory/**",
-    "dist/**",
-    "**/dist/**",
-    "**/.cache/**",
-    "**/cache/**",
     "**/.venv/**",
-    "**/venv/**",
     "**/__pycache__/**",
-    "**/*.log",
-    "**/*.tmp",
-    "**/.DS_Store"
+    "portable/memory/**",
+    "packs/drafts/**",
+    "dist/**",
+    "**/*.log"
   ],
-  "excludeWhy": {
-    "packs/drafts/**": "**agent 生成 SKILL 草稿的输出目录**（task-summarizer.mjs 会往里写）⇒ 内容本来就变，纳入基线只会天天报'变更'。这条是实测踩出来的：packs 占 Tier1 的 ~90%（841 文件/13M），若不排除会把守门吵成摆设。",
-    "**/node_modules/**": "依赖目录：由包管理器生成与改写，不是'我会执行的代码'的稳定来源。**注意 packs/ 下的包可能自带 node_modules**（如 colab-bridge / knowledge-fetch），所以要用 `**/` 前缀覆盖任意层级，不能只写顶层。",
-    "**/.venv/** / **/venv/** / **/__pycache__/**": "Python 虚拟环境与字节码缓存：同上，产物而非源。",
-    "**/*.log / **/*.tmp / **/.DS_Store": "日志与临时文件：本来就在变。",
-    ".git/**": "内部对象与引用（体量大、且由 git 自己保证完整性；`git fsck` 是更合适的工具）。",
-    "portable/memory/**: 运行时数据（会话、日志、统计、安全基线本身）——**每分钟都在写**。",
-    "dist/**: 构建产物；要盯构建结果就单独对产物哈希，不要混进这层。"
+  "excludeWhy": "排除判据是'本来就在变'，不是'不重要'：node_modules/.venv/dist 是产物；portable/memory 是运行时数据（会话/日志/统计每分钟都在写）；packs/drafts 是 agent 生成 SKILL 草稿的输出目录（task-summarizer 会往里写）；日志同理。把噪声纳入基线的后果不是更安全，而是守门天天报警然后被无视——那比没有基线更糟。",
+  "storage": "portable/memory/security/<tier>-baseline.json（运行时目录，不入库，与 pi-backup 的 .backup-baseline 惯例一致）",
+  "efficiency": {
+    "record": [
+      "path",
+      "size",
+      "mtimeMs",
+      "sha256"
+    ],
+    "verify": "先比 size+mtimeMs，只有不一致才重算 sha256 ⇒ 日常 O(改动数)",
+    "targets": {
+      "tier1_init_ms": 100,
+      "tier1_verify_warm_ms": 100
+    }
   }
 }

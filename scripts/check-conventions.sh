@@ -209,6 +209,26 @@ done
 # ── E. 知识索引不漂移（WikiSkill 借鉴 A 项，2026-10-08）──
 # 索引是"找先例"的入口；它一旦与源文档不一致就会误导下一轮优化，所以按**确定性输出**逐字节比对。
 # 挂在既有守门里而不是新增 golden 步：步数被第 D 节钉住，加步会连带改好几处计数。
+# JSON 语法合法性（2026-10-10 补的守门缺口）：packs/**、scripts/**、sync/** 下我们自己写的 .json。
+# 起因：一份**非法 JSON** 的 `packs/security-baseline/tiers.json` 一路提交成功 —— 因为**没有任何守门
+# 检查 JSON 语法**（文档链接/约定/死导出都不管它）。用 node 解析，跨平台、无外部依赖。
+if node -e '
+  const fs=require("fs"),path=require("path");
+  const walk=(d,out=[])=>{let es=[];try{es=fs.readdirSync(d)}catch{return out}
+    for(const n of es){const f=path.join(d,n);let st;try{st=fs.statSync(f)}catch{continue}
+      if(st.isDirectory()){if(n!=="node_modules"&&n!==".venv")walk(f,out)}
+      else if(n.endsWith(".json"))out.push(f)}
+    return out};
+  const files=[...walk("packs"),...walk("scripts"),...walk("sync")];
+  let bad=0;
+  for(const f of files){try{JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){bad++;console.error("非法 JSON: "+f+" → "+e.message)}}
+  if(bad){process.exit(1)}
+  ' 2>&1; then
+  ok "JSON 语法合法（packs/scripts/sync 下的 .json）"
+else
+  bad "有非法 JSON（见上）"
+fi
+
 if [ -f scripts/knowledge-compile.mjs ]; then
   if node scripts/knowledge-compile.mjs --check >/dev/null 2>&1; then
     ok "知识库与源证据一致（docs/knowledge/）"
