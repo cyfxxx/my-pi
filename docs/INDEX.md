@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（191 条）
+## 决策台账（192 条）
 
+- `DECISIONS.md` · [2026-10-10] **BUG-REPLAYS 的"静默跳过"缺陷**：守门只查"有没有命令"、不查列数 ✗✓（+ 知识库 16 → 25 条） · **发现经过（很值得记）**：我让子代理把 `CODING-TRAPS` 的教训收进知识库 ⇒ 它查证后回报： · 数字: 6 条 / 25 条 / 5 条 · 证据: node scripts/knowledge-compile.mjs --update
 - `DECISIONS.md` · [2026-10-10] 把 6 条通用教训补进**可查阅**处（`docs/design/CODING-TRAPS.md`） · **起因（用户问"遇到的问题是否都有记录作为经验"）**：grep 审计发现 **5 条只躺在 `DECISIONS.md`（台账）里** ✗ · 数字: 5 条 / 6 条 / 1 条 / 3 轮
 - `DECISIONS.md` · [2026-10-10] 池回收 bug **已修 + 有牙齿的回归测试**；并发现"**测试把 bug 当契约**"这个更深的病因 · **修复**（`custom/features/subagent/core/rpc-pool.ts`）：`shutdown(force = false)` ⇒ **默认只 dispose `idle`，不碰 `leased`** ✓；
 - `DECISIONS.md` · [2026-10-10] 文档全面检查：**4 个一致性检查器全过**，但抓到一处"记录未到位" ✗ 已补 · **用户要求**：对项目文档做一次全面检查，确保该更新/该记录的都已落实 ✓。 · 数字: 4 个 / 3 条 · 证据: node scripts/security-scan.mjs --file
@@ -199,7 +200,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（189 条）
+## 进度记录（190 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -390,8 +391,9 @@
 - `PROGRESS.md` · 文档全面检查（2026-10-10） · - 4 个一致性检查器全过（doc-index / changes-ledger / knowledge-compile / doc-links ✓）；**7 个新脚本 README 行 7/7** ✓。 · 数字: 4 个 / 7 个 / 3 条
 - `PROGRESS.md` · 池回收 bug 已修 + 回归测试（2026-10-10） · - 修：`shutdown(force=false)` 默认只 dispose idle、不碰 leased（force 才连 leased）；并加 `closing` 语义
 - `PROGRESS.md` · 6 条通用教训补进可查阅处（2026-10-10） · - 新建 `docs/design/CODING-TRAPS.md`：6 条陷阱 + 1 条"记录本身"的陷阱，**每条配可执行判据** ✓ · 数字: 6 条 / 1 条
+- `PROGRESS.md` · BUG-REPLAYS 静默跳过缺陷 + 知识库 16 → 25（2026-10-10） · - 查证：知识库**没有输入口**（`create_patterns` 是编译器输出；它只读 BUG-REPLAYS / CHANGES rejected / 既有页） · 数字: 6 条 / 25 条
 
-## 缺陷回放（19 条）
+## 缺陷回放（25 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -409,9 +411,15 @@
 - `docs/BUG-REPLAYS.md` · #14 **system 加固块静默丢失（进程内前缀漂移）**：`before_agent_start` 处理器返回的 `systemPrompt` 没生效——pi 会**静默吞掉**该处理器的异常（只发给内存 listener，不落盘）， · `portable/memory/logs/prefix-fingerprints.jsonl` 里**同一进程内**出现 `changed:["system",…,"messages@0-7"]` 且 `systemBytes` 差值 ≈ · 数字: 772B · 证据: npx vitest run custom/features/context/__tests__/system-prompt-total.test.ts / npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
-- `docs/BUG-REPLAYS.md` · #17 **类型级修复"潜伏未提交"**：`typebox` 1.3.x **没有 `Type.Null()`**（只有 `Null` 常量）⇒ "可选 + null"这条最常用路径会抛 ReferenceError；而我的提交门禁走 `g · `bash -c 'node_modules/.bin/tsc --noEmit -p custom/'`
-- `docs/BUG-REPLAYS.md` · #18 **并行时"运行中的 worker 被池回收"**：并行子代理会把在跑的 worker 回收 ⇒ 回退到 `spawn` 路径 ⇒ **中途投递的消息永远停在未读**（实测 `未读 1 / 共 1`） · `bash -c 'grep -n "被池回收" custom/features/subagent/core/rpc-pool.ts'` · 证据: node_modules/.bin/vitest run custom/features/subagent/__tests__/rpc-pool-shutdown.test.ts'
-- `docs/BUG-REPLAYS.md` · #19 **状态文案会"说谎"**：`not-scanned` 曾一律打印"本机没有 ClamAV/YARA"，而引擎其实装着、真实原因是"文件不存在" ⇒ 写死的解释性文案会随环境从"保守"变成"撒谎" · `node scripts/security-scan.mjs --file /tmp/不存在的文件` · 证据: node scripts/security-scan.mjs --file
+- `docs/BUG-REPLAYS.md` · #17 **类型级修复「潜伏未提交」**：typebox 1.3.x 没有 Type.Null()（只有 Null 常量）⇒「可选 + null」这条最常用路径抛 ReferenceError；而提交门禁走 golden --fast（跳过 · 全量 tsc 才暴露（--fast 不跑它）
+- `docs/BUG-REPLAYS.md` · #18 **并行时「运行中的 worker 被池回收」**：shutdown() 连 leased 一起 dispose ⇒ 回退 spawn（无投递通道）⇒ 中途投递的消息永远停在未读 · 并行子代理投递后消息停在「未读 1/1」 · 证据: node_modules/.bin/vitest run custom/features/subagent/__tests__/rpc-pool-shutdown.test.ts'
+- `docs/BUG-REPLAYS.md` · #19 **状态文案会「说谎」**：not-scanned 曾一律打印「本机没有 ClamAV/YARA」，而引擎其实装着、真实原因是「文件不存在」⇒ 写死的解释性文案会随环境从「保守」变成「撒谎」 · 端到端演示时发现文案与事实不符 · 证据: node scripts/security-scan.mjs --file
+- `docs/BUG-REPLAYS.md` · #20 **注释里「两个星号紧跟斜杠」⇒ 块注释被提前关闭**：报错行看起来完全正常（它是被挤出注释的普通文本）⇒ 表现为 ReferenceError: xxx is not defined · 写脚本时运行时崩（本会话白费 3 轮；另一次 440 行实现同源崩） · 数字: 3 轮
+- `docs/BUG-REPLAYS.md` · #21 **形参名与导入的模块名同名** ⇒ 块内引用模块会打到形参上；且「补一个 import」完全无效（导入同样被形参遮蔽） · 运行时 path.join is not a function（我先误判成导入缺失，白费 1 轮） · 数字: 1 轮
+- `docs/BUG-REPLAYS.md` · #22 **pkill -f 会杀掉自己**：-f 匹配整条命令行，而自己的命令行里就含那个模式 ⇒ 命令被打断、后续步骤静默不执行 · 整条 bash 调用被自己 SIGTERM（killed by signal: SIGTERM）
+- `docs/BUG-REPLAYS.md` · #23 **为「模拟缺工具」清空 PATH ⇒ 连自己的工具一起弄没**：报 timeout/grep: command not found，看起来像被测代码失败，其实是测试方法错 · 同一个坑犯了两次，两次都误判成代码有问题
+- `docs/BUG-REPLAYS.md` · #24 **新引入一种「我写的文件格式」⇒ 必须同时引入校验它的守门**：非法 JSON 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS） · 补排除项时被 json.loads 抓到（此前已据此写了文档）
+- `docs/BUG-REPLAYS.md` · #25 **测试把 bug 当契约**：既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） · 修池 bug 时发现原测试 expect(a.worker.alive).toBe(false) 正是 bug 行为
 
 ## 设计文档（146 条）
 

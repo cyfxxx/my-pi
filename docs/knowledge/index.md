@@ -6,7 +6,7 @@
 > 每页四件事：是什么 / 根因 / **确切命令序列** / **含确切语法的解法**；篇幅 **10–30 行**；只记可泛化的。
 > **本产物不自动进模型上下文、不改任何运行时行为**，只供人审阅。
 
-## 失败模式（16 条，来源：`docs/BUG-REPLAYS.md`）
+## 失败模式（25 条，来源：`docs/BUG-REPLAYS.md`）
 
 - [bug-001](patterns/bug-001.md): 切了模式、重启后没生效 + `modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` + `check-conventions`（状态不入库）+ 状态体检 `modes-legacy-current`；模式状态已迁到 gitignored 的 `modes-sessions.json`
 - [bug-002](patterns/bug-002.md): 模式解析"第 3 轮工厂执行后漂回 full" + `PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 + `mode-switch.test.ts` 的三轮回归 + `resolveStartupMode()` 单一写入点
@@ -24,6 +24,15 @@
 - [bug-014](patterns/bug-014.md): **system 加固块静默丢失（进程内前缀漂移）** + `before_agent_start` 处理器返回的 `systemPrompt` 没生效——pi 会**静默吞掉**该处理器的异常（只发给内存 listener，不落盘），于是 my-pi 追加的 772B system 加固块整块消失，请求退回"纯分段渲染"。system 在请求最前，少一块 = 前缀从第 0 个 token 起分叉 → **整段全价重放**。实测一次会话内 `system` 在 8020B/7239B 两变体间来回翻（14:11:22 翻过去、14:25:27 翻回来），两次 = 147,555 + 10,308 token = 该会话**全部未命中的 60.8%** + ① `before_agent_start` 改「关键路径 vs 可选增强」分层：拿 system 文本 + 追加加固块只做纯字符串运算，其余（工具分层/顺序对齐/用量校准/提示）全部就地 try/catch → 增强失败不再牵连前缀；② `prefix-fingerprint.ts` 记 `systemAppend` + `systemSections`/`systemChangedSections`（分段字节表，能区分"某段被改写"与"末尾整块丢了"）+ `system:append-lost`/`system:append-back` 标签；③ 独立台账 + 有 UI 时 `ui.notify`；④ `daily-health` 按**逐条** `systemAppend:false` 一律 alert（不再混进"疑似整段重算"）
 - [bug-015](patterns/bug-015.md): **诊断工具自身的盲区 + JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `systemSectionSizes()` 再也切不开分段，整块 system 被记成一段 `preamble`。后果：第 14 条那类"进程内 system 漂移"**根本没法定位到段**，只能看到 `changed:["system"]`；字节数也整体虚高（7142B 原文 → 7239B） + `systemTextOf()`：字符串**原样返回**，只有非字符串（结构化 content）才 `stable()` 序列化；测试同时钉住"保留真实换行"
 - [bug-016](patterns/bug-016.md): **终端层"假卡死" + agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 pty 的主端在 Android 侧，`/proc` 里无持有者；当时内存吃紧 swap 4.4G/5.6G），不在 agent 层 + head -1); w1=$(awk '/^wchar/{print $2}' /proc/$P/io); kill -WINCH $P; sleep 2; w2=$(awk '/^wchar/{print $2}' /proc/$P/io); echo "wchar $w1 -> $w2"; ls -l /proc/$P/fd \
+- [bug-017](patterns/bug-017.md): **类型级修复「潜伏未提交」** + typebox 1.3.x 没有 Type.Null()（只有 Null 常量）⇒「可选 + null」这条最常用路径抛 ReferenceError；而提交门禁走 golden --fast（跳过 tsc）⇒ 修复能一直躺在工作区不被发现 + **全量 tsc**（关键改动后手动补跑；--fast 不覆盖）
+- [bug-018](patterns/bug-018.md): **并行时「运行中的 worker 被池回收」** + shutdown() 连 leased 一起 dispose ⇒ 回退 spawn（无投递通道）⇒ 中途投递的消息永远停在未读 + **已修 + 回归测试挡住**（改前 1 failed / 改后 4 passed）
+- [bug-019](patterns/bug-019.md): **状态文案会「说谎」** + not-scanned 曾一律打印「本机没有 ClamAV/YARA」，而引擎其实装着、真实原因是「文件不存在」⇒ 写死的解释性文案会随环境从「保守」变成「撒谎」 + 文案已改为指向真实原因 + 打印 原因：…；**无自动守门**
+- [bug-020](patterns/bug-020.md): **注释里「两个星号紧跟斜杠」⇒ 块注释被提前关闭** + 报错行看起来完全正常（它是被挤出注释的普通文本）⇒ 表现为 ReferenceError: xxx is not defined + **无自动守门**（靠写注释时自查 + node --check）
+- [bug-021](patterns/bug-021.md): **形参名与导入的模块名同名** ⇒ 块内引用模块会打到形参上；且「补一个 import」完全无效（导入同样被形参遮蔽） + 未独立记录（见「是什么」原文） + **无自动守门**（scripts/*.mjs 不进 tsc -p custom/；正解=块内不引用那个名字）
+- [bug-022](patterns/bug-022.md): **pkill -f 会杀掉自己** + -f 匹配整条命令行，而自己的命令行里就含那个模式 ⇒ 命令被打断、后续步骤静默不执行 + **无自动守门**（先看清自己的命令行是否含该模式；改用精确 PID/作业管理）
+- [bug-023](patterns/bug-023.md): **为「模拟缺工具」清空 PATH ⇒ 连自己的工具一起弄没** + 报 timeout/grep: command not found，看起来像被测代码失败，其实是测试方法错 + **无自动守门**（受限 PATH 只能注入给被测进程；自己的工具用绝对路径）
+- [bug-024](patterns/bug-024.md): **新引入一种「我写的文件格式」⇒ 必须同时引入校验它的守门** + 非法 JSON 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS） + **已有守门**：scripts/check-conventions.sh 的 JSON 语法守门（packs/scripts/sync 下的 .json）
+- [bug-025](patterns/bug-025.md): **测试把 bug 当契约** + 既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） + **无自动守门**（改语义前须人工回看断言表达的契约）
 
 ## 被否提案（7 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 

@@ -125,8 +125,16 @@ GOLDEN_STEPS="$(head -n "${SMOKE_LINE:-99999}" scripts/golden-tasks.sh | grep -o
 if [ -f docs/BUG-REPLAYS.md ]; then
   LEDGER_ROWS="$(grep -cE '^\| [0-9]+ \|' docs/BUG-REPLAYS.md)"
   LEDGER_NO_CMD="$(grep -E '^\| [0-9]+ \|' docs/BUG-REPLAYS.md | grep -vE '(node |bash |npx |scripts/|my-pi\.sh)' || true)"
+  # 2026-10-10 补：**列数**也必须查 ✗ —— 只查"有没有可执行命令"是不够的：
+  # 编译器要求 5 列（`cells.length >= 6`，knowledge-compile.mjs），而列数不足的行会被**静默跳过** ✗
+  # ⇒ 症状是"守门全绿、知识库里却没有这条"（本会话真的发生过：第 17–19 行 3 列被静默丢弃 ✗✓）。
+  LEDGER_BADCOLS="$(grep -E '^\| [0-9]+ \|' docs/BUG-REPLAYS.md | awk -F'|' 'NF!=7' || true)"
   if [ "${LEDGER_ROWS:-0}" -lt 5 ]; then
     bad "docs/BUG-REPLAYS.md 台账只剩 $LEDGER_ROWS 行（应 >=5；是不是被删了？）"
+  if [ -n "$LEDGER_BADCOLS" ]; then
+    bad "docs/BUG-REPLAYS.md 有行不是 5 列（编译器会**静默跳过**它 ⇒ 知识库里没有这条）:"
+    echo "$LEDGER_BADCOLS" | head -3 | sed 's/^/      /'
+  fi
   elif [ -n "$LEDGER_NO_CMD" ]; then
     bad "docs/BUG-REPLAYS.md 有 $(( $(printf '%s\n' "$LEDGER_NO_CMD" | wc -l) )) 行没有可执行命令（每行必须能重跑）："
     printf '%s\n' "$LEDGER_NO_CMD" | cut -c1-100 | sed 's/^/       /'
