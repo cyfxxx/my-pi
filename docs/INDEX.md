@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（192 条）
+## 决策台账（193 条）
 
+- `DECISIONS.md` · [2026-10-10] 中途注入实验：**"改变行为"仍未观察到** ✗ —— 但拿到了决定性证据（病因收窄） · **必须先把话说清**：**"子代理中途通信"这个功能的用户价值（中途纠偏）目前*尚未交付*** ✗。 · 数字: 3 个 / 1 个 / 2 个 / 4 个
 - `DECISIONS.md` · [2026-10-10] **BUG-REPLAYS 的"静默跳过"缺陷**：守门只查"有没有命令"、不查列数 ✗✓（+ 知识库 16 → 25 条） · **发现经过（很值得记）**：我让子代理把 `CODING-TRAPS` 的教训收进知识库 ⇒ 它查证后回报： · 数字: 6 条 / 25 条 / 5 条 · 证据: node scripts/knowledge-compile.mjs --update
 - `DECISIONS.md` · [2026-10-10] 把 6 条通用教训补进**可查阅**处（`docs/design/CODING-TRAPS.md`） · **起因（用户问"遇到的问题是否都有记录作为经验"）**：grep 审计发现 **5 条只躺在 `DECISIONS.md`（台账）里** ✗ · 数字: 5 条 / 6 条 / 1 条 / 3 轮
 - `DECISIONS.md` · [2026-10-10] 池回收 bug **已修 + 有牙齿的回归测试**；并发现"**测试把 bug 当契约**"这个更深的病因 · **修复**（`custom/features/subagent/core/rpc-pool.ts`）：`shutdown(force = false)` ⇒ **默认只 dispose `idle`，不碰 `leased`** ✓；
@@ -200,7 +201,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（190 条）
+## 进度记录（191 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -392,6 +393,7 @@
 - `PROGRESS.md` · 池回收 bug 已修 + 回归测试（2026-10-10） · - 修：`shutdown(force=false)` 默认只 dispose idle、不碰 leased（force 才连 leased）；并加 `closing` 语义
 - `PROGRESS.md` · 6 条通用教训补进可查阅处（2026-10-10） · - 新建 `docs/design/CODING-TRAPS.md`：6 条陷阱 + 1 条"记录本身"的陷阱，**每条配可执行判据** ✓ · 数字: 6 条 / 1 条
 - `PROGRESS.md` · BUG-REPLAYS 静默跳过缺陷 + 知识库 16 → 25（2026-10-10） · - 查证：知识库**没有输入口**（`create_patterns` 是编译器输出；它只读 BUG-REPLAYS / CHANGES rejected / 既有页） · 数字: 6 条 / 25 条
+- `PROGRESS.md` · 中途注入实验：改变行为仍未观察到（2026-10-10） · - **用户价值尚未交付** ✗：已证的是"投递链路"（t+19s 投递、未读 1→0、consumed:2）与"并行不再被池 bug 打断"； · 数字: 2 个 / 4 个
 
 ## 缺陷回放（25 条）
 
