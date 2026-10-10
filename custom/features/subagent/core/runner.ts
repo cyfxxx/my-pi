@@ -344,6 +344,55 @@ export function assertPromptAccepted(res: { success?: boolean; error?: string } 
   }
 }
 
+/**
+ * 跑一轮投递（**依赖注入版**，可直接单测 ✓）。
+ *
+ * 抽出来的唯一目的是**可测** ✓：让回归测试能注入假 worker，断言
+ * ① **实际发出的请求负载**确实带 `streamingBehavior:'steer'` ✓；
+ * ② 响应 `success:false` ⇒ **不得消费**（消息保留未读、下次重试 ✓）；
+ * ③ 响应 `success:true` ⇒ **必须消费**（`markConsumed` ✓）。
+ * 生产代码也走这一份（⇒ 导出有生产引用，不会死在"仅测试引用"规则上 ✓）。
+ */
+export interface InboxRoundDeps {
+  send: (
+    frame: { type: 'prompt'; message: string; streamingBehavior: 'steer' },
+    timeoutMs: number,
+  ) => Promise<{ success?: boolean; error?: string } | undefined>;
+  drain: (id: string, opts: { consumed: number }) => { messages: { seq: number; text: string }[]; note?: string };
+  markConsumed: (id: string, seq: number) => void;
+  unreadTotal: (id: string) => number;
+  log: (msg: string) => void;
+}
+
+export async function deliverInboxRound(
+  deps: InboxRoundDeps,
+  ids: string[],
+  consumed: Map<string, number>,
+): Promise<void> {
+  for (const id of ids) {
+    const { messages, note } = deps.drain(id, { consumed: consumed.get(id) ?? 0 });
+    if (note) deps.log(`[subagent-inbox] ${id}: ${note}`);
+    for (const m of messages) {
+      try {
+        const res = await deps.send(buildSteerPrompt(m.seq, m.text), 120_000);
+        assertPromptAccepted(res); // ★ success:false ⇒ 抛（下面 catch ⇒ **不消费** ✓）
+        consumed.set(id, m.seq);
+        deps.markConsumed(id, m.seq);
+        deps.log(`[subagent-inbox] ${id}: 已投递 #${m.seq}（子进程将在下一个 turn 边界执行）`);
+      } catch (e) {
+        deps.log(
+          `[subagent-inbox] ${id}: 投递 #${m.seq} 失败，保留未读（下次重试）：${e instanceof Error ? e.message : String(e)}`,
+        );
+        return; // 该 id 本轮到此为止；**不消费** ⇒ 下次重试（宁可重复，也不静默丢 ✓）
+      }
+    }
+    const left = deps.unreadTotal(id);
+    if (left > 0) {
+      deps.log(`[subagent-inbox] ${id}: 还有 ${left} 条未读，留到下一轮（单轮上限 ${MAX_PER_ROUND}）`);
+    }
+  }
+}
+
 async function forwardInboxWhileRunning(
   worker: RpcWorker,
   inboxIds: readonly string[],
@@ -359,33 +408,17 @@ async function forwardInboxWhileRunning(
   });
 
   const deliverOne = async (id: string): Promise<void> => {
-    const { messages, note } = drainInbox(id, { consumed: consumed.get(id) ?? 0 });
-    if (note) console.error(`[subagent-inbox] ${id}: ${note}`);
-    for (const m of messages) {
-      try {
-        // ★ 必须传 `streamingBehavior:'steer'`：子进程在"正在处理"时**会拒绝**裸 prompt
-        //   （实测原文：`Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')
-        //   to queue the message.`，见 vendor `core/agent-session.ts:2002`）⇒ 不传就**从未入队** ✗。
-        const res = (await worker.send(buildSteerPrompt(m.seq, m.text), 120_000)) as
-          | { success?: boolean; error?: string }
-          | undefined;
-        // ★ 也必须检查 `success:false`：否则**子进程的拒绝会被当成投递成功** ✗（本会话真的发生过：
-        //   父侧日志写着"已投递 #2"，而子进程回的是 success:false ⇒ 这是"假装成功"，必须杜绝 ✗）。
-        assertPromptAccepted(res);
-        consumed.set(id, m.seq);
-        markConsumed(id, m.seq);
-        console.error(`[subagent-inbox] ${id}: 已投递 #${m.seq}（子进程将在下一个 turn 边界执行）`);
-      } catch (e) {
-        console.error(
-          `[subagent-inbox] ${id}: 投递 #${m.seq} 失败，保留未读（下次重试）：${e instanceof Error ? e.message : String(e)}`,
-        );
-        return; // 该 id 本轮到此为止；**不消费** ⇒ 下次重试（宁可重复，也不静默丢）
-      }
-    }
-    const left = unreadTotal(id);
-    if (left > 0) {
-      console.error(`[subagent-inbox] ${id}: 还有 ${left} 条未读，留到下一轮（单轮上限 ${MAX_PER_ROUND}）`);
-    }
+    await deliverInboxRound(
+      {
+        send: (frame, timeoutMs) => worker.send(frame, timeoutMs) as Promise<{ success?: boolean; error?: string } | undefined>,
+        drain: drainInbox,
+        markConsumed,
+        unreadTotal,
+        log: (msg) => console.error(msg),
+      },
+      [id],
+      consumed,
+    );
   };
 
   try {
