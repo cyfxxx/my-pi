@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（190 条）
+## 决策台账（191 条）
 
+- `DECISIONS.md` · [2026-10-10] 把 6 条通用教训补进**可查阅**处（`docs/design/CODING-TRAPS.md`） · **起因（用户问"遇到的问题是否都有记录作为经验"）**：grep 审计发现 **5 条只躺在 `DECISIONS.md`（台账）里** ✗ · 数字: 5 条 / 6 条 / 1 条 / 3 轮
 - `DECISIONS.md` · [2026-10-10] 池回收 bug **已修 + 有牙齿的回归测试**；并发现"**测试把 bug 当契约**"这个更深的病因 · **修复**（`custom/features/subagent/core/rpc-pool.ts`）：`shutdown(force = false)` ⇒ **默认只 dispose `idle`，不碰 `leased`** ✓；
 - `DECISIONS.md` · [2026-10-10] 文档全面检查：**4 个一致性检查器全过**，但抓到一处"记录未到位" ✗ 已补 · **用户要求**：对项目文档做一次全面检查，确保该更新/该记录的都已落实 ✓。 · 数字: 4 个 / 3 条 · 证据: node scripts/security-scan.mjs --file
 - `DECISIONS.md` · [2026-10-10] 每运行实例独立收件箱（+164B）+ **我两处前提被证伪** + 一个既有池 bug + 一笔未提交的修复 · **① 交付：每运行实例独立收件箱**（用户已批准抬预算，但**实际不需要抬** ✓✓）。 · 数字: 3 条 / 24399B / 24563B / 164B · 证据: 8493be6d
@@ -198,7 +199,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（188 条）
+## 进度记录（189 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -388,6 +389,7 @@
 - `PROGRESS.md` · 每运行实例独立收件箱 + 三处如实更正（2026-10-10） · - 交付：运行级 id `<agent>#<序号>`（**可预测**）+ agent 名保留（**向后兼容**）+ 每个 id **独立已读偏移**（并行互不串箱）+ · 数字: 164B / 24563B / 31005B / 2236B
 - `PROGRESS.md` · 文档全面检查（2026-10-10） · - 4 个一致性检查器全过（doc-index / changes-ledger / knowledge-compile / doc-links ✓）；**7 个新脚本 README 行 7/7** ✓。 · 数字: 4 个 / 7 个 / 3 条
 - `PROGRESS.md` · 池回收 bug 已修 + 回归测试（2026-10-10） · - 修：`shutdown(force=false)` 默认只 dispose idle、不碰 leased（force 才连 leased）；并加 `closing` 语义
+- `PROGRESS.md` · 6 条通用教训补进可查阅处（2026-10-10） · - 新建 `docs/design/CODING-TRAPS.md`：6 条陷阱 + 1 条"记录本身"的陷阱，**每条配可执行判据** ✓ · 数字: 6 条 / 1 条
 
 ## 缺陷回放（19 条）
 
@@ -411,7 +413,7 @@
 - `docs/BUG-REPLAYS.md` · #18 **并行时"运行中的 worker 被池回收"**：并行子代理会把在跑的 worker 回收 ⇒ 回退到 `spawn` 路径 ⇒ **中途投递的消息永远停在未读**（实测 `未读 1 / 共 1`） · `bash -c 'grep -n "被池回收" custom/features/subagent/core/rpc-pool.ts'` · 证据: node_modules/.bin/vitest run custom/features/subagent/__tests__/rpc-pool-shutdown.test.ts'
 - `docs/BUG-REPLAYS.md` · #19 **状态文案会"说谎"**：`not-scanned` 曾一律打印"本机没有 ClamAV/YARA"，而引擎其实装着、真实原因是"文件不存在" ⇒ 写死的解释性文案会随环境从"保守"变成"撒谎" · `node scripts/security-scan.mjs --file /tmp/不存在的文件` · 证据: node scripts/security-scan.mjs --file
 
-## 设计文档（139 条）
+## 设计文档（146 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -419,6 +421,13 @@
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · （历史段落，保留作对照）最初的"判定不通" · - 引擎：本环境**未安装**；
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 下一步（建议接成"可选 L3 层"） · 在 `scripts/security-scan.mjs` 里加 **可选 L3 = YARA**：有 `yara` 引擎 + 有规则文件才跑；
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 常驻（`clamd`）vs 瞬时（`clamscan`）：实测数字与判断规则（2026-10-10） · **本机基准**：`MemTotal 7718 MB / MemAvailable 2544 MB / Swap 5768 MB`。 · 数字: 10 秒 / 966 MB / 1 GB / 7718 MB
+- `docs/design/CODING-TRAPS.md` · 1. 注释里出现"两个星号紧跟斜杠"⇒ 块注释被提前关闭 · - **症状**：`ReferenceError: xxx is not defined`，而报错行**看起来完全正常**（因为它是被"挤出注释"的普通文本）。 · 数字: 3 轮
+- `docs/design/CODING-TRAPS.md` · 2. 形参名与导入的模块名同名 ⇒ 块内引用模块会打到形参上 · - **症状**：`path.join is not a function`；**而且"补一个 import"完全无效**（导入同样被形参遮蔽）。 · 数字: 1 轮
+- `docs/design/CODING-TRAPS.md` · 3. `pkill -f <模式>` 可能杀掉自己 · - **症状**：命令自己被打断（`[killed by signal: SIGTERM]`），后续步骤静默不执行。
+- `docs/design/CODING-TRAPS.md` · 4. 为"模拟缺工具"而清空 `PATH` ⇒ 连自己的工具一起弄没 · - **症状**：报 `timeout: command not found` / `grep: command not found`，**看起来像被测代码失败**，其实是测试方法错。
+- `docs/design/CODING-TRAPS.md` · 5. 新引入一种"我写的文件格式"⇒ 必须同时引入一条校验它的守门 · - **症状**：一份**非法 JSON** 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS ⇒ **没人看 `.json` 语法**）。
+- `docs/design/CODING-TRAPS.md` · 6. 改语义前，先读断言本身表达的契约——测试可能是 bug 的保护壳 · - **症状**：一个 bug 长期存活，因为**既有测试把错误行为写成了期望**（实例：`it('shutdown 回收空闲与在租的全部 worker')`
+- `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
 - `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次
