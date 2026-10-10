@@ -2,6 +2,34 @@
 
 ## 格式
 
+### [2026-10-10] 分层完整性基线：**实现落地**（换路成功：独立小脚本 + 先证明能跑）
+
+**换路的原因**：上一次把基线塞进 440 行的 `security-scan.mjs` 会崩 ⇒ 改为**职责分离**：
+`security-scan.mjs` 管"单文件/URL 三态"，新脚本 `scripts/security-baseline.mjs` 管"分层清单完整性"。
+**不新增声明工具**（仍是脚本 ⇒ 技能+bash 调用 ⇒ **零声明面字节** ✓）。
+
+**崩溃根因（顺带查清，与上次 WIP 同源）**：注释里写了含 `**` 紧跟 `/` 的文字 ⇒ **`*/` 提前关闭块注释**
+⇒ 后面的字被当代码 ⇒ `ReferenceError: name is not defined`。**这条我自己更早记成过纪律，这次又踩**；
+那个 440 行 WIP 极可能是同一个坑（**下次可以据此抢救它**）。
+
+**实现要点**：`--tier1|--tier2 --init|--verify [--strict]`；清单存 `(path,size,mtimeMs,sha256)`；
+**verify 先比 size+mtimeMs，只有不一致才重算哈希**（实测热态 **重算 0 个** ✓）；基线存运行时目录
+`portable/memory/security/`（不入库，同 pi-backup 惯例）；**默认只记录不阻断**（`--strict` 才非 0）；
+只用 Node 标准库（`fs/promises`+`crypto`+`path`+`os`），**不调任何外部命令** ✓。
+
+**自证（四项、双向）**：临时目录造树 ⇒ 不改 `unchanged=2`；**改一字节** `changed=["a.txt"]`（且 `rehashed=1`）；
+**加** `added=["c.txt"]`；**删** `removed=["sub/b.txt"]` ⇒ 全对才 exit 0 ✓。
+
+**性能实测与两次自我纠错（本轮最值钱的部分）**：
+1. 第一版**只对文件过滤** ⇒ **整个仓库被遍历**（含 `.git/`）⇒ Tier2 仅 25 文件也要 **3s** ✗；
+   加**两道剪枝**（永不下潜 `.git`/`node_modules`/`vendor`/`dist`… + 目录**字面前缀**剪枝）后
+   Tier2 **190ms**（**13×**）✓，Tier1 verify 4.7s → **3.1s**。
+2. 但剪枝第一版**剪错了**：`**/*.txt` 这类**无字面前缀**的模式被判定"不可能命中" ⇒ **一个子目录都不进**
+   ⇒ **静默少看文件**（比重算慢得多危险）。**自证当场判红**（`unchanged=1` 应为 2、`removed=[]` 应含 `sub/b.txt`）
+   ⇒ 规则改为"**无字面前缀 ⇒ 不剪枝**"。
+   **诚实结论**：本机（proot/Android）`stat` 很慢 ⇒ **Tier1 verify 3.1s 是文件系统遍历主导**，
+   脚本会**如实打印这一点**；**要快就用 Tier2（190ms）**。这也正是"只在显式调用时跑"的理由。
+
 ### [2026-10-10] 修非法 `tiers.json` + **补上"JSON 语法合法性"这个守门缺口**
 
 **发现**：上一版提交里的 `packs/security-baseline/tiers.json` 是**非法 JSON**（`JSONDecodeError: line 70`）——
