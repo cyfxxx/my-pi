@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（188 条）
+## 决策台账（189 条）
 
+- `DECISIONS.md` · [2026-10-10] 文档全面检查：**4 个一致性检查器全过**，但抓到一处"记录未到位" ✗ 已补 · **用户要求**：对项目文档做一次全面检查，确保该更新/该记录的都已落实 ✓。 · 数字: 4 个 / 3 条 · 证据: node scripts/security-scan.mjs --file
 - `DECISIONS.md` · [2026-10-10] 每运行实例独立收件箱（+164B）+ **我两处前提被证伪** + 一个既有池 bug + 一笔未提交的修复 · **① 交付：每运行实例独立收件箱**（用户已批准抬预算，但**实际不需要抬** ✓✓）。 · 数字: 3 条 / 24399B / 24563B / 164B · 证据: 8493be6d
 - `DECISIONS.md` · [2026-10-10] 方案 1 落地：**用 RPC `prompt` 通道投递**（比我原定的"子进程内插桩"更好） · **先说验证结论（这是本轮最有价值的部分）**：我原以为要"在子进程里插一个步骤边界观测点" ✗ ⇒ **实测该路不可用**： · 数字: 9 秒 / 3 条
 - `DECISIONS.md` · [2026-10-10] 子代理"中途通信"：**先做方案 1（文件投递 + 步骤边界轮询），方案 2 留作升级** · **问题（用户问）**：my-pi 的主会话能否在子代理**运行中途**给它发消息？ · 数字: 1.1 KB
@@ -196,7 +197,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（186 条）
+## 进度记录（187 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -384,8 +385,9 @@
 - `PROGRESS.md` · 子代理中途通信：决策记录（2026-10-10） · - 查代码结论：**my-pi 主会话不能在子代理运行中途发消息** ✗（子代理递归零匹配 send/steer/resume；工具参数无相关入参； · 数字: 1.1KB
 - `PROGRESS.md` · 方案 1 落地：RPC prompt 投递（2026-10-10） · - 验证结论：子代理是子 pi 进程（`--mode rpc` + **默认 `--no-extensions`**）⇒ "子进程内插桩"不可用 ✗， · 数字: 9 秒
 - `PROGRESS.md` · 每运行实例独立收件箱 + 三处如实更正（2026-10-10） · - 交付：运行级 id `<agent>#<序号>`（**可预测**）+ agent 名保留（**向后兼容**）+ 每个 id **独立已读偏移**（并行互不串箱）+ · 数字: 164B / 24563B / 31005B / 2236B
+- `PROGRESS.md` · 文档全面检查（2026-10-10） · - 4 个一致性检查器全过（doc-index / changes-ledger / knowledge-compile / doc-links ✓）；**7 个新脚本 README 行 7/7** ✓。 · 数字: 4 个 / 7 个 / 3 条
 
-## 缺陷回放（16 条）
+## 缺陷回放（19 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -403,6 +405,9 @@
 - `docs/BUG-REPLAYS.md` · #14 **system 加固块静默丢失（进程内前缀漂移）**：`before_agent_start` 处理器返回的 `systemPrompt` 没生效——pi 会**静默吞掉**该处理器的异常（只发给内存 listener，不落盘）， · `portable/memory/logs/prefix-fingerprints.jsonl` 里**同一进程内**出现 `changed:["system",…,"messages@0-7"]` 且 `systemBytes` 差值 ≈ · 数字: 772B · 证据: npx vitest run custom/features/context/__tests__/system-prompt-total.test.ts / npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #15 **诊断工具自身的盲区：JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `syst · `prefix-fingerprints.jsonl` 里 system 相关记录只有 `preamble` 一段、`systemChangedSections` 恒为全部段名或空；`systemBytes` 比 `wc -c` 出来的 s · 数字: 1B · 证据: npx vitest run custom/features/context/__tests__/prefix-fingerprint.test.ts
 - `docs/BUG-REPLAYS.md` · #16 **终端层"假卡死"：agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 p · ① 0 CPU / 20s 内 0 输出、无 socket、无子进程；② `kill -WINCH` 后 `wchar` 有增长、`stty rows` 触发整屏重绘（数千字节）→ 事件循环活着；③ 回合**已收尾**：`aborted` 
+- `docs/BUG-REPLAYS.md` · #17 **类型级修复"潜伏未提交"**：`typebox` 1.3.x **没有 `Type.Null()`**（只有 `Null` 常量）⇒ "可选 + null"这条最常用路径会抛 ReferenceError；而我的提交门禁走 `g · `bash -c 'node_modules/.bin/tsc --noEmit -p custom/'`
+- `docs/BUG-REPLAYS.md` · #18 **并行时"运行中的 worker 被池回收"**：并行子代理会把在跑的 worker 回收 ⇒ 回退到 `spawn` 路径 ⇒ **中途投递的消息永远停在未读**（实测 `未读 1 / 共 1`） · `bash -c 'grep -n "被池回收" custom/features/subagent/core/rpc-pool.ts'`
+- `docs/BUG-REPLAYS.md` · #19 **状态文案会"说谎"**：`not-scanned` 曾一律打印"本机没有 ClamAV/YARA"，而引擎其实装着、真实原因是"文件不存在" ⇒ 写死的解释性文案会随环境从"保守"变成"撒谎" · `node scripts/security-scan.mjs --file /tmp/不存在的文件` · 证据: node scripts/security-scan.mjs --file
 
 ## 设计文档（139 条）
 

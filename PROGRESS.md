@@ -3165,3 +3165,11 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   下一步：把任务做成**两个长步骤**，让注入落在两步之间 ⇒ 可证伪）。
 - **顺带提交一笔未提交的正确修复** ✓：`tool-adapter.ts` 的 `Type.Null()` → **`Null` 常量**（typebox 1.3.x 无 `Type.Null`）
   ⇒ 修的是"可选+null"最常用路径的 ReferenceError；它"潜伏"是因为**我的门禁走 --fast、跳过 tsc** ✗ ⇒ 全量 tsc 实跑 rc=0 ✓。
+
+### 文档全面检查（2026-10-10）
+
+- 4 个一致性检查器全过（doc-index / changes-ledger / knowledge-compile / doc-links ✓）；**7 个新脚本 README 行 7/7** ✓。
+- **抓到缺口** ✗：今天修的真 bug 只在 `DECISIONS`（台账），没进 `docs/BUG-REPLAYS.md`（**可复现台账**）⇒ 已补 3 条（均带可执行命令 ✓）：
+  ① typebox `Type.Null()` 不存在（因门禁 `--fast` 跳过 tsc 而潜伏）；② 并行时运行中的 worker 被池回收 ⇒ 中途投递失效（**待立项**）；
+  ③ 状态文案说谎（not-scanned 谎称没装引擎；已改但**无自动守门**）。
+- 教训（本会话反复出现）：**"写进台账" ≠ "记进会被人翻到的地方"**；检查方法是在**目标读者会翻的地方 grep** ✓。
