@@ -275,6 +275,8 @@ export interface WorkerLease {
 
 export class RpcPool {
   private readonly idle = new Map<string, RpcWorker>();
+  /** `shutdown(false)` 之后置真：此后交还的 worker **直接销毁**，不再回 idle（防漏进程 ✓） */
+  private closing = false;
   private readonly leased = new Set<RpcWorker>();
 
   private readonly createWorker: WorkerFactory;
@@ -302,6 +304,11 @@ export class RpcPool {
   }
 
   private release(w: RpcWorker): void {
+    if (this.closing) {
+      w.dispose();
+      this.leased.delete(w);
+      return;
+    }
     this.leased.delete(w);
     if (!w.alive) {
       w.dispose();
@@ -336,11 +343,24 @@ export class RpcPool {
     return this.idle.size;
   }
 
-  shutdown(): void {
+  /**
+   * 收工。**默认不碰 `leased`（正在服务任务的 worker）** —— 2026-10-10 修：
+   * `session_shutdown` 钩子会在**任务仍在跑**时触发，旧实现连 `leased` 一起 dispose ✗
+   * ⇒ 在跑的 worker 被 SIGTERM ⇒ 待处理请求全部 reject 成「worker 被池回收」
+   * ⇒ 池路径失败 ⇒ 回退到**没有投递通道**的 spawn 路径 ⇒ **中途投递的消息永远没被消费** ✗（并行时必现）。
+   *
+   * 语义：`force=false` 只清 idle 并把池标记为 `closing`（此后**交还的** worker 直接销毁，避免漏进程 ✓）；
+   *       `force=true` 用于**确定没有在跑的任务**的场合（测试复位等），连 leased 一起销毁 ✓。
+   */
+  shutdown(force = false): void {
     for (const [, w] of this.idle) w.dispose();
-    for (const w of this.leased) w.dispose();
     this.idle.clear();
-    this.leased.clear();
+    if (force) {
+      for (const w of this.leased) w.dispose();
+      this.leased.clear();
+      return;
+    }
+    this.closing = true;
   }
 }
 

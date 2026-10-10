@@ -266,15 +266,31 @@ describe('RpcPool 租借语义（用注入的假 worker，不真起进程）', (
     expect(pool.idleCount()).toBe(2);
   });
 
-  it('shutdown 回收空闲与在租的全部 worker', () => {
+  // ⚠️ 2026-10-10 修正：**这条测试原来把 bug 当成了契约** —— 它断言"在租的 worker 也被回收"
+  // （`a.worker.alive === false` ✗），而 `shutdown()` 由 `session_shutdown` 钩子在**任务仍在跑**时触发
+  // ⇒ 在跑的 worker 被 SIGTERM ⇒ 待处理请求全 reject 成「worker 被池回收」⇒ 回退到**无投递通道**的
+  // spawn 路径 ⇒ **中途投递的消息永远没被消费**（并行时必现）。有测试保护，bug 才长期存活 ✓。
+  // 新契约：**非 force 只回收空闲；在租的留活，交还时才销毁**（既不断任务、也不漏进程）。
+  it('shutdown（非 force）：只回收空闲；**在租的留活**，交还即销毁（不断任务、不漏进程）', () => {
+    const pool = new RpcPool((o) => fakeWorker(o));
+    const a = pool.lease(opts('k1')); // 在租（模拟"任务还在跑"）
+    const b = pool.lease(opts('k2'));
+    b.release(); // b 回到空闲
+    pool.shutdown();
+    expect(pool.idleCount()).toBe(0); // 空闲的已回收
+    expect(a.worker.alive).toBe(true); // ★ 在租的**不得**被杀（这正是旧行为错的地方）
+    expect(pool.size()).toBe(1); // 仍在追踪它（不是"忘了它"）
+    a.release(); // 任务结束、交还 ⇒ 收工态下直接销毁
+    expect(a.worker.alive).toBe(false);
+    expect(pool.size()).toBe(0);
+  });
+
+  it('shutdown(force)：连在租的一起回收（确定没有在跑的任务时用）', () => {
     const pool = new RpcPool((o) => fakeWorker(o));
     const a = pool.lease(opts('k1'));
-    const b = pool.lease(opts('k2'));
-    b.release();
-    pool.shutdown();
-    expect(pool.size()).toBe(0);
-    expect(pool.idleCount()).toBe(0);
+    pool.shutdown(true);
     expect(a.worker.alive).toBe(false);
+    expect(pool.size()).toBe(0);
   });
 });
 

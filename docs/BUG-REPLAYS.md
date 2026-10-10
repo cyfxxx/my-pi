@@ -44,5 +44,5 @@
 - 脚本索引与运行成本：[`scripts/README.md`](../scripts/README.md)
 - 系统化排障流程：[`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)
 | 17 | **类型级修复"潜伏未提交"**：`typebox` 1.3.x **没有 `Type.Null()`**（只有 `Null` 常量）⇒ "可选 + null"这条最常用路径会抛 ReferenceError；而我的提交门禁走 `golden --fast`（**跳过 tsc**）⇒ 修复能一直躺在工作区不被发现 | `bash -c 'node_modules/.bin/tsc --noEmit -p custom/'` |
-| 18 | **并行时"运行中的 worker 被池回收"**：并行子代理会把在跑的 worker 回收 ⇒ 回退到 `spawn` 路径 ⇒ **中途投递的消息永远停在未读**（实测 `未读 1 / 共 1`） | `bash -c 'grep -n "被池回收" custom/features/subagent/core/rpc-pool.ts'` |
+| 18 | **并行时"运行中的 worker 被池回收"**：并行子代理会把在跑的 worker 回收 ⇒ 回退到 `spawn` 路径 ⇒ **中途投递的消息永远停在未读**（实测 `未读 1 / 共 1`） | `bash -c 'grep -n "被池回收" custom/features/subagent/core/rpc-pool.ts'` | **已修 + 有回归测试挡住**：`bash -c 'node_modules/.bin/vitest run custom/features/subagent/__tests__/rpc-pool-shutdown.test.ts'`（改前 1 failed / 改后 4 passed ✓）
 | 19 | **状态文案会"说谎"**：`not-scanned` 曾一律打印"本机没有 ClamAV/YARA"，而引擎其实装着、真实原因是"文件不存在" ⇒ 写死的解释性文案会随环境从"保守"变成"撒谎" | `node scripts/security-scan.mjs --file /tmp/不存在的文件` |
