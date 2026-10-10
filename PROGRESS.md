@@ -3212,3 +3212,16 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 最可能病因（未定论）：注入被接收并标记已投递，但**未被派发成新的一轮**；不能排除"子代理看到了没做"（无 transcript）或偶发。
 - 三条可证伪下一步已备：拉长到 3–4 turn + t+5s 投递；抓 RPC stdin/stdout 帧；拿子代理自己的输出。
 - 纪律：未改仓库文件、无残留进程、如实报"未达到"而不是找说法让它看起来成功 ✓。
+
+### ★ 中途注入已交付：根因是"拒绝被当成成功"（2026-10-10）
+
+- 仪表定性（非推断）：Q1 父侧**确实写了** prompt 帧 ✓；Q2 子进程**直接拒绝** ✗
+  （`success:false`："Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')…"）。
+- 两个缺陷：① 未传 `streamingBehavior:'steer'` ✗；② **父侧把 `success:false` 当成功** ✗✓ ⇒ 日志写"已投递"并 `markConsumed`
+  ⇒ **"假装成功"**（本项目最忌）。修：传 steer + **`success:false` 就抛** ⇒ 走"不消费、下次重试" ✓。
+- 修复后证据：`disposition:"queued"` ✓ + 注入后 **5 次 `turn_start`** ✓ + `turns.log` 4 步 ✓ + **`inbox-proof.txt = INBOX-OK`** ✓✓✓
+  ⇒ **行为确实被改变，功能真的交付** ✓。
+- 更正上轮误导结论：裸 prompt 只在代理**空闲**时可用；**处理中会被拒** ✗✓。
+- 新增 `PI_RPC_TRACE` 门控仪表（默认关零写盘；in 帧在 parse 前记录、out 帧在 stdin 写入成功后记录 ⇒ Q1 证据强度来源）。
+- 验证：tsc rc=0（自跑）✓、108 项全过 ✓、dead-exports 干净 ✓、守门全过 ✓、声明面一字不差 ✓。
+- 未做：该修复的回归单测（私有函数需小重构）；supervisor/技能路径未覆盖；仪表热路径用同步写（默认关）。

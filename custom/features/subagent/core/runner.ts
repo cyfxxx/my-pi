@@ -333,7 +333,18 @@ async function forwardInboxWhileRunning(
     if (note) console.error(`[subagent-inbox] ${id}: ${note}`);
     for (const m of messages) {
       try {
-        await worker.send({ type: 'prompt', message: `[父会话中途指令 #${m.seq}] ${m.text}` }, 120_000);
+        // ★ 必须传 `streamingBehavior:'steer'`：子进程在"正在处理"时**会拒绝**裸 prompt
+        //   （实测原文：`Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')
+        //   to queue the message.`，见 vendor `core/agent-session.ts:2002`）⇒ 不传就**从未入队** ✗。
+        const res = (await worker.send(
+          { type: 'prompt', message: `[父会话中途指令 #${m.seq}] ${m.text}`, streamingBehavior: 'steer' },
+          120_000,
+        )) as { success?: boolean; error?: string } | undefined;
+        // ★ 也必须检查 `success:false`：否则**子进程的拒绝会被当成投递成功** ✗（本会话真的发生过：
+        //   父侧日志写着"已投递 #2"，而子进程回的是 success:false ⇒ 这是"假装成功"，必须杜绝 ✗）。
+        if (res && res.success === false) {
+          throw new Error(`子进程拒绝该指令：${res.error ?? '未知原因'}`);
+        }
         consumed.set(id, m.seq);
         markConsumed(id, m.seq);
         console.error(`[subagent-inbox] ${id}: 已投递 #${m.seq}（子进程将在下一个 turn 边界执行）`);

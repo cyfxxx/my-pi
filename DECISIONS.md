@@ -2,6 +2,56 @@
 
 ## 格式
 
+### [2026-10-10] ★ 中途注入的真根因：**子进程拒绝了 prompt，而父侧把"拒绝"当成功** ✗✓ —— 修好后功能**真的交付了** ✓
+
+**上一轮我把状态写成"未交付"** ✗ —— 现在**可以改口**：**功能已交付** ✓（有客观证据 ✓）。过程与根因值得完整记下。
+
+**定性靠的是仪表（不是推断）** ✓：加了 `PI_RPC_TRACE=1` 门控的 RPC 帧仪表后，原始帧直接给出答案：
+```
+Q1 父侧有没有写进去？ ⇒ 有 ✓
+  dir=out {"id":"2","type":"prompt","message":"[父会话中途指令 #3] …"}          ← 写进 stdin 了 ✓
+Q2 子进程回了什么？   ⇒ 直接拒绝 ✗✗
+  dir=in  {"id":"2","type":"response","command":"prompt","success":false,
+           "error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message."}
+```
+⇒ **卡在"子进程拒绝"** ✗（从未入队 ⇒ 没有新 turn ⇒ 行为不变 ✓）。该错误由 vendor 抛出：
+`vendor/pi/.../core/agent-session.ts:2002`；而 `modes/rpc/rpc-client.ts:201/208-211` **正好有 `streamingBehavior` 与专门的 `steer()`**
+（注释原文："Queue a steering message to interrupt the agent mid-run" ✓）⇒ **接口早就在那儿，是我们没用** ✗。
+
+**两个缺陷（都在我们自己的代码里）** ✗：
+1. `custom/features/subagent/core/runner.ts:336` 发的是**裸 `prompt`**，**未传 `streamingBehavior:'steer'`** ✗；
+2. **更该记的**：`worker.send()` 对 `success:false` **照常 resolve** ⇒ 转发代码把它**当成功** ✗ ⇒
+   日志写"**已投递 #2（子进程将在下一个 turn 边界执行）**"并 `markConsumed` ✗✓ —— **这是"假装成功"**，
+   **恰恰是本项目最忌的那种**（也是本会话反复出现的一类错误：状态文案/结果判断**不反映真实事实** ✗）。
+
+**修法（两处）**：① 转发时传 **`streamingBehavior:'steer'`** ✓；② **检查 `success:false` 就抛** ✓
+⇒ 抛出后自然走**既有**的"**不消费、下次重试**"路径 ✓（即"宁可重复不丢"的语义终于生效 ✓）。
+
+**修复后的决定性证据（同款任务 + 同款投递）** ✓✓：
+```
+OUT 20:04:24.529 {"type":"prompt","streamingBehavior":"steer"}
+IN  20:04:24.622 {"success":true,"data":{"disposition":"queued"}}      ← 接受并入队 ✓
+IN  20:04:49.9 / 20:05:12.8 / 20:05:36.1 / 20:05:59.0 / 20:06:03.0  {"type":"turn_start"} × 5   ← 注入后真的产生新 turn ✓
+/tmp/turns.log     = step-1 … step-4   ← 基础任务真跑完 4 轮 ✓
+/tmp/inbox-proof.txt = INBOX-OK        ← **注入的副作用真的出现 ⇒ 行为确实被改变** ✓✓✓
+```
+
+**顺带更正一个此前的误导性结论** ✗✓：上轮说"纯 `pi --mode rpc` 中途插 prompt 能产生新 turn"——
+**那只在代理空闲时成立** ✓；**正在处理时裸 prompt 会被拒绝** ✓（这正是我们踩的坑 ✓）。
+
+**新增的仪表（可保留，非临时 hack ✓）**：`PI_RPC_TRACE=1` 才启用 ✓（**默认关 ⇒ 零写盘**，单测已证明"连文件都不出现" ✓）；
+每条 `{ts,dir:'in'|'out',raw}` ✓；**超长截断并标 `truncated`** ✓；**fail-open** ✓；纯函数 `makeTraceRecord` 可单测 ✓；
+关键细节两条：**`in` 帧在 `JSON.parse` 之前记录**（**坏帧也留痕** ✓）、**`out` 帧只在写进 stdin 成功之后记录** ✓
+⇒ 这就是 Q1 证据强度的来源（"out 帧 = 真的发出去了" ✓）。
+
+**验证**：`tsc --noEmit -p custom/` **rc=0** ✓（**它自己跑的，没用会跳过 tsc 的 `--fast`** ✓）；
+子代理套件 **8 文件 / 108 项全过** ✓（含新增 7 项）；`check-dead-exports` 干净 ✓；`check-conventions.sh` 全过 ✓；
+**声明面一字不差**（`进前缀 41/24552B｜不进前缀 18/6442B｜合计 30994B` ✓）。
+
+**仍未做（如实 ✗）**：① **这次修复没有回归单测** ✗（`forwardInboxWhileRunning` 是模块私有、未导出；加单测需小重构 ✓）
+—— 目前靠**真实 E2E** 作证据 ✓；② 实验用 `--no-skills --no-session` ⇒ **supervisor 路径与技能路径未覆盖** ✗；
+③ 仪表开启时在热路径用**同步 `appendFileSync`**（默认关 ⇒ 无影响 ✓；若长期开建议改异步 ✓）。
+
 ### [2026-10-10] 中途注入实验：**"改变行为"仍未观察到** ✗ —— 但拿到了决定性证据（病因收窄）
 
 **必须先把话说清**：**"子代理中途通信"这个功能的用户价值（中途纠偏）目前*尚未交付*** ✗。

@@ -6,7 +6,7 @@
 > 每页四件事：是什么 / 根因 / **确切命令序列** / **含确切语法的解法**；篇幅 **10–30 行**；只记可泛化的。
 > **本产物不自动进模型上下文、不改任何运行时行为**，只供人审阅。
 
-## 失败模式（25 条，来源：`docs/BUG-REPLAYS.md`）
+## 失败模式（26 条，来源：`docs/BUG-REPLAYS.md`）
 
 - [bug-001](patterns/bug-001.md): 切了模式、重启后没生效 + `modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` + `check-conventions`（状态不入库）+ 状态体检 `modes-legacy-current`；模式状态已迁到 gitignored 的 `modes-sessions.json`
 - [bug-002](patterns/bug-002.md): 模式解析"第 3 轮工厂执行后漂回 full" + `PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 + `mode-switch.test.ts` 的三轮回归 + `resolveStartupMode()` 单一写入点
@@ -33,6 +33,7 @@
 - [bug-023](patterns/bug-023.md): **为「模拟缺工具」清空 PATH ⇒ 连自己的工具一起弄没** + 报 timeout/grep: command not found，看起来像被测代码失败，其实是测试方法错 + **无自动守门**（受限 PATH 只能注入给被测进程；自己的工具用绝对路径）
 - [bug-024](patterns/bug-024.md): **新引入一种「我写的文件格式」⇒ 必须同时引入校验它的守门** + 非法 JSON 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS） + **已有守门**：scripts/check-conventions.sh 的 JSON 语法守门（packs/scripts/sync 下的 .json）
 - [bug-025](patterns/bug-025.md): **测试把 bug 当契约** + 既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） + **无自动守门**（改语义前须人工回看断言表达的契约）
+- [bug-026](patterns/bug-026.md): **RPC 的 prompt 被拒、父侧却当成功** + 缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolve** ⇒ 日志写「已投递（将在下一个 turn 边界执行）」并 `markConsumed` ✗ ⇒ 注入从未入队、行为不变 —— 典型「假装成功」 + **已修 + 由真实 E2E 挡住**：修复后帧出现 `disposition:"queued"` + 注入后 **5 次 `turn_start`**，且 `/tmp/inbox-proof.txt` = `INBOX-OK` ✓
 
 ## 被否提案（7 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 

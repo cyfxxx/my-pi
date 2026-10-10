@@ -17,11 +17,14 @@
  */
 
 import { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { getMemoryDir } from '../../../core/config';
 import type { ChildProcess } from 'node:child_process';
 
 /** rpc 请求（只列本模块用到的；完整定义见 vendor/pi/.../modes/rpc/rpc-types.ts） */
 export type RpcRequest =
-  | { type: 'prompt'; message: string }
+  | { type: 'prompt'; message: string; streamingBehavior?: 'steer' | 'followUp' }
   | { type: 'new_session'; parentSession?: string }
   | { type: 'abort' };
 
@@ -45,6 +48,56 @@ export function isResponseFor(msg: unknown, id: string): boolean {
 /** 池是否启用：`PI_SUBAGENT_POOL=off` 回退到原来的 spawn 路径 */
 export function poolEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.PI_SUBAGENT_POOL !== 'off';
+}
+
+/** 单帧记录的最大长度：超长**截断并标注**（避免巨帧把日志撑爆，也避免写盘卡住主流程） */
+export const RPC_TRACE_MAX_CHARS = 2000;
+
+/** 是否开启 RPC 帧追踪：`PI_RPC_TRACE=1`（**默认关** ⇒ 零写盘、零开销） */
+export function rpcTraceEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.PI_RPC_TRACE === '1';
+}
+
+/** 追踪文件：`PI_RPC_TRACE_FILE` 优先（便于实验与单测注入），否则 `<memoryDir>/logs/rpc-trace.jsonl` */
+export function rpcTraceFile(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.PI_RPC_TRACE_FILE) return env.PI_RPC_TRACE_FILE;
+  const mem = env.PI_MEMORY_DIR || getMemoryDir();
+  return path.join(mem, 'logs', 'rpc-trace.jsonl');
+}
+
+/**
+ * 帧 → 记录（**纯函数**）：`dir` 区分方向（`out`=父→子、`in`=子→父 ✓）。
+ * 用 `JSON.stringify` 写出 ⇒ 帧里的换行/引号都被转义 ⇒ **一条记录必然是一行** ✓（JSONL 不被破坏 ✓）。
+ */
+export function makeTraceRecord(
+  dir: 'in' | 'out',
+  raw: string,
+  ts: string = new Date().toISOString(),
+): { ts: string; dir: 'in' | 'out'; raw: string; truncated?: true } {
+  const tooLong = raw.length > RPC_TRACE_MAX_CHARS;
+  return tooLong ? { ts, dir, raw: raw.slice(0, RPC_TRACE_MAX_CHARS), truncated: true } : { ts, dir, raw };
+}
+
+/**
+ * 建追踪器。**默认关**时返回空操作（零开销、零写盘 ✓）；**写失败一律 fail-open**（绝不影响任务 ✓）。
+ * `append`/`now` 可注入 ⇒ 让"方向/截断/默认关/坏帧"都能被直接测到 ✓（不是为了生产切换）。
+ */
+export function createRpcTracer(opts: {
+  enabled: boolean;
+  file: string;
+  append?: (file: string, line: string) => void;
+  now?: () => string;
+}): (dir: 'in' | 'out', raw: string) => void {
+  if (!opts.enabled) return () => {};
+  const append = opts.append ?? ((file: string, line: string) => fs.appendFileSync(file, line));
+  const now = opts.now ?? (() => new Date().toISOString());
+  return (dir, raw) => {
+    try {
+      append(opts.file, `${JSON.stringify(makeTraceRecord(dir, raw, now()))}\n`);
+    } catch {
+      /* fail-open：追踪失败绝不影响任务 */
+    }
+  };
 }
 
 /**
@@ -101,6 +154,8 @@ export class RpcWorker {
   private settledWaiters: Array<() => void> = [];
   private exitCode: number | null = null;
   private stderrTail = '';
+  /** RPC 帧追踪（默认关；`PI_RPC_TRACE=1` 打开） */
+  private readonly trace: (dir: 'in' | 'out', raw: string) => void;
 
   readonly profileKey: string;
 
@@ -112,6 +167,7 @@ export class RpcWorker {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: opts.env as NodeJS.ProcessEnv,
     });
+    this.trace = createRpcTracer({ enabled: rpcTraceEnabled(), file: rpcTraceFile() });
     this.framer = createLineFramer((line) => this.onLine(line));
     this.proc.stdout?.on('data', (d: Buffer) => this.framer.feed(d.toString('utf8')));
     this.proc.stderr?.on('data', (d: Buffer) => {
@@ -154,6 +210,7 @@ export class RpcWorker {
   }
 
   private onLine(line: string): void {
+    this.trace('in', line); // 子→父：先记再解析（坏帧也要留痕 ✓）
     let msg: unknown;
     try {
       msg = JSON.parse(line);
@@ -186,7 +243,11 @@ export class RpcWorker {
       }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       try {
-        this.proc.stdin?.write(encodeRequest(id, req));
+        const line = encodeRequest(id, req);
+        if (this.proc.stdin) {
+          this.proc.stdin.write(line);
+          this.trace('out', line); // 父→子：写入成功才记 ✓
+        }
       } catch (e) {
         clearTimeout(timer);
         this.pending.delete(id);
