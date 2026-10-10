@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（182 条）
+## 决策台账（183 条）
 
+- `DECISIONS.md` · [2026-10-10] **进程级验证成功**：真实 pi 会话里钩子真的被触发（三条未验证项全部收敛） · **做法**：从**生产代码**（`scripts/pi-supervisor.sh` 第 261 行）找到非交互调用方式
 - `DECISIONS.md` · [2026-10-10] 钩子接线**独立复核**：静态证据 + 我自己重跑 E2E（把"未验证"缩小到 pi 核心行为） · **背景**：钩子交付时留了三条未验证项。本轮我做**独立复核**（不依赖交付者的自述），且**刻意不去跑真实 pi 会话** · 数字: 200MB / 1.5 GB / 1MB / 14.1 秒
 - `DECISIONS.md` · [2026-10-10] 病毒库**每日自动更新**（用项目自己的定时任务机制，不用 cron） · **为什么必须补这条**：`freshclam` 现在能成功拉库（48 MB ✓），**但没有任何东西在定期跑它** ⇒ · 数字: 48 MB · 证据: node scripts/reseed-seeds.mjs --apply
 - `DECISIONS.md` · [2026-10-10] 收尾审计：把"常驻取舍"写进**面向使用**的文档 + 补跑全量测试 · **用户问"常驻有记录到文档中吗"——grep 实证：没有（只在内部门台账里）** ✗。核实命令与结果：
@@ -190,7 +191,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（180 条）
+## 进度记录（181 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -372,6 +373,7 @@
 - `PROGRESS.md` · 收尾审计：常驻取舍进"面向使用"文档 + 补跑全量测试（2026-10-10） · - grep 实证：常驻取舍此前**只在 DECISIONS/PROGRESS**（BASELINE/AV 文档/技能里都是 0 处）✗ ⇒ 已补进
 - `PROGRESS.md` · 病毒库每日自动更新（2026-10-10） · - 起因：`freshclam` 能拉库但**没有任何东西定期跑** ⇒ 库会过期、防护随时间衰减 ✗（整套体系里唯一"自己变差"的环节）。 · 证据: node scripts/reseed-seeds.mjs --apply
 - `PROGRESS.md` · 钩子接线独立复核（2026-10-10） · - 静态证据：`index.ts` 中 `event: 'tool_result'`(704) → `autoscan.maybeStart(bashCmd, cwd)`(740) → · 数字: 200MB / 1.5GB
+- `PROGRESS.md` · 钩子进程级验证成功（2026-10-10） · - 从生产代码（pi-supervisor.sh:261）学到非交互调用：`-p "<prompt>"`；**去掉 `--no-extensions`** 以加载我的扩展。
 
 ## 缺陷回放（16 条）
 

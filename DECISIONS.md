@@ -2,6 +2,29 @@
 
 ## 格式
 
+### [2026-10-10] **进程级验证成功**：真实 pi 会话里钩子真的被触发（三条未验证项全部收敛）
+
+**做法**：从**生产代码**（`scripts/pi-supervisor.sh` 第 261 行）找到非交互调用方式
+`node <cli> --no-extensions --no-skills --no-session -p "<prompt>"` ⇒ **去掉 `--no-extensions`**（否则我的扩展/钩子
+根本不加载 ✗），保留 `--no-session` ✓，然后：
+`MY_PI_NO_SUPERVISOR=1 ./my-pi.sh --no-skills --no-session -p "用 bash 运行 curl -o /tmp/pi-verify.sh http://127.0.0.1:8099/payload.sh ; ls -la …"`
+（本地起 `python3 -m http.server 8099` 提供**含反弹 shell 特征**的载荷 ⇒ 期望扫描报 `suspicious`）。
+
+**结果（硬证据）**：钩子日志 **0 行 → 1 行** ✓✓
+```
+{"file":"/tmp/pi-verify.sh","via":"-o","verdict":"suspicious",
+ "layers":"L0_hash=ok L1_structure=ok L2_antivirus=hit",
+ "hits":["yara:reverse_shell_bash_tcp: 命中 YARA 规则"],"ms":10683,"memChecked":true}
+```
+⇒ **① 进程级已证**（真实 pi 会话、真实 `tool_result`、真实日志写入）✓；
+⇒ **② 内存护栏真的跑了**（`memChecked:true` ✓ —— 它读到了 `/proc/meminfo` 并放行）✓
+（"低内存时跳过"那条分支仍只有单测覆盖 ✓，如实保留）；
+⇒ **③ `nice` 降级仍未实测** ✓（低风险）。
+**顺带**：那个 pi 会话**自己拒绝执行**反弹 shell 载荷（只做了 `curl` 与 `ls` ✓）⇒ 说明"人身判断"这层也在起作用 ✓。
+
+**教训（可复用）**：要"非交互地跑一次真实 agent"时，**去生产代码里找现成的调用方式**（supervisor 的探活命令
+就是范例 ✓），比翻 `--help` 快且准 ✓（这次 `--help` 还把进程拖进了 TUI ✗，我不得不先收掉它）。
+
 ### [2026-10-10] 钩子接线**独立复核**：静态证据 + 我自己重跑 E2E（把"未验证"缩小到 pi 核心行为）
 
 **背景**：钩子交付时留了三条未验证项。本轮我做**独立复核**（不依赖交付者的自述），且**刻意不去跑真实 pi 会话**
