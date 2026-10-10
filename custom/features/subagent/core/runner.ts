@@ -16,6 +16,7 @@ import type { SingleResult, SubagentDetails, OnUpdateCallback } from './types';
 import { getFinalOutput, resolveAgentTools, buildAgentPrompt, scheduleKillChain, calculateContextTokens } from './helpers';
 import { findActivePlan } from '../../plan-mode/logic';
 import { recordSubagentUsage } from './usage-log';
+import { POLL_MS, drainInbox, markConsumed, readConsumed, unreadTotal, MAX_PER_ROUND } from './inbox';
 
 /**
  * 子代理模型优先级（高 → 低）：
@@ -254,7 +255,10 @@ async function runPooledAgent(
       }
 
       await worker.send({ type: 'prompt', message: task }, 120_000);
-      await settled;
+      // 可发现性（2026-10-10）：inbox 的 id 就是 agent 名，但调用方**看不到**这个名字 ⇒ 起任务时打印一次，
+      // 否则主会话只能靠猜（本轮 E2E 就因此投错了箱子 ✗）。
+      console.error(`[subagent-inbox] 本任务收件箱 id = "${agent.name}"（投递：node scripts/subagent-inbox.mjs post ${agent.name} "…"）`);
+      await forwardInboxWhileRunning(worker, agent.name, settled);
     } finally {
       off();
       lease.release();
@@ -282,6 +286,57 @@ async function runPooledAgent(
       }
     }
   }
+}
+
+/**
+ * **中途通信的投递侧**（2026-10-10）：在等待任务结束期间轮询收件箱，把新消息通过**既有 RPC 的 `prompt` 通道**
+ * 转发给子进程。
+ *
+ * ## 为什么是父侧投递（而不是在子代理里读文件）
+ * 子代理以 **`--no-extensions`** 启动（见 {@link buildPooledSpawnArgs}）⇒ **子进程里跑不到我们的代码**，
+ * "子代理内部读 inbox"这条路**默认不可用**；而那一行注释明确写着它是**安全属性** ⇒ 不去放开它 ✓。
+ *
+ * ## 语义（实测，别误解）
+ * 真起 `pi --mode rpc`、任务进行到一半再发一条 `prompt` ⇒ **被接受**（`success:true`，帧序列出现第二个
+ * `turn_start`…`turn_end`）⇒ 注入是"**排队 + 在下一个 turn 边界执行**"，即**步骤边界**语义，
+ * **不是**打断当前工具调用 ✗。
+ *
+ * ## 安全与容错
+ * - 只转发**文本**：不改工具集、不改权限、不跳过任何守门 ✓（追加指令与用户消息同源，但**不得**被当作更高优先级）；
+ * - **fail-open**：收件箱缺失/坏行/读取异常一律跳过并记 stderr，绝不影响任务 ✓；
+ * - **不丢**：只有 `worker.send` **成功后**才 `markConsumed` ⇒ 投递失败下一轮还会再试（宁可重复一次，也不静默丢）；
+ * - **限速**：单轮最多 {@link MAX_PER_ROUND} 条，其余留到下一轮，并在 stderr 如实记录"还有未读"。
+ */
+async function forwardInboxWhileRunning(worker: RpcWorker, inboxId: string, settled: Promise<void>): Promise<void> {
+  let consumed = readConsumed(inboxId);
+  let done = false;
+  const waiter = settled.then(() => {
+    done = true;
+  });
+  try {
+    while (!done) {
+      await Promise.race([waiter, new Promise<void>((r) => setTimeout(r, POLL_MS))]);
+      if (done) break;
+      const { messages, note } = drainInbox(inboxId, { consumed });
+      if (note) console.error(`[subagent-inbox] ${inboxId}: ${note}`);
+      for (const m of messages) {
+        try {
+          await worker.send({ type: 'prompt', message: `[父会话中途指令 #${m.seq}] ${m.text}` }, 120_000);
+          consumed = m.seq;
+          markConsumed(inboxId, m.seq);
+          console.error(`[subagent-inbox] ${inboxId}: 已投递 #${m.seq}（子进程将在下一个 turn 边界执行）`);
+        } catch (e) {
+          console.error(`[subagent-inbox] ${inboxId}: 投递 #${m.seq} 失败，保留未读（下次重试）：${e instanceof Error ? e.message : String(e)}`);
+          break;
+        }
+      }
+      const left = unreadTotal(inboxId);
+      if (left > 0) console.error(`[subagent-inbox] ${inboxId}: 还有 ${left} 条未读，留到下一轮（单轮上限 ${MAX_PER_ROUND}）`);
+    }
+  } catch (e) {
+    console.error(`[subagent-inbox] ${inboxId}: 轮询异常，已忽略（fail-open）：${e instanceof Error ? e.message : String(e)}`);
+  }
+  await waiter; // 语义与改动前一致：等待 settled 被兑现
 }
 
 /** 该 worker 是否已经跑过至少一个任务（决定复用前是否需要 `new_session`） */

@@ -3139,3 +3139,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   子代理侧改 `custom/features/subagent/**`。
 - **必须先验证**：子代理以非交互方式跑时，其内部有无可插的步骤边界；优先子进程扩展的 tool_result 观测点，
   退而求其次 chain 阶段之间/任务结束时由父侧注入 ⇒ **先验证再实现，不许假设**。
+
+### 方案 1 落地：RPC prompt 投递（2026-10-10）
+
+- 验证结论：子代理是子 pi 进程（`--mode rpc` + **默认 `--no-extensions`**）⇒ "子进程内插桩"不可用 ✗，
+  且**不为注入放开该默认**（注释明说是安全属性 ✓）。**实测替代锚点**：父侧走 RPC `prompt` ⇒ **被接受并排队**、
+  在**下一个 turn 边界**执行 ✓（真起 rpc 子进程 + sleep 25 + 第 9 秒插第二条 ⇒ 两次 turn_start/turn_end）。
+- 交付：`scripts/subagent-inbox.mjs`（post/list/read[--max/--consume]/--self-check；id 白名单防穿越；坏行不崩）
+  + `core/inbox.ts`（父侧读取、纯函数、fail-open）+ `core/runner.ts` 的 `forwardInboxWhileRunning()`（1.5s 轮询、
+  单轮≤3、**投递成功才消费**）+ `__tests__/inbox.test.ts`（7/7）；tsc 0；dead-exports 干净；**声明面按构造不变**。
+- 两处如实否定：投错 id（`general` 不存在 ⇒ 是投递方错，已加"收件箱 id"日志 ✓）；**"行为改变"未验** ✗
+  （sleep 是正在执行的工具调用 ⇒ 按 turn 边界语义无法打断，**恰好印证非抢占** ✓；要证需注入"完成后额外做 Y"）。
+- 局限：仅池化路径支持 ✗；同一 agent 并行共用一个收件箱 ✗。脚本数 61 → 62。
