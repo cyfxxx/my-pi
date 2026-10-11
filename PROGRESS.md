@@ -3319,3 +3319,16 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   建议单独立项审锁的归属/过期判定。
 - 父代理复核：全量 vitest 100 files / 1096 passed | 4 skipped；全量 tsc rc=0；运行时状态未变、无残留锁。
 - 未闭环（如实）：未在非 VITEST 下真跑一次任务以证明生产照常执行。
+
+### 调度器锁审计：修掉僵尸锁死 + 并发双跑 TOCTOU 根因（2026-10-11）
+
+- 五问（文件行号）：取/放锁在 locks.ts:49/:110，调用点 index.ts:752→:768 finally{release}、:781→:810 finally{release}
+  ⇒ 放锁在 finally ✓；创建原子（openSync 'wx'）⇒ 只有 SIGKILL/崩溃留锁。过期判据 = PID 真活着 + 年龄（TTL 24h、空内容 60s 宽限）；
+  回收由下一个取锁者完成。无恢复/告警路径（三个审计脚本引用 scheduler.lock/lockPath 均为 0 次 ⇒ 陈旧锁是静默的）。
+- ★并发双跑根因 = 抢占路径 TOCTOU（unlinkSync 不复核）；已修：比较后再删 + 建锁后回读校验。
+- ★僵尸即锁死：旧判据 existsSync('/proc/<pid>') 被僵尸骗 ⇒ 每轮让出、停跑且无告警；已修：isPidAlive 把僵尸 Z 视为不活
+  （读不到 stat 保守当作活着；非 Linux 与旧行为一致）。
+- 证据：同一测试改前 1 failed（Expected true / Received false）⇒ 改后 1 passed；4 条前提断言防真空通过 + 反向断言（真活着者必须抢占失败）。
+- 闸门：全量 tsc rc=0、autopilot+mode 276 passed、死导出干净；真实状态未污染（无锁、logs 51、nextRun 原值）；无 git 写操作。
+- 未做（如实）：两进程同刻活体复现（仅代码级论证）；PID 复用收口（可用 /proc stat starttime 比对，本次未实现）；
+  审计告警未实现（scripts/** 属父代理，已给插入点）；僵尸判定依赖 Linux /proc（非 Linux 行为不变）。
