@@ -3332,3 +3332,14 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 闸门：全量 tsc rc=0、autopilot+mode 276 passed、死导出干净；真实状态未污染（无锁、logs 51、nextRun 原值）；无 git 写操作。
 - 未做（如实）：两进程同刻活体复现（仅代码级论证）；PID 复用收口（可用 /proc stat starttime 比对，本次未实现）；
   审计告警未实现（scripts/** 属父代理，已给插入点）；僵尸判定依赖 Linux /proc（非 Linux 行为不变）。
+
+### 让陈旧锁可见：daily-health 只读检查（2026-10-11）
+
+- 补上"陈旧锁静默"的缺口：daily-health.mjs 加 checkSchedulerLock（四态 none/held/stale/stalled）+
+  checkOverdueTasks（症状侧兜底：nextRun 逾期 ⇒ 调度器可能停摆）+ 汇总字段 + "陈旧/疑似卡死 且 逾期"的组合判定；
+  只报告、不改状态、不退出非零；只读性核查（unlink/write/append/rename/truncate 0 处）。
+- 阈值与理由：锁 2h（按 20 分钟最长任务预算的 6× 余量）、逾期 12h；僵尸必须算"不活"。
+- 五份证据（全程 PI_MEMORY_DIR 隔离 ⇒ 真实状态一次未碰）：无锁不误报 / 陈旧锁报 stale / 活持有者+老时间戳报 stalled
+  （区分正确）/ 逾期报停摆 / 组合判定；实状态核验（无锁、nextRun 原值、logs 51）；tsc rc=0、check-conventions 通过。
+- 未做：PID 复用加固（配方已备：比对 /proc/<pid>/stat field 22 starttime）；非 Linux 返回 unknown 并打印原因；
+  未接入 verdict/alert（组合布尔量已算出，可随时升级）。

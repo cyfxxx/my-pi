@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（204 条）
+## 决策台账（205 条）
 
+- `DECISIONS.md` · [2026-10-11] 让陈旧锁**可见**：`daily-health` 增加调度器健康只读检查 ✓（补上"静默"这个缺口） · **背景**：上一轮审计指出 —— **陈旧锁是"静默"的** ✗✗（`state-audit.mjs`/`lib-state-audit.mjs`/`daily-health.mjs` 对 · 数字: 0 次 / 20 分钟 / 3 天
 - `DECISIONS.md` · [2026-10-11] 调度器锁审计：**修掉"僵尸即锁死" + 并发双跑的 TOCTOU 根因** ✓（+ 一处**静默**被点出 ✗） · **为什么查**：上轮发现"测试驱动会泄漏 `scheduler.lock`" ✗，而**一条陈旧锁 = 调度器静默停摆** ✗✗ · 数字: 8 条 / 2 个 / 4 条
 - `DECISIONS.md` · [2026-10-11] 产品侧加固：**任何测试都不可能驱动真实调度器** ✓（+ 一条新的真实缺陷被挖出 ✗） · **为什么要加固（比追查历史凶手更值钱 ✓）**：上一轮把"并发驱动"机制钉死了 ✓（同秒 8 条、`durationMs` 553–1782ms ⇒ **重叠** ✓； · 数字: 8 条 · 证据: 1791685551178
 - `DECISIONS.md` · [2026-10-11] 修掉 `tool-stats-daily` 反复失败的根因：**autopilot 会拿 vitest worker 入口当 pi 启动** ✗✓ · **结论先行**：这是一处**真实代码缺陷** ✓，已修 + 有**同一环境的改前红/改后绿证据** ✓； · 数字: 51 条 / 5 条 / 5 次
@@ -212,7 +213,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（202 条）
+## 进度记录（203 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -416,6 +417,7 @@
 - `PROGRESS.md` · 修 tool-stats-daily 根因：autopilot 拿 vitest worker 当 pi 启动（2026-10-11） · - 根因（推翻我的前提）：getPiInvocation 无条件信任 argv[1] ⇒ 在 vitest worker 里会去启动 init-forks 块 ⇒ · 数字: 5 条 / 5 次
 - `PROGRESS.md` · 产品侧加固：测试永远无法驱动真实调度器（2026-10-11） · - 收口点：autopilot/index.ts:720 runDueTasks 第一行（所有自动触发的唯一入口，且在任何状态读写之前）⇒ 一处早退全覆盖。 · 证据: 1791685551178
 - `PROGRESS.md` · 调度器锁审计：修掉僵尸锁死 + 并发双跑 TOCTOU 根因（2026-10-11） · - 五问（文件行号）：取/放锁在 locks.ts:49/:110，调用点 index.ts:752→:768 finally{release}、:781→:810 finally{release} · 数字: 0 次 / 4 条
+- `PROGRESS.md` · 让陈旧锁可见：daily-health 只读检查（2026-10-11） · - 补上"陈旧锁静默"的缺口：daily-health.mjs 加 checkSchedulerLock（四态 none/held/stale/stalled）+ · 数字: 20 分钟
 
 ## 缺陷回放（26 条）
 

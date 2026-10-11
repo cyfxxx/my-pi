@@ -62,6 +62,95 @@ const SUBAGENT_USAGE = process.env.PI_SUBAGENT_USAGE_FILE || join(MEM, 'subagent
 const GOAL_TERMINATIONS =
   process.env.PI_GOAL_TERMINATION_LOG || join(MEM, 'logs', 'goal-terminations.jsonl');
 const SESSIONS_DIR = process.env.PI_SESSIONS_DIR || join(AGENT, 'sessions');
+/**
+ * 调度器陈旧锁检查（2026-10-11，**只读** ✓）。
+ *
+ * 为什么要有这条：`scheduler.lock` 一旦被**陈旧持有**（持有进程已死/成僵尸），后续每一次
+ * `runDueTasks` 都会因拿不到锁而"让出本轮" ⇒ **调度器静默停摆、每日任务再也不跑** ✗，
+ * 而唯一症状就是"任务不再跑" ⇒ **没有人会发现** ✗✗（本日的实测：`state-audit`/`daily-health`
+ * 对 `lockPath` 的引用都是 0 次 ✓）。本检查把这件事**变成可见告警** ✓。
+ *
+ * 口径（严格只读 ✓）：**绝不删除、绝不修改任何锁** ✗；只解析 `PID:timestamp` 并判定三态：
+ *   - `none`    无锁 ⇒ 正常 ✓
+ *   - `held`    持有者活着且年龄 ≤ 阈值 ⇒ 正常 ✓（**不误报** ✓）
+ *   - `stale`   持有者**已死或僵尸** ⇒ 陈旧锁（**下次取锁会自动抢占** ✓，无需人工干预 ✓）
+ *   - `stalled` 持有者**活着但年龄 > 阈值** ⇒ **疑似卡死** ✓（需人工看 ✓）
+ * 僵尸必须算"不活" ✗✓：僵尸的 `/proc/<pid>` **同样存在** ⇒ 只看目录存在会误判为"活着" ✗
+ * （这正是 2026-10-11 那次"僵尸 PID 占用 ⇒ 静默停摆"的根因 ✓）。
+ *
+ * 阈值：默认 **2 小时**（`PI_HEALTH_LOCK_STALL_H` 可覆盖）。理由：本项目最长任务预算按 20 分钟计
+ * （见 `tool-stats-daily` 的提示词"给这次 push timeout 300"、"耗尽 1200s 预算" ✓），2 小时 ≈ 6× 余量
+ * ⇒ 既不会把正常长任务误判为卡死 ✓，又能在一个工作日内暴露真正的卡死 ✓。
+ *
+ * 平台：判定"进程是否活着"依赖 `/proc`（Linux ✓）；非 Linux ⇒ 返回 `unknown` 并**如实说明** ✗（不猜 ✓）。
+ */
+const LOCK_STALL_MS = (Number(process.env.PI_HEALTH_LOCK_STALL_H) || 2) * 3600 * 1000;
+/** 任务 `nextRun` 逾期多久算"调度器可能停摆"（默认 12 小时；`PI_HEALTH_OVERDUE_H` 可覆盖） */
+const OVERDUE_MS = (Number(process.env.PI_HEALTH_OVERDUE_H) || 12) * 3600 * 1000;
+
+function procState(pid) {
+  try {
+    const raw = readFileSync(`/proc/${pid}/stat`, 'utf-8');
+    const after = raw.slice(raw.lastIndexOf(')') + 1).trim();
+    return after.split(/\s+/)[0] || ''; // R/S/D/Z/…
+  } catch {
+    return null; // 读不到 ⇒ 不算活着
+  }
+}
+
+function checkSchedulerLock() {
+  const lockF = process.env.PI_HEALTH_LOCK_FILE || join(MEM, 'scheduler', 'scheduler.lock');
+  if (!existsSync(lockF)) return { status: 'none', detail: '' };
+  let raw = '';
+  try {
+    raw = readFileSync(lockF, 'utf-8').trim();
+  } catch {
+    return { status: 'unknown', detail: `锁存在但读不出来：${lockF}` };
+  }
+  const pid = raw.split(':')[0] ?? '';
+  const ts = Number(raw.split(':')[1] ?? 0);
+  const ageMs = ts > 0 ? Date.now() - ts : -1;
+  const ageStr = ageMs >= 0 ? `${(ageMs / 3600000).toFixed(1)}h` : '未知';
+  if (process.platform !== 'linux') {
+    return { status: 'unknown', detail: `非 Linux：无法判定持有者 ${pid} 是否存活（锁年龄 ${ageStr}）` };
+  }
+  const st = procState(pid);
+  if (st === null || st === 'Z') {
+    const why = st === 'Z' ? '持有进程已是僵尸' : '持有进程已不存在';
+    return { status: 'stale', detail: `陈旧锁（${why}；PID ${pid}，年龄 ${ageStr}）⇒ 下次取锁会自动抢占，无需人工干预` };
+  }
+  if (ageMs > LOCK_STALL_MS) {
+    return { status: 'stalled', detail: `疑似卡死（PID ${pid} 活着，但锁已持有 ${ageStr} > 阈值 ${(LOCK_STALL_MS / 3600000).toFixed(0)}h）` };
+  }
+  return { status: 'held', detail: `持有中（PID ${pid}，年龄 ${ageStr}）` };
+}
+
+/** 症状侧兜底：`nextRun` 早已过期 ⇒ 即便锁判据漏了，也能发现"该跑没跑" ✓ */
+function checkOverdueTasks() {
+  const f = process.env.PI_HEALTH_TASKS_FILE || join(MEM, 'scheduler', 'tasks.json');
+  if (!existsSync(f)) return { count: 0, detail: '' };
+  try {
+    const j = JSON.parse(readFileSync(f, 'utf-8'));
+    const list = Array.isArray(j) ? j : (j.tasks ?? []);
+    const now = Date.now();
+    const late = list.filter((t) => {
+      if (!t || t.enabled === false) return false;
+      const nr = t.nextRun ? Date.parse(t.nextRun) : NaN;
+      return Number.isFinite(nr) && now - nr > OVERDUE_MS;
+    });
+    return {
+      count: late.length,
+      detail: late.length
+        ? `${late.length} 个启用任务的 nextRun 已逾期 > ${(OVERDUE_MS / 3600000).toFixed(0)}h：` +
+          late.slice(0, 3).map((t) => `${t.name}(${t.nextRun})`).join('、') +
+          ' ⇒ 调度器可能停摆'
+        : '',
+    };
+  } catch (e) {
+    return { count: 0, detail: `tasks.json 解析失败：${e && e.message}` };
+  }
+}
+
 /** 父级在其后的多少个助手回合内再改同一文件算"返工" */
 const REWORK_TURNS = Number(process.env.PI_HEALTH_REWORK_TURNS) || 5;
 /** 与 features/subagent/core/usage-log.ts 的 WRITE_TOOLS 保持同口径（catch-all 不算） */
@@ -651,10 +740,20 @@ if (tlAnchored.length === 0) {
 
 const termStr = `评审到界=${reviewCapped} 环境阻塞=${envBlocked}`;
 
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} 父子时间线=${timelineStr} ${termStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+const lockCheck = checkSchedulerLock();
+const overdue = checkOverdueTasks();
+const lockStatus = lockCheck.status === 'held' ? '正常' : lockCheck.status;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} 父子时间线=${timelineStr} ${termStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 调度锁=${lockStatus} 任务逾期=${overdue.count} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);
+if (lockCheck.status === 'stale' || lockCheck.status === 'stalled' || lockCheck.status === 'unknown') {
+  console.log(`  └ 调度锁[${lockCheck.status}]: ${lockCheck.detail}`);
+}
+if (overdue.count > 0) console.log(`  └ 任务逾期: ${overdue.detail}`);
+if ((lockCheck.status === 'stale' || lockCheck.status === 'stalled') && overdue.count > 0) {
+  console.log('  └ 组合判定: 锁被陈旧/疑似卡死持有 + 任务逾期 ⇒ 调度器很可能已停摆（先看锁的持有者，再决定是否手动清锁）');
+}
 if (totalOnly.length > 0) console.log(`  └ 提示: ${totalOnly.length} 次请求中段内容被改写（changed=total，命中率之外的前缀风险）`);
 if (coldStarts.length > 0 && coldStartCost.paired === 0) {
   console.log('  └ 冷启动未命中: 未能与本窗口的每轮用量配对（缺少 .usage-diag.jsonl 记录）');
