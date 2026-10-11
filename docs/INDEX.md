@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（199 条）
+## 决策台账（200 条）
 
+- `DECISIONS.md` · [2026-10-11] ① 覆盖验证：**supervisor 路径 + 技能启用下，中途注入仍生效** ✓✓（三项断言全成立） · **为什么要补这次**：此前"中途注入生效"只在"**`MY_PI_NO_SUPERVISOR=1` + `--no-skills`**"这一种组合下证过 ✗ · 数字: 1 轮 / 1.55 GB / 1.96 GB / 966 MB · 证据: node scripts/subagent-inbox.mjs read
 - `DECISIONS.md` · [2026-10-10] DSH 换基座 spike：**契约已量出** ✓（含纠正我上一版一个错误指向 ✗✓） · **执行**：隔离 `HOME=/tmp/dsh-spike` ✓，**未动 my-pi 仓库、未改 DSH 安装、无 git 写操作** ✓（符合我给的边界 ✓）。 · 数字: 250 个 / 3 轮 / 11 个
 - `DECISIONS.md` · [2026-10-10] 中途注入回归单测补齐（**功能闭环**）+ 一次**子代理越界**与我的**规格自相矛盾** ✗✓ · **① 单测已补齐（这是"中途注入"这条线的最后一块 ✓）**： · 数字: 30994B · 证据: ff90022b9 / 7b7998998
 - `DECISIONS.md` · [2026-10-10] 中途注入的回归测试升级为**注入式**（断言"真实负载"与"消费策略"） · **上一轮的 7 项测试不够** ✗：它测的是**纯函数**（`buildSteerPrompt`/`assertPromptAccepted`）⇒
@@ -207,7 +208,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（197 条）
+## 进度记录（198 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -406,6 +407,7 @@
 - `PROGRESS.md` · 中途注入的回归测试升级为注入式（2026-10-10） · - 上一轮 7 项只测纯函数 ⇒ 没断言"真实负载"、没覆盖"失败⇒不消费/成功⇒消费"接线 ✗。
 - `PROGRESS.md` · 中途注入回归单测补齐 + 一次越界与规格自相矛盾（2026-10-10） · - 依赖注入：抽出导出 `deliverInboxRound(deps, ids, consumed)`，生产侧委托一次 ⇒ 导出有生产引用（不死于"仅测试引用"规则）✓。
 - `PROGRESS.md` · DSH 换基座 spike：契约量出（2026-10-10） · - 契约（带文件行号）：工具 = `ctx.tools.register(defineTool({…}))`（含必填 output.schema + render ✗）； · 数字: 250 个 / 3 轮
+- `PROGRESS.md` · ① supervisor+技能路径覆盖：中途注入仍生效（2026-10-11） · - 同款实验只改两维度（经 supervisor、不带 --no-skills）⇒ **三项断言全成立** ✓：`INBOX-OK` ✓、 · 数字: 1 轮 / 1.96 GB
 
 ## 缺陷回放（26 条）
 

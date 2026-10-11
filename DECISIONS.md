@@ -2,6 +2,37 @@
 
 ## 格式
 
+### [2026-10-11] ① 覆盖验证：**supervisor 路径 + 技能启用下，中途注入仍生效** ✓✓（三项断言全成立）
+
+**为什么要补这次**：此前"中途注入生效"只在"**`MY_PI_NO_SUPERVISOR=1` + `--no-skills`**"这一种组合下证过 ✗
+⇒ **可用性边界不清** ✓。本轮只改这两个维度、其余同款实验 ✓。
+
+**结果（原始证据 ✓）**：
+```
+CMD: PI_RPC_TRACE=1 PI_RPC_TRACE_FILE=/tmp/rt-supervised.jsonl ./my-pi.sh --no-session -p "<4步任务>"
+     [经 supervisor；不带 --no-skills；不设 MY_PI_NO_SUPERVISOR]
+[supervisor] 启动 Pi...（第 1 轮，模式 full）      ← ★ 确实走了 supervisor，且第 1 轮 ⇒ **没有重启** ✓
+START 00:55:57 → POST 00:56:22（父会话仍在跑 ⇒ **运行期间投递** ✓）→ END 00:58:53
+```
+- **① 注入副作用** ✓：`/tmp/inbox-proof.txt` = **`INBOX-OK`** ✓
+- **② 子进程明确报告入队** ✓（关键帧）：`out` 带 `streamingBehavior:"steer"` ✓ →
+  `in {"type":"queue_update","steering":["[父会话中途指令 #5] …"],"followUp":[]}` ✓ →
+  `in {"success":true,"data":{"disposition":"queued"}}` ✓
+- **③ 注入后仍产生新 turn** ✓：`turn_start` **7** / `turn_end` **7**；**`success":false` 计数 = 0** ✓（零拒绝 ✓）；
+  基础任务 **step-1…step-4 全跑完** ✓；收件箱 `worker#1：未读 0 / 共 5` ⇒ **我投的 seq=5 已被消费** ✓
+- **与上次的唯一差异**：日志多一行 supervisor 启动 ✓（**round 1 ⇒ 无重启** ✓）；注入链路行为**完全一致** ✓；技能启用**未引入额外步骤或阻塞** ✓
+- **内存**：开始 **1.55 GB** 可用、结束 **1.96 GB** ✓（**未 OOM**）；它**只起一个会话且任务内无下载** ⇒ **主动避开了 `clamscan` 的 ~966 MB 峰值** ✓（我给的约束被正确执行 ✓）
+
+**它踩到并纠正的一个坑（值得记）** ✗✓：第一次取帧 `grep` 全空 ✗ —— 因为 trace 的帧是**嵌套 JSON 字符串**
+（`raw` 里 `type` 被转义成 `\"type\"`）⇒ **必须先 `head` 看一条真实形状**再写匹配模式 ✓。
+⇒ 与"**先探测再下结论**"同源：**别用想当然的模式去数证据** ✓。
+
+**遗留状态（仅报告，未触碰 ✓）**：`general：未读 2 / 共 2`、`worker#2：未读 1 / 共 1` ✗ —— 更早实验留下的未读消息 ✓
+（需要时 `node scripts/subagent-inbox.mjs read <id> --consume` 可清 ✓）。
+
+**未验证（如实 ✗）**：`--no-session` 仍保留 ⇒ **会话持久化路径未覆盖** ✓；DI 缝的 `send` **只声明 steer-prompt 一种请求形状** ✓；
+**只跑了一次** ⇒ 统计上不足以排除偶发 ✓（但 `queue_update` + `queued` + 副作用**三者自洽** ✓）。
+
 ### [2026-10-10] DSH 换基座 spike：**契约已量出** ✓（含纠正我上一版一个错误指向 ✗✓）
 
 **执行**：隔离 `HOME=/tmp/dsh-spike` ✓，**未动 my-pi 仓库、未改 DSH 安装、无 git 写操作** ✓（符合我给的边界 ✓）。
