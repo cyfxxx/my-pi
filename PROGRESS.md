@@ -3604,3 +3604,29 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   ★但"没再失败"与"没再运行"不可区分（hasUI 门控 + lastRun 仍停在 10-10）⇒ 需真跑一次才能闭环；fail/run 高比值来自累计不重置
   + 同一到期被并发触发约 8 遍（history 4 条落在 76ms 内而单条耗时 553–1713ms）；★唯一"今天仍在发生"的信号 = seed-drift.log
   从 02:25Z 到 14:03Z 反复报告 tool-stats-daily(prompt) 漂移（成因未核实：同步不收敛或占位符展开被当漂移）。
+
+### 种子静默失效修复 + 守卫隔离（2026-10-11）
+
+- 我的锅：ClamAV 种子只有 [name,prompt] ⇒ 被 isSeedLike（要求 type∈{interval,cron,once} 且 schedule 非空）过滤掉 ⇒ 永不注册且
+  全程无日志 ⇒ 我早先说的"已排程"实际从未发生（当时守门只查提示词 headless 可用、不查种子是否有效）。
+- ★ 最重要的产出：落修1 会让 scheduler-test-env-guard 变红 —— 该用例跑真实 session_start 并断言真实 tasks.json 不被改写，而种子一旦
+  合法就会真注册 ⇒ 守卫在惩罚正确改动（根因：只隔离 memory 目录、没隔离种子源 agentDir）。
+- 第一步（守卫隔离，检查力更强）：产品侧 session_start 新增 syncSeeds = isTestEnvironment()? resolve({added:0,drifted:[]}) :
+  syncSeedTasks()（一处覆盖 3 个调用点）；测试侧 PI_CODING_AGENT_DIR 指向 mkdtemp + 写入本地不存在的探针种子 __guard-probe-seed +
+  断言隔离真生效（loadSeeds 必须含探针、不得读到 tool-stats-daily）；探针本地不存在 ⇒ 若早退被移除必写真实 tasks.json ⇒ 断言必红。
+  证据：去掉早退 ⇒ 1 failed（AssertionError 真实 tasks.json 不得被改写）| 2 passed；恢复 ⇒ 3 passed；实验期间真实数据双保险恢复（sha256 回基线）。
+- 第二步三条修法：修1 种子加 type:cron + schedule:"15 6 * * *"（prompt 未动；与现有 5 个 cron 全错开，清晨先更新库早于当日 golden）；
+  修2 被拒种子记"种子被忽略（缺 type/schedule 或字段非法）：<名字>"（同批只记一次）；修3 prompt 漂移带两侧摘要
+  prompt(本地 <FNV32/len> ≠ 种子 <FNV32/len>) + 签名落盘 logs/seed-drift.sig（新进程不再重复记录，仅签名变化时写）。
+- 测试：新增 seeds-reconcile.test.ts 5 项全过（合法真注册+幂等；非法被报出、合法不误报；漂移含两侧摘要且不同、重复只记一条、一致不记；
+  反向断言相同/相异给出相反结论、摘要对同输入稳定对不同输入不同）；并更新 seeds.test.ts 锁定旧标签 'prompt' 的断言（旧断言锁的是信息量
+  不足的旧格式，属应更新的契约，不是改测试迎合实现）。
+- 验证：全量 tsc rc=0；autopilot 27 files/244 passed+3 skipped；check-seeds-headless rc=0 且 6 条种子全 headless 可用（含 ClamAV）
+  ⇒ golden 第 11 步仍绿；check-conventions 全绿；golden --fast 20 步全绿；死导出/文档链接（193 md）均绿；真实状态 sha256(tasks.json)
+  与基线逐字节一致、无残留锁。
+- 未核实/待定：真实 tasks.json 仍无 ClamAV（按约束未动真实数据）⇒ daily-health 仍报种子失配=1，它会在下次真实会话启动时自动注册
+  （逻辑已在隔离目录验证），未做真实端到端；ClamAV 种子只补两字段，其余走默认（useSubagent:false/retries:0/maxRunTime=DEFAULT/无 tags）
+  ⇒ 建议与其它 5 条对齐（尤其 useSubagent:true，否则会在交互会话里内联跑数分钟）；本地 tool-stats-daily prompt 仍旧版（设计不覆盖本地）
+  ⇒ 漂移会继续存在，但现在日志带两侧摘要可诊断；新增运行时产物 logs/seed-drift.sig（logs 51→52 是上轮 WIP 探针 14:45 写的）。
+- 方法论教训：部分回退会给出错误归因（先只回退 seeds.ts 仍红 ⇒ 一度误判"不是我"）；未隔离的守卫会惩罚正确改动（守门绿 ≠ 做对了，
+  只等于没碰它覆盖不到的地方）；用"本地不存在的探针"做隔离断言比"断言没变化"更有分辨力。

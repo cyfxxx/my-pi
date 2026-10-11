@@ -44,6 +44,7 @@ import { parseSubcommand, filterCompletions } from '../../core/cli';
 import { listSessions, resolveSession } from '../../adapters/session-adapter';
 import { formatSessionList } from './store/sessions';
 import { syncSeedTasks } from './store/seeds';
+import type { SeedSyncResult } from './store/seeds';
 import { collectUnread, formatSummary, writeSeenTs } from './store/notifications';
 import {
   readAutopilotConfig,
@@ -876,6 +877,13 @@ export function register(pi: ExtensionAPI): void {
     event: 'session_start',
     handler: async (_event, ctx) => {
       resetWatchdogState();
+      // **测试环境不得驱动真实调度器**（与 `runDueTasks` 的早退同一策略）。种子对账会**写** `tasks.json`
+      // （缺失的种子任务自动注册）——而守卫测试常常**故意**用真实 memory 目录来验证"不写"，于是
+      // 一旦种子文件里新增一条合法种子，对账就会真的落盘，把守卫搞红（守卫在惩罚正确改动 ✗）。
+      // 因此测试环境一律不跑对账：新增合法种子不再影响任何测试，而"真实目录不被改写"的检查力仍由
+      // 本测试守住（若移除这个早退，测试里那条探针种子就会被注册进真实 tasks.json ⇒ 测试必红 ✓）。
+      const syncSeeds = (): Promise<SeedSyncResult> =>
+        isTestEnvironment() ? Promise.resolve({ added: 0, drifted: [] }) : syncSeedTasks();
       // 调度器**只在交互会话**里跑。`-p` 一次性运行（含 golden 的无头冒烟、临时提问）会在启动时
       // 立刻跑 `runDueTasks`，而逾期的每日任务每个都是一次完整子代理会话（数分钟）——
       // 于是"问一句就退出"会变成长期挂起，且**凭空触发若干不该发生的后台任务**（实测：一次
@@ -884,18 +892,18 @@ export function register(pi: ExtensionAPI): void {
       // 会话看的未读报告标记成已读而丢失）。调度器自己的工作进程走 `--no-extensions -p`，
       // 不加载扩展、不会回到这个钩子，故无副作用。
       if (!ctx.hasUI) {
-        await syncSeedTasks();
+        await syncSeeds();
         return;
       }
       if (tickTimer) clearInterval(tickTimer);
       tickTimer = setInterval(() => {
         void runDueTasks(ctx);
         checkHang(ctx);
-        void syncSeedTasks();
+        void syncSeeds();
       }, 60000);
       tickTimer.unref?.();
       void runDueTasks(ctx);
-      const sync = await syncSeedTasks();
+      const sync = await syncSeeds();
       if ((sync.added || sync.drifted.length) && ctx.hasUI) {
         ctx.ui.notify(
           `种子任务对账: 新增 ${sync.added}${sync.drifted.length ? `，与种子不一致: ${sync.drifted.join('；')}` : ''}`,

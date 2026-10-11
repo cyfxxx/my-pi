@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（220 条）
+## 决策台账（221 条）
 
+- `DECISIONS.md` · [2026-10-11] 种子静默失效修复 ✓ + ★ 守卫隔离缺陷（**守卫在惩罚正确的改动** ✗✓） · **★ 我自己的锅（先认 ✓）**：`portable/agent/scheduled-seeds.json` 里那条 **「每日更新 ClamAV 病毒库」只有 `['name','prompt']`** · 数字: 5 条 / 3 个 / 6 条
 - `DECISIONS.md` · [2026-10-11] 修 `daily.ts` 的"说谎状态" ✓（`null` 不再显示成"✓ 成功"）+ 诊断报告落盘 · **修的是什么** ✗：`custom/features/autopilot/daily.ts` 的 `lastMark()` 旧逻辑是**唯一的说谎点** ✓： · 证据: b6ffc4599f04745e / node scripts/daily-health.mjs --print
 - `DECISIONS.md` · [2026-10-11] 第 2 条锁可移植化：**纠正性质 —— 不是"静默降级"，是"静默双跑"** ✗✓ · **★ 我原先的判断被纠正** ✗✓（**我低估了严重性** ✓）：`custom/features/autopilot/store/locks.ts` 的 `isPidAlive()`（`:38-44`） · 证据: e436fc2a2 / 8afefec31
 - `DECISIONS.md` · [2026-10-11] 优化第 1/3 条：**第 1 条按证据改为"改代码"** ✗✓ + 备份保留脚本（含自查出的两处真缺陷修复 ✓）+ ★ 发现 5 个任务全在失败 · **★ 第 1 条：清 `lastResult="failed"` 的计划被**代码级证据**否掉** ✗✓（**方案变了，不是没做** ✓）： · 数字: 1 条 / 10 条 / 8 条 / 466 B · 证据: b6ffc4599f04745e
@@ -228,7 +229,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（218 条）
+## 进度记录（219 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -448,6 +449,7 @@
 - `PROGRESS.md` · 优化第 1/3 条 + 发现 5 个任务全在失败（2026-10-11） · - ★第 1 条改为"改代码"：任务书判据满足（history 10 条、8 条 @01:07），但清掉会引入新缺陷 —— daily.ts:91 把 null 显示成"✓ 成功" · 数字: 1 条 / 10 条 / 8 条 / 23466B · 证据: b6ffc4599f04745e
 - `PROGRESS.md` · 第 2 条锁可移植化：性质纠正为"静默双跑"（2026-10-11） · - ★ 纠正：旧 isPidAlive 只看 /proc ⇒ 非 Linux 上 existsSync('/proc/<pid>') 恒 false ⇒ 存活持锁者被判不活 ⇒ "被持有"分支 · 证据: 8afefec31 / fad6b2b69
 - `PROGRESS.md` · 修 daily.ts 说谎状态 + 5 任务失败诊断落盘（2026-10-11） · - 修 lastMark()：旧逻辑"非 failed 即成功"⇒ null 显示"✓ 成功"；新逻辑三分支严格（success/failed/— 未记录）；"—"沿用项目既有习惯 · 数字: 50 条 / 4 条 · 证据: b6ffc4599f04745e / d339950a3
+- `PROGRESS.md` · 种子静默失效修复 + 守卫隔离（2026-10-11） · - 我的锅：ClamAV 种子只有 [name,prompt] ⇒ 被 isSeedLike（要求 type∈{interval,cron,once} 且 schedule 非空）过滤掉 ⇒ 永不注册且 · 数字: 3 个 / 5 个 / 6 条 / 5 条
 
 ## 缺陷回放（26 条）
 

@@ -2,6 +2,60 @@
 
 ## 格式
 
+### [2026-10-11] 种子静默失效修复 ✓ + ★ 守卫隔离缺陷（**守卫在惩罚正确的改动** ✗✓）
+
+**★ 我自己的锅（先认 ✓）**：`portable/agent/scheduled-seeds.json` 里那条 **「每日更新 ClamAV 病毒库」只有 `['name','prompt']`**
+✗（同文件另 5 条都有完整键 ✓）—— 而 `store/seeds.ts:40-52` 的 **`isSeedLike()`** 要求 **`type ∈ {interval,cron,once}` 且 `schedule` 非空** ✓
+⇒ 它在 `loadSeeds()` 的 **`.filter(isSeedLike)`（`:61`）里被直接过滤** ✗ ⇒ **进不了对账 ⇒ 永不注册** ✓，**且不报错、不留日志** ✗✗
+⇒ **我早先对你说的"已排程"实际从未发生** ✓（**当时的守门只查"提示词是否 headless 可用"，不查"种子是否有效"** ✗）。
+
+**★ 本轮最重要的产出不是修法，而是一条独立缺陷** ✗✓：**落"修 1"会让既有守卫变红** ✗ ——
+`scheduler-test-env-guard.test.ts` 有一条用例跑**真实 `session_start`** ✓ 并断言**真实 `tasks.json` 不得被改写** ✓；
+而**种子一旦合法**，测试里的 `syncSeedTasks` 就**真的把 ClamAV 注册进真实任务表** ✗ ⇒ **守卫在惩罚正确的改动** ✗✓
+⇒ **今后任何新增的合法种子都会让它红** ✗。**根因**：**该路径只隔离了 memory 目录，没隔离种子源（agentDir）** ✗✓。
+
+**第一步：守卫隔离（已修，且检查力更强 ✓✓）**：
+- **产品侧** ✓：`session_start` 里新增包装 `syncSeeds = () => isTestEnvironment() ? Promise.resolve({added:0,drifted:[]}) : syncSeedTasks()`
+  ⇒ **一处覆盖 3 个调用点**（无头 `:887`、tick `:894`、交互 `:898` ✓）；理由：种子对账会**写** `tasks.json` ⇒ 与 `runDueTasks`
+  的早退**同一策略** ✓；
+- **测试侧** ✓：`PI_CODING_AGENT_DIR` 指向 `mkdtemp` 临时目录 ✓（`getAgentDir()` **每次读 env、无模块级缓存** ✓，
+  沿用 `admin-tools.test.ts` 既有做法 ✓），并写入一条**本地不存在的探针种子** `__guard-probe-seed` ✓ + 新增断言证明隔离**真的生效** ✓
+  （`loadSeeds()` **必须**含探针、且**不得**读到 `tool-stats-daily` ✓）；
+- ★ **为什么检查力更强** ✓✓：**探针种子本地不存在** ⇒ **若早退被移除，对账会把它写进真实 `tasks.json`** ⇒ **断言必红** ✓；
+- **证据（改前红 ✓）**：临时去掉早退 ⇒ `× 走一遍真实 session_start … 目录毫发无损` +
+  `AssertionError: 真实 tasks.json 不得被改写（nextRun/lastResult 等）` ✓、`1 failed | 2 passed` ✗；恢复后 ⇒ **`3 passed`** ✓；
+  实验期间真实 `tasks.json` 由测试 `afterAll` + 另存备份**双保险**恢复 ✓（`sha256` 复核回到基线 ✓）。
+
+**第二步：三条修法（全部落地 ✓）**：
+- **修 1** ✓：种子只加两行（**prompt 一字未动** ✓）：`"type":"cron"` + `"schedule":"15 6 * * *"` ✓ ——
+  **15 6 与现有 30 7 / 50 7 / 20 8 / 5 9 / 30 23 全错开** ✓，且**清晨先更新病毒库、早于当日 golden** ✓（理由充分 ✓）；
+- **修 2** ✓：被 `isSeedLike` 拒掉的条目 ⇒ 记 `种子被忽略（缺 type/schedule 或字段非法）：<名字>` 进 `logs/seed-drift.log` ✓
+  （**同批只记一次、不刷屏** ✓）；
+- **修 3** ✓：prompt 漂移改为 `prompt(本地 <FNV32/len> ≠ 种子 <FNV32/len>)` ✓（**零依赖**短摘要 ✓）；
+  漂移签名**落盘** `logs/seed-drift.sig` ✓ ⇒ **新进程不再重复记录同一条** ✓（仅在签名变化时写 ✓）；
+- **测试** ✓：新增 `__tests__/seeds-reconcile.test.ts`（**5 项全过** ✓）：合法种子真注册（隔离目录 `added=1` + `type`/`schedule`/`prompt`
+  原样 + `nextRun` 已算 + **幂等** ✓）；非法被报出、合法不误报 ✓；prompt 漂移**含两侧摘要且不同** ✓、重复对账**只记一条** ✓、
+  一致后不记 ✓；★ **反向断言**（相同/相异给出相反结论 ✓、摘要对相同输入稳定对不同输入不同 ✓）；
+  **并更新** `seeds.test.ts` 里锁定旧标签 `'prompt'` 的断言 ✓ —— **理由**：**旧断言锁的是"信息量不足的旧格式"，属应当更新的契约** ✓✓
+  （**这不是"改测试去迎合实现"** ✓，而是**契约本身升级** ✓）。
+
+**验证（全实跑 ✓）**：`tsc -p custom/` **rc=0** ✓；`vitest run custom/features/autopilot` ⇒ **27 files / 244 passed + 3 skipped** ✓；
+`node scripts/check-seeds-headless.mjs` **rc=0**、**6 条种子全部 headless 可用** ✓（含新补的 ClamAV ✓）⇒ **golden 第 11 步仍绿** ✓；
+`check-conventions.sh` 全绿 ✓；**`golden-tasks.sh --fast` 20 步全绿** ✓；`check-dead-exports` ✓；`check-doc-links` 一致（193 md）✓；
+真实状态：**`sha256(tasks.json)` 与基线逐字节一致** ✓、**无残留锁** ✓。
+
+**仍未核实 / 待定（✗）**：① **真实 `tasks.json` 里仍没有 ClamAV 任务** ✓（按约束未动真实数据 ✓）⇒ `daily-health --print` 仍是
+`种子失配=1` ✓；它会在**下一次真实（非测试）会话启动**时由既有对账**自动注册** ✓（注册逻辑已在隔离目录验证 ✓）——**未做真实端到端** ✗；
+② ClamAV 种子**只补了指定的两个字段** ✓ ⇒ 其余走默认（`useSubagent:false`、`retries:0`、`maxRunTime=DEFAULT`、无 tags ✓）
+⇒ **建议与其它 5 条对齐**（尤其 **`useSubagent:true`** ✓：否则该任务会在**交互会话里内联跑数分钟** ✗）——**待我点头后补** ✓；
+③ 本地 `tool-stats-daily` 的 prompt 仍是 2026-10-05 版 ✓（设计上**不覆盖本地** ✓）⇒ **该漂移会继续存在** ✓，但**现在日志带两侧摘要，
+下次发生即可诊断** ✓（此前只有标签、事后无法判断差异 ✗）；④ 新增运行时产物 `logs/seed-drift.sig` ✓；`logs/` 51→52 是**上一轮 WIP 探针
+14:45 写入**的 ✓（它 14:52 的运行未新增 ✓，守卫测试的 before/after 计数断言亦佐证 ✓）。
+
+**方法论教训（值得进记忆库 ✓）**：① **部分回退会给出错误的归因** ✓（它先把 `seeds.ts` 单独回退 ⇒ 仍红 ⇒ 一度误判"不是我" ✗✓，
+三处全回退才确证 ✓）；② **未隔离的守卫会惩罚正确的改动** ✗✓（⇒ 守门绿 ≠ 做对了 ✓，**只等于"没碰它覆盖不到的地方"** ✗）；
+③ **用"本地不存在的探针"做隔离断言** ✓✓（比"断言没变化"更有分辨力 ✓）。
+
 ### [2026-10-11] 修 `daily.ts` 的"说谎状态" ✓（`null` 不再显示成"✓ 成功"）+ 诊断报告落盘
 
 **修的是什么** ✗：`custom/features/autopilot/daily.ts` 的 `lastMark()` 旧逻辑是**唯一的说谎点** ✓：

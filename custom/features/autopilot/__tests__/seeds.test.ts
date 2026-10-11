@@ -69,6 +69,11 @@ describe('autopilot 种子任务对账', () => {
     const local = { type: 'cron' as const, schedule: '0 9 * * *', prompt: 'x' };
     expect(diffSeedTask(local, { name: 's', type: 'cron', schedule: '0 9 * * *', prompt: 'x' })).toBeNull();
     expect(diffSeedTask(local, { name: 's', type: 'cron', schedule: '0 10 * * *', prompt: 'x' })).toContain('schedule');
-    expect(diffSeedTask(local, { name: 's', type: 'cron', schedule: '0 9 * * *', prompt: 'y' })).toBe('prompt');
+    // prompt 漂移必须带上两侧短摘要（2026-10-11 修 3：此前只有 'prompt' 标签，事后无法诊断哪个字节不同）
+    const promptDiff = diffSeedTask(local, { name: 's', type: 'cron', schedule: '0 9 * * *', prompt: 'y' });
+    expect(promptDiff).toContain('prompt(本地 ');
+    const digests = promptDiff?.match(/([0-9a-f]{8}\/\d+)/g) ?? [];
+    expect(digests).toHaveLength(2);
+    expect(digests[0]).not.toBe(digests[1]);
   });
 });

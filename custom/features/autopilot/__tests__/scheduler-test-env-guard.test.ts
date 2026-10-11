@@ -4,24 +4,37 @@
  * 背景（本会话实测的两起污染）✗：
  * ① 大批 `tool-stats-daily` 失败日志里，那些进程的 `argv[1]` 正是 **vitest worker** ⇒ 它们确实是被
  *    **测试运行器进程**驱动的（并发触发）；② 更早一次是 `usage.jsonl` 被 e2e 污染（只隔离了一个变量）。
- * ⇒ 结论：**只靠"逐个测试记得隔离"永远会漏**（两次先例）⇒ 必须在**调度器入口**加**测试环境早退** ✓。
+ * ⇒ 结论：**只靠"逐个测试记得隔离"永远会漏**（两次先例）⇒ 必须在调度器入口加**测试环境早退** ✓。
  *
  * 本测试刻意**不设 `PI_MEMORY_DIR`**（指向**真实**调度器目录 ✓），并在**强制有到期任务**的前提下，
  * 真正走一遍 `session_start` 处理器 ⇒ 断言真实调度器目录**毫发无损**（日志数不变、`tasks.json` 不变）。
  * 加早退之前，这条会**失败**（真实目录被驱动）✗ —— 这正是它作为回归守门的价值 ✓。
+ *
+ * 2026-10-11 追加：**种子源也要隔离** ✗✓。此前本测试只隔离了 memory 目录，而种子对账读的是
+ * **agentDir** 的 `scheduled-seeds.json` ⇒ 种子里一旦新增一条本地缺失的**合法**种子，对账就会真的
+ * 把任务写进真实 `tasks.json`，把本测试搞红（守门在惩罚正确改动 ✗）。现在：
+ * ① 产品侧 `index.ts` 里对账同样受"测试环境"早退约束（与 `runDueTasks` 同一策略）；
+ * ② 本测试把 `PI_CODING_AGENT_DIR` 指向临时目录，并放一条**本地不存在的探针种子** ⇒
+ *    **若哪天早退被移除**，这条探针种子就会落到真实 `tasks.json` 上 ⇒ 本测试必红 ✓✓
+ *    （所以检查力不但保住，还多覆盖了种子这条写路径）。
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { isTestEnvironment, isTestRunnerEntryPath } from '../run/runner';
 import { getSchedulerSkipStats } from '../index';
+import { loadSeeds, __resetSeedCache } from '../store/seeds';
 
 type Handler = (event: unknown, ctx?: unknown) => unknown;
 const MEM = process.env.PI_MEMORY_DIR || join(process.cwd(), 'portable', 'memory');
 const SCHED = join(MEM, 'scheduler');
 const LOGS = join(SCHED, 'logs');
 const TASKS = join(SCHED, 'tasks.json');
+
+/** 探针种子名：本地一定不存在（若对账在测试环境里跑了，它就会出现在真实 tasks.json 上 ⇒ 测试红） */
+const PROBE_SEED = '__guard-probe-seed';
 
 /** 宽松假 pi：已知桩 + 未知方法一律 no-op（避免因枚举不完备而假失败） */
 function makeFakePi(): { pi: unknown; hooks: Map<string, Handler[]> } {
@@ -42,6 +55,8 @@ function makeFakePi(): { pi: unknown; hooks: Map<string, Handler[]> } {
 }
 
 let backup: string | null = null;
+let tmpAgent: string | null = null;
+const origAgentDir = process.env.PI_CODING_AGENT_DIR;
 
 /**
  * **前提必须由测试自己造** ✓（否则会"真空通过"：没有到期任务 ⇒ 提前返回 ⇒ 什么都测不到 ✗）。
@@ -49,6 +64,23 @@ let backup: string | null = null;
  * `afterAll` 里**必须恢复并校验** ✓。
  */
 beforeAll(() => {
+  // 种子源隔离：临时 agentDir + 一条本地不存在的探针种子（getAgentDir 每次读 env，无模块级缓存 ✓）
+  tmpAgent = mkdtempSync(join(tmpdir(), 'sched-guard-agent-'));
+  writeFileSync(
+    join(tmpAgent, 'scheduled-seeds.json'),
+    JSON.stringify(
+      {
+        version: 1,
+        tasks: [
+          { name: PROBE_SEED, type: 'cron', schedule: '5 5 * * *', prompt: '探针：不应被注册。' },
+        ],
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  process.env.PI_CODING_AGENT_DIR = tmpAgent;
+
   if (!existsSync(TASKS)) return;
   backup = readFileSync(TASKS, 'utf8');
   const d = JSON.parse(backup) as { tasks?: Array<Record<string, unknown>> };
@@ -68,6 +100,9 @@ beforeAll(() => {
 
 afterAll(() => {
   if (backup !== null) writeFileSync(TASKS, backup); // 无条件恢复 ✓
+  if (origAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+  else process.env.PI_CODING_AGENT_DIR = origAgentDir;
+  if (tmpAgent) rmSync(tmpAgent, { recursive: true, force: true });
 });
 
 const snapshot = (): { logs: number; tasks: string } => ({
@@ -84,6 +119,13 @@ describe('测试环境不得驱动真实调度器', () => {
     expect(isTestRunnerEntryPath('/root/my-pi/node_modules/vitest/dist/workers/forks.js')).toBe(true);
     expect(isTestRunnerEntryPath('/x/node_modules/jest/bin/jest.js')).toBe(true);
     expect(isTestRunnerEntryPath(undefined)).toBe(false);
+  });
+
+  it('种子源已隔离：读到的是临时 agentDir 里的探针种子（隔离失效会当场暴露 ✗）', () => {
+    __resetSeedCache();
+    const names = loadSeeds().map((s) => s.name);
+    expect(names, 'PI_CODING_AGENT_DIR 必须把种子源指向临时目录').toContain(PROBE_SEED);
+    expect(names, '真实种子文件不得被读到（否则隔离失效）').not.toContain('tool-stats-daily');
   });
 
   it('走一遍真实 session_start（真实调度器目录 + 强制到期任务）⇒ 目录毫发无损', async () => {
@@ -121,5 +163,6 @@ describe('测试环境不得驱动真实调度器', () => {
     const after = snapshot();
     expect(after.logs, '真实调度器日志数不得变化（否则说明测试驱动了真实调度器）').toBe(before.logs);
     expect(after.tasks, '真实 tasks.json 不得被改写（nextRun/lastResult 等）').toBe(before.tasks);
+    expect(after.tasks, '探针种子绝不能被注册进真实 tasks.json（种子对账也必须有测试环境早退）').not.toContain(PROBE_SEED);
   }, 60_000);
 });
