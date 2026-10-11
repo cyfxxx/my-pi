@@ -3516,3 +3516,25 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   INDEX 重生成。守门全绿（192 md、gen-doc-index --check 一致、成对括号 0）；未碰代码；无 git 写操作。
 - 未核实：本结论静态可证、未运行 DSH 做行为验证（"无客户端时真能触发"未验证）；DSH 是否有"模型没真执行"的检测；
   仅覆盖 0.2.0-rc.2；未逐包确认 hasUI 之外是否还有别的等效门控（如按客户端连接数）。
+
+### 记忆库治理：清理/合并/写入 12 条经验（2026-10-11）
+
+- 安全优先：先备份（backups/2026-10-11T13-01-15Z，sha256 可复现）→ dry-run（与实际一致）→ 自带工具优先（memory-store.mjs
+  --source manual、memory-lifecycle.mjs --json）→ 仅合并操作手改且每步过 json.load；所有删除都是软删除（deleted:true +
+  supersededBy）⇒ 不回滚也能按 id 找回。
+- 三类改动：15 条软删除（工具基线 2/跨设备 2/playwright 1/daily-health alert 2/长任务 1/knowledge-subscribe 1/Context 面板族 4/
+  重试风暴 1/24h 安全 1）；2 条"结论被今日实测推翻"（tool-stats-daily 超时根因、连续失败根因是 pre-push 守门）标 supersededBy +
+  追加更正说明保留原文；9 个簇合并（规范条目=【合并条目】+逐来源正文，无截断，links 记被并入 id）。
+- 写入 12 条经验（12/12 在库，223–447 字，均按现象→根因→判据/做法）：测试可能把 bug 当契约；argv[1] 不可信（正面白名单）；
+  僵尸 /proc 依然存在；锁 TOCTOU；一次不复现≠不存在；隔离须在 import 前；回执/成功≠真执行；hasUI 门控；别做跨时钟比较；
+  负向主张要交代搜索面；证据强度分级；git 提交纪律。
+- 独立复核（父代理）：总数 116/软删 15 一致；活跃实测 101（它报 98，无害算术错，104+12-15=101）；12 条经验按内容复查 12/12 命中
+  （我起初按精确 id 查 0 命中——库里是完整 UUID，它报的是 8 位前缀 ⇒ 是我的方法错）；★contentHash 是真隐患（它手算值 105/116
+  与 sha256(content) 不一致，store 用 computeContentHash）⇒ 已把 116 处派生字段移除交 store 重算，内容未改、JSON 合法
+  （总 116/活跃 101/软删 15/含 contentHash 0），另存 …-verify 备份。
+- 验证：vitest run custom/features/memory ⇒ 3 files / 56 passed（未改测试；PI_MEMORY_DIR 指向临时目录双保险）。
+- 判断不该动：notes.json 的 _ctx.compacted_at 确有引用（index.ts:355 读/:397 写）⇒ 不能删（我原先怀疑是残留键，被取证否掉）；
+  task.audit-upstream-fixes 保留；剩余 2 个 conflictSuspects 是不同 CVE（相似度 0.95/0.68）不合并；41 条 CVE 订阅条目保留
+  （何时关注过什么的历史轨迹）；version 2 未改、不做批量淘汰。
+- 未完成：检索只做数据级抽查（索引级需 /memory search + 交互会话）；未走 /memory prune|lifecycle|cleanup 命令路径；
+  注册面计数与"DSH 无压缩前干预"结论不在记忆库（正则 0 命中）无需清理。
