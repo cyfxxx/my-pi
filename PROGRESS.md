@@ -3588,3 +3588,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - ★ 协作级问题：docs/CHANGES.jsonl 是自指台账，两个写入者互顶 ⇒ 本轮产生 2 笔推不上去的本地台账提交（8afefec31/fad6b2b69），
   执行者未 force/未 amend/未 --no-verify（按纪律），由父代理直接丢弃。建议守门/pre-push 对自指台账给出"请先 --settle 或允许
   amend 本地未推送提交"的明确指引。另：其 subagent 调用被拒（depth 2 exceeds maxDepth 1）⇒ 改动为自己直接做的。
+
+### 修 daily.ts 说谎状态 + 5 任务失败诊断落盘（2026-10-11）
+
+- 修 lastMark()：旧逻辑"非 failed 即成功"⇒ null 显示"✓ 成功"；新逻辑三分支严格（success/failed/— 未记录）；"—"沿用项目既有习惯
+  （schedule-tool.ts:56）；未改 storage.ts 归一化语义、未改真实数据（sha256 一致 b6ffc4599f04745e）。
+- 它核实后拒绝做两件已被覆盖的事（我多虑）：陈旧可见性现有实现本来就带时间（daily.test.ts:125 断言）；null 不误计失败本来就对。
+- 证据：三分支对比 + not.toContain('✓ 成功') + 反向断言 lyingMark(null)==='✓ 成功' 且新实现必不等于它 + 两种"没成功"被区分 +
+  null 不进失败提示；新测 6/6、既有 daily 18/18、autopilot 26 files/238 passed+3 skipped、全量 tsc rc=0、守门全绿。
+- ★ 顺带发现：daily-health --print 有"种子失配=1（种子任务 每日更新 ClamAV 病毒库 未注册）"⇒ 种子对账没跑，与 hasUI 门控一致。
+- 未验证：未在真实 pi 会话看 /daily 渲染（只跑纯函数层）；index.ts:107 详情字段 null 时不打印（不撒谎但不显式，按最小改动未动）；
+  未跑全量 vitest。
+- ② 5 任务失败诊断报告已落盘 docs/design/SCHEDULER-FAILURES.md（120 行）：50 条失败日志同一签名 = 今天修的 getPiInvocation bug；
+  最后一次失败 01:07:44Z(09:07+0800) 早于修复 d339950a3(10:13:34+0800) 与白名单 e917032d4(16:14:15+0800) ⇒ 修复后无失败日志；
+  ★但"没再失败"与"没再运行"不可区分（hasUI 门控 + lastRun 仍停在 10-10）⇒ 需真跑一次才能闭环；fail/run 高比值来自累计不重置
+  + 同一到期被并发触发约 8 遍（history 4 条落在 76ms 内而单条耗时 553–1713ms）；★唯一"今天仍在发生"的信号 = seed-drift.log
+  从 02:25Z 到 14:03Z 反复报告 tool-stats-daily(prompt) 漂移（成因未核实：同步不收敛或占位符展开被当漂移）。

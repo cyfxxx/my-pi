@@ -85,10 +85,19 @@ function lastDurationMs(t: Task): number | undefined {
   return t.history[t.history.length - 1]?.durationMs;
 }
 
-/** 上次结果标记 */
+/**
+ * 上次结果标记：只有 `success` 才算成功。
+ *
+ * `lastResult` 的 `null` 语义是**从未运行**（见 `store/storage.ts` 的归一化：
+ * 非字符串一律置 `null`），历史数据里也可能出现未知字符串——这些一律显示
+ * 「— 未记录」，**绝不能落进"成功"分支**（否则会显示成"✓ 成功"，
+ * 正是"说谎的状态"这一类缺陷：没跑过却报成功）。
+ * `—` 沿用本项目对"未知值"的既有符号（见 `tools/schedule-tool.ts`）。
+ */
 function lastMark(t: Task): string {
-  if (!t.lastRun) return '未跑过';
-  return t.lastResult === 'failed' ? '✗ 失败' : '✓ 成功';
+  if (t.lastResult === 'success') return '✓ 成功';
+  if (t.lastResult === 'failed') return '✗ 失败';
+  return '— 未记录';
 }
 
 /** 单行摘要：`● 07:30 golden-fast   上次 09-30 19:12 ✓ 成功 1.5m  下次 10-01 07:30  成 9/失 0` */
