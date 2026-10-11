@@ -14,8 +14,42 @@ export function withStoreLock<T>(fn: () => Promise<T> | T): Promise<T> {
 
 let lockPid: string | null = null;
 
+/**
+ * `/proc` 是否**不可用**（非 Linux / 受限容器 / 测试开关）✓。
+ * `PI_LOCK_DISABLE_PROC=1` ⇒ 当作没有 `/proc` ✓（**用于在 Linux 上模拟 Windows/macOS** ✓ 与受限环境 ✓）。
+ * **调用时**读 env ✓（不在导入时缓存 ✗ —— 否则测试无法切换 ✓）。
+ */
+function procUnavailable(): boolean {
+  return process.env.PI_LOCK_DISABLE_PROC === '1';
+}
+
+/**
+ * **可移植**的存活判定 ✓（Windows / macOS / Linux 皆可用）—— 用 `process.kill(pid, 0)` 探测 ✓。
+ * 语义（必须精确 ✓）：
+ *   - `ESRCH` ⇒ 进程**不存在** ⇒ 返回 `false`（**已死是权威信号** ✓，可直接采信 ✓）；
+ *   - `EPERM` ⇒ 进程存在但**无权限发信号** ⇒ 返回 `true`（活着 ✓）；
+ *   - 其它错误 / 异常 ⇒ 返回 `true`（**保守当作活着** ✓ —— 绝不因为读不到就抢占 ✗，那会**双跑** ✓）。
+ * `PI_LOCK_KILL_ERRNO`（**测试/受限环境用** ✓）⇒ 显式模拟 `process.kill` 的 errno ✓：
+ *   `ESRCH` ⇒ 当作已死；其它值 ⇒ 当作"未知错误"⇒ 活着 ✓（用于证明保守性 ✓）。
+ */
+function portablePidAlive(pid: string): boolean {
+  const n = Number(pid);
+  if (!Number.isInteger(n) || n <= 0) return false;
+  const forced = process.env.PI_LOCK_KILL_ERRNO;
+  if (forced) return forced !== 'ESRCH';
+  try {
+    process.kill(n, 0);
+    return true;
+  } catch (e) {
+    const code = typeof e === 'object' && e !== null && 'code' in e ? String(Reflect.get(e, 'code')) : '';
+    if (code === 'ESRCH') return false;
+    return true;
+  }
+}
+
 /** 读 `/proc/<pid>/stat` 的状态字段（第 3 个字段）；读不到 ⇒ 返回 `''`（调用方须**保守**处理 ✓）。 */
 function procState(pid: string): string {
+  if (procUnavailable()) return '';
   try {
     const stat = readFileSync(`/proc/${pid}/stat`, 'utf-8');
     const after = stat.slice(stat.lastIndexOf(')') + 2);
@@ -37,7 +71,14 @@ function procState(pid: string): string {
  */
 export function isPidAlive(pid: string): boolean {
   if (!/^[0-9]+$/.test(pid)) return false;
-  if (!existsSync(`/proc/${pid}`)) return false;
+  // ① **可移植判定**（2026-10-11 新增 ✓）：`process.kill(pid, 0)` ⇒ 三平台通用 ✓。
+  //    为什么必须加：旧实现只看 `/proc` ✗ —— 在 **Windows/macOS** 上 `existsSync('/proc/<pid>')` 恒为 false ✗
+  //    ⇒ 任何存活持锁者都会被判"不活" ⇒ "被持有"分支永不进入 ⇒ 直接走到 unlink ✗✗
+  //    ⇒ **删掉别人活着的锁 ⇒ 同一到期任务并行执行（双跑）** ✗，且**不报错、不告警** ✗✗。
+  //    （所以这个缺陷在非 Linux 上不是"静默降级"，而是"静默双跑" ✗ —— 比降级更严重 ✓。）
+  if (!portablePidAlive(pid)) return false;
+  // ② `/proc` **增强**：能读到时再做**僵尸**精化 ✓（僵尸的 `/proc/<pid>` 依然存在 ⇒ 只看存在会误判为活着 ✗）。
+  //    读不到（非 Linux / 受限容器 / 开关）⇒ **保守当作活着** ✓（宁可让出，也不误抢 ✓）。
   const st = procState(pid);
   if (st === 'Z') return false;
   return true;
@@ -72,6 +113,7 @@ function clockTicksPerSecond(): number | null {
  * `PI_LOCK_DISABLE_PROC_START=1` ⇒ 直接不判定（**用于复现修复前行为** ✓ 与受限环境 ✓）。
  */
 export function procStartWallClockMs(pid: string): number | null {
+  if (procUnavailable()) return null;
   if (process.env.PI_LOCK_DISABLE_PROC_START === '1') return null;
   try {
     const hz = clockTicksPerSecond();
@@ -140,6 +182,7 @@ export function isPidReused(pid: string, lockTs: number): boolean {
  * 读不到 / 解析失败 / 非 Linux / `PI_LOCK_DISABLE_PROC_START=1` ⇒ **返回 null（不判定）** ✓（保守 ✓）。
  */
 export function procStartTicks(pid: string): number | null {
+  if (procUnavailable()) return null;
   if (process.env.PI_LOCK_DISABLE_PROC_START === '1') return null;
   try {
     const raw = readFileSync(`/proc/${pid}/stat`, 'utf-8');

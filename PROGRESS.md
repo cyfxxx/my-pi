@@ -3538,3 +3538,37 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   （何时关注过什么的历史轨迹）；version 2 未改、不做批量淘汰。
 - 未完成：检索只做数据级抽查（索引级需 /memory search + 交互会话）；未走 /memory prune|lifecycle|cleanup 命令路径；
   注册面计数与"DSH 无压缩前干预"结论不在记忆库（正则 0 命中）无需清理。
+
+### 锁加固去 /proc 依赖（可移植存活判定）（2026-10-11）
+
+- ★纠正性质：不是"静默降级"而是"静默双跑"——isPidAlive 原本只看 /proc，非 Linux 上 existsSync 恒 false ⇒ 存活持锁者被判不活
+  ⇒ "被持有"分支永不进入 ⇒ 直接 unlink 别人的锁 ⇒ 同一到期任务并行执行，且不报错不告警。
+- 修法：新增 portablePidAlive（process.kill(pid,0)；ESRCH⇒死、EPERM⇒活、其它⇒保守当作活；错误码用 Reflect.get 无 any）；
+  isPidAlive 改为"可移植判定 + /proc 增强（僵尸精化，读不到则保守当作活着）"，删掉旧的"存在性"判据；
+  开关沿用文件既有风格不新增导出：PI_LOCK_DISABLE_PROC=1 模拟无 /proc、PI_LOCK_KILL_ERRNO 模拟 errno，均调用时读 env；
+  procState/procStartTicks/procStartWallClockMs 一并纳入开关。
+- 证据（新测 8 项全过）：①死 PID 可回收（不依赖 /proc）★②活持有者绝不抢占 ③无 /proc 不判复用（带荒谬小也保守让出）
+  ④保守性（已死但模拟非 ESRCH ⇒ 依旧判活着不抢）④b 开关有效（模拟 ESRCH ⇒ 判死可回收，证明 ④ 非真空）
+  ★反向断言（永远可抢占的假实现必红）⑤/⑤b 默认模式不回归。隔离：PI_MEMORY_DIR 临时目录且 import 前设好；受控子进程按 PID 收掉。
+- 闸门：全量 tsc rc=0；锁相关 4 文件 23 passed|2 skipped；全量 vitest 105 files/1131 passed|6 skipped（+8）；守门全通过。
+- Windows 残留（如实）：无僵尸精化（残留锁等 24h TTL）；无 starttime ⇒ 不判复用（保守让出，假持有最长 24h）；未在真 Windows/macOS 跑过
+  （可移植路径用开关在 Linux 上模拟，process.kill 三平台语义由 Node 文档保证）。
+- 披露：本次提交含 STRUCTURE.md（62→63）与 scripts/README.md（补 memory-lifecycle 行）两处改动，非本轮产物、守门自证一致，一并提交。
+
+### 优化第 1/3 条 + 发现 5 个任务全在失败（2026-10-11）
+
+- ★第 1 条改为"改代码"：任务书判据满足（history 10 条、8 条 @01:07），但清掉会引入新缺陷 —— daily.ts:91 把 null 显示成"✓ 成功"
+  （正是今天修过的"说谎的状态"）、daily.ts:126 当天失败计数会漏、store schema 语义 null="从未运行"（storage.ts:100/131）与现存
+  lastRun 组合自相矛盾 ⇒ 正确修法是改代码（null 渲染"未运行"或失败带时间）。证据强度：代码级论证，非实测（它自己标注）。
+  tasks.json 未改一字（sha256=b6ffc4599f04745e，23466B）。
+- ★发现：5 个启用任务全部 failed，失败率 30–50%（golden-fast 24/44、knowledge-subscribe 14/38、daily-health 20/39、
+  daily-review 11/30、tool-stats-daily 28/50）；可疑失败=0 ⇒ 是真失败不是"没做事"；最后真实运行都停在 2026-10-10 10:06–10:39
+  ⇒ 与 hasUI 门控一致；nextRun 已过但任务逾期=0（阈值 12h）⇒ 建议单独立项查（尤其 golden-fast/daily-health 本该最稳）。
+- 第 3 条交付 scripts/memory-backup-prune.mjs（默认 dry-run，--apply 才删；保留最近 10 份+30 天）；顺带自查出并修掉两个真缺陷：
+  ① 软链绕过守卫（原 resolve 是词法解析，实测真删了 /tmp/evil-XXX/secret）⇒ 信任根判定（根须在 cwd 下且自身非软链，否则 rc=3）
+  + lstat 拒软链 + realpath 双向比较 + 恰好一层；② "最近 N 份"按 mtime 不稳（同秒）⇒ 改名字优先（ISO 时间戳目录名）+ mtime 兜底。
+  证明：--self-check 9 用例全过 + 反证（永远放行会错放 7 个应拒用例）；临时区 keep1/days0 留最新删 2 且 entries.json 完好；
+  根为软链 rc=3 且目标原封不动；真实仓库 dry-run/apply 均"无需删除"（没为了有输出而删）。STRUCTURE 脚本数 62→63、README 加行；
+  守门四项全绿（含脚本数一致 63）。
+- 未验证：真实仓库仅 2 份备份 ⇒ 删除路径只在临时区行使（真实数据未删任何东西）；未跑全量 vitest（只加独立脚本+改两处文档）；
+  "备份目录不存在/为空"真实场景未覆盖；第 1 条故意未执行且依据为代码级论证。
