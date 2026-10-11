@@ -2,6 +2,69 @@
 
 ## 格式
 
+### [2026-10-11] ③-b 复核：**我"DSH 无压缩前干预"的结论被推翻** ✗✓（并发现 DSH 扩展面**至少三类** ★）
+
+**做法（我要求的纪律 ✓）**：先给"**负向主张**"立法 —— **说"DSH 没有 X"必须交代"我搜了什么"** ✓
+（搜索命令原文 + 覆盖范围 + 读过的候选清单 ✓），否则"没找到"**不算证据** ✗。
+
+**★ 结论：原判断不成立** ✗ —— DSH **有**压缩前介入能力，只是**形态不同** ✓：
+DSH 的介入点是**服务级**（**可替换的压缩引擎 `CompactionEngine`**）＋ **失败路径的 waterfall 事件**（`compaction/summary-error` ✓），
+而**不是** pi 那种"**每次压缩前的回调闸门**" ✓。
+
+**正向证据（文件:行号，均实测读过 ✓）**：
+1. `dsh-compaction/lib/types/index.d.ts:102`：`export declare abstract class CompactionEngine extends Service` ✓，
+   注册为 `ctx.compaction`（`:67-70` ✓）；
+2. 同文件 **`:94-95` 契约原文**："**Implementations own trigger policy, retention, and summarization**" ✓；
+   `:100`："Load one implementation per context as `ctx.compaction`" ✓
+   ⇒ **换实现 = 完全控制压缩前的取舍**（**比 pi 的钩子更强** ✓✓）；
+3. 三个抽象方法：`compactIfNeeded`(`:116`)、`compactNow`(`:137`)、`compactRegion`(`:157`) ✓；
+4. **首方就是"换实现"** ✓：`dsh-compaction-basic/lib/types/index.d.ts:24` `class BasicCompactionEngine extends CompactionEngine` ✓；
+5. 另一首方插件在**压缩触发后、摘要前**削减超大工具输出 ✓（`dsh-compaction-tool-result-pruner/README.md`：
+   "Once a compaction trigger qualifies, it replaces over-budget text …" ✓）；
+6. **真·可拦截瀑布** ✓：`'compaction/summary-error'(payload, next): boolean`，**`@mode waterfall`** ✓（`:85`，注解 `:83` ✓）；
+   `:72-77` 允许 "synchronously record a durable change to its selected input" 并 "re-derives and re-prices the selection before retrying" ✓
+   ⇒ **能改被摘要的输入，但仅失败路径** ✗；
+7. **首方真在用它** ✓：`dsh-compaction-image-offload/lib/index.js:146` 的 `ctx.on("compaction/summary-error", …)` ✓；
+8. 策略可配置 ✓（`dsh-compaction-basic/lib/types/config.d.ts:22/29/42` ✓）；手动 `/compact` ✓（`dsh-command-compact/README.md` ✓）；
+9. `compaction/start|summary|end|prune` **确为 `SessionEventMap`** ✓（`dsh-compaction/lib/types/types.d.ts:15`，条目 `:21/:35/:73/:88` ✓）
+   ⇒ **这部分原判断成立** ✓（日志类型、提交后不可拦截 ✓）。
+
+**负向主张的搜索面（它按标准执行 ✓✓）**：覆盖 npx 目录下 **289 个包** ✓；
+`ls $DSH | grep -iE 'compact|context|session|agent|summar|memory|prompt|hook'` ⇒ **5 个压缩相关包全部打开读过** ✓
+（`dsh-compaction`、`-basic`、`-tool-result-pruner`、`-image-offload`、`dsh-command-compact` ✓）；
+`grep -rnE "^\s*'compaction[^']*'" $DSH --include=*.d.ts` ⇒ **仅 5 行**（4 个日志类型 + 1 个真事件 ✓）⇒
+**没有 `compaction/prepare` / `compaction/before-*` 形态的 cordis 事件** ✓；
+`dsh-compaction/lib/types/` 下 **6 个类型文件全读**（含 `index.d.ts` 160 行全文 ✓）⇒ **介入点在服务、不在事件** ✓；
+`grep -rln "CompactionEngine"` ⇒ 契约 + 实现 + 引用三个包 ✓；`grep -rn "on('compaction|on(\"compaction"` ⇒ 只有 image-offload 的
+`summary-error` 一处 ✓。
+
+**★ 根因（它自我更正 ✓✓）**：原判断把"**只扫了事件**"当成"**不存在**" ✗ ——
+**DSH 的扩展面至少三类**：**cordis 事件（105）** ✓、**会话日志类型（59，仅供观察）** ✓、
+**服务替换（`ctx.compaction` 这类，原清单完全没扫 ✗）** ✓✓。
+
+**更正后的判定（对清单的影响 ✓）**：第 3 节第 13 行**档位仍是 ②需改语义** ✓（**不是①**：无"每次压缩前逐次回调"的直接对应 ✓；
+**不是③**：能力存在 ✓），但**理由改写**为"**闸门在服务层**" ✓；**三档计数不变**（①11/②7/③0 ✓；调用点加权 23/29、总数 53 ✓）；
+**§3.2 第 2 类风险"性质降级"** ✓：从"**静默缺失**（不报错、行为悄悄变）"✗ → "**需要一次架构选择**" ✓ ——
+**只有当移植时不知道有这条服务级介入点才会退化** ✓。
+
+**顺带核实（第 4 节第 3 条 `thinking_level_select` ✓）**：负向搜索面 `grep -rniE "thinking" $DSH --include=*.d.ts` ⇒
+命中全是 UI 文案 / **适配器配置**（`dsh-llm-deepseek/lib/types/config.d.ts:11-13`：`thinking: enabled|disabled|undefined`，
+注释 "Default thinking effort (default `high`); `off` disables thinking per request" ✓）/ 分析事件 `thinking_level_switch` ✓ /
+思考重放元数据 ✓ ⇒ **无思考级别选择的生命周期钩子或会话事件** ✓ ⇒ **判断维持 ②** ✓；
+**仍未核实** `ModelSelection`（`dsh-api-session-controller/lib/types/types.d.ts:35` ✓）字段是否携带级别 ✗。
+
+**文档改动（只改它 + INDEX ✓）**：新增**第 6 节**（6.1 正向证据表 / 6.2 负向搜索证据 / 6.3 更正判定 / 6.4 thinking / 6.5 自我更正 ✓）；
+第 0 节加**复核横幅** ✓；**第 3 节第 13 行与 §3.2 第 2 类就地更正**（**原文保留作对照、用删除线标出** ✓，本会话约定 ✓）；
+第 4 节第 2 条**划掉**并写明残留缺口 ✓、第 3 条补新证据 ✓；第 1 节补 pi 侧 `session_before_compact` 语义原文
+（`vendor/pi/…/types.ts:763`/`:798`、`agent-session.ts:2778` ✓）；**§2.4 新增"第三类扩展点：服务替换"** ✓✓。
+**守门** ✓：`check-conventions.sh` 全绿 ✓、`check-doc-links.mjs` 一致（**192 md** ✓）、本文件内无成对链接括号 ✓；
+**未碰任何代码** ✓；**无 git 写操作** ✓。
+
+**仍未核实的缺口（✗，7 条）**：① **真实 profile 里"替换引擎"是否是官方推荐路径**（只读到契约句，**未见迁移指南/示例插件** ✗）；
+② **除 `summary-error` 外是否存在"每次压缩前必然触发"的服务级回调**（只看到三个抽象方法，**未逐个追调用者** ✗）；
+③ `ModelSelection` 是否含思考级别 ✗；④ `session/event` 提交后时序是否晚到无法决策 ✗；⑤ `@mode` 注解未回源码验证 dispatcher ✗；
+⑥ 只扫已安装 `0.2.0-rc.2` 的 `lib/` ✓；⑦ **全程静态，无行为验证** ✓。
+
 ### [2026-10-11] ③ hook → DSH 事件**三档映射完成** ✓（并**修正我早先一组数字** ✗✓ + 挖出"DSH 有两套事件面" ★）
 
 **交付物**：`docs/design/DSH-HOOK-MAPPING.md`（206 行 ✓）+ `docs/INDEX.md` 随之更新 ✓（**其余禁区未碰** ✓、**无 git 写操作** ✓；守门全绿 ✓、链接 192 md ✓、md 内无成对 `](` ✓）。

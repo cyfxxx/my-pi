@@ -3446,3 +3446,28 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 未核实 7 条（必读）：autopilot 21 点的 ctx 能力未核（hasUI 门控对应什么）；★最可能被推翻：session_before_compact 的压缩前干预
   是否真缺失（只扫已声明事件，未查 dsh-compaction 别名/非事件介入点）；thinking_level_select 无对应事件但 model/selection 负载未核；
   session/event 是提交后流、是否晚到无法决策未核；@mode 是文档注解未回源码确认；只扫已安装 lib（0.2.0-rc.2 快照）；未运行任何东西。
+
+### ③-b 复核：原结论被推翻 —— DSH 有服务级压缩前介入（2026-10-11）
+
+- 先给"负向主张"立法：说"DSH 没有 X"必须交代"我搜了什么"（命令原文 + 覆盖范围 + 读过的候选清单），否则"没找到"不算证据。
+- ★ 结论：原判断不成立 —— DSH 有压缩前介入能力，形态不同：服务级可替换压缩引擎 CompactionEngine（ctx.compaction）+
+  失败路径 waterfall 事件 compaction/summary-error，而非 pi 的"每次压缩前回调闸门"。
+- 正向证据：dsh-compaction/lib/types/index.d.ts:102（abstract class CompactionEngine extends Service；:67-70 注册为 ctx.compaction）；
+  :94-95 契约"Implementations own trigger policy, retention, and summarization"；:100 "Load one implementation per context as
+  ctx.compaction" ⇒ 换实现=完全控制压缩前取舍（强于 pi 钩子）；三抽象方法 compactIfNeeded:116/compactNow:137/compactRegion:157；
+  首方 dsh-compaction-basic :24 就是换实现；dsh-compaction-tool-result-pruner 在触发后摘要前削减超大工具输出；
+  'compaction/summary-error' @mode waterfall（:85，注解 :83），:72-77 允许同步记录对所选输入的改变并重新推导重定价后重试 ⇒ 可改被摘要
+  输入但仅失败路径；首方 dsh-compaction-image-offload/lib/index.js:146 真在用；策略可配置 config.d.ts:22/29/42；手动 /compact；
+  compaction/start|summary|end|prune 确为 SessionEventMap（types.d.ts:15，:21/:35/:73/:88）⇒ 这部分原判断成立。
+- 负向搜索面：覆盖 289 个包；5 个压缩相关包全部读过；grep 'compaction*' --include=*.d.ts 仅 5 行（4 日志类型+1 真事件）⇒ 无
+  compaction/prepare 或 before-* 形态事件；dsh-compaction/lib/types 下 6 个类型文件全读 ⇒ 介入点在服务不在事件。
+- ★根因（自我更正）：把"只扫了事件"当成"不存在"——DSH 扩展面至少三类：cordis 事件(105)、会话日志类型(59 仅供观察)、服务替换
+  （ctx.compaction 这类，原清单完全没扫）。
+- 更正后：第 3 节第 13 行档位仍 ②（无逐次回调直接对应，但能力存在），理由改写为"闸门在服务层"；三档计数不变（①11/②7/③0；
+  调用点 23/29，共 53）；§3.2 第 2 类风险性质降级：从"静默缺失"→"需要一次架构选择"（只有不知道该服务级介入点才会退化）。
+- 顺带：thinking_level_select 维持 ②（负向面：thinking 命中全是 UI 文案/适配器配置 dsh-llm-deepseek config.d.ts:11-13/分析事件/
+  重放元数据，无生命周期钩子或会话事件）；ModelSelection 是否含级别仍未核。
+- 文档：新增第 6 节（正向证据/负向搜索/更正判定/thinking/自我更正）+ §0 复核横幅 + §3 就地更正（原文删除线保留）+ §4 划掉第 2 条
+  并写残留缺口 + §1 补 pi 语义原文 + §2.4 新增"第三类扩展点：服务替换"；守门全绿（192 md）、未碰代码、无 git 写操作。
+- 仍未核实 7 条：替换引擎是否官方推荐路径（未见迁移指南/示例）；除 summary-error 外是否有"每次压缩前必然触发"的服务级回调
+  （未逐个追调用者）；ModelSelection 是否含思考级别；session/event 提交后时序；@mode 未回源码验证；只扫 0.2.0-rc.2 的 lib；全程静态无行为验证。
