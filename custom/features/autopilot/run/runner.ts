@@ -46,6 +46,29 @@ export function isTestEnvironment(): boolean {
   return !!process.env.VITEST || isTestRunnerEntryPath(process.argv[1]);
 }
 
+/**
+ * `argv[1]` 是否指向**合法的 pi CLI 入口**（**正面要求** ✓）。
+ *
+ * 背景（2026-10-11 发现 ✗）：先前只做"测试运行器**黑名单**"不够 —— 经 `tsx` 跑一个仓库内脚本时，
+ * `argv[1]` **既不是 pi CLI 也不是 vitest** ⇒ 子进程仍被拼成 `node <脚本> --mode json …` ✗
+ * （实测报 `Cannot find module '…/autopilot/index'` ✓）。
+ * ⇒ 改成**正面要求**：只认下面两类**有据可查**的合法形态 ✓，其余一律**回退 `'pi'`** ✓
+ * （**宁可回退，也不把任意脚本当 pi 启动** ✗；且**不放宽到"任何 .js/.ts 都算合法"** ✗ —— 那就退回原缺陷了）。
+ *
+ * 合法形态（逐条有据 ✓）：
+ *   ① basename = `pi` —— PATH 上的启动器（实测 `command -v pi` ⇒ `…/pi-node/<ver>/bin/pi` ✓）；
+ *   ② basename ∈ {`cli.js`, `cli.mjs`, `cli.ts`} **且** 路径含 `/packages/coding-agent/`
+ *      —— 打包/源码构建的 CLI 入口（实测 `scripts/pi-supervisor.sh:23` 用
+ *      `$ROOT/vendor/pi/packages/coding-agent/dist/cli.js` ✓）。
+ */
+export function isPiCliEntryPath(currentScript: string | undefined): boolean {
+  if (!currentScript) return false;
+  const base = path.basename(currentScript).toLowerCase();
+  if (base === 'pi' || base === 'pi.exe') return true;
+  const isCliName = base === 'cli.js' || base === 'cli.mjs' || base === 'cli.ts';
+  return isCliName && currentScript.split(path.sep).join('/').includes('/packages/coding-agent/');
+}
+
 export function getPiInvocation(args: string[]): { command: string; args: string[] } {
   const currentScript = process.argv[1];
   const isBunVirtual = currentScript?.startsWith('/$bunfs/root/');
@@ -55,8 +78,11 @@ export function getPiInvocation(args: string[]): { command: string; args: string
   // `node <forks.js> --mode json …` ⇒ 抛 `Expected worker to be run in node:child_process` ⇒ 任务必然失败。
   // 判据（**纯附加、最小** ✓）：入口位于测试运行器目录（vitest/jest/mocha）⇒ **回退到 `'pi'`** ✓；
   // 其余路径行为**完全不变** ✓。
+  // 正面要求（2026-10-11 加固 ✓）：**必须**是合法 pi CLI 入口才走 `execPath + script` ✓；
+  // 黑名单（测试运行器）**保留**作为双保险 ✓（两道判据都过才启用该路径 ✓）。
+  const isPiCliEntry = isPiCliEntryPath(currentScript);
   const isTestRunnerEntry = isTestRunnerEntryPath(currentScript);
-  if (currentScript && !isBunVirtual && !isTestRunnerEntry && fs.existsSync(currentScript)) {
+  if (currentScript && !isBunVirtual && isPiCliEntry && !isTestRunnerEntry && fs.existsSync(currentScript)) {
     return { command: process.execPath, args: [currentScript, ...args] };
   }
   const execName = path.basename(process.execPath).toLowerCase();

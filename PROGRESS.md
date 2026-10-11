@@ -3370,3 +3370,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   tsc rc=0；守门全绿；真实状态未碰（无锁、logs 51）；无 git 写操作。
 - 未验证：未端到端真跑（不烧 143 秒）；判据可能漏形态（不漏报即不误报）；thinking 块内标记看不到；143 秒 stdout 不可回溯。
 - 待做：daily-health 加只读统计"lastResult=failed 且 output 含 suspect: 的任务数"。
+
+### ①-g 可疑失败可见 + ①-h 入口正面白名单（2026-10-11）
+
+- ①-g：daily-health 加 checkSuspectFailures（只读、解析失败不抛、同既有约定）；汇总加"失败=<n> 可疑失败=<n>"分开报
+  + 细节行（上游模型可能不支持工具调用）；字段路径先查实（lastResult/lastOutput/history[]，lastOutput 优先回退最新 history）。
+  四证据：failed+suspect 计入 ⇒ 去掉 suspect 后可疑=0（确实分开）⇒ success 不计 ⇒ 真实状态未碰（logs 51、无锁、nextRun 原值）。
+- ①-h：getPiInvocation 改正面白名单（合法形态：basename=pi；cli.js|cli.mjs|cli.ts 且路径含 /packages/coding-agent/），
+  保留测试运行器黑名单作双保险；未放宽到任意 .js/.ts。三组证据：真实 CLI true；tsx/临时脚本 false（旧黑名单会放行）；
+  vitest worker 仍 false；另加反面 /tmp/some/cli.js 等 false。测试扩到 6 项含反向断言。
+- 闸门：全量 tsc rc=0；autopilot+mode 28 files/288 passed；check-conventions 全绿；3 文件；无 git 写操作。
+- 未验证：①-g 用合成 tasks.json（未等真实 suspect 失败落盘）；①-h 只证纯函数层（未真起 tsx 子进程验证回退）；
+  合法形态只列 2 类（第三类会安全回退到 pi）；未跑全量 vitest（父代理补跑）。

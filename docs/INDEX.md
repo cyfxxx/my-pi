@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（207 条）
+## 决策台账（208 条）
 
+- `DECISIONS.md` · [2026-10-11] ①-g 可疑失败可见 + ①-h 入口"正面白名单" ✓（两项收尾） · **①-g：`daily-health` 增加"可疑失败"只读统计** ✓（仅改 `scripts/daily-health.mjs` ✓）： · 数字: 3 个
 - `DECISIONS.md` · [2026-10-11] 堵住"定时任务报成功、实际什么都没做"的静默失效 ✓（并解释了"那 143 秒为何无痕迹"✗✓） · **检测点（文件:行号 ✓）**：`custom/features/autopilot/run/runner.ts` 的 `finish()`（约 `:112-125`），旧逻辑逐字： · 数字: 143 秒 / 2 次
 - `DECISIONS.md` · [2026-10-11] ①e 闭环 ✓✓ + **★ 调度器只在交互会话里跑**（附带挖出"报成功却什么都没做"的隐患 ✗✗） · **① "生产照常"已闭环** ✓✓（非 VITEST 下**端到端**）：临时探针（**已删、零痕迹** ✓）在**不设 `VITEST`** 下调用真实 · 数字: 143 秒
 - `DECISIONS.md` · [2026-10-11] 让陈旧锁**可见**：`daily-health` 增加调度器健康只读检查 ✓（补上"静默"这个缺口） · **背景**：上一轮审计指出 —— **陈旧锁是"静默"的** ✗✗（`state-audit.mjs`/`lib-state-audit.mjs`/`daily-health.mjs` 对 · 数字: 0 次 / 20 分钟 / 3 天
@@ -215,7 +216,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（205 条）
+## 进度记录（206 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -422,6 +423,7 @@
 - `PROGRESS.md` · 让陈旧锁可见：daily-health 只读检查（2026-10-11） · - 补上"陈旧锁静默"的缺口：daily-health.mjs 加 checkSchedulerLock（四态 none/held/stale/stalled）+ · 数字: 20 分钟
 - `PROGRESS.md` · ①e 闭环 + 调度器只在交互会话里跑（2026-10-11） · - 已闭环：非 VITEST 下探针（hasUI:true）⇒ 读到到期任务→取锁释放（无残留）→ 起真实 pi 子进程（73–143s）→
 - `PROGRESS.md` · 堵住"报成功却什么都没做"的静默失效（2026-10-11） · - 检测点：runner.ts finish()（约 :112-125）旧逻辑只在失败时落诊断日志 ⇒ 退出码 0 + 标记泄漏 = 报 success 且无痕迹 · 数字: 143 秒 / 2 次
+- `PROGRESS.md` · ①-g 可疑失败可见 + ①-h 入口正面白名单（2026-10-11） · - ①-g：daily-health 加 checkSuspectFailures（只读、解析失败不抛、同既有约定）；汇总加"失败=<n> 可疑失败=<n>"分开报
 
 ## 缺陷回放（26 条）
 

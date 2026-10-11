@@ -2,6 +2,39 @@
 
 ## 格式
 
+### [2026-10-11] ①-g 可疑失败可见 + ①-h 入口"正面白名单" ✓（两项收尾）
+
+**①-g：`daily-health` 增加"可疑失败"只读统计** ✓（仅改 `scripts/daily-health.mjs` ✓）：
+- 新增 `checkSuspectFailures()` ✓（只读 ✓、解析失败**不抛出** ✓、与既有 `checkOverdueTasks` 同约定 ✓）；
+- 汇总行加 **`失败=<n> 可疑失败=<n>`**（**分开报** ✓ —— 普通失败可能是正常业务失败 ✓；**可疑失败意味着"可能什么都没做"** ✗）
+  + 命中时打细节行（"…疑似什么都没做（output 含 `suspect:`）…**上游模型可能不支持工具调用**" ✓）；
+- **字段路径先查实、未猜** ✓：实测 `tasks.json` 键 = `lastResult` / **`lastOutput`** /
+  `history[].{durationMs,output,result,time}` ✓（`lastOutput` 优先，回退最新 history 条 ✓）。
+- **四份证据**（隔离：`PI_HEALTH_TASKS_FILE` 指向 /tmp ✓、`--print` 不写盘 ✓）：
+  ① failed **且**含 `suspect:` ⇒ `失败=2 可疑失败=1` ✓；② **把 `suspect:` 去掉再跑 ⇒ `可疑失败=0`** ✓✓
+  （**证明"普通失败"与"可疑失败"确实分开、不混为一谈** ✓）；③ `success` 任务**两个计数都不含它** ✓；
+  ④ 真实状态**一次未碰** ✓（`scheduler/logs` **51** ✓、**无锁** ✓、`nextRun` 原值 ✓）。
+
+**①-h：`getPiInvocation` 改"正面要求入口是 pi CLI"** ✓（`run/runner.ts` ✓）：
+- **合法形态清单（逐条有据 ✓）**：① **basename = `pi`** —— PATH 上的启动器 ✓（实测 `command -v pi` ✓）；
+  ② basename ∈ {`cli.js`,`cli.mjs`,`cli.ts`} **且路径含 `/packages/coding-agent/`** ✓ —— 打包/源码构建入口 ✓
+  （证据：`scripts/pi-supervisor.sh:23` 用 `$ROOT/vendor/pi/packages/coding-agent/dist/cli.js` ✓）；
+- 新增导出 `isPiCliEntryPath()` ✓ 并**以它为主判据** ✓，**保留**测试运行器黑名单作**双保险** ✓；
+  **没有**放宽到"任意 `.js/.ts`" ✗（那就是退回原缺陷 ✓）。
+- **三组改前/改后证据**（纯函数层；`pi-invocation-guard.test.ts` 扩到 **6 项全过** ✓，含**反向断言**
+  "永远返回 true"的假实现必然在用例上失败 ✓）：(a) **真实 pi CLI 入口** ⇒ `true` ✓（`vendor/…/dist/cli.js` ✓、
+  `src/cli.ts` ✓、`…/bin/pi` ✓）；(b) **tsx/临时脚本**（新失败场景 ✗：旧黑名单在此**放行**）⇒ 改后 **`false`** ✓
+  （`/tmp/sched-probe/due.mts` ✓、`…/__probe__.mts` ✓）；(c) **vitest worker** ⇒ 仍 `false` ✓（**未回归** ✓）；
+  另加反面：`/tmp/some/cli.js`、`/tmp/some/index.ts` ⇒ `false` ✓。
+
+**闸门（它实跑 ✓ + 我复核 ✓）**：全量 `tsc -p custom/` **rc=0** ✓；autopilot+mode ⇒ **28 files / 288 passed | 1 skipped** ✓；
+`check-conventions.sh` 全绿 ✓；改动 **3 个文件**（全在授权内 ✓）；**无任何 git 写操作** ✓、**未用 `pkill -f`** ✓、**未改运行时状态** ✓。
+
+**未验证（如实 ✗）**：① **①-g 用合成 `tasks.json`** ✗（形状与我实测的真实结构一致 ✓，但**没有**等一次真实的带 `suspect:` 的失败落盘后再看健康输出 ✓）；
+② **①-h 只证到纯函数层** ✗（**没有**真起一个 `tsx` 子进程验证它确实回退到 `'pi'` ✓；改前会拼错已有 `Cannot find module` 证据 ✓）；
+③ **合法形态只列 2 类** ✗ ⇒ 将来出现第三类合法入口时会**回退到 `'pi'`** ✓（**安全**，但走 PATH 上的 pi ✓）；
+④ 它**未跑全量 vitest** ✓（按约束与内存限制 ✓，由我补跑 ✓）。
+
 ### [2026-10-11] 堵住"定时任务报成功、实际什么都没做"的静默失效 ✓（并解释了"那 143 秒为何无痕迹"✗✓）
 
 **检测点（文件:行号 ✓）**：`custom/features/autopilot/run/runner.ts` 的 `finish()`（约 `:112-125`），旧逻辑逐字：

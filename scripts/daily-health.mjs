@@ -151,6 +151,47 @@ function checkOverdueTasks() {
   }
 }
 
+/**
+ * 只读统计：**"可疑失败"** —— `lastResult === 'failed'` **且**该次运行的 output 含 `suspect:` ✓
+ * （2026-10-11 新增）：autopilot 现在会把"**工具调用标记泄漏**"判为 failed 并把原因前置进 output ✓
+ * ⇒ 这类失败意味着"**报失败，但很可能什么都没做**" ✗（上游模型可能不支持工具调用 ✓）。
+ * 口径：**与普通失败分开报** ✓ —— 普通失败可能是正常业务失败 ✓，可疑失败是"疑似空跑" ✗。
+ * 字段路径**按实际结构**（`tasks.json` 实测键：`lastResult` / **`lastOutput`** / `history[].output` ✓）；
+ * **只读**、不改状态 ✓；解析失败**不抛出** ✓（与既有函数同约定 ✓）。
+ */
+function checkSuspectFailures() {
+  const f = process.env.PI_HEALTH_TASKS_FILE || join(MEM, 'scheduler', 'tasks.json');
+  if (!existsSync(f)) return { failed: 0, suspect: 0, detail: '' };
+  try {
+    const j = JSON.parse(readFileSync(f, 'utf-8'));
+    const list = Array.isArray(j) ? j : (j.tasks ?? []);
+    let failed = 0;
+    const suspectNames = [];
+    for (const t of list) {
+      if (!t || t.lastResult !== 'failed') continue;
+      failed++;
+      const out =
+        typeof t.lastOutput === 'string' && t.lastOutput
+          ? t.lastOutput
+          : Array.isArray(t.history) && t.history.length
+            ? String(t.history[t.history.length - 1]?.output ?? '')
+            : '';
+      if (out.includes('suspect:')) suspectNames.push(t.name);
+    }
+    return {
+      failed,
+      suspect: suspectNames.length,
+      detail: suspectNames.length
+        ? `${suspectNames.length} 个任务"failed 且疑似什么都没做"（output 含 suspect:）：` +
+          suspectNames.slice(0, 3).join('、') +
+          ' ⇒ 上游模型可能不支持工具调用'
+        : '',
+    };
+  } catch (e) {
+    return { failed: 0, suspect: 0, detail: `tasks.json 解析失败：${e && e.message}` };
+  }
+}
+
 /** 父级在其后的多少个助手回合内再改同一文件算"返工" */
 const REWORK_TURNS = Number(process.env.PI_HEALTH_REWORK_TURNS) || 5;
 /** 与 features/subagent/core/usage-log.ts 的 WRITE_TOOLS 保持同口径（catch-all 不算） */
@@ -742,8 +783,9 @@ const termStr = `评审到界=${reviewCapped} 环境阻塞=${envBlocked}`;
 
 const lockCheck = checkSchedulerLock();
 const overdue = checkOverdueTasks();
+const suspect = checkSuspectFailures();
 const lockStatus = lockCheck.status === 'held' ? '正常' : lockCheck.status;
-const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} 父子时间线=${timelineStr} ${termStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 调度锁=${lockStatus} 任务逾期=${overdue.count} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
+const line = `${stamp} 命中=${hitStr} 未命中/轮=${unStr} 输出占比=${outPct}% 前端变更=${frontChanges.length} 加固块缺失=${appendMissing.length} 首段分叉=${headBreaks.length} 压缩重放=${headBreaksCompacted.length} 压缩回本=${paybackStr} 子代理池=${poolStr} 子代理返工=${reworkStr} 父子时间线=${timelineStr} ${termStr} 中后段分叉=${midBreaks.length} 冷启动=${coldStr}${sizeStr} 每步bash=${bashStepStr} 单命令=${singleCmdStr} 轮数=${records.length} 工具调用=${usage.length} 存储=${sizeMB.toFixed(2)}MB 条目=${entryCount} 种子失配=${seedDrift} 调度锁=${lockStatus} 任务逾期=${overdue.count} 失败=${suspect.failed} 可疑失败=${suspect.suspect} 状态异常=${stateErrors.length} 状态警告=${stateWarnings} 重启=${restartCount} 崩溃恢复=${recoveryCount} 结论=${verdict}`;
 
 console.log(line);
 for (const n of notes) console.log(`  └ 已知: ${n}`);
@@ -751,6 +793,7 @@ if (lockCheck.status === 'stale' || lockCheck.status === 'stalled' || lockCheck.
   console.log(`  └ 调度锁[${lockCheck.status}]: ${lockCheck.detail}`);
 }
 if (overdue.count > 0) console.log(`  └ 任务逾期: ${overdue.detail}`);
+if (suspect.suspect > 0) console.log(`  └ 可疑失败: ${suspect.detail}`);
 if ((lockCheck.status === 'stale' || lockCheck.status === 'stalled') && overdue.count > 0) {
   console.log('  └ 组合判定: 锁被陈旧/疑似卡死持有 + 任务逾期 ⇒ 调度器很可能已停摆（先看锁的持有者，再决定是否手动清锁）');
 }
