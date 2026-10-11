@@ -2,6 +2,41 @@
 
 ## 格式
 
+### [2026-10-11] ② 会话切换实测：**可行性与触发方式探明，活体实验未完成** ✗（含"代码推断"与"观测"的严格区分 ✓）
+
+**结果（如实 ✗）**：**三个问题都只有代码级证据、均标为推断** ✗，活体实验未做完 ✗。
+- **可行性** ✓：`node-pty` **不存在** ✗，但 **`tmux 3.4` + `script`** 可用 ✓ ⇒ pty 驱动可行 ✓（既有范例 `test-scenario-*.mjs` ✓）；内存 1.82 GB ⇒ 一次一会话 ✓。
+- **触发方式** ✓（**从 UI 文案里找到，未猜** ✓）：存在 `Start a new session` / `Resume a session` / `Resume Session (All)` /
+  `Resume Session (Current Folder)` / `Resume a different session` / `Cloned to new session` / `Forked to new session` ✓；
+  **精确斜杠命令名未取到** ✗（两次 grep 未命中 ⇒ 下一步在 pty 里 capture 面板即可确定 ✓）。
+- **Q1 在哪一步被打断**：**无观测** ✗；代码路径为**进程内会话替换**（`agent-session-runtime.ts:196/:226` ✓）⇒
+  向**旧 runner** 发 `session_shutdown`（`:172`/`:406`；`agent-session.ts:3649` `reason:"reload"` ✓）⇒ 核心明确警告
+  **`ctx` 立即 stale**（`agent-session.ts:1391` ✓）⇒ **旧回合无法继续**（**推断** ✗）。
+- **Q2 三个处理器**：注册点确认 ✓（`subagent/index.ts:220`、`tmux/index.ts:323`、`plan-mode/index.ts:388` ✓）；
+  **池**：我们的修复**跳过 `leased`** ✓ + `closing`"交还即销毁" ✓ ⇒ **在跑的子代理不会被切换杀掉** ✓✓
+  —— **代码 + 单测双证据**（回归测试改前红/改后绿 ✓），**但未在真实切换中观测** ✗。
+- **Q3 结果去哪**：**无观测** ✗；按代码路径（**推断** ✗）转发器活在**旧会话 runner** 里 ⇒ 结果投回 **stale 的旧 ctx** ✗
+  ⇒ **新会话很可能看不到** ✗（inbox/日志仍在运行时目录 ✓）。
+
+**对 5 条优化方案的判定（有依据 ✓）**：方案 4（逐个审 `session_shutdown` 处理器）**有证据支持** ✓（池已证明良性、tmux/plan-mode 仍待审 ✓）；
+方案 2（持久化+接管）**有证据支持** ✓（正是 Q3 的缺口 ✓）；方案 1（长活交给会话无关执行体）**机制已存在** ✓（tmux/定时任务/池 ✓）⇒ 成本低 ✓；
+方案 3（协作式等待）需**改 pi 核心** ⚠（走 `patches/` ✓）；方案 5 的**前提已部分成立** ✓（池是**进程级单例** `rpc-pool.ts:370` ✓ ⇒ 已能跨会话存活 ✓），
+缺"**新会话接管**"⇒ 与方案 2 合流 ✓。**被证据排除的：无** ✗。
+
+**★ 顺带发现的实时故障（已定性到方向 ✓，建议单独立项）**：定时任务 **`tool-stats-daily` 反复 exit 1** ✗。
+- **日志证据**：`Error: Expected worker to be run in node:child_process`（`node_modules/vitest/dist/chunks/init-forks…js:3`）
+  + `## stdout (pi JSONL) (empty)` ✓；
+- **我直接复现了脚本本身** ✓：`node scripts/tool-stats-sync.mjs --daily` ⇒ **rc=0**、"聚合已写 …/stats/tool-usage.json" ✓
+  ⇒ **失败不在脚本** ✗✓ ⇒ 方向指向任务的 **`git add/commit/push` 环节**（**钩子里的 vitest 调用被当成"直接执行 worker 块"** ✗，与日志完全吻合 ✓）。
+  ⇒ **结论**：这是**钩子/调度环境**的问题，不是统计脚本的问题 ✓；**修法方向**：让钩子里的 vitest **经 vitest 运行器**调用（而不是直接把 worker 入口当脚本跑 ✗）。**该故障与"换会话"无关 ✓，但它是真实健康问题 ✓。**
+
+**清理纪律（这次做得很好 ✓✓）**：子代理**绝未用 `pkill -f`** ✗（本会话教训 ✓），只按**会话名**关掉了自己的 `probe` ✓；
+发现 `0/21/30` 等会话**归属无法自证 ⇒ 一个都没动** ✓✗ 并**上报给我** ✓。
+**我用证据把归属定死了** ✓：它们的**父进程都是 5142** = `tmux new-session -d -s probe … MY_PI_NO_SUPERVISOR=1 ./my-pi.sh`
+⇔ **正是那个探针** ✓ ⇒ 确认为遗留 ✓ ⇒ **按会话名清理** ✓（不按模式 ✗）并**逐一核对 PID 已退出** ✓。
+
+**未验证（如实 ✗）**：Q1–Q3 均为**代码推断而非观测** ✗；精确的"新建会话"命令名 ✗；`--no-session`（会话持久化路径）未覆盖 ✓。
+
 ### [2026-10-11] ① 覆盖验证：**supervisor 路径 + 技能启用下，中途注入仍生效** ✓✓（三项断言全成立）
 
 **为什么要补这次**：此前"中途注入生效"只在"**`MY_PI_NO_SUPERVISOR=1` + `--no-skills`**"这一种组合下证过 ✗
