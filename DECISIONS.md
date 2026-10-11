@@ -2,6 +2,66 @@
 
 ## 格式
 
+### [2026-10-11] ③-c 缺口②answered ✓ + **服务替换清单 132 项**（"换引擎不是唯一途径" ✗✓）
+
+**① 缺口②有答案：存在"每次压缩前必然触发"的服务级点** ✓ —— **`ctx.toolResultPruner`** ✓
+（`dsh-compaction-basic/lib/index.js:926`：`const prune = this.ctx.get("toolResultPruner");` ⇒ **两条触发路径都在摘要之前调用它** ✓：
+`context-overflow` 在**选范围前** ✓、`pressure` 在**过阈值后** ✓）；它**是可替换服务** ✓（`ToolResultPruner extends Service`，
+注册名 `toolResultPruner` ✓ @ `dsh-compaction-tool-result-pruner/lib/types/index.d.ts:15`/`:19` ✓；实现侧
+`super(ctx,"toolResultPruner")` @ `lib/index.js:71` ✓）。
+**调用者清单（**无别的** ✓）**：`compactIfNeeded` 仅 `dsh-compaction-basic/lib/index.js:841`（`agent/pre-step` @ `:839`，pressure ✓）
+与 `:872`（`agent/request-error` @ `:861`，context-overflow ✓）；手动 `ctx.compaction.compactNow(...)` @
+`dsh-command-compact/lib/index.js:55` ✓。
+
+**★ "换引擎"不是唯一途径** ✗ —— **四条服务级杠杆** ✓：
+1. 替换 **`ctx.compaction`** ✓（`dsh-compaction/lib/types/index.d.ts:102`；`:94-100` "Implementations own trigger policy, retention, and summarization" ✓）；
+2. ★ **子类化 `BasicCompactionEngine` 覆写 `summarize()`** ✓ —— 契约原话 "**`summarize()` is the sole subclass customization hook**"
+   （`dsh-compaction-basic/lib/types/index.d.ts:20`/`:43`/`:49` ✓）⇒ **每次摘要**都过 ✓；
+3. ★ 替换 **`ctx.toolResultPruner`** ✓（每次压缩的**摘要前** ✓）；
+4. 替换 **`ctx.tokenMeter`** ✓（每次决策的计价 ✓）。
+另有 `compaction/summary-error` 瀑布（**仅失败路径** ✓，可持久改写被选中输入 @ `:72-77` ✓）＋ 配置化策略 ✓。
+**残留差异** ✗：**"单独取消/否决这次压缩"没有钩子**（只有 `AbortSignal` ✓）⇒ §3 第 13 行**仍判 ②** ✓，
+但理由**精确化**为"**三处等价落脚点 + 唯一缺『单独取消压缩』**" ✓；§3.2 第 2 类风险**再降一级**为
+"**在三个成文介入点里选一个**" ✓✓。
+
+**★ 顺带一条移植陷阱** ✗✓：压缩摘要走 **`ctx.llm.stream()` 直连** ✓，文档明说
+"**without running the loop-only `agent/request` extension point**" ✓ ⇒ **挂 `agent/request`（对应 my-pi 的
+`before_provider_request`）看不到压缩请求** ✓✓ —— 这会**静默造成行为差异** ✗（正是本会话反复警惕的一类 ✓）。
+**★ 并部分回答了缺口①** ✓："替换服务"**是成文的官方扩展方式** ✓ —— `dsh-jobs/lib/types/index.d.ts:22`：
+"**Subclass, implement the abstract members, and load the subclass as a plugin** — it registers as `ctx.jobs`" ✓✓。
+
+**② 服务清单：distinct 服务名 132 个** ✓（口径可复跑并已写进文档 ✓：扫全部 `.d.ts` 的 `interface Context { … }` 属性行去重 ✓；
+内核 85 / 客户端 47 ✓；`extends Service` 命中 76 处 ✓）。
+**它自己做了诚实修正** ✓：按包名前缀机械划分时 `sessionLogDownload`（声明在 `dsh-session-log-export/lib/types/client/index.d.ts` ✓）
+被误分入内核 ⇒ **实际内核 84 / 客户端 48** ✓（文档已就地标注 ✓）。
+**族级映射判定** ✓：**①可直接对应**（工具/命令/技能族、**定时调度与后台作业 `schedule`/`jobs`** ✓、**计划模式 `planMode`** ✓、
+子代理族、语音、部分审批 ✓）；**②需改造**（压缩族、会话与持久化 13 项、提示词与计量、LLM/凭证 5 项、文件系统/进程、
+Agent 生命周期 5 项、设置 ✓）；**③my-pi 无对应**（宿主/启动/插件管理 21 项、遥测族、沙箱/授权、若干单件、**客户端侧全部
+Remote/API 控制器** ✓）；**④my-pi 独有（必须自己搬 ✗）**：**supervisor/自愈外壳** ✓、**注入面基线** ✓、**用量度量守门** ✓、
+**web-terminal** ✓、**tmux 注册表** ✓ —— **这份"自研件"清单是新增的关键输入** ✓✓。
+**★ 对 autopilot 风险的实质修正** ✓：调度器的服务级对手**存在** —— **`ctx.schedule`** ✓
+（`dsh-schedule/lib/types/index.d.ts:15`，"**Durable Host-wide reminder management**"，含 **cron/daily/weekly/every 解析** ✓）
+＋ **`ctx.jobs`** ✓（`dsh-jobs/lib/types/index.d.ts:18` ✓）⇒ **若 `schedule` 是宿主级持久、不依赖交互客户端** ✓，
+则 my-pi 那条 **`hasUI` 门控（无头不跑 ✗）在 DSH 侧会自动消失** ⇒ **降低**移植风险 ✓（**未核实** ✗）。
+**一句话** ✓：84 个内核服务里**没有一项**是"my-pi 的能力找不到任何形态"的 ✓；
+成本在 **②的接入形态改造** 与 **④的自研件搬运** ✓。
+
+**③ 文档改动（只改 2 个允许的文件 ✓）**：`docs/design/DSH-HOOK-MAPPING.md` **300 → 630 行** ✓
+（新增 **§7 服务替换清单**：7.0 方法与计数 / 7.1 内核 84 项按族映射 + 逐项类型与声明位置 / 7.2 客户端侧结构性结论 / 7.3 汇总 ✓；
+**§8 追 CompactionEngine 调用者**：8.1 调用者表 / 8.2 pruner 证据 / 8.3 四条杠杆 / 8.4 官方扩展方式 / 8.5 更正后的判定 ✓；
+§0 复核二横幅 ✓；§3.1 注与 §4 第 1/2/5 条**就地更新、原文保留作对照** ✓）；`docs/INDEX.md` 由生成器重生成 ✓。
+
+**④ 守门（最终 ✓）**：`check-conventions.sh` 全绿 ✓；`check-doc-links.mjs` 一致（**192 md** ✓）；
+`gen-doc-index --check` 一致 ✓；`gen-changes-ledger --check` 一致 ✓；本文件内成对链接括号 **0** ✓；
+**未碰任何代码/scripts/packs/DECISIONS/PROGRESS/STRUCTURE/BASE-SWITCH-DSH** ✓；**无任何 git 写操作** ✓。
+
+**⑤ 仍未核实（✗，8 条）**：① **DSH 的 `schedule` 是否真的不依赖交互客户端** ✓（**这决定 autopilot 的 `hasUI` 风险是否自动消失** ✓）；
+② `toolResultPruner` 的"替换"**是否有首方示例** ✓（只见到"由引擎取用"与契约 ✓）；③ `ModelSelection` 字段是否含**思考级别** ✓；
+④ `session/event` 的**提交后时序**是否晚到无法决策 ✓；⑤ **各 `@mode` 只拿到局部证据** ✓
+（`dsh-compaction-basic/lib/index.js:839`/`:861` 的带 `next` 形参与注解一致 ✓，**105 个事件未逐个回源码核** ✗）；
+⑥ 只扫已安装 **`0.2.0-rc.2`** 的 `lib/` ✓；⑦ **全程静态、无行为验证** ✓（本轮**未运行任何 DSH 进程** ✓）；
+⑧ §7 的①~④判定是**族级为主** ✓，my-pi 侧对应能力**未逐个读源码核实** ✗。
+
 ### [2026-10-11] ③-b 复核：**我"DSH 无压缩前干预"的结论被推翻** ✗✓（并发现 DSH 扩展面**至少三类** ★）
 
 **做法（我要求的纪律 ✓）**：先给"**负向主张**"立法 —— **说"DSH 没有 X"必须交代"我搜了什么"** ✓

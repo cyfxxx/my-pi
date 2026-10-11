@@ -3471,3 +3471,29 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   并写残留缺口 + §1 补 pi 语义原文 + §2.4 新增"第三类扩展点：服务替换"；守门全绿（192 md）、未碰代码、无 git 写操作。
 - 仍未核实 7 条：替换引擎是否官方推荐路径（未见迁移指南/示例）；除 summary-error 外是否有"每次压缩前必然触发"的服务级回调
   （未逐个追调用者）；ModelSelection 是否含思考级别；session/event 提交后时序；@mode 未回源码验证；只扫 0.2.0-rc.2 的 lib；全程静态无行为验证。
+
+### ③-c 缺口②answered + 服务替换清单 132 项（2026-10-11）
+
+- 缺口②有答案：存在"每次压缩前必然触发"的服务级点 ctx.toolResultPruner（dsh-compaction-basic/lib/index.js:926 两条触发路径
+  都在摘要前调用它；ToolResultPruner extends Service，注册名 toolResultPruner）。调用者清单无别的：compactIfNeeded 仅
+  index.js:841（agent/pre-step, pressure）与 :872（agent/request-error, context-overflow）；手动 compactNow @
+  dsh-command-compact/lib/index.js:55。
+- ★换引擎不是唯一途径 —— 四条服务级杠杆：①替换 ctx.compaction；②子类化 BasicCompactionEngine 覆写 summarize()
+  （契约"summarize() is the sole subclass customization hook"，每次摘要都过）；③替换 ctx.toolResultPruner（每次压缩摘要前）；
+  ④替换 ctx.tokenMeter。另有 summary-error 瀑布（仅失败路径）+ 配置化策略。残留差异：没有"单独取消这次压缩"的钩子（只有
+  AbortSignal）⇒ §3 第 13 行仍判 ②，理由精确化为"三处等价落脚点 + 唯一缺单独取消"；§3.2 第 2 类风险再降级为"在三个成文介入点里选一个"。
+- ★移植陷阱：压缩摘要走 ctx.llm.stream() 直连，文档明说 without running the loop-only agent/request extension point ⇒
+  挂 agent/request（对应 before_provider_request）看不到压缩请求（会静默造成行为差异）。缺口①部分answered：替换服务是成文官方方式
+  （dsh-jobs/lib/types/index.d.ts:22 Subclass…load the subclass as a plugin — registers as ctx.jobs）。
+- 服务清单：distinct 服务名 132（内核 84/客户端 48，修正前缀误分 sessionLogDownload；extends Service 命中 76）。
+  族级判定：①可直接对应（工具/命令/技能、schedule/jobs、planMode、子代理、语音、部分审批）；②需改造（压缩族、会话与持久化 13、
+  提示词与计量、LLM/凭证 5、文件系统/进程、Agent 生命周期 5、设置）；③my-pi 无对应（宿主/启动/插件管理 21、遥测、沙箱/授权、单件、
+  客户端 Remote/API 控制器）；④my-pi 独有必须自己搬：supervisor/自愈外壳、注入面基线、用量度量守门、web-terminal、tmux 注册表。
+  ★autopilot 风险修正：ctx.schedule（Durable Host-wide reminder management，含 cron/daily/weekly/every 解析）+ ctx.jobs 存在 ⇒
+  若 schedule 不依赖交互客户端，则 hasUI 门控在 DSH 侧自动消失（未核实）。一句话：84 内核服务里没有一项是 my-pi 能力找不到形态的；
+  成本在②接入形态改造与④自研件搬运。
+- 文档：DSH-HOOK-MAPPING.md 300→630 行（新增 §7 服务清单、§8 追调用者；§0 横幅；§3.1/§4 就地更新原文保留）；INDEX 重生成。
+  守门全绿（192 md、gen-doc-index --check 一致、gen-changes-ledger --check 一致、成对括号 0）；未碰代码；无 git 写操作。
+- 仍未核实 8 条：schedule 是否不依赖交互客户端；toolResultPruner 替换是否有首方示例；ModelSelection 是否含思考级别；
+  session/event 提交后时序；@mode 只局部证据（105 事件未逐个回源码核）；只扫 0.2.0-rc.2；全程静态无行为验证；
+  §7 判定族级为主、my-pi 侧对应能力未逐个读源码核实。
