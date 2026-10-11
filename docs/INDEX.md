@@ -476,7 +476,7 @@
 - `docs/BUG-REPLAYS.md` · #25 **测试把 bug 当契约**：既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） · 修池 bug 时发现原测试 expect(a.worker.alive).toBe(false) 正是 bug 行为
 - `docs/BUG-REPLAYS.md` · #26 **RPC 的 prompt 被拒、父侧却当成功**：缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolv · 帧证据：`dir=in {"success":false,"error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')…"}` · 数字: 4 轮 · 证据: node scripts/subagent-inbox.mjs post
 
-## 设计文档（168 条）
+## 设计文档（177 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -560,6 +560,15 @@
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 二、审计清单逐条结论（含证据） · ### 1. 上下文里留的是句柄还是只有一句"已归档"？→ **是句柄，但缺摘录** · 数字: 4 个 / 2 次 / 1 个 / 0 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 三、决策提案（**均不改默认**，等用户点头） · **建议顺序**：先 **P3-D**（拿到可观测数据）→ 再决定要不要 **P3-A/B**（它们都是"改句柄内容"， · 数字: 0 次 / 2 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 四、本次审计的实测数字（能力地板之外的"效率指标"） · - 归档目录：**563 文件 / 3.4MB**（说明归档在真实使用中活跃，不是死代码）； · 数字: 3.4MB / 2 次 / 4 个 / 0 次
+- `docs/design/SCHEDULER-FAILURES.md` · 结论（一句话） · **保留日志里的 50 条失败全部是同一个签名** —— `getPiInvocation` 把 **vitest worker 入口**当 pi 启动 ✗ · 数字: 50 条 / 1 小时 / 50%
+- `docs/design/SCHEDULER-FAILURES.md` · 1. 证据一：50/50 失败是同一个签名 ✓ · 按任务（每任务**保留最近 10 份** ✓）： · 证据: e7e2f169
+- `docs/design/SCHEDULER-FAILURES.md` · stdout (pi JSONL) · (empty)
+- `docs/design/SCHEDULER-FAILURES.md` · 2. 证据二：失败全部早于修复（历史 vs 现在 ✓） · 时间线（**注意时区**：提交是 `+0800` ✓，日志是 **UTC** ✓）： · 数字: 14 条 / 23 条 / 8 条 / 1 小时 · 证据: d339950a3 / 343b232bc
+- `docs/design/SCHEDULER-FAILURES.md` · 3. 证据三：`fail/run` 高比值的来源 = 累计计数 + 同一到期时刻被并发触发 ✗ · `runCount`/`failCount` 是**累计值、从不重置** ✓（`tool-stats-daily`: `run=50 fail=28` ✓）⇒ 修复后**仍会显示高失败率** ✗（历史包袱 ✓）。 · 数字: 4 条 / 8 条
+- `docs/design/SCHEDULER-FAILURES.md` · 4. 逐任务归因 ✓（可合并 ✓） · 5 个任务的失败**归因相同** ✓：**入口被拼成 `node <vitest worker>` ⇒ 立刻退出（rc=1）、stdout 空** ✓。 · 数字: 5 个 / 8 条
+- `docs/design/SCHEDULER-FAILURES.md` · 5. ★ 唯一"今天仍在发生"的信号：`seed-drift.log` 的漂移循环 ✗ · `logs/seed-drift.log`（**2572 B，最新一行 `2026-10-11T14:03:01.820Z`** ✓ **在修复之后** ✓）： · 数字: 2572 B
+- `docs/design/SCHEDULER-FAILURES.md` · 6. 建议的下一步（按价值排序 ✓） · 1. ★ **验证"已经好了"**（最高价值、最低成本 ✓）：让调度器**真正跑一次**并看结果 ✓ —— · 数字: 7 天 / 50%
+- `docs/design/SCHEDULER-FAILURES.md` · 7. 仍未核实（✗，必交） · 1. **"修复后没再失败"与"修复后没再运行"目前无法区分** ✗（第 2 节末 ✓）—— 这是**最重要的一条边界** ✓；
 - `docs/design/SECURITY-GUARD-RESEARCH.md` · 0. 本环境实测（`command -v` / `import` / `curl`，2026-10-09）
 - `docs/design/SECURITY-GUARD-RESEARCH.md` · 1. 哈希校验（**唯一现在就能做好的**） · - 工具：`sha256sum`（✓）/ `openssl dgst -sha256`（✓，两者互为独立实现，可交叉验证）。
 - `docs/design/SECURITY-GUARD-RESEARCH.md` · 2. 杀毒 / 恶意软件扫描 · **受限网络下 ClamAV 病毒库怎么更新（本环境实测，结论不乐观）**：
