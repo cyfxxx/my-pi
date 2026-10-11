@@ -65,3 +65,69 @@
 2. **UI 形态不同**（DSH 是 web/GUI + profile ✓；pi 是终端 TUI ✓）⇒ 11 个补丁里的 UI 部分不是"移植"而是"**重新决定要不要**"✓；
 3. **验证体系重建**（D 块 ✓）必须计入工期，**否则会出现"功能搬过来了但无法证明它没坏"** ✗；
 4. **不允许边搬边丢守门** ✗ —— 本项目既有纪律：**宁可显示缺口，也不显示虚假的绿色** ✓。
+
+---
+
+# 附：spike 实测结果（2026-10-10）—— **最大未知已量出** ✓
+
+> 本节是第五节的 spike **实际执行结果** ✓（隔离 `HOME=/tmp/dsh-spike` ✓，**未动 my-pi 仓库、未改 DSH 安装、无 git 写操作** ✓）。
+> **先纠正上一版的一个错误指向** ✗✓：本文原先说"最大未知在 `lib/types/plugin.d.ts`" —— 实际**那只是 `dsh plugin`
+> 包管理命令的类型** ✗，**不是**工具/钩子契约 ✓。真正的契约在下文（有文件:行号 ✓）。
+
+## 1. 契约实况（实证 ✓）
+
+| 原语 | DSH 的形态 | 证据 |
+|---|---|---|
+| **注册工具** | **`ctx.tools.register(defineTool({ … }))`** ✓ | `@deepseek-ai/dsh-tool-cordis/lib/index.js:39`（另见 `:55`）✓ |
+| **工具定义** | `defineTool({ name, description, parameters, **output: { schema（canonical）, render(args,value) }, execute(args,exec), deferLoading?, timeoutMs?, isConcurrencySafe? }`）✓ | `@deepseek-ai/dsh-tools/lib/types/schema.d.ts:178-248` ✓ |
+| **钩子/事件** | **cordis 事件** ✓（`declare module '@deepseek-ai/cordis' { interface Events {…} }`）；例：**`'tools/pre-execute'(this, exec, next)`**，**waterfall 模式** ✓ | `@deepseek-ai/dsh-tools/lib/types/index.d.ts:32-47` ✓ |
+| 生态规模 | `@deepseek-ai/*` 下约 **250 个包** ✓（含 `dsh-tools` / `dsh-tool-*` / `dsh-commands` / `dsh-hook-protocol` / `dsh-session*` / `dsh-subagent*` / `dsh-client-ui-*` / `cordis-plugin-*` ✓） | 包目录实测 ✓ |
+
+## 2. 最小 spike 跑通（原始输出 ✓）
+
+```
+[① 工具] defineTool 返回： object | name= spike_echo | 有 execute= function          ✓ 工具定义原语可用
+[② 事件] ctx.on 订阅后 emit：handler 收到 = {"hello":"dsh"}                          ✓ cordis 事件（=钩子）可用
+[③ 注册入口] root.tools.register 可用 = false   ← 裸 Context 没有 tools 服务（该服务由工具插件在真实 profile 里注入 ✗）
+[耗时] 导入 358 ms | 总计 406 ms
+```
+⇒ **① 工具定义 ✓ 与 ② 事件订阅 ✓ 两原语可用**；③ 需**完整 profile** 才验证（**未跑** ✗）。
+可复跑脚本留存：`/tmp/dsh-spike/spike.mjs` ✓（约 1 KB ✓）。
+
+## 3. 对照表：**pi 原语 → DSH 原语**（★ = 无等价物或形态差异大 ✗）
+
+| pi 原语（my-pi 用量 ✓） | DSH 对应 | 差异 / 风险 |
+|---|---|---|
+| `registerTool`（**57**） | `ctx.tools.register(defineTool({…}))` ✓ | ★**差异大**：pi 用 typebox `Type.*`；DSH 用**按属性 schema** 且**必填 `output`（canonical schema + `render` 投影）** ⇒ **每个工具要额外写输出 schema 与渲染** ✗ |
+| `registerHook`（**64**） | cordis 事件 `ctx.on('<event>', …)` ✓（**waterfall + `next()`**） | ★**事件名与语义完全不同** ⇒ **必须逐个人工映射** pi 的 `tool_call`/`tool_result`/`session_shutdown` 等 ✗；DSH 还多一层"**事件模式**"概念 ✓ ⇒ **这是最大不确定项** ✗ |
+| `registerCommand`（**20**） | 有 **`@deepseek-ai/dsh-commands`** ✓ | ✗**契约未读**（只确认"有这一层" ✓） |
+| `registerShortcut`（**4**） | `dsh-client-shortcuts` / `dsh-client-ui-shortcuts` ✓ | ★**在客户端层、不在内核** ✗（pi 的在核心 ✓）⇒ 属"另一层的事" |
+| 会话/模式/监督器 | `dsh-session*`（含 format **v0→v4 迁移** ✓）、`dsh-schedule`、`dsh-jobs`、`dsh-hmr`、`dsh-plugin-manager` ✓ | ★多半**被 DSH 自带能力替代** ✓（不是移植 ✓） |
+| 子代理池（`pi --mode rpc` ✗） | **`dsh-subagent` + `dsh-tool-subagent` + `dsh-subagent-in-process-driver` / `-spawn-in-process`** ✓ | ★**实现完全不同** ⇒ **要重写** ✓，但**有官方包可依赖** ✓✓ |
+
+## 4. 成本与换算（**明确不给"假装精确的工期"** ✗）
+
+- **实测**：工具定义 + 事件订阅的**运行时代价可忽略**（**406 ms**，其中导入 **358 ms** ✓）。
+  ⇒ **真正的代价是"读契约"**：本次用 **3 轮探查**（agent 小时级 ✓）才定位到 `ctx.tools.register` + `defineTool` ✗。
+- **换算假设（显式列出 ✓）**：① 223 个特性**不重写**、走 **shim**（`registerTool`→`ctx.tools.register` ✓、`registerHook`→`ctx.on` ✓）；
+  ② DSH 的事件集**覆盖**所需生命周期点（**我只确认了 `tools/pre-execute` 一个** ✗）；③ `0.2.0-rc.2` 接口**接近稳定** ✗（未验证 ✓）。
+- **在这些假设下**：shim 的杠杆最大（4 个原语 ⇒ 一层适配 ✓）；但成本集中在两处 ✗：
+  **① 57 个工具**各补 `output.schema` + `render`（机械但逐个要写 ✓）；**② 64 个钩子**要**人工映射事件名与语义** ✗（**最大不确定项** ✓）。
+- **下一步（真正的降不确定办法，比拍工期有用 ✓）**：先把 my-pi 的 **64 处 hook 按事件名归类**（去重后剩几类 ✓），
+  再对 DSH **现已声明的 `Events`** 逐类找对应 ⇒ 产出"**可映射 / 需改语义 / 无对应**"**三档清单** ✓
+  ⇒ **那才是能用来换算的输入** ✓。
+
+## 5. 本次未验证（如实 ✗）
+
+1. **未跑完整 profile** ⇒ `ctx.tools.register` 在**真实服务里未验证** ✗（`dsh plugin` 需 pnpm/网络，未跑 ✗）；
+2. **DSH 的完整事件清单未读** ✗（只读了 `dsh-tools` 的 `Events` 块 ✓）；
+3. **`dsh-commands` 契约未读** ✗；
+4. **DSH 是否有终端 UI**（关系到那 **11 个 UI 补丁**的去留）**未查** ✗；
+5. 受内存约束（本机可用约 1.8–2.5 GB），**未起完整 profile 或任何重进程** ✓（只跑了一个 406 ms 的 node 进程 ✓）。
+
+## 6. 结论（相对上一版的变化）
+
+**从"最大未知 ✗"变成"契约已知、两原语可用 ✓，成本集中在 57 工具的输出 schema 与 64 钩子的事件映射"** ✓✓。
+⇒ 换基座**可行性上升**（有官方 `dsh-subagent` 等包可依赖 ✓），但**工作量仍未可精确估计** ✗ ——
+因为**最大不确定项（64 钩子的语义映射）尚未分类** ✓；建议先做第 4 节末尾那份"三档清单"再谈工期 ✓。
+

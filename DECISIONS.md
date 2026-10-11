@@ -2,6 +2,34 @@
 
 ## 格式
 
+### [2026-10-10] DSH 换基座 spike：**契约已量出** ✓（含纠正我上一版一个错误指向 ✗✓）
+
+**执行**：隔离 `HOME=/tmp/dsh-spike` ✓，**未动 my-pi 仓库、未改 DSH 安装、无 git 写操作** ✓（符合我给的边界 ✓）。
+**结果（有文件:行号 ✓）**：**工具 = `ctx.tools.register(defineTool({…}))`** ✓（`dsh-tool-cordis/lib/index.js:39` ✓；
+`defineTool` 形状见 `dsh-tools/lib/types/schema.d.ts:178-248` ✓，**含必填 `output: {schema, render}`** ✗）；
+**钩子 = cordis 事件** ✓（`dsh-tools/lib/types/index.d.ts:32-47` ✓，例 `'tools/pre-execute'`，**waterfall + next()** ✓）；
+生态约 **250 个 `@deepseek-ai/*` 包** ✓（含 `dsh-subagent*`、`dsh-commands`、`dsh-hook-protocol`、`dsh-session*` ✓）。
+**最小 spike 跑通** ✓：`defineTool` 返回可用对象 ✓、`ctx.on` 订阅后 emit 收到 ✓（总耗时 **406 ms** ✓）；
+裸 Context **无 `tools` 服务** ✗（需完整 profile ⇒ **未跑** ✗）。
+**★ 纠正上一版的错误指向** ✗✓：我说"最大未知在 `lib/types/plugin.d.ts`" —— 实际**那只是 `dsh plugin` 包管理命令的类型** ✗，
+**不是**工具/钩子契约 ✓（是 spike 读源码后纠正的 ✓）。
+
+**对照表要点（决定成本的两处 ✗）**：
+① `registerTool`(**57**) → `ctx.tools.register` ✓，但 ★**形态差异大**：pi 用 typebox，DSH 用**按属性 schema + 必填 `output`（canonical + `render` 投影）**
+⇒ **每个工具都要多写输出 schema 与渲染** ✗；
+② `registerHook`(**64**) → cordis 事件 ✓，但 ★**事件名与语义完全不同** ⇒ **必须逐个人工映射** ✗ ⇒ **最大不确定项** ✓；
+③ `registerCommand`(**20**) 有 `dsh-commands` ✓（契约未读 ✗）；④ `registerShortcut`(**4**) 在**客户端层** ✗（pi 在内核 ✓）；
+⑤ 会话/模式/监督器多半**被 DSH 自带能力替代** ✓（不是移植 ✓）；⑥ 子代理池**实现完全不同** ⇒ 重写 ✓ 但**有官方包** ✓✓。
+
+**成本口径（拒绝假装精确 ✗）**：运行时代价可忽略（406 ms ✓）；**真正的代价是"读契约"**（3 轮探查 ✓）；
+换算可给"shim 杠杆最大 ✓、成本集中在 57 工具的输出 schema 与 64 钩子的事件映射 ✗"，但**不给统一工期** ✗。
+**下一步（比拍工期有用 ✓）**：先把 64 处 hook **按事件名归类**（去重后几类 ✓），再对 DSH 已声明的 `Events` 逐类找对应
+⇒ 产出"**可映射 / 需改语义 / 无对应**"**三档清单** ✓ ⇒ **那才是能换算的输入** ✓。
+
+**未验证（如实 ✗）**：完整 profile 未跑（`ctx.tools.register` 在真实服务里未验证 ✗）；DSH 完整事件清单未读 ✗；
+`dsh-commands` 契约未读 ✗；**DSH 是否有终端 UI 未查** ✗（关系到 11 个 UI 补丁去留 ✓）；受内存约束未起重进程 ✓。
+⇒ **相对上一版**：从"最大未知 ✗"变成"**契约已知、两原语可用 ✓，成本集中在两处**" ⇒ **可行性上升** ✓，但工期仍不可精确估计 ✗。
+
 ### [2026-10-10] 中途注入回归单测补齐（**功能闭环**）+ 一次**子代理越界**与我的**规格自相矛盾** ✗✓
 
 **① 单测已补齐（这是"中途注入"这条线的最后一块 ✓）**：

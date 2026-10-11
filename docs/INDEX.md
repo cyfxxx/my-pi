@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（198 条）
+## 决策台账（199 条）
 
+- `DECISIONS.md` · [2026-10-10] DSH 换基座 spike：**契约已量出** ✓（含纠正我上一版一个错误指向 ✗✓） · **执行**：隔离 `HOME=/tmp/dsh-spike` ✓，**未动 my-pi 仓库、未改 DSH 安装、无 git 写操作** ✓（符合我给的边界 ✓）。 · 数字: 250 个 / 3 轮 / 11 个
 - `DECISIONS.md` · [2026-10-10] 中途注入回归单测补齐（**功能闭环**）+ 一次**子代理越界**与我的**规格自相矛盾** ✗✓ · **① 单测已补齐（这是"中途注入"这条线的最后一块 ✓）**： · 数字: 30994B · 证据: ff90022b9 / 7b7998998
 - `DECISIONS.md` · [2026-10-10] 中途注入的回归测试升级为**注入式**（断言"真实负载"与"消费策略"） · **上一轮的 7 项测试不够** ✗：它测的是**纯函数**（`buildSteerPrompt`/`assertPromptAccepted`）⇒
 - `DECISIONS.md` · [2026-10-10] 补上 `steer` 修复的**回归单测**（用"抽纯函数 + 生产引用"绕开死导出守门） · **上一轮我如实标了"这次修复没有回归单测"** ✗ —— 本轮补上 ✓。**难点不是写测试，是"怎么加才不违规"** ✓：
@@ -206,7 +207,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（196 条）
+## 进度记录（197 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -404,6 +405,7 @@
 - `PROGRESS.md` · 补齐 steer 修复的回归单测（2026-10-10） · - 抽两个纯函数并让生产引用（绕开"仅测试引用不算生产引用"的死导出守门 ✓）：`buildSteerPrompt`（强制 steer ✓）、
 - `PROGRESS.md` · 中途注入的回归测试升级为注入式（2026-10-10） · - 上一轮 7 项只测纯函数 ⇒ 没断言"真实负载"、没覆盖"失败⇒不消费/成功⇒消费"接线 ✗。
 - `PROGRESS.md` · 中途注入回归单测补齐 + 一次越界与规格自相矛盾（2026-10-10） · - 依赖注入：抽出导出 `deliverInboxRound(deps, ids, consumed)`，生产侧委托一次 ⇒ 导出有生产引用（不死于"仅测试引用"规则）✓。
+- `PROGRESS.md` · DSH 换基座 spike：契约量出（2026-10-10） · - 契约（带文件行号）：工具 = `ctx.tools.register(defineTool({…}))`（含必填 output.schema + render ✗）； · 数字: 250 个 / 3 轮
 
 ## 缺陷回放（26 条）
 
@@ -434,7 +436,7 @@
 - `docs/BUG-REPLAYS.md` · #25 **测试把 bug 当契约**：既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） · 修池 bug 时发现原测试 expect(a.worker.alive).toBe(false) 正是 bug 行为
 - `docs/BUG-REPLAYS.md` · #26 **RPC 的 prompt 被拒、父侧却当成功**：缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolv · 帧证据：`dir=in {"success":false,"error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')…"}` · 数字: 4 轮 · 证据: node scripts/subagent-inbox.mjs post
 
-## 设计文档（152 条）
+## 设计文档（158 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -448,6 +450,12 @@
 - `docs/design/BASE-SWITCH-DSH.md` · 四、工程量分块 · > **D 为什么最危险**：它**不产生新功能**，却决定"**改完还能不能证明自己是好的**" ✓ —— · 数字: 4 个 / 223 个 / 11 个 / 6 个
 - `docs/design/BASE-SWITCH-DSH.md` · 五、建议的 spike（**用户决定测试时，照此执行即可** ✓） · **目标**：把上面最大的未知（B 的契约）**量出来**，让估算从"拍脑袋"变成"有系数" ✓。**不碰 my-pi 仓库** ✓（零风险 ✓）。 · 数字: 4 个
 - `docs/design/BASE-SWITCH-DSH.md` · 六、风险与前提（如实） · 1. **对标的是 RC 版本**（`0.2.0-rc.2` ✗）⇒ **接口可能变动** ✓；换基座前应锁定一个**稳定版**或接受跟随成本 ✗； · 数字: 11 个
+- `docs/design/BASE-SWITCH-DSH.md` · 1. 契约实况（实证 ✓） · 数字: 250 个
+- `docs/design/BASE-SWITCH-DSH.md` · 2. 最小 spike 跑通（原始输出 ✓） · [① 工具] defineTool 返回： object | name= spike_echo | 有 execute= function ✓ 工具定义原语可用 · 数字: 1 KB
+- `docs/design/BASE-SWITCH-DSH.md` · 3. 对照表：**pi 原语 → DSH 原语**（★ = 无等价物或形态差异大 ✗）
+- `docs/design/BASE-SWITCH-DSH.md` · 4. 成本与换算（**明确不给"假装精确的工期"** ✗） · - **实测**：工具定义 + 事件订阅的**运行时代价可忽略**（**406 ms**，其中导入 **358 ms** ✓）。 · 数字: 3 轮 / 223 个 / 4 个 / 57 个
+- `docs/design/BASE-SWITCH-DSH.md` · 5. 本次未验证（如实 ✗） · 1. **未跑完整 profile** ⇒ `ctx.tools.register` 在**真实服务里未验证** ✗（`dsh plugin` 需 pnpm/网络，未跑 ✗）； · 数字: 11 个 / 2.5 GB
+- `docs/design/BASE-SWITCH-DSH.md` · 6. 结论（相对上一版的变化） · **从"最大未知 ✗"变成"契约已知、两原语可用 ✓，成本集中在 57 工具的输出 schema 与 64 钩子的事件映射"** ✓✓。
 - `docs/design/CODING-TRAPS.md` · 1. 注释里出现"两个星号紧跟斜杠"⇒ 块注释被提前关闭 · - **症状**：`ReferenceError: xxx is not defined`，而报错行**看起来完全正常**（因为它是被"挤出注释"的普通文本）。 · 数字: 3 轮
 - `docs/design/CODING-TRAPS.md` · 2. 形参名与导入的模块名同名 ⇒ 块内引用模块会打到形参上 · - **症状**：`path.join is not a function`；**而且"补一个 import"完全无效**（导入同样被形参遮蔽）。 · 数字: 1 轮
 - `docs/design/CODING-TRAPS.md` · 3. `pkill -f <模式>` 可能杀掉自己 · - **症状**：命令自己被打断（`[killed by signal: SIGTERM]`），后续步骤静默不执行。

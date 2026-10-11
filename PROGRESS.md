@@ -3260,3 +3260,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **根因在我** ✗✓：规格自相矛盾（"不许 git 写" vs "仓库必须保持闸门绿"）⇒ 执行者必然牺牲一条；**修法**：规格给出冲突时的优先级
   （"过不了闸门就停下报告，或只提交自己的改动并说明"）。
 - 未覆盖：supervisor/技能路径；DI 的 send 只声明一种请求形状；最终证据仍是真实 E2E。
+
+### DSH 换基座 spike：契约量出（2026-10-10）
+
+- 契约（带文件行号）：工具 = `ctx.tools.register(defineTool({…}))`（含必填 output.schema + render ✗）；
+  钩子 = cordis 事件（waterfall + next，例 tools/pre-execute）；生态约 250 个 @deepseek-ai/* 包。
+- 最小 spike 跑通：defineTool 可用 ✓、ctx.on 事件可用 ✓、总 406ms ✓；裸 Context 无 tools 服务（需完整 profile，未跑 ✗）。
+- **纠正上一版错误指向**：plugin.d.ts 只是 dsh plugin 包管理命令的类型，不是工具/钩子契约。
+- 对照表：registerTool(57) 形态差异大（要补 output schema + render ✗）；registerHook(64) 事件名语义完全不同 ⇒
+  逐个人工映射 = 最大不确定项 ✗；registerCommand(20) 有 dsh-commands（契约未读）；registerShortcut(4) 在客户端层；
+  会话/模式/监督器多半被 DSH 自带能力替代；子代理池实现完全不同但**有官方包**。
+- 成本：运行时 406ms 可忽略；真代价是读契约（3 轮）；不给统一工期 ✗。下一步：把 64 处 hook 按事件名归类 ⇒
+  对 DSH 已声明 Events 逐类找对应 ⇒ 产出"可映射/需改语义/无对应"三档清单 ⇒ 才是能换算的输入。
