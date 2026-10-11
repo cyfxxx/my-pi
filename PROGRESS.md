@@ -3426,3 +3426,23 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 环境与清理：mem 2.11→2.12GB；第一次失败留下 3 进程 ⇒ 先核实归属再按 PID 收掉，残留=无；tmux 无服务；仓库 git status 空；
   真实调度器未碰（logs 51、无锁）；全程按 PID、未用 pkill -f；证据在 /tmp/sw-exp/。
 - 存疑：新会话消息未落在旧 s.jsonl（旧文件是否封存未追）；悬空连接最终状态未测；只跑 1 次不足以排除偶发（机制链自洽）。
+
+### ③ hook → DSH 事件三档映射完成（2026-10-11）
+
+- 交付：docs/design/DSH-HOOK-MAPPING.md（206 行）+ docs/INDEX.md 更新；其余禁区未碰、无 git 写操作、守门全绿。
+- 实测计数（grep）：registerHook 55（53 特性+2 适配器）⇒ distinct 事件 18；registerTool 61 / registerCommand 14 / registerShortcut 4。
+  ★修正早先数字：BASE-SWITCH-DSH 记的 57/64/20/4 ⇒ 实测 61/55/14/4（差异源于"不带括号的 registerHook 文本出现 67 次"）。
+- ★DSH 有两套事件面：① cordis 事件 105 个（可 ctx.on，带引号签名 + @mode 注解：waterfall/serial/emit/parallel/bail，决定能否拦截；
+  覆盖 41 命名空间）；② SessionEventMap 59 个会话日志事件类型（dsh-agent/lib/types/types.d.ts:86，非钩子，只能 session/event 后按
+  event.type 派发，提交后不可拦截）。它自查修正：解析器把对象字面量字段当事件名 ⇒ 只认引号键后 123→105；且只扫 interface Events
+  会漏 *EventMap。
+- 三档（18 事件）：①可映射 11（23 调用点；最干净：tool_call→tools/pre-execute[waterfall，能力≥pi]、tool_result→tools/post-execute、
+  context→system-prompt/assemble[返回值即权威]、before_provider_request→agent/request）；②需改语义 7（29 调用点）；
+  ③无对应 0 ⇒ 风险不在"找不到"而在"接入方式与粒度"。★按调用点加权 ①23/②29 ⇒ 过半落"需改语义"，集中在会话生命周期与输入/压缩干预。
+- 风险最高三族：会话生命周期三件套（21 调用点，粒度会话→agent/步，错配会静默不启动/不清理）；输入与压缩前干预（DSH 无等价
+  "改写输入/压缩前改写"闸门 ⇒ 行为悄悄变）；工具/请求 decision 形状差异（8 点，机械改造）。
+- 澄清：dsh-hook-protocol 不是插件钩子 API 而是外部命令钩子桥（HookDialect claude-code|codex、{type:'command',…}、事件名如
+  PreToolUse；其自身注释 "A native plugin at the interception points is not a bridge"）⇒ 原生插件移植用那 105 个 cordis 事件。
+- 未核实 7 条（必读）：autopilot 21 点的 ctx 能力未核（hasUI 门控对应什么）；★最可能被推翻：session_before_compact 的压缩前干预
+  是否真缺失（只扫已声明事件，未查 dsh-compaction 别名/非事件介入点）；thinking_level_select 无对应事件但 model/selection 负载未核；
+  session/event 是提交后流、是否晚到无法决策未核；@mode 是文档注解未回源码确认；只扫已安装 lib（0.2.0-rc.2 快照）；未运行任何东西。

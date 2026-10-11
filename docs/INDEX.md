@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（211 条）
+## 决策台账（212 条）
 
+- `DECISIONS.md` · [2026-10-11] ③ hook → DSH 事件**三档映射完成** ✓（并**修正我早先一组数字** ✗✓ + 挖出"DSH 有两套事件面" ★） · **交付物**：`docs/design/DSH-HOOK-MAPPING.md`（206 行 ✓）+ `docs/INDEX.md` 随之更新 ✓（**其余禁区未碰** ✓、**无 git 写操作** ✓；守门全绿 ✓、链接 192 md · 数字: 2 个 / 67 次 / 18 个 / 7 个
 - `DECISIONS.md` · [2026-10-11] ② 会话切换**活体实验成功**：Q1 实测闭环 ✓（Q2/Q3 如实"无证据" ✗） · **触发方式（来自代码，不是猜 ✓）**：**`/new`**（"Start a new session"）—— `vendor/pi/…/core/slash-commands.ts:40` ✓ · 数字: 8 条 / 6 个 / 3 个 / 5 条
 - `DECISIONS.md` · [2026-10-11] ①i PID 复用**在本机真跑绿了** ✓✓ —— 走**节拍路线**（对配方的一处**有证据的偏离** ✗✓） · **第一步（我要求先验证的前提）**：**两个 uptime 来源不可比** ✗（原始输出 ✓）： · 数字: 124.08 秒 / 563.95 秒 / 182 天 / 439.87 秒 · 证据: 1680020856 / 1791709252
 - `DECISIONS.md` · [2026-10-11] ①f PID 复用加固：**诊断定死（上一轮假设被证伪 ✗✓）+ 实现落地（核心用例本机显式跳过 ✗）** · **① 第一步诊断的答案（原始输出，已定死 ✓）**：**`acquireSessionLock()` 用的就是 `lockPath()`，路径完全一致** ✓ · 数字: 2 个 / 124 秒 / 182 天 / 1 小时 · 证据: 1791707429670 / 1574680206
@@ -219,7 +220,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（209 条）
+## 进度记录（210 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -430,6 +431,7 @@
 - `PROGRESS.md` · ①f PID 复用：诊断定死 + 实现落地（核心用例本机显式跳过）（2026-10-11） · - 诊断（原始输出）：acquireSessionLock 用的就是 lockPath，路径一致；paths.ts 在调用时读 PI_MEMORY_DIR（非导入时缓存） · 数字: 124 秒 / 182 天
 - `PROGRESS.md` · ①i PID 复用在本机真跑绿：节拍路线（2026-10-11） · - 第一步前提验证：两个 uptime 来源不可比（/proc/uptime 124 秒 vs starttime/HZ ≈182 天；btime 2023 vs now 2026）⇒ 按前提不硬做跨钟比较。 · 数字: 124 秒 / 182 天 / 2 条 · 证据: 1574856374 / 1574856395
 - `PROGRESS.md` · ② 会话切换活体实验成功（2026-10-11） · - 触发方式（来自代码）：/new（slash-commands.ts:40；:42 是 /resume）；键位 app.session.new 的 defaultKeys 为空 ⇒ 是命令不是快捷键； · 数字: 6 个 / 3 个 / 2.12GB / 1 次
+- `PROGRESS.md` · ③ hook → DSH 事件三档映射完成（2026-10-11） · - 交付：docs/design/DSH-HOOK-MAPPING.md（206 行）+ docs/INDEX.md 更新；其余禁区未碰、无 git 写操作、守门全绿。 · 数字: 67 次 / 105 个 / 59 个 / 7 条
 
 ## 缺陷回放（26 条）
 
@@ -460,7 +462,7 @@
 - `docs/BUG-REPLAYS.md` · #25 **测试把 bug 当契约**：既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） · 修池 bug 时发现原测试 expect(a.worker.alive).toBe(false) 正是 bug 行为
 - `docs/BUG-REPLAYS.md` · #26 **RPC 的 prompt 被拒、父侧却当成功**：缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolv · 帧证据：`dir=in {"success":false,"error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')…"}` · 数字: 4 轮 · 证据: node scripts/subagent-inbox.mjs post
 
-## 设计文档（158 条）
+## 设计文档（164 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -492,6 +494,12 @@
 - `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 四、本次的实测数字（本项的"效率指标"） · - 未接线清单规模：**A 段 18 条 + B 段 4 条 + C 段 1 条（我误放的，已移正）**； · 数字: 18 条 / 4 条 / 1 条 / 5 条
 - `docs/design/DORMANT-AUDIT.md` · 五、执行结果（2026-10-08）：`TOOL_LAYERING` 已删除 · 用户授权"由你决定"。**判断：删除。** 依据（按分量排序）： · 数字: 100 个 / 18 个 / 442B / 60.8%
+- `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
+- `docs/design/DSH-HOOK-MAPPING.md` · 1. 第一步：my-pi 的钩子归类（实测，非估算） · grep 命令（可复跑）： · 数字: 55 个 / 53 个 / 2 个 / 18 个
+- `docs/design/DSH-HOOK-MAPPING.md` · 2. 第二步：DSH 实际声明的事件（附行号） · DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不在 my-pi 的 `node_modules`**）。 · 数字: 105 个 / 41 个 / 59 个 · 证据: 1e7f6d9597241db0
+- `docs/design/DSH-HOOK-MAPPING.md` · 3. 第三步：逐类映射（18 个 my-pi 事件） · ### 3.1 三档汇总 · 数字: 23 个 / 29 个 / 0 个 / 21 个
+- `docs/design/DSH-HOOK-MAPPING.md` · 4. 未核实项（必读，明确列出） · 1. **自动化任务（autopilot）的 21 个调用点是本清单里最难的一块**：它注册 `session_start`/`session_shutdown`/`turn_*`/`tool_*`/`input`/`agent_settl · 数字: 21 个
+- `docs/design/DSH-HOOK-MAPPING.md` · 5. 复跑命令（供核对） · # my-pi 侧 · 数字: 53 个 / 105 个 / 59 个 · 证据: 1e7f6d9597241db0
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ② 分材料明细 · ### 2.1 WikiSkill（arXiv:2608.27454） · 数字: 48.7% / 63.7% / 15.0% / 60.9%
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ③ 这些新信息改变了什么判断（只写确凿的） · 1. **WikiSkill：那条"读 wiki 有害"必须带条件引用。** 新数字显示它是**条件性**的：只有在 **Skill Proposer 也有 wiki 访问**时， · 数字: 10 个 / 204 个 / 46 个

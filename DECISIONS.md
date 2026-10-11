@@ -2,6 +2,63 @@
 
 ## 格式
 
+### [2026-10-11] ③ hook → DSH 事件**三档映射完成** ✓（并**修正我早先一组数字** ✗✓ + 挖出"DSH 有两套事件面" ★）
+
+**交付物**：`docs/design/DSH-HOOK-MAPPING.md`（206 行 ✓）+ `docs/INDEX.md` 随之更新 ✓（**其余禁区未碰** ✓、**无 git 写操作** ✓；守门全绿 ✓、链接 192 md ✓、md 内无成对 `](` ✓）。
+
+**第一步（实测计数，附 grep 命令 ✓）**：`grep -rn "registerHook(" custom/ --include=*.ts | grep -v __tests__ | wc -l` ⇒ **55**
+（53 特性 + 2 个适配器 `custom/adapters/hook-adapter.ts:33/:50` ✓）⇒ **distinct 事件 = 18** ✓；同口径另三面：**registerTool 61 / registerCommand 14 / registerShortcut 4** ✓。
+**★ 它修正了我早先的数字** ✗✓：`BASE-SWITCH-DSH.md` 里记的 **57/64/20/4** ⇒ 按"**带括号调用点**"口径实测为 **61/55/14/4** ✓；
+差异来源：**不带括号的 `registerHook` 文本出现 67 次**（含 import / 类型引用 / 注释 / 适配器内部 ✓）⇒ 我那个 64 大概是某个**中间口径** ✓。
+18 个事件（调用点数）：`session_start` 9｜`session_shutdown` 6｜`before_agent_start` 6｜`turn_start` 4｜`agent_settled` 4｜`input` 4｜
+`tool_call` 3｜`tool_result` 3｜`turn_end` 3｜`session_compact` 2｜`agent_end` 2｜+ 7 个各 1 次 ✓；
+pi 侧可用面 `types.ts:1366` 的 `ExtensionEvent` 共 **36** 项 ✓。
+
+**★ 第二步：DSH 有"两套事件面"（本轮最重要的结构性发现 ✓）**：
+1. **cordis 事件 105 个** ✓（可直接 `ctx.on(名, …)` ✓），声明形态是**带引号的方法签名**（例 `'tools/pre-execute'(this, exec, next)`
+   @ `dsh-tools/lib/types/index.d.ts:47` ✓），**每个带 `@mode` 注解**（waterfall/serial/emit/parallel/bail ✓）——
+   **该注解决定能否拦截** ✓；覆盖 **41 个命名空间** ✓。
+2. **`SessionEventMap` 59 个"会话日志事件类型"** ✓（`dsh-agent/lib/types/types.d.ts:86` ✓）——**不是钩子** ✗，
+   只能订阅 `session/event` 后按 `event.type` 派发（**提交后、不可拦截** ✗）：含 `turn/start`、`turn/end`、`tool/call`、
+   `tool/result`、`compaction/*`、`model/selection`、`hook/invoked|result` 等 ✓。
+**★ 它自己的一个真实缺陷（自查并修正 ✓）**：第一版解析器把**对象字面量字段**当成事件名（因为它把"非引号标识符"也算进去了 ✗✓），
+改成**只认引号键**后 123 → **105** ✓；并发现"只扫 `.d.ts` 的 `interface Events` 会**漏掉 `*EventMap`**" ✓。
+（另：DSH 装在 `/root/.npm/_npx/…/node_modules/@deepseek-ai/` ✓，**不在 my-pi 的 node_modules** ⇒ 它第一遍搜错了地方并纠正 ✓。）
+
+**第三步：三档（18 个事件）** ✓：
+- **①可映射 11 个**（`turn_start`/`turn_end`/`agent_settled`/`tool_call`/`tool_result`/`tool_execution_start`/`session_compact`/
+  `context`/`before_provider_request`/`message_update`/`message_end`）⇒ **覆盖 23 个调用点** ✓；
+  最干净的几处：`tool_call→tools/pre-execute`（**waterfall**，allow/deny/cancel/ask ⇒ **能力 ≥ pi** ✓）、
+  `tool_result→tools/post-execute` ✓、`context→system-prompt/assemble`（**返回值即权威** ✓）、`before_provider_request→agent/request` ✓。
+- **②需改语义 7 个**（`session_start`/`session_shutdown`/`before_agent_start`/`agent_end`/`input`/`session_before_compact`/
+  `thinking_level_select`）⇒ **覆盖 29 个调用点** ✓。
+- **③无对应 0 个** ✗ —— **没有任何一个 my-pi 事件在 DSH 里完全找不到影子** ✓；
+  ⇒ **风险不在"找不到"，而在"接入方式与粒度"** ✓✓。
+- **★ 按调用点加权：① 23 / ② 29** ⇒ **超过一半（29/53）落在"需改语义"** ✓，且集中在**会话生命周期**与**输入/压缩干预**两族 ✓
+  —— **这就是我早先缺的那个定量输入** ✓✓。
+
+**换基座风险最高的三族（文档已列 ✓）**：
+1. **会话生命周期三件套**（`session_start` 9 + `session_shutdown` 6 + `before_agent_start` 6 = **21 个调用点** ✓）：
+   粒度从"**会话**"变"**agent/步**" ✓，`session_shutdown` 还多出**归档停止**路径 ✓；而这些点在本项目做的是**资源启停与状态落盘**
+   （子代理池、tmux、计划模式、autopilot 调度器、记忆 ✓）⇒ **错配会"静默不启动或静默不清理"** ✗✗；
+2. **输入与压缩前的干预点**（`input` 4 + `session_before_compact` 1 ✓）：DSH 对应点是"步"级或只有 **`compaction/summary-error`**
+   （失败恢复 ✓）⇒ **没有等价的"改写输入 / 压缩前改写"闸门** ✗ ⇒ **不会报错，只会行为悄悄变** ✗✗；
+3. **工具/请求的 decision 形状**（8 个调用点 ✓）：事件级可对应（① ✓），但 pi 的"改参数/改结果"与 DSH 的 `PreToolDecision`、
+   归一化结果对象**形状不同** ✓ ⇒ **逐个处理器机械改造** ✓。
+
+**顺带澄清（避免走错路 ✓）**：`@deepseek-ai/dsh-hook-protocol` **不是**插件钩子 API，而是**外部命令钩子桥** ✓
+（`HookDialect = 'claude-code' | 'codex'` @ `…/types.d.ts:46` ✓、配置 `{type:'command', command, timeout?}` @ `:48` ✓、
+事件名是**外部方言**如 `'PreToolUse'` @ `runner.d.ts:37` ✓）；它自己的注释写着 "A native plugin at the interception points
+is not a bridge"（`types.d.ts:43` ✓）⇒ **原生插件移植该用的就是那 105 个 cordis 事件** ✓✓。
+
+**未核实项（文档第 4 节，共 7 条 ✓ —— 这是必读部分 ✗）**：① **autopilot 的 21 个调用点最难**：只核到"事件级有对应"，
+**未核对**其处理器依赖的 `ctx` 能力在 DSH 里是否存在（例如调度器受 `hasUI` 门控**对应什么** ✓）；
+② ★ **最可能被推翻的一条**：`session_before_compact` 的"压缩前干预"**是否真的缺失** —— 只扫了**已声明的事件**，
+**未核实** `dsh-compaction` 是否有**别名或非事件形式**的介入点 ✓；③ `thinking_level_select`：确认无 thinking-level 命名事件，
+**未核实** `model/selection` 负载是否携带思考级别 ✓；④ `session/event` 是"**提交后**"流，**未核实**对 `turn/start`/`tool/call`
+的观察是否**晚到无法做决策** ✓；⑤ 各 `@mode` 是**文档注解**，**没有逐个回源码**确认 dispatcher 真按该模式调用 ✓；
+⑥ 只扫了**已安装的 `lib/`**（DSH 是 `0.2.0-rc.2`，本清单是**该版本快照** ✓）；⑦ **未运行任何东西**（全静态读取，**无行为验证** ✓）。
+
 ### [2026-10-11] ② 会话切换**活体实验成功**：Q1 实测闭环 ✓（Q2/Q3 如实"无证据" ✗）
 
 **触发方式（来自代码，不是猜 ✓）**：**`/new`**（"Start a new session"）—— `vendor/pi/…/core/slash-commands.ts:40` ✓
