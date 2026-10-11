@@ -3382,3 +3382,16 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 闸门：全量 tsc rc=0；autopilot+mode 28 files/288 passed；check-conventions 全绿；3 文件；无 git 写操作。
 - 未验证：①-g 用合成 tasks.json（未等真实 suspect 失败落盘）；①-h 只证纯函数层（未真起 tsx 子进程验证回退）；
   合法形态只列 2 类（第三类会安全回退到 pi）；未跑全量 vitest（父代理补跑）。
+
+### ①f PID 复用：诊断定死 + 实现落地（核心用例本机显式跳过）（2026-10-11）
+
+- 诊断（原始输出）：acquireSessionLock 用的就是 lockPath，路径一致；paths.ts 在调用时读 PI_MEMORY_DIR（非导入时缓存）
+  ⇒ 上一轮两个假设都被证伪。真因是测试设计错：被持有分支要求 oldPid !== myPid，锁里是自己 PID ⇒ 合法 (重)获取返回 true。
+- 实现：2 文件；locks-pid-reuse.test.ts 9 项 = 7 passed + 2 skipped（改用受控外来存活 PID）；僵尸用例未回归；
+  autopilot+mode 29 files/295 passed|3 skipped；全量 tsc rc=0；守门全绿；真实状态未动；受控 sleep 按 PID 收掉。
+- ★ 本机 /proc 时钟自相矛盾（btime 2023 / uptime 124 秒 / starttime ≈182 天 / Date.now 2026）⇒ 墙钟换算差数年
+  ⇒ 核心用例（② 复用⇒可抢占、★ 反向断言）显式跳过，不假绿。新增保护：两条独立推法互校（容差 1h），否则返回 null 不判定
+  （宁可少跑不可双跑）⇒ 本机实测 null。
+- 建议的真正修法（未实现）：锁内容扩成 PID:wallTs:uptimeMs（向后兼容），复用判定改比较"进程启动 uptime"与"写锁 uptime"
+  ⇒ 同一时钟 ⇒ proot 可用；并加同样的互校自证。
+- 未验证：②/★ 本机未验证（显式跳过，非通过）；非 Linux/无 HZ 仅代码层论证；端到端未跑。WIP 在 /tmp/lock-reuse-wip/NOTES.md。

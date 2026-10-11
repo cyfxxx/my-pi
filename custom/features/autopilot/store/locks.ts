@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, unlinkSync, openSync, closeSync, writeSync, statSync } from 'node:fs';
 import { schedulerDir, lockPath } from './paths';
 
@@ -42,6 +43,89 @@ export function isPidAlive(pid: string): boolean {
   return true;
 }
 
+/**
+ * HZ（每秒时钟节拍）—— **只从 `getconf CLK_TCK` 取** ✓；取不到就返回 null ⇒ **不做复用判定**（保守 ✓）。
+ * 为什么不猜默认值：Linux 常见 100/250/300，**猜错会让"进程启动时间"算偏** ✗ ——
+ * 而偏早会让我们把活着的持锁者误判为"复用"⇒ 误抢 ⇒ **双跑** ✗✗。所以**宁可不判定** ✓。
+ * 测试/受限环境可用 `PI_LOCK_CLK_TCK` 显式覆盖 ✓。
+ */
+let cachedHz: number | null | undefined;
+function clockTicksPerSecond(): number | null {
+  if (cachedHz !== undefined) return cachedHz;
+  const env = process.env.PI_LOCK_CLK_TCK;
+  if (env && /^[0-9]+$/.test(env)) {
+    cachedHz = Number(env);
+    return cachedHz;
+  }
+  try {
+    const out = execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8', timeout: 2000 }).trim();
+    cachedHz = /^[0-9]+$/.test(out) ? Number(out) : null;
+  } catch {
+    cachedHz = null;
+  }
+  return cachedHz;
+}
+
+/**
+ * 进程启动的**墙钟毫秒**（`/proc/<pid>/stat` 的 **field 22 = starttime** 节拍 ⇒ 换算）✓。
+ * 读不到 / 无 HZ / 非 Linux / 解析失败 ⇒ **返回 null（不判定）** ✓。
+ * `PI_LOCK_DISABLE_PROC_START=1` ⇒ 直接不判定（**用于复现修复前行为** ✓ 与受限环境 ✓）。
+ */
+export function procStartWallClockMs(pid: string): number | null {
+  if (process.env.PI_LOCK_DISABLE_PROC_START === '1') return null;
+  try {
+    const hz = clockTicksPerSecond();
+    if (!hz) return null;
+    const raw = readFileSync(`/proc/${pid}/stat`, 'utf-8');
+    // comm（field 2）可能含空格与括号 ⇒ 从**最后一个 ')'** 之后开始切，再按 0 基取 field 22：
+    // 切后索引 0 = state(field 3) ⇒ starttime(field 22) = 索引 19 ✓
+    const close = raw.lastIndexOf(')');
+    if (close < 0) return null;
+    const fields = raw.slice(close + 2).trim().split(/\s+/);
+    const startTicks = Number(fields[19]);
+    if (!Number.isFinite(startTicks)) return null;
+    let btimeMs: number | null = null;
+    const m = /^btime\s+(\d+)/m.exec(readFileSync('/proc/stat', 'utf-8'));
+    if (m) btimeMs = Number(m[1]) * 1000;
+    if (btimeMs === null) {
+      const up = Number(readFileSync('/proc/uptime', 'utf-8').split(/\s+/)[0]);
+      if (!Number.isFinite(up)) return null;
+      btimeMs = Date.now() - up * 1000;
+    }
+    // ★ 时钟一致性自证（2026-10-11，**本环境实测逼出来的** ✗✓）：
+    // 同一件事有两条独立推法 —— ①`btime + starttime/HZ`；②`now − (uptime − starttime/HZ)`。
+    // proot/Android 上实测三者互相矛盾：`/proc/stat btime` = 2023-03-28 ✗、`/proc/uptime` = 124 秒 ✗、
+    // 而 `starttime` 是 182 天量级 ✗ ⇒ ① 算成 2023-09-27，与 `Date.now()`（2026-10-11）差**数年** ✗。
+    // 若直接采信 ①，就是给复用判定喂一个"自信的错值" ⇒ 判定整体失真 ✗。
+    // ⇒ 两条推法**必须互相吻合**（1 小时内）才可信 ✓；否则 **返回 null ⇒ 不判定**（保守 ✓，宁可少跑不可双跑）。
+    const fromBtime = btimeMs + (startTicks * 1000) / hz;
+    const upSec = Number(readFileSync('/proc/uptime', 'utf-8').split(/\s+/)[0]);
+    if (!Number.isFinite(upSec)) return null;
+    const fromUptime = Date.now() - (upSec - startTicks / hz) * 1000;
+    const CLOCK_SKEW_TOLERANCE_MS = 3600 * 1000;
+    if (Math.abs(fromBtime - fromUptime) > CLOCK_SKEW_TOLERANCE_MS) return null;
+    return fromBtime;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * **PID 复用**判定 ✓：进程启动时间**晚于"写锁时刻"**（留 `REUSE_MARGIN_MS` 余量）⇒ 该 PID 必然是
+ * 在锁写完之后才被复用的 ⇒ 锁是**陈旧**的 ⇒ **可安全抢占** ✓（收口"死 PID 被复用 ⇒ 最长 24h 假持有"✗）。
+ * 余量理由：starttime 只到节拍精度（约 10ms 级）+ 墙上时钟可能有抖动 ⇒ 留 1 分钟既不会误判"真持有者"✓，
+ * 又能把 24h 的假持有压到分钟级 ✓。
+ * **保守性（关键）**：任何不确定（读不到 stat / 无 HZ / 非 Linux / 解析失败 / lockTs 非法）⇒ **返回 false**
+ * ⇒ **当作未复用、不抢占** ✓（**绝不因为读不到就抢** ✗ —— 那会双跑 ✓）。
+ */
+export function isPidReused(pid: string, lockTs: number): boolean {
+  const REUSE_MARGIN_MS = 60 * 1000;
+  if (!(lockTs > 0)) return false;
+  const startedAt = procStartWallClockMs(pid);
+  if (startedAt === null) return false;
+  return startedAt > lockTs + REUSE_MARGIN_MS;
+}
+
 export function isPidInTasklistOutput(stdout: string, pid: string | number): boolean {
   return stdout.split(/\s+/).includes(String(pid));
 }
@@ -72,7 +156,14 @@ export function acquireSessionLock(): boolean {
         if (!oldPid) {
           if (age < EMPTY_LOCK_GRACE_MS) return false;
         } else if (oldPid !== myPid && age <= LOCK_TTL_MS && isPidAlive(oldPid)) {
-          return false;
+          // ★ PID 复用收口（2026-10-11）：进程"活着"但**启动时间晚于写锁时刻** ⇒ 该 PID 是后来复用的 ⇒
+          // 锁其实是陈旧的 ⇒ **可安全抢占** ✓（旧判据会把它当持有者 ⇒ 最长 24h 假持有 ✗）。
+          // 不确定时 isPidReused 返回 false ⇒ 保持旧行为（让出）✓ —— 宁可少跑，不可双跑 ✓。
+          if (isPidReused(oldPid, lockTs)) {
+            console.error(`[autopilot-lock] 判定 PID 复用（PID ${oldPid} 启动于锁写入之后）⇒ 陈旧锁，抢占回收 ✓`);
+          } else {
+            return false;
+          }
         }
         // ★ 比较后再删（2026-10-11）：旧实现直接 unlink ✗ —— 两个实例可能**同时**判定同一把锁陈旧，
         // 于是 A 删旧锁+建新锁后，B 仍按**先前读到**的内容把 **A 的新锁**删掉 ✗✗ ⇒ 两边都以为持有 ⇒
