@@ -3572,3 +3572,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   守门四项全绿（含脚本数一致 63）。
 - 未验证：真实仓库仅 2 份备份 ⇒ 删除路径只在临时区行使（真实数据未删任何东西）；未跑全量 vitest（只加独立脚本+改两处文档）；
   "备份目录不存在/为空"真实场景未覆盖；第 1 条故意未执行且依据为代码级论证。
+
+### 第 2 条锁可移植化：性质纠正为"静默双跑"（2026-10-11）
+
+- ★ 纠正：旧 isPidAlive 只看 /proc ⇒ 非 Linux 上 existsSync('/proc/<pid>') 恒 false ⇒ 存活持锁者被判不活 ⇒ "被持有"分支
+  永不进入 ⇒ 走到 unlinkSync ⇒ 删掉别人活着的锁 ⇒ 同一到期任务并行执行（不报错不告警）⇒ 不是"降级"而是并发双跑。
+- 修法：新增 portablePidAlive 用 process.kill(pid,0)（ESRCH⇒已死权威采信；EPERM⇒活着；其它/异常⇒保守当作活着；错误码走
+  Reflect.get 无 any）；isPidAlive 改两段（可移植判定→/proc 增强做僵尸精化；读不到⇒保守当作活着）并删掉旧存在性判据；
+  开关沿用既有风格不新增导出：PI_LOCK_DISABLE_PROC=1 模拟无 /proc、PI_LOCK_KILL_ERRNO 模拟 errno，均调用时读 env，
+  procState/procStartTicks/procStartWallClockMs 一并纳入。
+- 证据：新测 8 项全过（死 PID 可回收；★活持有者绝不抢占；无 /proc 不判复用；保守性 EACCES 仍判活着；④b 证明非真空通过；
+  ★反向断言永远可抢占的假实现必在活持有者用例失败；默认模式不回归）；全量 tsc rc=0；锁相关 4 文件 23 passed+2 skipped；
+  全量 vitest 105 files/1131 passed+6 skipped（+8）；守门全绿。
+- Windows 仍剩：无僵尸精化（TTL 24h 有界）；无 starttime 不做复用判定（保守让出，假持有最长 24h）；未在真 Windows/macOS 跑过。
+- ★ 协作级问题：docs/CHANGES.jsonl 是自指台账，两个写入者互顶 ⇒ 本轮产生 2 笔推不上去的本地台账提交（8afefec31/fad6b2b69），
+  执行者未 force/未 amend/未 --no-verify（按纪律），由父代理直接丢弃。建议守门/pre-push 对自指台账给出"请先 --settle 或允许
+  amend 本地未推送提交"的明确指引。另：其 subagent 调用被拒（depth 2 exceeds maxDepth 1）⇒ 改动为自己直接做的。
