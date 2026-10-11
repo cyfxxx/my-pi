@@ -2,6 +2,47 @@
 
 ## 格式
 
+### [2026-10-11] 修掉 `tool-stats-daily` 反复失败的根因：**autopilot 会拿 vitest worker 入口当 pi 启动** ✗✓
+
+**结论先行**：这是一处**真实代码缺陷** ✓，已修 + 有**同一环境的改前红/改后绿证据** ✓；
+**测试套件不是污染源**（**强否定证据** ✓）；但暴露出**另一个可疑现象**（重试风暴 ✗），已单列为待查项 ✓。
+
+**根因**（诊断推翻了我的前提 ✗✓ —— 我原以为是"提交/推送环节跑钩子"✗，证据显示**任务根本没跑起来**：
+`durationMs: 868` + `stdout (pi JSONL) (empty)` ✓）：
+`custom/features/autopilot/run/runner.ts` 的 `getPiInvocation()` **无条件信任 `process.argv[1]`** ✗ ——
+当**跑 autopilot 的进程本身是 vitest worker** 时，`argv[1]` 就是 **vitest 的 forks worker 入口** ⇒ 它去启动
+`node <init-forks.js> --mode json …` ⇒ 立刻抛 `Expected worker to be run in node:child_process` ✓
+（**最小复现**：`node node_modules/vitest/dist/chunks/init-forks.DgHqDQHC.js` ⇒ 与日志逐字一致 ✓）。
+
+**修法（纯附加、最小 ✓）**：新增 `isTestRunnerEntry` 判据 —— `argv[1]` 若位于 `node_modules/(vitest|jest|mocha)/`
+下 ⇒ **回退到 `'pi'`** ✓；**其余路径行为完全不变** ✓。同时**导出** `getPiInvocation` 以便测试（生产仍调用它 ⇒
+**不触"仅测试引用"的死导出规则** ✓✓）。
+
+**证据（同一测试、同一环境 ✓✓）**：
+```
+[premise] process.argv[1] = /root/my-pi/node_modules/vitest/dist/workers/forks.js   ← 前提成立 ✓
+改前：× 绝不能把 vitest worker 入口当成 pi  ⇒ Test Files 1 failed | Tests 1 failed | 1 passed   ✗
+改后：✓ 同一测试（premise 仍指向 vitest worker）⇒ Test Files 1 passed | Tests 2 passed        ✓
+```
+新测试 `custom/features/autopilot/__tests__/pi-invocation-guard.test.ts` **刻意跑在 vitest 里** ⇒ **真实复现该场景** ✓
+（不是构造假路径 ✓），且**第一条断言专门守 premise** ✓。
+
+**强否定证据：测试套件不污染真实调度器目录** ✓✗：
+- 单跑 autopilot 子集（19 文件 / 195 项）⇒ 真实 `portable/memory/scheduler/logs/` **51 → 51 条**（不变 ✓）；
+- 跑**整套**（99 文件 / **1094 项**）⇒ 仍然 **51 → 51** ✓；
+- 唯一驱动 `runTaskOnce` 的测试 `command-run-manual.test.ts` **已 mock `../run/runner`** ✓。
+⇒ **结论：污染源不在测试套件里** ✓（**未找到** ✗，按口径如实写"未找到 + 已排除清单" ✓）。
+
+**⚠ 新发现（建议单独立项）**：那批失败日志**不是定时触发的** ✗，且像**重试风暴** ✗ ——
+任务 `schedule: "30 23 * * *"` ✓，而失败日志时间戳是 **01:07:44** ✗（**与排程不符** ✓）；
+**5 条在约 100ms 内**（`…-44-404Z / -431Z / -466Z / -484Z / -508Z` ✗）⇒ **连击/重试** ✓；`reason:` 为空 ✗。
+**可证伪的判断**：这 5 次是**同一进程内的连续 `runTaskOnce` 调用**（手动/强制触发或重试逻辑 ✓），
+而该进程 `argv[1]` 当时正是 vitest worker ✗ ⇒ 触发了本 bug ✓。**但"是谁在 01:07 连续调用 5 次"仍未定位** ✗
+（测试套件已用前后计数排除 ✓；`reason` 为空无法佐证 ✗）⇒ **建议查 autopilot 的重试/连击逻辑**（5 次/100ms 不是人类操作 ✓）。
+
+**未验证（如实 ✗）**：① **正常路径未用真实 pi 启动实测**（依据是"改动纯附加" + 回退目标 `pi` 确认在 PATH ✓）；
+② **污染源未找到** ✗（但有两次前后计数的**强否定** ✓）；③ **"谁在 01:07 连调 5 次"未定位** ✗。
+
 ### [2026-10-11] ② 会话切换实测：**可行性与触发方式探明，活体实验未完成** ✗（含"代码推断"与"观测"的严格区分 ✓）
 
 **结果（如实 ✗）**：**三个问题都只有代码级证据、均标为推断** ✗，活体实验未做完 ✗。

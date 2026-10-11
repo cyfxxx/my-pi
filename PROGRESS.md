@@ -3293,3 +3293,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   而在任务的 commit/push 环节（钩子的 vitest 调用方式 ✗）⇒ 建议单独立项。
 - 清理：子代理只按会话名关自己的 probe、**归属不明的会话一个没动** ✓ + 上报 ✓；我用**父进程 5142 = 探针命令**定死归属 ✓
   ⇒ 按名字清理并逐一核对 PID 退出 ✓（**全程未用 pkill -f** ✗）。
+
+### 修 tool-stats-daily 根因：autopilot 拿 vitest worker 当 pi 启动（2026-10-11）
+
+- 根因（推翻我的前提）：getPiInvocation 无条件信任 argv[1] ⇒ 在 vitest worker 里会去启动 init-forks 块 ⇒
+  立刻抛 Expected worker to be run in node:child_process（868ms、stdout 空）。
+- 修法（纯附加）：argv[1] 位于 node_modules/(vitest|jest|mocha)/ ⇒ 回退到 'pi'；其余不变；并导出该函数以便测试
+  （生产仍调用 ⇒ 不触"仅测试引用"死导出规则）。
+- 证据：同一环境同一测试，改前 1 failed/1 passed ⇒ 改后 1 passed/2 passed；新测试刻意跑在 vitest 里真实复现该场景。
+- 强否定：autopilot 子集（19 文件/195 项）与整套（99 文件/1094 项）跑完，真实调度器日志 51→51 不变 ⇒ 测试套件不污染。
+- ⚠ 新发现待查：失败日志在 01:07:44（排程是 23:30）且 5 条/约 100ms ⇒ 像重试风暴；"谁连调 5 次"未定位（可证伪判断：
+  同进程连续 runTaskOnce，其 argv[1] 正是 vitest worker）。
+- 未验证：正常路径未用真实 pi 启动实测；污染源未找到（有强否定）；连调 5 次者未定位。

@@ -25,10 +25,21 @@ export function buildRunArgs(task: Task): string[] {
   return ['--mode', 'json', '-p', '--no-session', '--no-extensions', renderPrompt(task.prompt)];
 }
 
-function getPiInvocation(args: string[]): { command: string; args: string[] } {
+export function getPiInvocation(args: string[]): { command: string; args: string[] } {
   const currentScript = process.argv[1];
   const isBunVirtual = currentScript?.startsWith('/$bunfs/root/');
-  if (currentScript && !isBunVirtual && fs.existsSync(currentScript)) {
+  // 2026-10-11 修（定时任务 `tool-stats-daily` 反复失败的真根因 ✗）：
+  // **不能无条件信任 `process.argv[1]`** —— 本进程若是 **vitest worker**，`argv[1]` 就是测试运行器的
+  // worker 入口（实测 `/…/node_modules/vitest/dist/workers/forks.js`）⇒ 旧逻辑会去
+  // `node <forks.js> --mode json …` ⇒ 抛 `Expected worker to be run in node:child_process` ⇒ 任务必然失败。
+  // 判据（**纯附加、最小** ✓）：入口位于测试运行器目录（vitest/jest/mocha）⇒ **回退到 `'pi'`** ✓；
+  // 其余路径行为**完全不变** ✓。
+  const isTestRunnerEntry =
+    !!currentScript &&
+    currentScript.includes(`${path.sep}node_modules${path.sep}vitest${path.sep}`) ||
+    !!currentScript && currentScript.includes(`${path.sep}node_modules${path.sep}jest${path.sep}`) ||
+    !!currentScript && currentScript.includes(`${path.sep}node_modules${path.sep}mocha${path.sep}`);
+  if (currentScript && !isBunVirtual && !isTestRunnerEntry && fs.existsSync(currentScript)) {
     return { command: process.execPath, args: [currentScript, ...args] };
   }
   const execName = path.basename(process.execPath).toLowerCase();
