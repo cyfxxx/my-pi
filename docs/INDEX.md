@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（210 条）
+## 决策台账（211 条）
 
+- `DECISIONS.md` · [2026-10-11] ② 会话切换**活体实验成功**：Q1 实测闭环 ✓（Q2/Q3 如实"无证据" ✗） · **触发方式（来自代码，不是猜 ✓）**：**`/new`**（"Start a new session"）—— `vendor/pi/…/core/slash-commands.ts:40` ✓ · 数字: 8 条 / 6 个 / 3 个 / 5 条
 - `DECISIONS.md` · [2026-10-11] ①i PID 复用**在本机真跑绿了** ✓✓ —— 走**节拍路线**（对配方的一处**有证据的偏离** ✗✓） · **第一步（我要求先验证的前提）**：**两个 uptime 来源不可比** ✗（原始输出 ✓）： · 数字: 124.08 秒 / 563.95 秒 / 182 天 / 439.87 秒 · 证据: 1680020856 / 1791709252
 - `DECISIONS.md` · [2026-10-11] ①f PID 复用加固：**诊断定死（上一轮假设被证伪 ✗✓）+ 实现落地（核心用例本机显式跳过 ✗）** · **① 第一步诊断的答案（原始输出，已定死 ✓）**：**`acquireSessionLock()` 用的就是 `lockPath()`，路径完全一致** ✓ · 数字: 2 个 / 124 秒 / 182 天 / 1 小时 · 证据: 1791707429670 / 1574680206
 - `DECISIONS.md` · [2026-10-11] ①-g 可疑失败可见 + ①-h 入口"正面白名单" ✓（两项收尾） · **①-g：`daily-health` 增加"可疑失败"只读统计** ✓（仅改 `scripts/daily-health.mjs` ✓）： · 数字: 3 个
@@ -218,7 +219,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（208 条）
+## 进度记录（209 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -428,6 +429,7 @@
 - `PROGRESS.md` · ①-g 可疑失败可见 + ①-h 入口正面白名单（2026-10-11） · - ①-g：daily-health 加 checkSuspectFailures（只读、解析失败不抛、同既有约定）；汇总加"失败=<n> 可疑失败=<n>"分开报
 - `PROGRESS.md` · ①f PID 复用：诊断定死 + 实现落地（核心用例本机显式跳过）（2026-10-11） · - 诊断（原始输出）：acquireSessionLock 用的就是 lockPath，路径一致；paths.ts 在调用时读 PI_MEMORY_DIR（非导入时缓存） · 数字: 124 秒 / 182 天
 - `PROGRESS.md` · ①i PID 复用在本机真跑绿：节拍路线（2026-10-11） · - 第一步前提验证：两个 uptime 来源不可比（/proc/uptime 124 秒 vs starttime/HZ ≈182 天；btime 2023 vs now 2026）⇒ 按前提不硬做跨钟比较。 · 数字: 124 秒 / 182 天 / 2 条 · 证据: 1574856374 / 1574856395
+- `PROGRESS.md` · ② 会话切换活体实验成功（2026-10-11） · - 触发方式（来自代码）：/new（slash-commands.ts:40；:42 是 /resume）；键位 app.session.new 的 defaultKeys 为空 ⇒ 是命令不是快捷键； · 数字: 6 个 / 3 个 / 2.12GB / 1 次
 
 ## 缺陷回放（26 条）
 

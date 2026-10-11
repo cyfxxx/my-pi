@@ -3409,3 +3409,20 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   墙钟 9 项 7 passed + 2 诚实跳过；僵尸用例无回归；全量 vitest 1123 passed/6 skipped（+7）；tsc rc=0；守门全绿；真实状态未碰。
 - 未验证：墙钟路线本机仍不可用（2 条仍跳过，非通过）；非 Linux/无 /proc 仅代码层论证；锁格式多一可选段（旧版本只取前两段，向后兼容）；
   真实调度器主循环里的复用抢占未跑（② 已是真实文件+真实受控进程+真实 acquire 路径的端到端）。
+
+### ② 会话切换活体实验成功（2026-10-11）
+
+- 触发方式（来自代码）：/new（slash-commands.ts:40；:42 是 /resume）；键位 app.session.new 的 defaultKeys 为空 ⇒ 是命令不是快捷键；
+  实验里 pty.send('/new\r') 真生效。驱动栈：真 pty(script) + 真 supervisor + 真 pi + 真 my-pi 扩展 + 项目假 provider；
+  造"正在跑的一轮"手法：发消息前才 hangNext(1) ⇒ 挂住的必然是这一轮。
+- ★Q1（决定性）：在"等模型响应"处被 abort —— Operation aborted（pi 文案）+ respondedAt 始终 None + 旧会话文件末条是空 content 的
+  assistant 记录 + **PID 完全不变**（进程内替换）+ 另建新会话文件且新会话可用。
+- ★Q2：无直接证据；并更正事实——session_shutdown 处理器是 6 个不是 3 个（autopilot:1156/browser:382/plan-mode:388/subagent:220/
+  tmux:323/voice:397）。可证：进程内替换 ⇒ 处理器必然触发；新会话 session_start 确实跑了。无证据：池/tmux/plan-mode 的实际动作
+  （本设置下都不留可观察制品）。
+- ★Q3：无证据 —— 假 provider 不能产生工具调用 ⇒ 无法进入 leased ⇒ "池保住在跑 worker"仍只有代码+单测支撑，未升级为实测。
+- 附加：/new 在回合中照样执行（未被排队，与笔记里 /quit 被排队不同）；推断（标明为推断）当时在等网络响应、输入循环未阻塞。
+- 方案判定：1 有支持、2 有支持、5 强间接支持（进程活着 PID 不变 ⇒ 池天然跨会话存活）、4 部分支持、3 需改核心；无被排除项。
+- 环境与清理：mem 2.11→2.12GB；第一次失败留下 3 进程 ⇒ 先核实归属再按 PID 收掉，残留=无；tmux 无服务；仓库 git status 空；
+  真实调度器未碰（logs 51、无锁）；全程按 PID、未用 pkill -f；证据在 /tmp/sw-exp/。
+- 存疑：新会话消息未落在旧 s.jsonl（旧文件是否封存未追）；悬空连接最终状态未测；只跑 1 次不足以排除偶发（机制链自洽）。
