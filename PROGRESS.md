@@ -3395,3 +3395,17 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 建议的真正修法（未实现）：锁内容扩成 PID:wallTs:uptimeMs（向后兼容），复用判定改比较"进程启动 uptime"与"写锁 uptime"
   ⇒ 同一时钟 ⇒ proot 可用；并加同样的互校自证。
 - 未验证：②/★ 本机未验证（显式跳过，非通过）；非 Linux/无 HZ 仅代码层论证；端到端未跑。WIP 在 /tmp/lock-reuse-wip/NOTES.md。
+
+### ①i PID 复用在本机真跑绿：节拍路线（2026-10-11）
+
+- 第一步前提验证：两个 uptime 来源不可比（/proc/uptime 124 秒 vs starttime/HZ ≈182 天；btime 2023 vs now 2026）⇒ 按前提不硬做跨钟比较。
+- ★ 关键发现：坏的是"节拍→秒/墙钟"的换算，节拍本身跨进程自洽（同 shell 1574856374 vs 其 sleep 1574856395，差 21 节拍≈0.21s）
+  ⇒ 只比节拍大小即可判"谁先启动" ⇒ 不需要 HZ/btime/uptime/墙钟 ⇒ proot 可用。
+- 偏离配方（有证据、父代理认可）：第三段存 starttime 原始节拍（而非 uptimeMs，因为 uptime/btime 正是坏掉的源）；
+  锁内容 PID:wallTs:startTicks（向后兼容：拿不到节拍只写两段；旧两段锁回退墙钟路线）；新增 procStartTicks +
+  isPidReusedByTicks（holderTicks > lockStartTicks ⇒ 复用 ⇒ 可抢占）；同进程 starttime 终生不变 ⇒ 相等即不抢（无需余量）。
+- 证据：端到端抢占真发生（[autopilot-lock] 判定 PID 复用…节拍路线 ⇒ 陈旧锁，抢占回收）；新测 7 passed（真持有者节拍相等不抢且锁未动 /
+  复用则抢且锁变成我们的 / 反向断言 / 旧格式+关墙钟路线保守让出 / 关墙钟路线仍正确判复用 ⇒ 不依赖 HZ / DISABLE 开关不判定 / 环境自证防假绿）；
+  墙钟 9 项 7 passed + 2 诚实跳过；僵尸用例无回归；全量 vitest 1123 passed/6 skipped（+7）；tsc rc=0；守门全绿；真实状态未碰。
+- 未验证：墙钟路线本机仍不可用（2 条仍跳过，非通过）；非 Linux/无 /proc 仅代码层论证；锁格式多一可选段（旧版本只取前两段，向后兼容）；
+  真实调度器主循环里的复用抢占未跑（② 已是真实文件+真实受控进程+真实 acquire 路径的端到端）。
