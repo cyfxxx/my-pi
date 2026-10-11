@@ -40,10 +40,13 @@ echo "=== my-pi doctor（$ROOT）==="
 # ── 1. Node ──
 echo "[1] 运行时"
 if command -v node >/dev/null 2>&1; then
-  MAJOR="$(node -v | sed 's/^v//' | cut -d. -f1)"
-  if [ "${MAJOR:-0}" -ge 22 ]; then ok "Node $(node -v)"; else bad "Node $(node -v) < 22（需要 >=22）"; fi
+  if node_version_ok; then
+    ok "Node $(node -v)"
+  else
+    bad "Node $(node -v) 低于要求（需要 >= ${PI_NODE_MIN}）；上游构建脚本需内置类型剥离运行 .ts"
+  fi
 else
-  bad "未找到 node（安装 Node >=22）"
+  bad "未找到 node（安装 Node >= ${PI_NODE_MIN}）"
 fi
 
 # ── 2. 根工作区依赖 ──
@@ -62,9 +65,15 @@ fi
 echo "[3] vendor/pi"
 if [ -d "$VENDOR_PI/.git" ]; then
   ok "vendor/pi 是独立 git 仓库"
-  if git -C "$VENDOR_PI" diff --quiet 2>/dev/null; then ok "vendor/pi 工作树干净"; else
-    warn "vendor/pi 有未提交修改（check-isolation 会失败）"
-  fi
+  # 不能用 `git diff --quiet 2>/dev/null`：git 读不了仓库时（exFAT/网络盘的属主检查）
+  # 会退化为用法错误（退出码 129），被误判成"有未提交修改"。
+  git_dirty_state "$VENDOR_PI"
+  case $? in
+    0) ok "vendor/pi 工作树干净" ;;
+    1) warn "vendor/pi 有未提交修改（check-isolation 会失败）" ;;
+    *) bad "vendor/pi 无法读取：git 拒绝访问（并非「有改动」）"
+       git_unreadable_hint "$VENDOR_PI" 2>&1 | sed 's/^/     /' >&2 ;;
+  esac
   if grep -Eq '^[0-9a-f]{7,40}([[:space:]]|$)' "$VENDOR_PI/LAST_SYNC_POINT" 2>/dev/null; then
     ok "LAST_SYNC_POINT: $(awk '{print $1}' "$VENDOR_PI/LAST_SYNC_POINT")"
   else

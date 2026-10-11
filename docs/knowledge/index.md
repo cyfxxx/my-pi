@@ -6,7 +6,7 @@
 > 每页四件事：是什么 / 根因 / **确切命令序列** / **含确切语法的解法**；篇幅 **10–30 行**；只记可泛化的。
 > **本产物不自动进模型上下文、不改任何运行时行为**，只供人审阅。
 
-## 失败模式（26 条，来源：`docs/BUG-REPLAYS.md`）
+## 失败模式（30 条，来源：`docs/BUG-REPLAYS.md`）
 
 - [bug-001](patterns/bug-001.md): 切了模式、重启后没生效 + `modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` + `check-conventions`（状态不入库）+ 状态体检 `modes-legacy-current`；模式状态已迁到 gitignored 的 `modes-sessions.json`
 - [bug-002](patterns/bug-002.md): 模式解析"第 3 轮工厂执行后漂回 full" + `PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 + `mode-switch.test.ts` 的三轮回归 + `resolveStartupMode()` 单一写入点
@@ -23,7 +23,7 @@
 - [bug-013](patterns/bug-013.md): **多实例不可见（静默失效）** + `state-audit` 数实例的判据是 `argv` 里含 `cli.js`，而真 pi 启动后 `process.title='pi'` 把 `/proc/<pid>/cmdline` 覆盖成只剩 `pi` → 真机上实例数恒为 0/1（只有假 CLI 或启动早期才数得到），"多实例可见"这条承诺从上线起就没兑现 + `scripts/state-audit.mjs` 的 `countRunningInstances()`：认 `cli.js` **或**标题 `pi`/`pi-rpc` 两种形态，且要求 `exe=node`、排除 `node -e` 助手
 - [bug-014](patterns/bug-014.md): **system 加固块静默丢失（进程内前缀漂移）** + `before_agent_start` 处理器返回的 `systemPrompt` 没生效——pi 会**静默吞掉**该处理器的异常（只发给内存 listener，不落盘），于是 my-pi 追加的 772B system 加固块整块消失，请求退回"纯分段渲染"。system 在请求最前，少一块 = 前缀从第 0 个 token 起分叉 → **整段全价重放**。实测一次会话内 `system` 在 8020B/7239B 两变体间来回翻（14:11:22 翻过去、14:25:27 翻回来），两次 = 147,555 + 10,308 token = 该会话**全部未命中的 60.8%** + ① `before_agent_start` 改「关键路径 vs 可选增强」分层：拿 system 文本 + 追加加固块只做纯字符串运算，其余（工具分层/顺序对齐/用量校准/提示）全部就地 try/catch → 增强失败不再牵连前缀；② `prefix-fingerprint.ts` 记 `systemAppend` + `systemSections`/`systemChangedSections`（分段字节表，能区分"某段被改写"与"末尾整块丢了"）+ `system:append-lost`/`system:append-back` 标签；③ 独立台账 + 有 UI 时 `ui.notify`；④ `daily-health` 按**逐条** `systemAppend:false` 一律 alert（不再混进"疑似整段重算"）
 - [bug-015](patterns/bug-015.md): **诊断工具自身的盲区 + JSON 转义吃掉分段结构**：`systemTextOf()` 对字符串 `content` 也无条件 `JSON.stringify` → 真实换行被转义成字面量 `\n`、并加上首尾引号 → `systemSectionSizes()` 再也切不开分段，整块 system 被记成一段 `preamble`。后果：第 14 条那类"进程内 system 漂移"**根本没法定位到段**，只能看到 `changed:["system"]`；字节数也整体虚高（7142B 原文 → 7239B） + `systemTextOf()`：字符串**原样返回**，只有非字符串（结构化 content）才 `stable()` 序列化；测试同时钉住"保留真实换行"
-- [bug-016](patterns/bug-016.md): **终端层"假卡死" + agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 pty 的主端在 Android 侧，`/proc` 里无持有者；当时内存吃紧 swap 4.4G/5.6G），不在 agent 层 + head -1); w1=$(awk '/^wchar/{print $2}' /proc/$P/io); kill -WINCH $P; sleep 2; w2=$(awk '/^wchar/{print $2}' /proc/$P/io); echo "wchar $w1 -> $w2"; ls -l /proc/$P/fd \
+- [bug-016](patterns/bug-016.md): **终端层"假卡死" + agent 正常、用户却完全无法交互**：pi 进程健康（事件循环响应、整屏重绘正常、回合已干净收尾），但 14:25:27 之后再没有任何输入到达进程，用户视角就是"卡死"。根因在**终端/输入层**（该 pty 的主端在 Android 侧，`/proc` 里无持有者；当时内存吃紧 swap 4.4G/5.6G），不在 agent 层 + **不做自动重启**（按 2026-10-07 定的口径）：supervisor 只在 crash/admin action 时重拉，这类"终端层卡死"的处置是**关掉该 my-pi 所在的终端会话**再重开——不引入看门狗误伤在飞会话
 - [bug-017](patterns/bug-017.md): **类型级修复「潜伏未提交」** + typebox 1.3.x 没有 Type.Null()（只有 Null 常量）⇒「可选 + null」这条最常用路径抛 ReferenceError；而提交门禁走 golden --fast（跳过 tsc）⇒ 修复能一直躺在工作区不被发现 + **全量 tsc**（关键改动后手动补跑；--fast 不覆盖）
 - [bug-018](patterns/bug-018.md): **并行时「运行中的 worker 被池回收」** + shutdown() 连 leased 一起 dispose ⇒ 回退 spawn（无投递通道）⇒ 中途投递的消息永远停在未读 + **已修 + 回归测试挡住**（改前 1 failed / 改后 4 passed）
 - [bug-019](patterns/bug-019.md): **状态文案会「说谎」** + not-scanned 曾一律打印「本机没有 ClamAV/YARA」，而引擎其实装着、真实原因是「文件不存在」⇒ 写死的解释性文案会随环境从「保守」变成「撒谎」 + 文案已改为指向真实原因 + 打印 原因：…；**无自动守门**
@@ -34,6 +34,10 @@
 - [bug-024](patterns/bug-024.md): **新引入一种「我写的文件格式」⇒ 必须同时引入校验它的守门** + 非法 JSON 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS） + **已有守门**：scripts/check-conventions.sh 的 JSON 语法守门（packs/scripts/sync 下的 .json）
 - [bug-025](patterns/bug-025.md): **测试把 bug 当契约** + 既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） + **无自动守门**（改语义前须人工回看断言表达的契约）
 - [bug-026](patterns/bug-026.md): **RPC 的 prompt 被拒、父侧却当成功** + 缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolve** ⇒ 日志写「已投递（将在下一个 turn 边界执行）」并 `markConsumed` ✗ ⇒ 注入从未入队、行为不变 —— 典型「假装成功」 + **已修 + 由真实 E2E 挡住**：修复后帧出现 `disposition:"queued"` + 注入后 **5 次 `turn_start`**，且 `/tmp/inbox-proof.txt` = `INBOX-OK` ✓
+- [bug-027](patterns/bug-027.md): **Node 主版本够、minor 不够 ⇒ 构建中途才崩** + `package.json`、13 个 vendor 包与上游 README 都要求 Node **>= 22.19.0**，而 `build.sh` 与 `doctor.sh` 只比对**主版本**（`>= 22`）⇒ Node 22.14.0 被放行，直到上游脚本用 `node scripts/*.ts`（内置类型剥离，22.18+ 才默认开启）时才以 `ERR_UNKNOWN_FILE_EXTENSION` 失败，报错点离根因很远 + **已硬化**：`scripts/lib-vendor.sh` 的 `node_version_ok`（逐段比较 major/minor/patch）+ `node_version_hint`，由 `build.sh` 与 `doctor.sh` **共用**（单一事实来源，防两处口径漂移）；实测 22.14.0 被拒、22.23.3 构建全绿，详见 `docs/operations/BUILD-PORTABILITY.md` §1
+- [bug-028](patterns/bug-028.md): **在 exFAT 卷上装依赖 ⇒ npm 报内部错误而非「不支持符号链接」** + U 盘（exFAT）无法创建符号链接（Windows junction 亦被拒），而 npm workspaces 必须把工作区包符号链接进 `node_modules`（根 `workspaces:["custom"]`、`vendor/pi` 的 `packages/*`）⇒ 报 `Cannot read properties of null (reading 'edgesOut')`（arborist 内部错误），**完全看不出真实原因**。与 my-pi 自身理念冲突：`portable/` 本就禁止符号链接（`check-isolation.sh` 检查 1） + **已硬化**：`scripts/lib-vendor.sh` 新增 `preflight_symlinks`，`build.sh` 第 1b 步在**安装前**调用（根依赖与 vendor 构建都跳过时免检）；详见 `docs/operations/BUILD-PORTABILITY.md` §2
+- [bug-029](patterns/bug-029.md): **canvas 原生构建挡住整个构建** + `vendor/pi/packages/ai` 的 `canvas@3.2.3` 是 **devDependency**（该包测试用），无预编译包时 npm 退化为 `node-gyp` 源码编译，而 canvas 需要 GTK/cairo ⇒ 构建在 `cairo.h: No such file or directory` 处整链失败；而它在 pi-ai 源码与测试里**零引用**、构建产物也不依赖它 + **旁路用法已写进 build.sh 头部注释**（无自动守门：属"可选依赖缺平台构建工具"，刻意不做成失败）；上游 README 亦有前提 *"Pi does not require dependency lifecycle scripts"*；详见 `docs/operations/BUILD-PORTABILITY.md` §3
+- [bug-030](patterns/bug-030.md): **守门把「读不了仓库」误报成「有未提交的修改」，方向完全相反** + `check-isolation.sh` 检查 6 用 `if ! git diff --quiet 2>/dev/null` 判 `vendor/pi` 是否干净。`git diff --quiet` 有**三个**结局——0 干净、1 有改动、**129 读不了仓库**（exFAT/网络盘上因 "dubious ownership" 退化为 `--no-index` 用法错误）。只看"非 0"就把 129 归进"有改动"，再加 `2>/dev/null` 吞掉线索 ⇒ 报出 `vendor/pi/ 有未提交的修改`，而它其实是干净的。同类写法在 `doctor.sh`、`sync-upstream.sh` 里各有一处（后者会因此拒绝同步） + **已修 + 判据收敛**：`scripts/lib-vendor.sh` 新增 `git_repo_readable` / `git_dirty_state`（三态）/ `git_unreadable_hint`，由 `check-isolation.sh`、`doctor.sh`、`sync-upstream.sh`、`build.sh` 共用（单一事实来源，防口径漂移）；`build.sh` 在 clone 后**自动登记** `vendor/pi` 的 `safe.directory`；详见 `docs/operations/BUILD-PORTABILITY.md` §4.1
 
 ## 被否提案（7 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 
@@ -51,7 +55,7 @@
 
 > 判据第 ⑤ 条：**只记可泛化的**。这里只收 `remind===true`（已按 `REPAIR_THRESHOLDS {3,5,8}` 触发过修复提醒）或 `attempts>=3` 的指纹；**一次性手误不入库**。同一指纹一页（取最新一条）。
 
-- （该来源**已接线但当前没有达到收录门槛的记录**——指纹日志只在工具调用失败时追加，且要反复出现才入库）
+- （该来源**已接线**，但 `portable/memory/logs/error-fingerprints.jsonl` **还不存在** ⇒ 没有语料可编译；**不造数据**）
 
 ## 明确未接线的来源
 

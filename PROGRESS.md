@@ -3630,3 +3630,20 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   ⇒ 漂移会继续存在，但现在日志带两侧摘要可诊断；新增运行时产物 logs/seed-drift.sig（logs 51→52 是上轮 WIP 探针 14:45 写的）。
 - 方法论教训：部分回退会给出错误归因（先只回退 seeds.ts 仍红 ⇒ 一度误判"不是我"）；未隔离的守卫会惩罚正确改动（守门绿 ≠ 做对了，
   只等于没碰它覆盖不到的地方）；用"本地不存在的探针"做隔离断言比"断言没变化"更有分辨力。
+
+### ClamAV 种子字段对齐（2026-10-11）
+
+- 只改 scheduled-seeds.json 里「每日更新 ClamAV 病毒库」一条（prompt 逐字节未变、另 5 条逐字节未变、version/note 未变）；
+  diff 1 file changed 10 insertions 1 deletion（那 1 处 deletion 是 prompt 行位置调整，内容程序化核对未变）。
+- 另 5 条实际字段：type:cron；useSubagent:true(5/5)；notifyMain:true(5/5)；waitForUserOnLocal:true(5/5)；maxRunTime 600/900/900/300/900
+  （单位秒）；retries:1(5/5)；tags。
+- 补的字段与理由（都核实语义）：useSubagent:true（schedule-tool.ts:217 "在子代理中执行（不打断当前会话）"，与"freshclam 下载+校验几分钟
+  不该占住会话"吻合；storage.ts:98/134 默认 false ⇒ 必须显式）；maxRunTime:900（单位秒见 run/runner.ts:180，取同文件最大值）；
+  retries:1（与 5/5 一致；ops.ts:511/527 用于超时与 provider 故障重试，网络抖动实测 000↔403↔200）；tags:["security","daily"]；
+  notifyMain:true、waitForUserOnLocal:true（与 5/5 一致）。
+- ★ 如实未核实：notifyMain/waitForUserOnLocal 找不到行为消费点（全仓 grep 只有类型声明与种子→任务映射，run/ops 0 命中）⇒ 很可能是
+  未被消费的配置；对无人值守任务 waitForUserOnLocal 可论证为 false，但那会破坏 5/5 一致性 ⇒ 未擅改（父代理裁定保持 true：消费点不
+  存在时改动无可验证收益）；未用真实种子文件跑端到端（种子对账只能会话内触发），证据强度 = 静态断言 + 映射路径既有测试，非端到端；
+  真实 tasks.json 仍无 ClamAV ⇒ daily-health 仍报种子失配=1，待下次真实会话自动注册。
+- 验证：check-seeds-headless rc=0（6 条全绿含 ClamAV）；只有一条变；真实数据零改动（sha256=b6ffc4599f04745e592d5270 基线、无残留锁）；
+  check-conventions 全绿；golden --fast 20 步全绿（含第 11 步）。

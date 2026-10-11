@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（221 条）
+## 决策台账（222 条）
 
+- `DECISIONS.md` · [2026-10-11] ClamAV 种子字段对齐 ✓（并查实：`notifyMain`/`waitForUserOnLocal` **无消费点** ✗） · **改动范围（严格 ✓）**：`portable/agent/scheduled-seeds.json` **只有「每日更新 ClamAV 病毒库」那一条被改** ✓ · 数字: 5 条 / 48MB / 3 条 / 1 次 · 证据: b6ffc4599f04745e592d5270
 - `DECISIONS.md` · [2026-10-11] 种子静默失效修复 ✓ + ★ 守卫隔离缺陷（**守卫在惩罚正确的改动** ✗✓） · **★ 我自己的锅（先认 ✓）**：`portable/agent/scheduled-seeds.json` 里那条 **「每日更新 ClamAV 病毒库」只有 `['name','prompt']`** · 数字: 5 条 / 3 个 / 6 条
 - `DECISIONS.md` · [2026-10-11] 修 `daily.ts` 的"说谎状态" ✓（`null` 不再显示成"✓ 成功"）+ 诊断报告落盘 · **修的是什么** ✗：`custom/features/autopilot/daily.ts` 的 `lastMark()` 旧逻辑是**唯一的说谎点** ✓： · 证据: b6ffc4599f04745e / node scripts/daily-health.mjs --print
 - `DECISIONS.md` · [2026-10-11] 第 2 条锁可移植化：**纠正性质 —— 不是"静默降级"，是"静默双跑"** ✗✓ · **★ 我原先的判断被纠正** ✗✓（**我低估了严重性** ✓）：`custom/features/autopilot/store/locks.ts` 的 `isPidAlive()`（`:38-44`） · 证据: e436fc2a2 / 8afefec31
@@ -229,7 +230,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（219 条）
+## 进度记录（220 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -450,8 +451,9 @@
 - `PROGRESS.md` · 第 2 条锁可移植化：性质纠正为"静默双跑"（2026-10-11） · - ★ 纠正：旧 isPidAlive 只看 /proc ⇒ 非 Linux 上 existsSync('/proc/<pid>') 恒 false ⇒ 存活持锁者被判不活 ⇒ "被持有"分支 · 证据: 8afefec31 / fad6b2b69
 - `PROGRESS.md` · 修 daily.ts 说谎状态 + 5 任务失败诊断落盘（2026-10-11） · - 修 lastMark()：旧逻辑"非 failed 即成功"⇒ null 显示"✓ 成功"；新逻辑三分支严格（success/failed/— 未记录）；"—"沿用项目既有习惯 · 数字: 50 条 / 4 条 · 证据: b6ffc4599f04745e / d339950a3
 - `PROGRESS.md` · 种子静默失效修复 + 守卫隔离（2026-10-11） · - 我的锅：ClamAV 种子只有 [name,prompt] ⇒ 被 isSeedLike（要求 type∈{interval,cron,once} 且 schedule 非空）过滤掉 ⇒ 永不注册且 · 数字: 3 个 / 5 个 / 6 条 / 5 条
+- `PROGRESS.md` · ClamAV 种子字段对齐（2026-10-11） · - 只改 scheduled-seeds.json 里「每日更新 ClamAV 病毒库」一条（prompt 逐字节未变、另 5 条逐字节未变、version/note 未变）； · 数字: 5 条 / 6 条 · 证据: b6ffc4599f04745e592d5270
 
-## 缺陷回放（26 条）
+## 缺陷回放（30 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -479,6 +481,10 @@
 - `docs/BUG-REPLAYS.md` · #24 **新引入一种「我写的文件格式」⇒ 必须同时引入校验它的守门**：非法 JSON 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS） · 补排除项时被 json.loads 抓到（此前已据此写了文档）
 - `docs/BUG-REPLAYS.md` · #25 **测试把 bug 当契约**：既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） · 修池 bug 时发现原测试 expect(a.worker.alive).toBe(false) 正是 bug 行为
 - `docs/BUG-REPLAYS.md` · #26 **RPC 的 prompt 被拒、父侧却当成功**：缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolv · 帧证据：`dir=in {"success":false,"error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')…"}` · 数字: 4 轮 · 证据: node scripts/subagent-inbox.mjs post
+- `docs/BUG-REPLAYS.md` · #27 **Node 主版本够、minor 不够 ⇒ 构建中途才崩**：`package.json`、13 个 vendor 包与上游 README 都要求 Node **>= 22.19.0**，而 `build.sh` 与 `docto · 报错 `TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts" for .../packages/ai/scripts/check-model-data.ts · 证据: bash scripts/doctor.sh 2>&1'
+- `docs/BUG-REPLAYS.md` · #28 **在 exFAT 卷上装依赖 ⇒ npm 报内部错误而非「不支持符号链接」**：U 盘（exFAT）无法创建符号链接（Windows junction 亦被拒），而 npm workspaces 必须把工作区包符号链接进 `nod · 同一个 `package.json`：NTFS 安装成功、exFAT 崩溃；`cmd /c 'mklink /D ...'` 回 `The device does not support symbolic links.`，`mklink /
+- `docs/BUG-REPLAYS.md` · #29 **canvas 原生构建挡住整个构建**：`vendor/pi/packages/ai` 的 `canvas@3.2.3` 是 **devDependency**（该包测试用），无预编译包时 npm 退化为 `node-gyp`  · 报错 `npm error path .../node_modules/canvas` + `command ... prebuild-install -r napi` + `cairo.h: No such file or directo
+- `docs/BUG-REPLAYS.md` · #30 **守门把「读不了仓库」误报成「有未提交的修改」，方向完全相反**：`check-isolation.sh` 检查 6 用 `if ! git diff --quiet 2>/dev/null` 判 `vendor/pi` 是否干净 · 报错说"有改动"，但 `git -C vendor/pi status --porcelain` 输出 **0 行**；`git -C vendor/pi diff --quiet; echo $?` 得 **129**（不是 1）；手动 
 
 ## 设计文档（177 条）
 

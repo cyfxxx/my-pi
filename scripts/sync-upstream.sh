@@ -83,10 +83,17 @@ if [ "${PI_SYNC_DRY_RUN:-0}" = "1" ]; then
 fi
 
 # 要求 vendor 工作树干净（避免与临时 worktree 操作冲突）
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "❌ vendor/pi 有未提交改动，请先处理（git -C vendor/pi status）。" >&2
-    exit 1
-fi
+# 不能用 `git diff --quiet 2>/dev/null`：git 读不了仓库时（exFAT/网络盘的属主检查，
+# vendor/pi 是独立仓库，同样会中招）会退化为用法错误（退出码 129），被误判成"有改动"。
+git_dirty_state "$VENDOR_PI"
+case $? in
+    0) : ;;
+    1) echo "❌ vendor/pi 有未提交改动，请先处理（git -C vendor/pi status）。" >&2
+       exit 1 ;;
+    *) echo "❌ git 无法读取 vendor/pi（并非「有改动」）：很可能是该卷不记录文件属主。" >&2
+       git_unreadable_hint "$VENDOR_PI"
+       exit 1 ;;
+esac
 
 # ── 在临时 worktree 上重建补丁栈（全部成功才移动 vendor 分支）──
 # 补丁完整性：即使基线未变，patches/ 新增补丁也必须重建，否则新补丁不会进入

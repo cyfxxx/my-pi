@@ -2,6 +2,42 @@
 
 ## 格式
 
+### [2026-10-11] ClamAV 种子字段对齐 ✓（并查实：`notifyMain`/`waitForUserOnLocal` **无消费点** ✗）
+
+**改动范围（严格 ✓）**：`portable/agent/scheduled-seeds.json` **只有「每日更新 ClamAV 病毒库」那一条被改** ✓
+（**prompt 逐字节未变** ✓、**另 5 条逐字节未变** ✓、顶层 `version`/`note` 未变 ✓）——
+diff **1 file changed, 10 insertions(+), 1 deletion(-)** ✓（那 1 处 deletion 是 `prompt` 行**位置**调整，**程序化核对内容未变** ✓）。
+
+**另 5 条的实际字段（实测读取、非印象 ✓）**：`type:"cron"` ✓｜**`useSubagent:true`（5/5）** ✓｜**`notifyMain:true`（5/5）** ✓｜
+**`waitForUserOnLocal:true`（5/5）** ✓｜`maxRunTime` **600/900/900/300/900**（**单位=秒** ✓）｜**`retries:1`（5/5）** ✓｜`tags`（`["daily",…]`/`["health","daily"]` ✓）。
+
+**它补的字段与理由（每个都核实了真实语义 ✓，不是照抄 ✓）**：
+| 字段 | 取值 | 理由（含语义核实 ✓） |
+|---|---|---|
+| **`useSubagent`** | **`true`** | ★ **语义已核实** ✓：`tools/schedule-tool.ts:217` = "**在子代理中执行（不打断当前会话）**" ✓ —— 与"`freshclam` 下载 48MB 级库 + 校验要几分钟，不该占住交互会话"**完全吻合** ✓；`storage.ts:98/134` **默认 `false`** ✓ ⇒ **必须显式给 `true`** ✓ |
+| **`maxRunTime`** | **`900`** | **单位是秒** ✓（`run/runner.ts:180`：`timeoutMs = task.maxRunTime * 1000` ✓）；取同文件**最大值**（3 条为 900 ✓）⇒ 给下载+校验留余量 ✓ |
+| **`retries`** | **`1`** | 与 **5/5 一致** ✓；`store/ops.ts:511/527` 表明它用于**超时**与**provider 故障**重试 ✓ ⇒ 网络抖动（本会话实测 `database.clamav.net` **000↔403↔200 反复** ✓）下有 1 次重试**合理且与既有风格一致** ✓ |
+| **`tags`** | **`["security","daily"]`** | 风格照 `["health","daily"]`（主题在前 ✓）⇒ 便于检索 ✓ |
+| **`notifyMain`** | **`true`** | 与 5/5 一致 ✓（**但见下 ✗**） |
+| **`waitForUserOnLocal`** | **`true`** | 与 5/5 一致 ✓（**但见下 ✗**） |
+
+**★ 它如实说明的未核实（✗✓）**：
+1. **`notifyMain` / `waitForUserOnLocal` 找不到影响行为的消费点** ✗ —— 全仓 grep 只有：类型声明（`types.ts:30/31`、`seeds.ts:30/31` ✓）、
+   种子→任务映射（`seeds.ts:175-176` 传入 `addTask` ✓、`storage.ts:136-137` 默认 `false` ✓），**run/ops 里 0 命中** ✗
+   ⇒ 它按 **5/5 既有取值对齐** ✓，但**实际行为未经验证** ✗✓（**这两个字段很可能是"没被消费的配置"** ✗ —— 值得记 ✓）；
+   它也指出：对"无人值守任务"，`waitForUserOnLocal` **可论证应为 `false`** ✓ —— **但那会破坏 5/5 一致性** ⇒ **它没有擅自改** ✗✓
+   （**我裁定：保持 `true`** ✓ —— 既然消费点不存在 ✓，改动**无已验证收益** ✗ ⇒ **不为一个未证实的猜测破坏一致性** ✓）；
+2. **没有用真实种子文件跑端到端对账** ✗（种子对账**只能在会话内触发** ✓，隔离目录里跑需额外探针 ✓）⇒ **它没有声称"字段已落到真实任务上"** ✓✓；
+   可依据的是**映射路径**（`seeds.ts:174-178` ✓）被既有 `__tests__/seeds-reconcile.test.ts`（合法种子真注册 + 字段原样 + 幂等 ✓）覆盖 ✓
+   ⇒ **证据强度 = "静态断言 + 映射路径既有测试"，不是端到端** ✗✓（**这个分层说得很准** ✓）；
+3. **真实 `tasks.json` 里仍没有 ClamAV 任务** ✓（按约束未动真实数据 ✓）⇒ `daily-health --print` 仍报 `种子失配=1` ✓，
+   直到**下一次真实（非测试）会话启动**由既有对账自动注册 ✓。
+
+**验证（全实跑 ✓）**：`node scripts/check-seeds-headless.mjs` **rc=0** ✓（输出含 `✓ 每日更新 ClamAV 病毒库` ✓、**6 条种子全部 headless 可用** ✓）；
+**只有那一条变了** ✓（程序化逐条比对：另 5 条 `==` 为真 ✓）；**真实运行时数据零改动** ✓
+（`sha256(tasks.json) = b6ffc4599f04745e592d5270` **= 基线** ✓、**无残留锁** ✓）；`check-conventions.sh` 全绿 ✓；
+**`golden-tasks.sh --fast` 20 步全绿** ✓（**含第 11 步** ✓）；`git status` 仅那一个文件 ✓。
+
 ### [2026-10-11] 种子静默失效修复 ✓ + ★ 守卫隔离缺陷（**守卫在惩罚正确的改动** ✗✓）
 
 **★ 我自己的锅（先认 ✓）**：`portable/agent/scheduled-seeds.json` 里那条 **「每日更新 ClamAV 病毒库」只有 `['name','prompt']`**

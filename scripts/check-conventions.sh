@@ -159,7 +159,11 @@ MODE_ASSETS_DIR="portable/agent/modes/assets"
 MODE_ASSETS_MAX_BYTES=$((8 * 1024 * 1024))
 if [ -d "$MODE_ASSETS_DIR" ]; then
   ASSET_FILES="$(find "$MODE_ASSETS_DIR" -type f ! -name 'README.md' -printf '%f\n' 2>/dev/null | sort)"
-  ASSET_REFS="$(grep -rhoE '[0-9]{2}-[^ `"'"'"'()（）,，]+\.(png|jpe?g|webp|gif)' portable/agent/modes --include='*.md' 2>/dev/null | sort -u || true)"
+  # 2026-10-12 修：原模式的否定字符类里放了全角标点（（）,，）。在 C.UTF-8 locale 下
+  # grep 把 UTF-8 按**字节**处理，那个类会把整个中文件名吞掉 —— 实测 8 个资产只认出 3 个，
+  # 甚至匹配不了本行自己的文件名，于是 5 个真实存在的引用被误判成"孤儿资产"。
+  # 改为锚定真实引用形态（反引号包裹），只用 ASCII，不依赖 locale。
+  ASSET_REFS="$(grep -rhoE '`[0-9]{2}-[^`]+\.(png|jpe?g|webp|gif)`' portable/agent/modes --include='*.md' 2>/dev/null | tr -d '`' | sort -u || true)"
   MISSING_REFS=""
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue

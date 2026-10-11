@@ -2,7 +2,7 @@
 # build.sh — 一键重建 / 引导（新设备可复现）
 #
 # 阶段：
-#   1. Node 版本检查（>=22）
+#   1. Node 版本检查（>= 22.19.0，与 engines 一致）
 #   2. 根工作区依赖安装（npm workspaces，含 custom/ 依赖；package-lock 一致则跳过）
 #   3. vendor/pi 引导：clone 上游 → checkout PINNED_COMMIT → 幂等应用并提交 patches/
 #   4. 构建 vendor/pi（工作区按依赖顺序）；模型数据缺失时联网生成（packages/ai）
@@ -19,6 +19,13 @@
 #   PI_CLONE_TIMEOUT=<秒>    上游 clone 超时（默认 600）
 #   PI_CN_MIRROR=1           使用 npmmirror 加速 npm
 #   PI_NPM_REGISTRY=<url>    指定 npm registry
+#
+# 原生模块（旁路用法，非 build.sh 参数）：
+#   vendor/pi/packages/ai 把 canvas 列为 devDependency（仅其测试用，构建与运行都不需要）。
+#   canvas 无预编译包可用时 npm 会退化为 node-gyp 源码编译，Windows 上需要 GTK/cairo
+#   （canvas.h、C:\GTK\bin\*.dll），缺失即构建失败。若遇到该失败，用标准 npm 开关跳过
+#   安装期脚本：NPM_CONFIG_IGNORE_SCRIPTS=1 bash scripts/build.sh
+#   详见 docs/operations/BUILD-PORTABILITY.md
 set -e
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -35,18 +42,27 @@ fi
 npm_args=()
 [ -n "$NPM_REGISTRY" ] && npm_args+=(--registry="$NPM_REGISTRY")
 
-# ── 1. Node 版本检查（my-pi engines 要求 >= 22）──
+# ── 1. Node 版本检查（my-pi 与全部 vendor 包的 engines 均为 >= 22.19.0）──
+# 注意：必须比到 minor。只看主版本会让 22.14.0 通过，随后在构建中途因
+# "node scripts/*.ts" 缺少内置类型剥离而失败（详见 lib-vendor.sh 的说明）。
 if ! command -v node >/dev/null 2>&1; then
-  echo "✗ 未找到 node。请安装 Node.js >= 22（https://nodejs.org 或 nvm install 22）" >&2
+  echo "✗ 未找到 node。请安装 Node.js >= ${PI_NODE_MIN}（https://nodejs.org 或 nvm install ${PI_NODE_MIN_MAJOR}.${PI_NODE_MIN_MINOR}）" >&2
   exit 1
 fi
-NODE_MAJOR="$(node -v | sed 's/^v//' | cut -d. -f1)"
-if [ "${NODE_MAJOR:-0}" -lt 22 ]; then
-  echo "✗ Node.js $(node -v) < 22，my-pi 要求 >= 22（vendor/pi 构建亦需较新 Node）" >&2
-  echo "  升级建议：nvm install 22 && nvm use 22；或系统包管理器安装 Node 22" >&2
+if ! node_version_ok; then
+  echo "✗ Node.js $(node -v) 低于要求（>= ${PI_NODE_MIN}）" >&2
+  node_version_hint
   exit 1
 fi
 echo "✓ Node.js $(node -v) / npm $(npm -v 2>/dev/null || echo '?')"
+
+# ── 1b. 依赖安装前的文件系统能力预检（符号链接）──
+# npm workspaces 需要符号链接；exFAT/FAT32 不支持，会先抛出难以定位的
+# "Cannot read properties of null (reading 'edgesOut')"。此处提前给出可行动的错误。
+# 跳过安装时可免检（PI_SKIP_ROOT_INSTALL=1 且 PI_SKIP_VENDOR_BUILD=1 时无需安装）。
+if [ "${PI_SKIP_ROOT_INSTALL:-0}" != "1" ] || [ "${PI_SKIP_VENDOR_BUILD:-0}" != "1" ]; then
+  preflight_symlinks "$ROOT" || exit 1
+fi
 
 # ── 2. 根工作区依赖（custom/ 依赖提升到根 node_modules）──
 if [ "${PI_SKIP_ROOT_INSTALL:-0}" = "1" ]; then
@@ -76,6 +92,26 @@ if [ ! -d "$VENDOR_PI/.git" ]; then
   if ! timeout "${PI_CLONE_TIMEOUT:-600}" git clone "$UPSTREAM_URL" "$VENDOR_PI"; then
     echo "✗ clone 上游失败/超时（网络受限？）。可设 PI_UPSTREAM_URL 指向镜像。" >&2
     exit 1
+  fi
+
+  # vendor/pi 是**独立 git 仓库**，因此它自己也要过一遍 git 的属主检查。
+  # 在 exFAT/FAT32（不记录文件属主）或网络盘上，git 会拒读它，表现为
+  #   fatal: detected dubious ownership in repository at '.../vendor/pi'
+  # 而 check-isolation 的 `git diff --quiet` 会因此退化为用法错误（退出码 129），
+  # 被误报成"vendor/pi 有未提交的修改"（真实原因与方向完全不符）。
+  # git 有意忽略仓库自身的 safe.directory（防恶意仓库自我放行），只能写用户级配置。
+  # 这里在克隆后自动登记，避免新设备上留下这个坑；幂等，且路径按实际 clone 位置推导。
+  # 必须先规范化路径再比较：`pwd -P` 在 git-bash 下给 `/d/x`，而 git 会把它存成 `D:/x`，
+  # 不规范化就会每次构建都重复登记一条（实测踩到）。
+  vendor_safe_dir="$(cd "$VENDOR_PI" && pwd -P)"
+  vendor_safe_dir="$(git_norm_safe_dir "$vendor_safe_dir" || printf '%s' "$vendor_safe_dir")"
+  if ! git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$vendor_safe_dir"; then
+    if git config --global --add safe.directory "$vendor_safe_dir" 2>/dev/null; then
+      echo "  • 已登记 vendor/pi 到 git safe.directory（该卷不记录属主时需要）"
+    else
+      echo "  ⚠ 无法写入 git safe.directory；若后续报 'dubious ownership'，请手动执行：" >&2
+      echo "      git config --global --add safe.directory '$vendor_safe_dir'" >&2
+    fi
   fi
 
   PIN="$(grep -v '^#' "$PIN_FILE" 2>/dev/null | head -1 | awk '{print $1}')"

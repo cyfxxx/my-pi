@@ -11,6 +11,12 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OB
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ERRORS=0
 
+# 复用共享判据（git_repo_readable / git_dirty_state / git_unreadable_hint）。
+# 检查 6 曾自行用 `git diff --quiet 2>/dev/null` 判断 vendor/pi 是否干净，会踩 exFAT
+# 属主陷阱（详见该处注释与 lib-vendor.sh）；统一到 lib-vendor.sh 避免各脚本口径漂移。
+# shellcheck source=scripts/lib-vendor.sh
+. "$ROOT/scripts/lib-vendor.sh"
+
 echo "🔍 验证隔离边界..."
 
 # 检查 1: .pi/（若存在）与 portable/ 下无符号链接
@@ -90,21 +96,38 @@ fi
 
 # 检查 6: vendor/pi 必须干净
 # 若 vendor/pi 是独立 git 仓库则在其中检查，否则检查主仓库对其的改动
+#
+# 2026-10-12 修：原实现是 `if ! git diff --quiet 2>/dev/null`，把两类完全不同的失败
+# 混成一种：git **读不了仓库**（在 exFAT/网络盘上会因 "dubious ownership" 直接退化为
+# `--no-index` 用法错误、退出码 129）与仓库**真的有改动**（退出码 1）。原先 2>/dev/null
+# 还把线索吞掉了，于是最终只打印"有未提交的修改"——**指向错误的方向**（实测真实原因
+# 是 exFAT 不记录文件属主，vendor/pi 其实是干净的）。
+# 现复用 lib-vendor.sh 的共享判据：先判能否读取，再判是否干净，读不了就明确报"无法读取"。
 if [ -d "$ROOT/vendor/pi/.git" ]; then
-    if ! git -C "$ROOT/vendor/pi" diff --quiet 2>/dev/null; then
-        echo "❌ vendor/pi/ 有未提交的修改"
-        git -C "$ROOT/vendor/pi" diff --stat
+    if ! git_repo_readable "$ROOT/vendor/pi"; then
+        echo "❌ vendor/pi/ 无法读取：git 拒绝访问该仓库（不是「有改动」）"
+        git -C "$ROOT/vendor/pi" rev-parse --git-dir 2>&1 | head -2 | sed 's/^/     /'
+        git_unreadable_hint "$ROOT/vendor/pi"
         ERRORS=$((ERRORS + 1))
-    else
+    elif git_dirty_state "$ROOT/vendor/pi"; then
         echo "✅ vendor/pi/ 干净"
+    else
+        echo "❌ vendor/pi/ 有未提交的修改"
+        git -C "$ROOT/vendor/pi" status --short | head -20
+        ERRORS=$((ERRORS + 1))
     fi
 else
-    if ! git -C "$ROOT" diff --quiet -- vendor/pi/ 2>/dev/null; then
+    if ! git_repo_readable "$ROOT"; then
+        echo "❌ 无法读取主仓库：git 拒绝访问（不是「有改动」）"
+        git_unreadable_hint "$ROOT"
+        ERRORS=$((ERRORS + 1))
+    elif git -C "$ROOT" diff-index --quiet HEAD -- vendor/pi/ 2>/dev/null; then
+        echo "✅ vendor/pi/ 干净"
+    else
+        # 主仓库可读性已在上面确认；这里非 0 只可能是"确有改动"
         echo "❌ vendor/pi/ 有未提交的修改"
         git -C "$ROOT" diff --stat -- vendor/pi/
         ERRORS=$((ERRORS + 1))
-    else
-        echo "✅ vendor/pi/ 干净"
     fi
 fi
 
