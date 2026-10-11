@@ -2,6 +2,54 @@
 
 ## 格式
 
+### [2026-10-11] ③-d **回答最初的问题**：DSH 侧"无人值守"成立 ✓（代价：**Host 必须常驻** ✗；`hasUI` 门控不被继承 ✓）
+
+**对比表（my-pi 现状已实测 ✓ / DSH 本轮已核实 ✓）**：
+| 维度 | my-pi | DSH |
+|---|---|---|
+| **触发依赖** | **交互会话（`hasUI`）** ✗ | **Host 进程** ✓（**无客户端亦可** ✓） |
+| **纯无头** | **不跑** ✗ | 组合上**挂不上** ✗（需 Host Web Session controller + 会话持久化 ✓） |
+| **冷会话唤起** | — | **有** ✓（README:12 ✓） |
+| **部署含义** | 得挂着界面 | **得让 Host 常驻** ✓ |
+⇒ **my-pi 的 `hasUI` 门控在 DSH 侧不被继承** ✓ —— **这是部署形态的改变，不是能力缺口** ✓。
+
+**四问答案（各附证据 ✓）**：
+1. **谁驱动 = 宿主服务内的计时器（不是客户端）** ✓：`dsh-schedule/lib/index.js` 的 `ScheduleService.requestDrive()`
+   （注释原文 "Recompute the nearest obligation **after startup or a durable change**" @`:1533-1536` ✓）→ `drive()` 扫**持久任务行**：
+   `const due = this.tasks().filter((task) => task.status === "active" && Date.parse(task.record.scheduledAt) <= scanNow)`
+   @`:1567` ✓ ⇒ 只依赖**已存任务 + 当前墙钟** ✓；随后**只武装一个** `setTimeout` @`:1641` 并 **`this.timer.unref()`** @`:1645` ✓
+   （**不阻止进程退出**，但 Host 在跑时照常触发 ✓）；README:63 明写「**one Host timer**」✓。
+2. **有没有 `hasUI` 类门控 = 没有** ✓（**★负向证据**）：`grep -rn "hasUI" $DSH --include=*.js --include=*.d.ts`
+   ⇒ **0 命中** ✓，**覆盖 289 个包 / 3011 个 js+d.ts 文件** ✓；生命周期挂点全是**服务端 agent/session 事件**
+   （`agent/created`@`:2660`、`agent/disposed`@`:2663`、`session/created`@`:2669`、`workspace/session-activity`@`:2682`、
+   `workspace/session-stop`@`:2694` ✓），**无客户端/UI 事件** ✓；包里唯一的 `attach`/`attached`（`:2654-2702`）是
+   **给 agent 挂 schedule 工具**（`registerScheduleTools(...)`、`ctx.agents.roots()` ✓），**不是 UI 附着** ✓。
+3. **"宿主级持久"是什么 = 持久任务行 + 收件箱投递 + Host 常驻** ✓：
+   投递 `await this.ctx.sessionController.resolveAgent(task.sessionId)` @`:1569` ⇒ README:65「A plugin-sourced `followup()`
+   synchronously appends the message to the **Session inbox**; successful Session flush acknowledges durable delivery」✓
+   （**不需界面** ✓）；**冷会话可被唤起** ✓（README:12「The Host restores a **cold Session** when delivery is due.」✓）；
+   存储 = 单个 **`schedule.json`** 域文档（README:160 ✓，经 storage-domain 路由 ✓）；
+   **哪个进程必须活着 ⇒ Host** ✓（README:153 原文「**The Host must be running to deliver reminders.**」✗）。
+4. **`dsh-jobs` vs `dsh-schedule` 分工** ✓：`jobs` = **会话内**后台长任务注册表（所有权按 agent 会话隔离；
+   「A producer can start work only while a controller that serves the owner is attached」= **控制器**，不是 UI ✓）；
+   `schedule` = **宿主级持久**的**墙钟提醒**，到点以**后续消息**投回原会话 ✓。
+
+**★ 一条必须一起记住的跨项目风险** ✗✓：README:65 原文：receipts「… acknowledge inbox delivery, **not model execution**」✓
+⇒ **回执只确认"进了收件箱"，不确认"模型执行了"** ✗ —— **这与我在 my-pi autopilot 刚修的"报成功却没做事"是同一风险族** ✓✓
+（DSH 侧是否有对应防护，**未核实** ✗）。
+
+**文档改动（只改允许的 3 个文件 ✓）**：`docs/design/DSH-HOOK-MAPPING.md`（**新增 §7.4 复核三** ✓ +
+**§4 未核实项第 1 条就地更正**（原文删除线保留、写明已核实与怎么核的 ✓）+ §7.1「定时调度与后台作业」行改为已核实结论 ✓）；
+`docs/design/BASE-SWITCH-DSH.md`（**新增「附二：定时任务与无人值守」** ✓：my-pi 现状 / DSH 机制 / 对比表 / 风险 / 仍未核实 ✓）；
+`docs/INDEX.md` 由生成器重生成 ✓。
+**守门全绿** ✓：`check-conventions.sh` ✓、`check-doc-links.mjs` 一致（**192 md** ✓）、`gen-doc-index --check` 一致 ✓、
+两文件内成对链接括号 **0** ✓；**未碰任何代码/scripts/packs/DECISIONS/PROGRESS/STRUCTURE** ✓；**无任何 git 写操作** ✓。
+
+**仍未核实（✗，必交项）**：① **本结论是静态可证**（计时器 + 持久行 + 会话控制器 ✓），**未运行 DSH 验证行为** ✗
+—— 即「**无客户端时真的能触发**」**未做行为验证** ✓；② DSH 侧是否有对应我 `suspect: unparsed tool call` 那类
+「模型没真执行」的检测 ✗；③ 仅覆盖已安装 **`0.2.0-rc.2`** 快照 ✓；④ **未逐包确认 `hasUI` 之外是否还有别的等效门控** ✗
+（例如按客户端连接数判断 ✓）。
+
 ### [2026-10-11] ③-c 缺口②answered ✓ + **服务替换清单 132 项**（"换引擎不是唯一途径" ✗✓）
 
 **① 缺口②有答案：存在"每次压缩前必然触发"的服务级点** ✓ —— **`ctx.toolResultPruner`** ✓

@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（214 条）
+## 决策台账（215 条）
 
+- `DECISIONS.md` · [2026-10-11] ③-d **回答最初的问题**：DSH 侧"无人值守"成立 ✓（代价：**Host 必须常驻** ✗；`hasUI` 门控不被继承 ✓） · **对比表（my-pi 现状已实测 ✓ / DSH 本轮已核实 ✓）**： · 数字: 289 个 / 3011 个 / 3 个 / 1 条
 - `DECISIONS.md` · [2026-10-11] ③-c 缺口②answered ✓ + **服务替换清单 132 项**（"换引擎不是唯一途径" ✗✓） · **① 缺口②有答案：存在"每次压缩前必然触发"的服务级点** ✓ —— **`ctx.toolResultPruner`** ✓ · 数字: 132 个 / 84 个 / 2 个 / 5 条
 - `DECISIONS.md` · [2026-10-11] ③-b 复核：**我"DSH 无压缩前干预"的结论被推翻** ✗✓（并发现 DSH 扩展面**至少三类** ★） · **做法（我要求的纪律 ✓）**：先给"**负向主张**"立法 —— **说"DSH 没有 X"必须交代"我搜了什么"** ✓ · 数字: 289 个 / 5 个 / 4 个 / 1 个
 - `DECISIONS.md` · [2026-10-11] ③ hook → DSH 事件**三档映射完成** ✓（并**修正我早先一组数字** ✗✓ + 挖出"DSH 有两套事件面" ★） · **交付物**：`docs/design/DSH-HOOK-MAPPING.md`（206 行 ✓）+ `docs/INDEX.md` 随之更新 ✓（**其余禁区未碰** ✓、**无 git 写操作** ✓；守门全绿 ✓、链接 192 md · 数字: 2 个 / 67 次 / 18 个 / 7 个
@@ -222,7 +223,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（212 条）
+## 进度记录（213 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -436,6 +437,7 @@
 - `PROGRESS.md` · ③ hook → DSH 事件三档映射完成（2026-10-11） · - 交付：docs/design/DSH-HOOK-MAPPING.md（206 行）+ docs/INDEX.md 更新；其余禁区未碰、无 git 写操作、守门全绿。 · 数字: 67 次 / 105 个 / 59 个 / 7 条
 - `PROGRESS.md` · ③-b 复核：原结论被推翻 —— DSH 有服务级压缩前介入（2026-10-11） · - 先给"负向主张"立法：说"DSH 没有 X"必须交代"我搜了什么"（命令原文 + 覆盖范围 + 读过的候选清单），否则"没找到"不算证据。 · 数字: 289 个 / 5 个 / 6 个 / 2 条
 - `PROGRESS.md` · ③-c 缺口②answered + 服务替换清单 132 项（2026-10-11） · - 缺口②有答案：存在"每次压缩前必然触发"的服务级点 ctx.toolResultPruner（dsh-compaction-basic/lib/index.js:926 两条触发路径 · 数字: 8 条
+- `PROGRESS.md` · ③-d DSH 定时任务是否无需交互：已核实不依赖（2026-10-11） · - 核心结论：DSH 侧"无人值守"成立，代价是 Host 必须常驻；my-pi 的 hasUI 门控在 DSH 侧不被继承 ⇒ 部署形态的改变，不是能力缺口。 · 数字: 1 条
 
 ## 缺陷回放（26 条）
 
@@ -466,7 +468,7 @@
 - `docs/BUG-REPLAYS.md` · #25 **测试把 bug 当契约**：既有测试断言「在租的 worker 也被回收」，于是 bug 长期存活（测试成了它的保护壳） · 修池 bug 时发现原测试 expect(a.worker.alive).toBe(false) 正是 bug 行为
 - `docs/BUG-REPLAYS.md` · #26 **RPC 的 prompt 被拒、父侧却当成功**：缺 `streamingBehavior:'steer'` 时子进程直接拒绝 （`success:false`），而父侧对 `success:false` **照常 resolv · 帧证据：`dir=in {"success":false,"error":"Agent is already processing. Specify streamingBehavior ('steer' or 'followUp')…"}` · 数字: 4 轮 · 证据: node scripts/subagent-inbox.mjs post
 
-## 设计文档（167 条）
+## 设计文档（168 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -485,7 +487,7 @@
 - `docs/design/BASE-SWITCH-DSH.md` · 3. 对照表：**pi 原语 → DSH 原语**（★ = 无等价物或形态差异大 ✗）
 - `docs/design/BASE-SWITCH-DSH.md` · 4. 成本与换算（**明确不给"假装精确的工期"** ✗） · - **实测**：工具定义 + 事件订阅的**运行时代价可忽略**（**406 ms**，其中导入 **358 ms** ✓）。 · 数字: 3 轮 / 223 个 / 4 个 / 57 个
 - `docs/design/BASE-SWITCH-DSH.md` · 5. 本次未验证（如实 ✗） · 1. **未跑完整 profile** ⇒ `ctx.tools.register` 在**真实服务里未验证** ✗（`dsh plugin` 需 pnpm/网络，未跑 ✗）； · 数字: 11 个 / 2.5 GB
-- `docs/design/BASE-SWITCH-DSH.md` · 6. 结论（相对上一版的变化） · **从"最大未知 ✗"变成"契约已知、两原语可用 ✓，成本集中在 57 工具的输出 schema 与 64 钩子的事件映射"** ✓✓。
+- `docs/design/BASE-SWITCH-DSH.md` · 6. 结论（相对上一版的变化） · **从"最大未知 ✗"变成"契约已知、两原语可用 ✓，成本集中在 57 工具的输出 schema 与 64 钩子的事件映射"** ✓✓。 · 数字: 3011 个
 - `docs/design/CODING-TRAPS.md` · 1. 注释里出现"两个星号紧跟斜杠"⇒ 块注释被提前关闭 · - **症状**：`ReferenceError: xxx is not defined`，而报错行**看起来完全正常**（因为它是被"挤出注释"的普通文本）。 · 数字: 3 轮
 - `docs/design/CODING-TRAPS.md` · 2. 形参名与导入的模块名同名 ⇒ 块内引用模块会打到形参上 · - **症状**：`path.join is not a function`；**而且"补一个 import"完全无效**（导入同样被形参遮蔽）。 · 数字: 1 轮
 - `docs/design/CODING-TRAPS.md` · 3. `pkill -f <模式>` 可能杀掉自己 · - **症状**：命令自己被打断（`[killed by signal: SIGTERM]`），后续步骤静默不执行。
@@ -507,6 +509,7 @@
 - `docs/design/DSH-HOOK-MAPPING.md` · 6. 复核轮（2026-10-11）：验证或推翻"压缩前干预缺失" · **结论：原结论被推翻。** DSH **有**压缩前介入能力，只是形态与 pi 不同（pi 是"每次压缩前的回调闸门"，DSH 是"**可替换的压缩引擎服务**"＋失败路径瀑布）。 · 数字: 289 个 / 5 个 / 4 个 / 1 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 7. 第三类扩展点：服务替换清单（2026-10-11 复核二新增） · **为什么要清点它**：第 6 节发现「扩展点不止事件一类」。本轮把**服务替换**这一类**完整清点**了一遍 —— · 数字: 132 个 / 85 个 / 47 个 / 84 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 8. 复核二：追 `CompactionEngine` 的调用者（补齐第 4 节第 2 条的残留缺口） · **结论：缺口②已被回答 —— 存在「每次压缩前必然触发」的服务级点** ✓； · 数字: 1 条
+- `docs/design/DSH-HOOK-MAPPING.md` · 7.4 复核三：`schedule` 是否依赖交互客户端（**已核实 ✓**） · **问题**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：无头会话只做种子对账、不启调度器 ✗） · 数字: 289 个 / 3011 个 · 证据: 1e7f6d9597241db0
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ② 分材料明细 · ### 2.1 WikiSkill（arXiv:2608.27454） · 数字: 48.7% / 63.7% / 15.0% / 60.9%
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ③ 这些新信息改变了什么判断（只写确凿的） · 1. **WikiSkill：那条"读 wiki 有害"必须带条件引用。** 新数字显示它是**条件性**的：只有在 **Skill Proposer 也有 wiki 访问**时， · 数字: 10 个 / 204 个 / 46 个

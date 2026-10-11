@@ -131,3 +131,42 @@
 ⇒ 换基座**可行性上升**（有官方 `dsh-subagent` 等包可依赖 ✓），但**工作量仍未可精确估计** ✗ ——
 因为**最大不确定项（64 钩子的语义映射）尚未分类** ✓；建议先做第 4 节末尾那份"三档清单"再谈工期 ✓。
 
+---
+
+# 附二：定时任务与**无人值守**（2026-10-11 核实 ✓）
+
+**为什么单列**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：
+`if (!ctx.hasUI) { await syncSeedTasks(); return; }` ✗ ⇒ **纯无头/无人值守时定时任务不会跑** ✗，**刻意设计**，
+注释记录了当年事故）。⇒ 换基座后这条**是否继续存在**，直接决定「每日更新病毒库」这类任务**能否真正无人值守** ✓。
+
+**my-pi 现状（已实测 ✓）**：定时任务**只在你开着交互会话时**执行 ✓；纯无头下不跑 ✓；要跑需 `/daily run` 手动触发或保持交互会话 ✓。
+
+**DSH 的机制（已核实 ✓，第 7.4 节有完整证据）**：
+- 驱动 = **宿主服务内的计时器** ✓：`dsh-schedule/lib/index.js` 的 `requestDrive()`（注释 "after startup or a durable change"
+  @`:1533-1536`）→ `drive()` 扫**持久任务行**（`:1567`）→ 只武装**一个** `setTimeout`（`:1641`）+ `unref()`（`:1645`）✓；
+  README:63「**one Host timer**」✓；
+- 投递 = 经 `sessionController.resolveAgent`（`:1569`）写入**会话收件箱**，README:65「…appends the message to the Session
+  inbox; successful Session flush acknowledges durable delivery」✓ ⇒ **不需要任何界面** ✓；
+- **冷会话可被唤起** ✓（README:12「The Host restores a cold Session when delivery is due.」✓）；
+- **负向证据** ✓：全 DSH（**289 包 / 3011 个 js+d.ts**）搜 `hasUI` ⇒ **0 命中** ✓ ⇒ **没有** my-pi 那种门控 ✓；
+- 生命周期挂点均为服务端 agent/session 事件（`:2660`/`:2663`/`:2669`/`:2682`/`:2694` ✓），**无客户端/UI 事件** ✓。
+
+**⇒ 结论：DSH 侧「无人值守」成立，但代价是 Host 常驻** ✓：
+| 维度 | my-pi（现状） | DSH |
+|---|---|---|
+| 触发依赖 | **交互会话（`hasUI`）** ✗ | **Host 进程** ✓（无客户端亦可 ✓） |
+| 纯无头 | **不跑** ✗ | 组合上**挂不上** ✗（需 Host Web Session controller + 会话持久化 ✓） |
+| 冷会话唤起 | — | **有** ✓（README:12） |
+| 部署含义 | 得挂着界面 | **得让 Host 常驻** ✓ |
+
+**必须一并记住的差异/风险（如实 ✗）**：① Host 必须运行（README:153 ✓）；② 纯 headless/SDK-only 组合挂不上（README:26 ✓）；
+③ **回执只确认「进了收件箱」、不确认「模型执行了」** ✓（README:65「not model execution」✗）⇒ 与我在 my-pi autopilot
+刚修的「报成功却没做事」是**同一风险族** ✓（DSH 侧的对应防护**未核实** ✗）；④ **非 exactly-once**（崩溃/重启可重复投递 ✗，
+README:154 ✓；重复任务只补最近一次错过的发生 ✓）；⑤ 存储是单个 `schedule.json` 域文档（README:160 ✓）。
+
+**仍未核实（✗）**：
+1. `schedule` 的实际投递是否**在任何 Host 组合里都真的能在无客户端时触发** —— 本结论是**静态可证**（计时器 + 持久行 + 会话控制器 ✓），
+   **未运行 DSH 验证行为** ✗；
+2. DSH 侧是否有对应我 `suspect: unparsed tool call` 那类「模型没真执行」的检测 ✗；
+3. 仅覆盖已安装的 `0.2.0-rc.2` 快照 ✓；4. 未逐包确认 `hasUI` 之外是否还有别的**等效门控**（如客户端连接数判断 ✗）。
+

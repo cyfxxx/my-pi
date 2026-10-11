@@ -3497,3 +3497,22 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 仍未核实 8 条：schedule 是否不依赖交互客户端；toolResultPruner 替换是否有首方示例；ModelSelection 是否含思考级别；
   session/event 提交后时序；@mode 只局部证据（105 事件未逐个回源码核）；只扫 0.2.0-rc.2；全程静态无行为验证；
   §7 判定族级为主、my-pi 侧对应能力未逐个读源码核实。
+
+### ③-d DSH 定时任务是否无需交互：已核实不依赖（2026-10-11）
+
+- 核心结论：DSH 侧"无人值守"成立，代价是 Host 必须常驻；my-pi 的 hasUI 门控在 DSH 侧不被继承 ⇒ 部署形态的改变，不是能力缺口。
+  对比：触发依赖 my-pi=交互会话(hasUI) vs DSH=Host 进程（无客户端亦可）；纯无头 my-pi 不跑 vs DSH 组合上挂不上（需 Host Web Session
+  controller + 会话持久化）；冷会话唤起 DSH 有；部署含义 my-pi 得挂界面 vs DSH 得让 Host 常驻。
+- 四问证据：① 驱动=宿主服务内计时器（dsh-schedule/lib/index.js requestDrive 注释 after startup or a durable change @:1533-1536；
+  drive() 扫持久任务行 @:1567；只武装一个 setTimeout @:1641 且 timer.unref() @:1645；README:63 one Host timer）；
+  ② 无 hasUI 类门控（grep -rn hasUI $DSH --include=*.js --include=*.d.ts ⇒ 0 命中，覆盖 289 包/3011 文件；挂点全是服务端
+  agent/session 事件 :2660/:2663/:2669/:2682/:2694，无客户端事件；唯一 attach 是给 agent 挂 schedule 工具 :2654-2702）；
+  ③ 宿主级持久=持久任务行+收件箱投递+Host 常驻（投递 sessionController.resolveAgent @:1569；README:65 followup 同步追加到
+  Session inbox，flush 确认持久投递；冷会话可被唤起 README:12；存储单个 schedule.json 域文档 README:160；README:153 "The Host
+  must be running to deliver reminders."）；④ jobs=会话内后台长任务注册表（所有权按会话隔离，需控制器附着）vs schedule=宿主级持久墙钟提醒。
+- ★ 跨项目风险：README:65 receipts "acknowledge inbox delivery, not model execution" ⇒ 回执只确认进了收件箱、不确认模型执行
+  —— 与我在 my-pi autopilot 刚修的"报成功却没做事"同一风险族（DSH 侧是否有对应防护未核实）。
+- 文档：DSH-HOOK-MAPPING（新增 §7.4 复核三 + §4 第 1 条就地更正 + §7.1 行更新）；BASE-SWITCH-DSH（新增附二：定时任务与无人值守）；
+  INDEX 重生成。守门全绿（192 md、gen-doc-index --check 一致、成对括号 0）；未碰代码；无 git 写操作。
+- 未核实：本结论静态可证、未运行 DSH 做行为验证（"无客户端时真能触发"未验证）；DSH 是否有"模型没真执行"的检测；
+  仅覆盖 0.2.0-rc.2；未逐包确认 hasUI 之外是否还有别的等效门控（如按客户端连接数）。

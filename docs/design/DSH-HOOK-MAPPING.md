@@ -209,8 +209,11 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 1. **自动化任务（autopilot）的 21 个调用点是本清单里最难的一块**：它注册 `session_start`/`session_shutdown`/`turn_*`/`tool_*`/`input`/`agent_settled` 共 7 类，
    我只核到"事件级有对应"，**没有核对**它每个处理器依赖的 `ctx` 能力在 DSH 里是否存在（例如调度器受 `hasUI` 门控这一条在 DSH 里对应什么）。
    ⇒ **复核二部分回答**（第 7.1 节）：调度器的**服务级对手确实存在** —— `ctx.schedule`（`dsh-schedule/lib/types/index.d.ts:15`，"Durable Host-wide reminder management"，含 cron/daily/weekly/every 解析）
-   与 `ctx.jobs`（`dsh-jobs/lib/types/index.d.ts:18`）。**残留未核实** ✗：DSH 的 `schedule` 是否**不依赖交互客户端**
-   （若是，则 my-pi 那条 `hasUI` 门控带来的「无人值守不跑」在 DSH 侧**自动消失** —— 这是**降低**移植风险的差异）。
+   与 `ctx.jobs`（`dsh-jobs/lib/types/index.d.ts:18`）。
+   ~~**残留未核实** ✗：DSH 的 `schedule` 是否**不依赖交互客户端**（若是，则 my-pi 那条 `hasUI` 门控带来的「无人值守不跑」在 DSH 侧**自动消失**）。~~
+   ⇒ **复核三已回答（第 7.4 节）✓**：**DSH 的 `schedule` 不依赖交互客户端** ✓ —— 它是**宿主级计时器 + 持久任务行**，
+   投递经 `sessionController.resolveAgent` 写进**会话收件箱**、并能**唤起冷会话** ✓；**但 `Host` 进程必须运行** ✗
+   （且**纯 headless / SDK-only 组合挂不上** ✗）。⇒ my-pi 的 `hasUI` 门控**不被继承** ✓，代价是**部署形态**（Host 常驻）✓。
 2. ~~**`session_before_compact` 的"压缩前干预"是否真的缺失**：我只扫了已声明的事件（105 + 59）。
    **未核实** `dsh-compaction` 是否还有别名的、或非事件形式的介入点。这是本清单里**最可能被推翻的一条**。~~
    ⇒ **已核实，并被推翻**（2026-10-11 复核，证据见第 6.1/6.2 节）：**非事件形式的介入点确实存在**，就是 `CompactionEngine` 服务（`ctx.compaction`），
@@ -350,7 +353,7 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 | **压缩（含前置介入）** | **②** | `compaction`、`toolResultPruner` | 见第 8 节：能力存在，形态是服务替换/子类钩子，不是逐次前置回调 | `toolResultPruner` 在两条触发路径上都在摘要前执行 ✓ |
 | **会话与持久化** | **②** | `sessionPersistence`、`sessionProjections`、`sessionProjectionCache`、`sessionQuery`、`sessionTitle`、`sessionTelemetry`、`sessionReferenceResolver`、`sessionFeedback`、`launcherSessionQueryPath`、`storage`、`storageDomain`、`attachments`、`fileReferences` | my-pi 用 portable/memory 与 portable/agent/sessions 承担同类职责 | my-pi 没有「会话投影 / 查询引擎 / 标题服务」这三类独立设施 ⇒ ② |
 | **子代理 / 团队 / 工作流** | **①** | `subagents`、`subagentModelSelection`、`agentTeams`、`workflowEngine` | my-pi 的 subagent 特性（pi --mode rpc 池 + 收件箱）对应 subagents | `workflowEngine` 与 `agentTeams`（实验）my-pi 无对应 ⇒ ③ |
-| **定时调度与后台作业** | **①** | `schedule`、`jobs` | `schedule` = Durable Host-wide reminder management（dsh-schedule/lib/types/index.d.ts:15），对应 my-pi 的 autopilot 调度器；`jobs` 对应后台作业 | ★ 差异要查：DSH 的 schedule 是宿主级持久，而 my-pi 的 autopilot 受 hasUI 门控（无头不跑）⇒ 可能是降低移植风险的差异，但未核实 schedule 是否依赖交互客户端 |
+| **定时调度与后台作业** | **①** | `schedule`、`jobs` | `schedule` = Durable Host-wide reminder management（dsh-schedule/lib/types/index.d.ts:15），对应 my-pi 的 autopilot 调度器；`jobs` 对应后台作业 | **已核实（第 7.4 节）✓**：DSH 的 `schedule` = **宿主级计时器**（`dsh-schedule/lib/index.js` 的 `requestDrive`/`drive`，`setTimeout` @`:1641` + `unref` @`:1645`）读**持久任务行**（`:1567`）投递，**不依赖交互客户端** ✓（全 DSH `hasUI` 命中 **0**，覆盖 289 包 / 3011 文件）；**但 Host 进程必须运行** ✗，且纯 headless/SDK-only 组合挂不上 ✗ ⇒ my-pi 的 `hasUI` 门控**不被继承** ✓ |
 | **计划模式** | **①** | `planMode` | my-pi 的 plan-mode 特性有直接对应（PlanModeController） | 本清单里最干净的一处服务级对应 |
 | **审批 / 授权 / 权限 / 沙箱 / 提问** | **①** | `approval`、`authorization`、`permissionPresets`、`sandbox`、`sandboxPolicy`、`userQuestions` | my-pi 有交互确认与写入边界约定；userQuestions 对应向用户提问 | sandbox / sandboxPolicy / authorization / permissionPresets my-pi 无对应（本项目靠约定与守门，不靠运行时沙箱）⇒ ③ |
 | **LLM / 凭证 / 账号 / 默认模型** | **②** | `llm`、`credentials`、`deepseekAccount`、`deepseekLlmApiExtensions`、`agentDefaultModel` | pi 有自己的 provider/模型配置（portable/agent/models.json） | 接入方式不同 ⇒ ② |
@@ -628,3 +631,51 @@ my-pi 是**终端 TUI 应用**（pi-tui + 11 个 UI 补丁），没有「浏览�
 **顺带一个必须记住的差异** ✗：压缩的摘要调用是 `ctx.llm.stream()` **直连**，文档明说它
 "**without running the loop-only `agent/request` extension point**"（`dsh-compaction-basic/README.md`）
 ⇒ 挂 `agent/request`（对应 my-pi 的 `before_provider_request`）**看不到压缩请求** ✗ —— 移植时若指望在那里做计费/改写，会**静默失效**。
+
+## 7.4 复核三：`schedule` 是否依赖交互客户端（**已核实 ✓**）
+
+**问题**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：无头会话只做种子对账、不启调度器 ✗）
+⇒ 若 DSH 的 `schedule` 也依赖 UI，则「无人值守不跑」会在换基座后**继续存在**。**结论：不依赖** ✓。
+
+**① 驱动 = 宿主服务内的计时器（不是客户端）✓**：`dsh-schedule/lib/index.js` 的 `ScheduleService.requestDrive()`
+（注释原文 "Recompute the nearest obligation **after startup or a durable change**" @`:1533-1536`）→ `drive()`
+扫**持久任务行**：`const due = this.tasks().filter((task) => task.status === "active" && Date.parse(task.record.scheduledAt) <= scanNow)` @`:1567`
+⇒ 只依赖**已存任务 + 当前墙钟** ✓；随后为下一次义务**只武装一个** `setTimeout` @`:1641`，
+并 **`this.timer.unref()`** @`:1645`（不阻止进程退出，但**Host 在跑时照常触发** ✓）。
+README 也明写「**one Host timer**」（`dsh-schedule/README.md:63`）。
+
+**② 投递不需要 UI ✓**：`drive()` 里 `await this.ctx.sessionController.resolveAgent(task.sessionId)` @`:1569`
+⇒ 经**会话控制器**解析原会话；README:65 原文：「Delivery resolves the original Session through `sessionController.resolveAgent`.
+A plugin-sourced `followup()` synchronously appends the message to the **Session inbox**; successful Session flush acknowledges
+durable delivery.」✓ 即投递 = **写进会话收件箱**（不需要有人开着界面 ✓）。
+
+**③ 冷会话可被唤起 ✓**：README:12「The Host restores a **cold Session** when delivery is due.」✓
+⇒ 目标会话**不必是活跃/交互中的** ✓。
+
+**④ 负向证据（关键 ✓）**：全 DSH 搜 `hasUI` ⇒ **0 命中** ✓。
+命令：`grep -rn "hasUI" $DSH --include=*.js --include=*.d.ts`（`$DSH` = `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai`）；
+覆盖：**289 个包 / 3011 个 js+d.ts 文件** ✓ ⇒ DSH **没有** my-pi 那种 `hasUI` 门控 ✓。
+
+**⑤ 生命周期挂点全是服务端 agent/session 事件 ✓**：`agent/created` @`:2660`、`agent/disposed` @`:2663`、
+`session/created` @`:2669`、`workspace/session-activity` @`:2682`、`workspace/session-stop` @`:2694` ✓ —
+**没有一个是客户端/UI 事件** ✓；包里唯一的 `attach`/`attached`（`:2654-2702`）是**给 agent 挂 schedule 工具**
+（`registerScheduleTools(...)`、`ctx.agents.roots()` ✓），**不是 UI 附着** ✓。
+
+**但必须一并记住的约束（如实 ✗）**：
+1. **Host 进程必须运行** ✓ —— README:153 原文「**The Host must be running to deliver reminders.**」✗
+   ⇒ 不是「无需任何进程」，而是「**无需交互客户端**」✓；
+2. **纯 headless / SDK-only 组合挂不上** ✗ —— README:26 原文：Schedule **cannot be mounted alone in a headless or SDK-only
+   composition**: delivery requires the **Host Web Session controller** and a Session persistence backend, because a delivery
+   commits only after the Session acknowledges `session/flush` ✓ ⇒ 它属于**宿主服务形态**，不是「无头 agent 自跑」✗；
+3. **回执只确认「进了收件箱」，不确认「模型执行了」✗** —— README:65 原文「Receipts … acknowledge inbox delivery,
+   **not model execution**」✓ ⇒ 这**与 my-pi autopilot 刚修的那类「报成功却没做事」是同一风险族** ✓✓
+   （我在 my-pi 侧加的 `suspect: unparsed tool call` 检测对应 DSH 侧的什么，**未核实** ✗）；
+4. **非 exactly-once** ✗：崩溃或任务写失败可在会话 flush 后**重复投递**（README:154 ✓）；且重复任务**只补投最近一次错过的发生**（README:12 ✓）；
+5. **存储 = 一个 JSON 域文档** `schedule.json`（README:160 ✓，经 storage-domain 路由 ✓）。
+
+**⑥ `dsh-jobs` 与 `dsh-schedule` 的分工（一句话）✓**：`jobs` = **会话内**后台长任务注册表
+（所有权按 agent 会话隔离、需要「服务该 owner 的控制器」附着 ✗ —— 那是**控制器**不是 UI ✓）；
+`schedule` = **宿主级持久**的**墙钟提醒**，到点以**后续消息**投回原会话 ✓。
+
+**⇒ 对换基座的可执行结论 ✓**：**「无人值守不跑」这条在 DSH 侧不继承** ✓ —— my-pi 需要**交互会话**（`hasUI` ✗），
+DSH 只需要**Host 常驻**（无客户端亦可 ✓）⇒ 这是**部署形态的改变**，**不是能力缺口** ✓。
