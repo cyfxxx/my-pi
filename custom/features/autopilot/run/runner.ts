@@ -25,6 +25,27 @@ export function buildRunArgs(task: Task): string[] {
   return ['--mode', 'json', '-p', '--no-session', '--no-extensions', renderPrompt(task.prompt)];
 }
 
+/**
+ * `argv[1]` 是否指向**测试运行器**的入口（vitest/jest/mocha）。
+ * 抽成导出函数 ⇒ 供 `getPiInvocation` 与"调度器测试环境早退"**共用一套判据**（不造第二套 ✓）。
+ */
+export function isTestRunnerEntryPath(currentScript: string | undefined): boolean {
+  return (
+    !!currentScript &&
+    (currentScript.includes(`${path.sep}node_modules${path.sep}vitest${path.sep}`) ||
+      currentScript.includes(`${path.sep}node_modules${path.sep}jest${path.sep}`) ||
+      currentScript.includes(`${path.sep}node_modules${path.sep}mocha${path.sep}`))
+  );
+}
+
+/**
+ * 当前进程是否运行在**测试运行器**里（`VITEST` 由 vitest 注入 ✓；或入口位于测试运行器目录）。
+ * 用途：**调度器入口据此早退** ⇒ 任何测试都不可能驱动真实调度器 ✓。
+ */
+export function isTestEnvironment(): boolean {
+  return !!process.env.VITEST || isTestRunnerEntryPath(process.argv[1]);
+}
+
 export function getPiInvocation(args: string[]): { command: string; args: string[] } {
   const currentScript = process.argv[1];
   const isBunVirtual = currentScript?.startsWith('/$bunfs/root/');
@@ -34,11 +55,7 @@ export function getPiInvocation(args: string[]): { command: string; args: string
   // `node <forks.js> --mode json …` ⇒ 抛 `Expected worker to be run in node:child_process` ⇒ 任务必然失败。
   // 判据（**纯附加、最小** ✓）：入口位于测试运行器目录（vitest/jest/mocha）⇒ **回退到 `'pi'`** ✓；
   // 其余路径行为**完全不变** ✓。
-  const isTestRunnerEntry =
-    !!currentScript &&
-    currentScript.includes(`${path.sep}node_modules${path.sep}vitest${path.sep}`) ||
-    !!currentScript && currentScript.includes(`${path.sep}node_modules${path.sep}jest${path.sep}`) ||
-    !!currentScript && currentScript.includes(`${path.sep}node_modules${path.sep}mocha${path.sep}`);
+  const isTestRunnerEntry = isTestRunnerEntryPath(currentScript);
   if (currentScript && !isBunVirtual && !isTestRunnerEntry && fs.existsSync(currentScript)) {
     return { command: process.execPath, args: [currentScript, ...args] };
   }
