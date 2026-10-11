@@ -90,6 +90,67 @@ export function extractRunOutput(lines: string[]): string {
   return text;
 }
 
+/**
+ * 「工具调用标记泄漏」检测 —— 防"报成功却什么都没做"的静默失效。
+ *
+ * 背景（**一次运行的实测** + 配置证据，**不是普遍现象**）：pi 默认走本地聚合代理 freellmapi
+ * （模型 auto），其上游不具备原生工具调用能力 ⇒ 模型把**伪调用标记当文本**吐出来，pi 无法解析成
+ * 工具调用 ⇒ bash 从未执行，而退出码为 0 ⇒ 任务「报成功却什么都没做」。
+ *
+ * 形态取证：`<dots_...>` 家族来自那一次运行的实测；我在本仓库制品里**未能**再找到该字面形态
+ * （pi 的 bundle 里 `<|...|>` 与 dots_ 均为 0 命中）⇒ 因此本判据**刻意写得窄**：
+ *   · 只认"形如伪调用标记"的少数几种家族；
+ *   · 且要求**同一条输出里出现 >= 2 次**（重复是最强信号：泄漏时模型会反复重试同一个标记；
+ *     正常的文档或说明里偶然提到一次不会命中）。
+ * 宁可漏报，也不误报 —— 误报会把正常成功判成失败，制造"狼来了"的噪声（本项目最忌）。
+ */
+const UNPARSED_MARKER_PATTERNS: Array<{ kind: string; re: RegExp }> = [
+  { kind: 'dots_function_call', re: /<dots_[a-z_]*function_call[a-z_]*\b[^>]*>/gi },
+  { kind: 'dots_marker', re: /<dots_[a-z_]+\b[^>]*>/gi },
+  { kind: 'pipe_delimited_call', re: /<\|[a-z_]*(?:tool|function)_call[a-z_]*\|>/gi },
+  { kind: 'xml_tool_call', re: /<(?:tool|function)_call\b[^>]*>/gi },
+];
+
+/** 检测输出里是否含**未解析的工具调用标记**（>= 2 次才算，见上方理由）。导出便于单测。 */
+export function detectUnparsedToolCallMarkers(
+  text: string,
+): { kind: string; count: number; sample: string } | null {
+  if (!text) return null;
+  for (const { kind, re } of UNPARSED_MARKER_PATTERNS) {
+    const matches = text.match(new RegExp(re.source, re.flags));
+    if (matches && matches.length >= 2) {
+      return { kind, count: matches.length, sample: matches[0].slice(0, 80) };
+    }
+  }
+  return null;
+}
+
+/**
+ * 由「退出码 / 错误信息 / 输出」推出运行结果 —— 抽成**纯函数**以便单测（导出）。
+ * 与既有语义保持一致：exit!=0 或 errMsg 或**空输出** ⇒ failed；唯一新增：**标记泄漏也算 failed** ✓。
+ */
+export function computeRunOutcome(input: { exitCode: number; errMsg?: string; output: string }): {
+  result: 'success' | 'failed';
+  reason?: string;
+  suspect?: { kind: string; count: number; sample: string };
+} {
+  const { exitCode, errMsg, output } = input;
+  if (exitCode !== 0 || errMsg) return { result: 'failed' };
+  if (!output) return { result: 'failed' };
+  const suspect = detectUnparsedToolCallMarkers(output);
+  if (suspect) {
+    return {
+      result: 'failed',
+      suspect,
+      reason:
+        `[suspect: unparsed tool call] 输出含未解析的工具调用标记（${suspect.kind} ×${suspect.count}，` +
+        `样例 ${suspect.sample}）⇒ 子进程很可能**没有真正执行任何工具调用**；` +
+        '该类标记不是 pi 认得的形态（常见于上游不支持原生工具调用的聚合代理）。',
+    };
+  }
+  return { result: 'success' };
+}
+
 export function runTaskOnce(task: Task, cwd: string, timeoutMs = task.maxRunTime * 1000): Promise<TaskRunResult> {
   const started = Date.now();
   const invocation = getPiInvocation(buildRunArgs(task));
@@ -110,7 +171,9 @@ export function runTaskOnce(task: Task, cwd: string, timeoutMs = task.maxRunTime
       settled = true;
       clearTimeout(timer);
       const output = extractRunOutput(stdout.split('\n'));
-      const failed = exitCode !== 0 || !!errMsg;
+      // 「标记泄漏」也按 failed 处理 ⇒ 会落诊断日志、并让下游（daily/UI/webhook）都看见 ✓
+      const outcome = computeRunOutcome({ exitCode, errMsg, output });
+      const failed = outcome.result === 'failed';
       // Patch (runner-failure-log): 失败/超时先把完整 stdout/stderr 落盘。
       // 超时路径 SIGKILL 子进程后内存输出即消失，tasks.json 只剩一句「任务超时」，
       // 无法区分卡在脚本、pre-push hook 还是模型回合。
@@ -118,10 +181,13 @@ export function runTaskOnce(task: Task, cwd: string, timeoutMs = task.maxRunTime
         ? writeRunLog(task, { exitCode, errMsg, durationMs: Date.now() - started, stdout, stderr })
         : null;
       const base =
-        (errMsg ? `${errMsg}\n${output}` : output).slice(0, 4000) ||
+        [outcome.reason, errMsg ? `${errMsg}\n${output}` : output]
+          .filter((s) => !!s)
+          .join('\n')
+          .slice(0, 4000) ||
         (exitCode === 0 ? '(无输出)' : `exit ${exitCode}`);
       resolve({
-        result: exitCode === 0 && !errMsg && output ? 'success' : 'failed',
+        result: outcome.result,
         output: logFile ? `${base}\n[诊断日志] ${logFile}` : base,
         // 保留真实退出码：124=超时（ops.errClassOf 依赖它判定 timeout），不要被 errMsg 覆盖为 1
         exitCode,

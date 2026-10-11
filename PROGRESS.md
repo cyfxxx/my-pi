@@ -3358,3 +3358,15 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   仓库外/非 vitest 从根 import 特性会失败（靠临时软链，已删）。
 - 零痕迹：git status 空、探针与软链已删、守门前后两次全绿、真实状态未动（logs 51/无锁/nextRun 原值/agent 目录与备份一致）、
   无孤儿进程、未用 pkill -f、未做 git 写操作。
+
+### 堵住"报成功却什么都没做"的静默失效（2026-10-11）
+
+- 检测点：runner.ts finish()（约 :112-125）旧逻辑只在失败时落诊断日志 ⇒ 退出码 0 + 标记泄漏 = 报 success 且无痕迹
+  （正好解释那 143 秒查不到痕迹）。
+- 判据刻意写窄（4 类家族 + 同一条输出出现 ≥2 次）：宁可漏报不误报（误报=狼来了）。
+- 改动：导出纯函数 detectUnparsedToolCallMarkers + computeRunOutcome；finish 改用它；reason 前置进 output（下游可见）；
+  新增 8 项测试。result 仍两值（不破坏消费方）；消费者逐一核对 ⇒ 命中处处可见 + 可疑时也落诊断日志。
+- 证据：改前 success ⇒ 改后 failed（suspect: unparsed tool call，命中 2）；对照组不误伤；8/8；autopilot+mode 218 passed；
+  tsc rc=0；守门全绿；真实状态未碰（无锁、logs 51）；无 git 写操作。
+- 未验证：未端到端真跑（不烧 143 秒）；判据可能漏形态（不漏报即不误报）；thinking 块内标记看不到；143 秒 stdout 不可回溯。
+- 待做：daily-health 加只读统计"lastResult=failed 且 output 含 suspect: 的任务数"。

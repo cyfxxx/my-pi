@@ -2,6 +2,51 @@
 
 ## 格式
 
+### [2026-10-11] 堵住"定时任务报成功、实际什么都没做"的静默失效 ✓（并解释了"那 143 秒为何无痕迹"✗✓）
+
+**检测点（文件:行号 ✓）**：`custom/features/autopilot/run/runner.ts` 的 `finish()`（约 `:112-125`），旧逻辑逐字：
+```ts
+const failed = exitCode !== 0 || !!errMsg;
+const logFile = failed ? writeRunLog(...) : null;                    // ← 只在"失败"时落诊断日志 ✗
+result: exitCode === 0 && !errMsg && output ? 'success' : 'failed'
+```
+⇒ **退出码 0 + 标记泄漏 ⇒ 报 `success` 且不落任何诊断日志** ✗✗ —— **这正好解释了"那 143 秒为什么查不到痕迹"** ✓
+（它 grep 调度日志 **0 命中** ✓）。
+
+**一处必须说明的取证局限** ✗✓：`<dots_function_call>` 在 `portable/` **全盘 0 命中** ✗，pi 自己的 bundle 里
+`<|…|>` 与 `dots_` 也 **0 命中** ✓ ⇒ 那些标记**不是 pi 认得的形态** ✓（与"从未被解析成工具调用"吻合 ✓），
+但**无法从现有制品复核那个字面形态** ✗ —— 它来自**那一次运行的实测** ✓。
+⇒ 因此判据**刻意写窄**（注释写明理由 ✓）：只认 **4 类家族**（`<dots_*function_call*>` / `<dots_*>` /
+`<|*tool|function_call*|>` / `<tool_call>`/`<function_call>`）+ **要求同一条输出里出现 ≥2 次** ✓
+（**重复是最强信号**：泄漏时模型反复重试同一标记；文档里偶然提一次不会命中 ✓）。
+**宁可漏报，也不误报** ✓ —— 误报会把正常成功判成失败，制造"狼来了" ✗。
+
+**改动（2 文件，均在授权内 ✓）**：`runner.ts` 新增**导出纯函数** `detectUnparsedToolCallMarkers()` ✓ +
+`computeRunOutcome({exitCode, errMsg, output})` ✓；`finish()` 改用它 ✓；并把 `outcome.reason` **前置进 `output`**
+⇒ **原因对下游可见** ✓。+ 新测试 `__tests__/unparsed-tool-call.test.ts`（**8 项** ✓）。
+**涟漪评估（做了 ✓）**：`result` **仍是两值** `'success' | 'failed'` ✓（**不新增第三种值** ⇒ 不破坏 `types.ts:12`
+与 `updateTaskAfterRun` 签名 ✓）；消费者逐一核对 ✓（`daily.ts` 计数/显示、`index.ts` 多处、webhook、
+UI 通知 `!== 'success'` ⇒ warning ✓）⇒ **命中即处处可见** ✓，且**可疑时也会落诊断日志** ✓（修好了"无痕迹"✗）。
+
+**决定性证据（原始输出 ✓）**：
+```
+改前判定： success   ← 报成功但其实一个工具都没执行 ✗
+改后判定： failed（suspect: unparsed tool call，命中 2 次 ⇒ 落诊断日志、下游 UI/webhook/daily 都可见 ✓）
+对照组（无标记）：改前/改后均为 success ✓（不误伤）
+```
+单测 **8/8** ✓（4 项检测：家族命中 ✓ / **只出现一次不命中** ✓ / 普通与空文本不命中 ✓ / 家族覆盖 ✓；
+4 项判定：**对照组仍 success** ✓ / **泄漏 ⇒ failed 且 reason 含"没有真正执行任何工具调用"** ✓ / 既有语义不变 ✓ /
+**反向断言**：`fakeAlwaysSuccess` 在两个泄漏用例上**必然不一致** ✓）；
+相关套件 autopilot+mode ⇒ **23 files / 218 passed | 1 skipped** ✓；全量 `tsc -p custom/` **rc=0** ✓；守门全绿 ✓；
+真实状态未被碰 ✓（无锁 ✓、`scheduler/logs` 仍 **51** ✓）；**无任何 git 写操作** ✓、**未用 `pkill -f`** ✓。
+
+**未验证（如实 ✗）**：① **未端到端真跑一次"上游吐标记"的会话** ✗（按约束不烧 143 秒；证据是合成输出 + 单测 + 代码路径 ✓）；
+② 判据**可能漏别的形态** ✗（只认 4 类家族 ⇒ 上游换格式会**漏报**，但**不会误报** ✓）；
+③ 标记若出现在**非 assistant 文本块**（如 thinking 块）⇒ `extractRunOutput` 可能看不到 ⇒ **漏报** ✗（未处理 ✓）；
+④ **那 143 秒的原始 stdout 无法回溯** ✗（成功不落盘 ✓ + 诊断日志只留最近若干份 ✓）。
+**建议（`scripts/**` 属我领域 ✓，它只报告 ✓）**：在 `scripts/daily-health.mjs` 加一行**只读**统计 ——
+`lastResult === 'failed'` **且** output 含 `suspect:` 的任务数 ⇒ **"可疑失败"在每日健康里可见** ✓（**待做** ✓）。
+
 ### [2026-10-11] ①e 闭环 ✓✓ + **★ 调度器只在交互会话里跑**（附带挖出"报成功却什么都没做"的隐患 ✗✗）
 
 **① "生产照常"已闭环** ✓✓（非 VITEST 下**端到端**）：临时探针（**已删、零痕迹** ✓）在**不设 `VITEST`** 下调用真实
