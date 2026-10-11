@@ -3343,3 +3343,18 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   （区分正确）/ 逾期报停摆 / 组合判定；实状态核验（无锁、nextRun 原值、logs 51）；tsc rc=0、check-conventions 通过。
 - 未做：PID 复用加固（配方已备：比对 /proc/<pid>/stat field 22 starttime）；非 Linux 返回 unknown 并打印原因；
   未接入 verdict/alert（组合布尔量已算出，可随时升级）。
+
+### ①e 闭环 + 调度器只在交互会话里跑（2026-10-11）
+
+- 已闭环：非 VITEST 下探针（hasUI:true）⇒ 读到到期任务→取锁释放（无残留）→ 起真实 pi 子进程（73–143s）→
+  result:"success"、推进 nextRun、写 telemetry；对照组 VITEST=1 ⇒ 跳过计数 0→3、不跑。
+- ★ 结论（代码+注释双证据，index.ts:886）：`if (!ctx.hasUI) { syncSeedTasks(); return; }` ⇒ **调度器只在交互会话里跑**；
+  注释记录了当年事故（无头启动即跑 runDueTasks ⇒ 挂起 + 凭空触发 tool-stats-daily 并留下被 git add 的文件）——
+  与我们追的 01:07 爆发同类。⇒ 「每日更新 ClamAV 病毒库」在纯无头下**不会跑**（刻意设计，非 bug）；要跑用 /daily run 或保持交互会话。
+- ✗✗ 新隐患：探针那次子进程输出是重复的 `<dots_function_call>`（未解析）+ 最终 success ⇒ 模型工具调用从未被解析 ⇒ bash 未执行；
+  根因是默认 freellmapi（localhost:3001，模型 auto）聚合代理的上游不具备原生工具调用 ⇒ 定时任务可能"报成功却什么都没做"
+  （本项目最忌的静默失效）⇒ 已单独立项。口径：一次运行实测 + 配置证据，不主张普遍。
+- 另两发现：getPiInvocation 只黑名单测试运行器（tsx 下 argv[1] 两者都不是 ⇒ 仍拼错）⇒ 宜改为正面要求入口是 pi CLI；
+  仓库外/非 vitest 从根 import 特性会失败（靠临时软链，已删）。
+- 零痕迹：git status 空、探针与软链已删、守门前后两次全绿、真实状态未动（logs 51/无锁/nextRun 原值/agent 目录与备份一致）、
+  无孤儿进程、未用 pkill -f、未做 git 写操作。
