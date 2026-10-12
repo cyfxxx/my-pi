@@ -256,6 +256,36 @@ bash -c '. scripts/lib-vendor.sh; git_dirty_state vendor/pi; echo "vendor/pi -> 
 bash -c '. scripts/lib-vendor.sh; git_unreadable_hint /h/my-pi/vendor/pi'
 ```
 
+### 4.2 启动："Windows 终端里跑不了 .sh" 的真相
+
+Windows 终端（PowerShell / cmd）**不能直接执行 `.sh`**：PowerShell 里敲 `./my-pi.sh`
+不会走 shebang，而是交给文件关联 —— 常见表现是弹窗、用记事本打开，或报"无法识别"。
+**这不是脚本坏了**，必须显式用 bash 执行：
+
+```powershell
+# 错：不会执行脚本
+PS> .\my-pi.sh
+
+# 对：显式用 bash（并保证 PATH 上的 node >= 22.19）
+PS> bash -lc "cd /h/my-pi && ./my-pi.sh"
+```
+
+两个容易踩的点：
+
+1. **`bash` 可能被 WSL 抢走**。git-bash 的 bash 与 WSL 的 bash 是两套东西：前者认
+   `/h/...` 这类 MSYS 路径，后者完全不认（那是另一套文件系统视图）。用
+   `D:\App_X\Git\bin\bash.exe` 显式指定可避免歧义。判断当前是哪个：
+   `bash -c 'uname -s'` → `MINGW64_NT-*` 是 git-bash，`Linux` 是 WSL。
+2. **交互式 TUI 需要真终端**。`my-pi.sh` 启动的是 supervisor + pi 全屏界面；无 TTY
+   （管道、重定向、某些终端嵌入）时它只会打印启动行就退出，看起来像"启动失败"。用
+   `--version` 这类子命令可以在无 TTY 下验证链路是否通。
+
+为免每次手敲，仓库提供启动器（自动选对 bash 与 Node）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run-my-pi.ps1            # 启动 TUI
+powershell -ExecutionPolicy Bypass -File scripts\run-my-pi.ps1 --version  # 只验证链路
+```
 
 ---
 
