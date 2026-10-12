@@ -79,6 +79,7 @@ sees the held-out results."*），理由是**如果我们按它调参，验收�
 | 脚本 | 用途 |
 |------|------|
 | `setup-external.sh` | 可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg shim） |
+| `setup-windows-git.ps1` | **Windows/exFAT 上让 git 能操作本仓库**（每台新机器一次）：登记外层仓库与 `vendor/pi` 的 `safe.directory`（exFAT 不记录属主，git 会因 "dubious ownership" 拒读；git 有意忽略仓库自身配置，故无法随盘携带），并校验 Node 版本（>= 22.19）与构建状态。`build.sh` 在 clone `vendor/pi` 后会自动登记它，本脚本用于**首次引导之前**与体检。详见 `docs/operations/BUILD-PORTABILITY.md` §4 |
 | `searxng-config.sh` | 生成 SearXNG `settings.yml`（禁用不可达引擎、bing 指向 cn.bing.com；`--force/--probe`） |
 
 ## 运行期自愈与运维
