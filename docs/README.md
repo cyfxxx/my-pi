@@ -65,6 +65,12 @@
 | [design/VISION.md](design/VISION.md) | 项目愿景、三大核心功能判据、软硬结合方法论、记忆治理规则、度量差距与落地路线 |
 | [design/UPGRADE-LEDGER.md](design/UPGRADE-LEDGER.md) | **升格通道台账**（VISION §3.1/§6 P4）：每条软引导的硬化落点、降权动作、验收证据，以及未硬化项的原因与前置条件；注入预算基线 |
 
+### 参考资料
+
+| 文档 | 内容 |
+|------|------|
+| [reference/WEB-INDEX.md](reference/WEB-INDEX.md) | **外部网页资源索引**（690 条，按 9 类分节）：平时查资料时的定位入口；机器可读版为 `reference/web-index.json`（`{category,sub,title,url}`）。同目录 [reference/README.md](reference/README.md) 写明**隐私过滤纪律**（个人账号/内网地址/跟踪参数等如何剔除）。注意：很多条需外部网络才能访问，**打不开不等于失效** |
+
 ### 项目主文档（仓库根）
 
 | 文档 | 内容 |
