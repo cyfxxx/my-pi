@@ -56,9 +56,11 @@ DEFAULTS = {
     "toc_page_range": [1, 20],
     "page_budget": 8,
     "dpi": 200,
-    "ocr_engine": "tesseract",
-    "ocr_langs": "chi_sim+eng",
-    "ocr_psm": "6",
+    # rapidocr：onnxruntime + PaddleOCR 模型，模型随 wheel 分发（离线可用），
+    # 本机实测 2.4-4.4 秒/页；tesseract 在本机 31-69 秒/页，慢一个数量级。
+    "ocr_engine": "rapidocr",
+    "ocr_langs": "chi_sim+eng",   # 仅 tesseract 用
+    "ocr_psm": "6",               # 仅 tesseract 用
     "quality_min_chars": 120,
     "quality_min_cjk_ratio": 0.25,
     "privacy_cloud_vision": False,
@@ -484,19 +486,68 @@ def cmd_index(args, cfg, rec: RunRecorder) -> dict:
 # ── read：按需提取（缓存优先） ─────────────────────────────────────────────
 
 
+_RAPIDOCR_SINGLETON = None
+
+
+def _rapidocr():
+    """惰性加载 RapidOCR（onnxruntime）单例。
+
+    为什么接它（2026-10-13 在本机实测）：
+      · **tesseract 在本机 31–69 秒/页**（项目文档 §1.3 记录），516 本扫描书的目录页
+        按每本 10–20 页算要 45–120 小时 —— 数量级上不可行；
+      · **RapidOCR 实测 2.4–4.4 秒/页（约快 10 倍）**，且**模型随 wheel 分发**
+        （`rapidocr_onnxruntime/models/*.onnx`，约 13 MB，无需联网下载），
+        对本库的 1950 年代简体旧书可用。
+      · 另一条现实约束：本机拿不到 tesseract 安装包（UB-Mannheim 403、GitHub 不通、
+        无 winget/scoop/choco/conda），而 **PyPI 镜像通畅** —— RapidOCR 是唯一可装的路线。
+    本函数保留 tesseract 作为回退，不破坏既有环境（`ocr_engine: "tesseract"` 仍可用）。
+    """
+    global _RAPIDOCR_SINGLETON
+    if _RAPIDOCR_SINGLETON is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR  # type: ignore
+        except ImportError as exc:  # pragma: no cover - 取决于环境
+            raise RuntimeError(
+                "OCR 引擎 rapidocr 不可用：缺 rapidocr_onnxruntime"
+                "（安装：python3 -m pip install rapidocr-onnxruntime onnxruntime）"
+            ) from exc
+        _RAPIDOCR_SINGLETON = RapidOCR()
+    return _RAPIDOCR_SINGLETON
+
+
 def ocr_image(png: Path, cfg: dict) -> str:
-    engine = cfg.get("ocr_engine", "tesseract")
-    if engine != "tesseract":
-        raise RuntimeError(f"OCR 引擎未实现: {engine}（可在 PC 端接 PaddleOCR/云端视觉）")
-    if not shutil.which("tesseract"):
-        raise RuntimeError("未找到 tesseract")
-    proc = subprocess.run(
-        ["tesseract", str(png), "stdout", "-l", cfg["ocr_langs"], "--psm", str(cfg["ocr_psm"])],
-        capture_output=True, text=True,
+    """对单页图片做 OCR，返回文本。引擎由 `ocr_engine` 选择。
+
+    · `rapidocr`（默认）：onnxruntime + PaddleOCR 模型，模型随包分发、离线可用，
+      本机实测 2.4–4.4 秒/页。
+    · `tesseract`：传统路线，本机 31–69 秒/页（慢一个数量级），且需系统级安装。
+    """
+    engine = cfg.get("ocr_engine", "rapidocr")
+
+    if engine == "rapidocr":
+        if not png.exists():
+            raise RuntimeError(f"待 OCR 的图片不存在: {png}")
+        result, _elapse = _rapidocr()(str(png))
+        # RapidOCR 返回 [[box, text, score], ...]；按行拼接（阅读顺序由它给出）
+        if not result:
+            return ""
+        return "\n".join(str(item[1]) for item in result if len(item) > 1)
+
+    if engine == "tesseract":
+        if not shutil.which("tesseract"):
+            raise RuntimeError("未找到 tesseract")
+        proc = subprocess.run(
+            ["tesseract", str(png), "stdout", "-l", cfg["ocr_langs"], "--psm", str(cfg["ocr_psm"])],
+            capture_output=True, text=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"tesseract 失败: {proc.stderr.strip()[:200]}")
+        return proc.stdout
+
+    raise RuntimeError(
+        f"OCR 引擎未实现: {engine}（已支持 rapidocr / tesseract；"
+        "PC 端接 PaddleOCR-GPU 或云端视觉需另加分支）"
     )
-    if proc.returncode != 0:
-        raise RuntimeError(f"tesseract 失败: {proc.stderr.strip()[:200]}")
-    return proc.stdout
 
 
 def cjk_ratio(text: str) -> float:

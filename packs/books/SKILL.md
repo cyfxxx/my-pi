@@ -35,10 +35,15 @@ python3 scripts/books.py report          # 汇总：书籍数/策略分布/已�
 
 ## 预算与限制（重要）
 
-- **单次最多 8 页**（`page_budget`，`--force` 可覆盖）。本机 OCR 实测 **31–69 秒/页**（CPU/tesseract），所以"多提几页"很贵。
-- 提页顺序：**文字层优先**（毫秒级）→ 无文字层才 OCR。同一页第二次直接命中缓存。
-- **不要**对整本书跑提取；也不要为了"看看有没有用"批量提页。先用 `index` 的章节表定位。
-- 本机语言包只有 `chi_sim/eng`；**古籍/竖排/繁体**（无 `chi_tra`）不要在本机硬跑，标 `needs_vision` 交给 PC 端（3070 Ti/32G，可接 PaddleOCR-GPU 或云端视觉）。
+- **单次最多 8 页**（`page_budget`，`--force` 可覆盖）。提页顺序：**文字层优先**（毫秒级）→
+  无文字层才 OCR；同一页第二次直接命中缓存（实测二次读取 23 ms）。
+- **OCR 引擎**（`ocr_engine`，默认 `rapidocr`）：
+  - `rapidocr`：onnxruntime + PaddleOCR 模型，**模型随 wheel 分发、离线可用**；本机实测
+    **2.4–4.4 秒/页**（CPU）。
+  - `tesseract`：传统路线，本机实测 **31–69 秒/页**，慢一个数量级，且需系统级安装 tesseract。
+  - 仍不要对整本书跑提取；先用 `index` 的章节表定位，再按需提页。
+- **古籍/竖排/繁体**：两种引擎都不擅长（本项目未接 `chi_tra`），标 `needs_vision`
+  交给 PC 端（3070 Ti/32G，可接 PaddleOCR-GPU 或云端视觉）。
 
 ## 质量门与降级
 

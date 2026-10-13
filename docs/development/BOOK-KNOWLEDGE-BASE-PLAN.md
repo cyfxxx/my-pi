@@ -141,8 +141,22 @@ L3 沉淀层（跨书复用）         记忆条目（category=reference/fact）
 | 索引层（P1） | `books.py index` | **27 本 / 5 486 章**章节表（PDF outline + EPUB spine），**13 本**标记需目录页 OCR（`_needs_toc_ocr.jsonl`）；零 OCR、耗时 0.5–4 s |
 | 按需提取（P2） | `books.py read --book <id> --pages A-B` | 文字层书：3 页 1 662 字符 / **547 ms**，二次读取 **命中缓存 11 ms**；扫描书：1 页 OCR **1 952 字符 / 72.3 s**，质量门通过 |
 | 记录 | 自动 | `_probe.jsonl` / `index/*.jsonl` / `cache/*/meta.jsonl`（method/quality/sha256/pages）/ `logs/run-YYYYMMDD.jsonl`（命令/角色/设备/计数/耗时） |
-| 自检（守门） | `node scripts/test-books.mjs`（golden 第 15 步） | 15 项断言：合成 PDF（内嵌目录 + 纯图像页）跑通 probe/index/read/report/记录；缺 tesseract 时 OCR 项显式跳过 |
+| 自检（守门） | `node scripts/test-books.mjs`（golden 第 15 步） | 16 项断言：合成 PDF（内嵌目录 + 纯图像页）跑通 probe/index/read/report/记录；缺 OCR 引擎时该项显式降级 |
 | 跨设备一致 | `book_id = 标题slug + 内容指纹8位` | 同一文件在两端 id 相同 → L2 缓存可经 `sync-memory.sh` 加密同步，无需复制原书 |
+
+### 9.1 后续更新：OCR 引擎换成 RapidOCR（2026-10-13，278 GB / 1286 本真实书库）
+
+上面的 §1.3 与 P2 记录的是 **tesseract** 的实测。接入真实书库后发现两件事，
+于是把默认引擎改为 **RapidOCR**（`rapidocr-onnxruntime` + onnxruntime）：
+
+| 项 | tesseract | **RapidOCR** |
+|---|---|---|
+| 本机速度 | 31–69 秒/页（§1.3 实测） | **2.4–4.4 秒/页**（实测，快约 10 倍） |
+| 模型来源 | 系统级安装 + 语言包 | **随 wheel 分发**（`models/*.onnx` 约 13 MB，离线可用） |
+| 本机可装性 | ❌ 拿不到安装包（UB-Mannheim 403、GitHub 不通、无 winget/scoop/choco/conda） | ✅ **PyPI 镜像通畅**（唯一可行路线） |
+
+`ocr_engine` 默认值已改为 `rapidocr`；`tesseract` 保留为回退（该分支未删）。
+端到端实测：真实扫描书 1 页 **5.75 s / 635 字符**，二次读取 **23 ms 命中缓存**。
 
 **两端分工已确定**（用户 2026-10-02 补充）：**PC = 3070 Ti + 32 GB 内存 = `role: worker`**（完整书库、
 批量目录页 OCR、GPU OCR/PaddleOCR、本地多模态兜底）；手机 = `role: phone`（索引 + 按需提页 + 与 Agent 交互）。

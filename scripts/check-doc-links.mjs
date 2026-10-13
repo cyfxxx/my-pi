@@ -12,7 +12,17 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCAN_DIRS = ['.', 'docs', 'portable/agent'];
-const SKIP = new Set(['node_modules', 'vendor', 'packs', '.git']);
+/**
+ * 跳过这些目录名。
+ *
+ * `memory` 是 2026-10-13 补的：`SCAN_DIRS` 含 `.`（递归全仓，为的是覆盖根目录散落的 md），
+ * 于是 `portable/memory/**` 的运行期产物也被纳入校验 —— 而那里的内容是**机器本地生成的数据**，
+ * 不是本文档体系的一部分。实测它误报过一处"失效链接"：
+ *   `portable/memory/knowledge/books/_report.md` 里一本书的标题恰好含
+ *   `《英汉汉英航海词典》[416974](090524)`，markdown 把 `[416974](090524)` 当成了链接。
+ * 排除运行期目录后，本守门只校验"有意编写的文档"，与它「文档链接守门」的定位一致。
+ */
+const SKIP = new Set(['node_modules', 'vendor', 'packs', '.git', 'memory']);
 
 /**
  * 目录项类型判定（**不信任 dirent 类型标志**）。

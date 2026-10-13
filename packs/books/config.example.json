@@ -6,7 +6,7 @@
   "toc_page_range": [1, 20],
   "page_budget": 8,
   "dpi": 200,
-  "ocr_engine": "tesseract",
+  "ocr_engine": "rapidocr",
   "ocr_langs": "chi_sim+eng",
   "ocr_psm": "6",
   "quality_min_chars": 120,

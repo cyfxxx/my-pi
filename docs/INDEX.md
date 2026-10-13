@@ -684,7 +684,7 @@
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 6. 分期路线（每阶段都有可验证判据） · - **P0 只读体检（0.5 天）**：`scripts/books-probe.mjs` 输出"每本书：页数/文字层/outline/体积/是否疑似扫描/建议策略"， · 数字: 0.5 天 / 2 天 / 1 条 / 80%
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 7. 风险与降级 · 数字: 1.4 GB / 51 GB
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 8. 需要你确认/提供的（其余我已按现状定好） · 1. **书库根路径**（本机 `/storage/emulated/0/我的文件/书籍` 只是 1.5 GB 的一部分；200 GB 那份在哪？外置盘/PC/网盘？） · 数字: 1.5 GB / 200 GB
-- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 9. 框架落地状态（2026-10-02 实测） · **已实现并可运行**（`scripts/books.py` + `scripts/test-books.mjs` + `packs/books/`）： · 数字: 1.54 GB / 4.0 秒 / 32 GB / 69 秒
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 9. 框架落地状态（2026-10-02 实测） · **已实现并可运行**（`scripts/books.py` + `scripts/test-books.mjs` + `packs/books/`）： · 数字: 1.54 GB / 4.0 秒 / 278 GB / 69 秒
 - `docs/development/CHECK-REPORT.md` · 一、修正说明（上一版报告的误报） · 上一版报告声称"所有问题已修复"，经与 pi-tools 原项目逐项比对，以下为**不实/未完成**项，本轮已修正： · 数字: 10个 / 5 个 / 12 个 / 14 个
 - `docs/development/CHECK-REPORT.md` · 二、修正后验证结果 · ### 2.1 隔离边界（`bash scripts/check-isolation.sh`） · 数字: 4 个
 - `docs/development/CHECK-REPORT.md` · 三、与原项目的真实差距（本轮未覆盖） · 本轮仅补"最近迁移波次"的注册面缺漏。以下为对照 pi-tools 后确认的**系统性差距**，属"全面移植 / 脚本编排"范围： · 数字: 12 个 / 9 个 / 6 个 / 3 条
