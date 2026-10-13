@@ -15,6 +15,32 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# 同一路径的两种形式。**必须区分**：bash 侧用 MSYS 形式（`/tmp/xxx`），
+# 而交给原生 node.exe 的路径要么是盘符形式、要么会被 MSYS 自动转成盘符形式。
+# 把 MSYS 形式拼进 `$ROOT/$AGENT_DIR` 会得到 `/m/my-pi//tmp/xxx` —— node 读它 **ENOENT**，
+# 而 lib-mode.sh 的 mode_resolve 捕获异常后**无条件回落 full**，于是 6 项会话模式断言
+# 全红且看不出原因（实测 2026-10-13）。同理，写进 modes-sessions.json 的键必须是
+# node 侧看到的形式，否则查不到记录。
+WIN() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
+
+# "子进程会看到的父 PID"。pi 写进请求的 ownerPid 是 node 的 `process.ppid`；在 Windows/MSYS
+# 下那是 **Windows PID**，而 bash 的 `$$` 是 **MSYS 自己的 PID 命名空间**，两者永不相等
+# （实测 $$=1720 vs node 报 42248）。supervisor 在 Linux 上两者同源，故只有 Windows 暴露
+# （见 docs/BUG-REPLAYS.md 第 37 条）。
+OWNER_PID="$(node -e 'process.stdout.write(String(process.ppid))' 2>/dev/null)"
+case "$OWNER_PID" in ''|*[!0-9]*) OWNER_PID=$$ ;; esac
+# 身份分两种语境，**不要混**（这是本文件最容易踩的地方）：
+#   · 直调用例（本进程内 source 了 supervisor，直接调 read_admin_action）：此时
+#     "supervisor 自己的 PID" 就是**本脚本的 PID** ⇒ 把 SUPERVISOR_OWNER_PID 设成本脚本的
+#     pid（不 export，只影响本进程）。
+#   · 子进程用例（真实跑 pi-supervisor.sh / stub）：它们会自行判定身份，**注入会把它们带错**
+#     （实测：export 本脚本的 $$ 后，end-to-end 主循环里 supervisor 认不出自家 pi 的请求，
+#      16 项里的 8 项正是这么红的）。
+# 之所以要分：MSYS 下 bash 的 `$$` 与 Windows PID 是**两套命名空间**，pi 写的是后者。
+OUTER_OWNER_PID="$(node -e 'process.stdout.write(String(process.ppid))' 2>/dev/null)"
+case "$OUTER_OWNER_PID" in ''|*[!0-9]*) OUTER_OWNER_PID=$$ ;; esac
+SUPERVISOR_OWNER_PID="$OUTER_OWNER_PID"   # 仅本进程；子进程会自行判定
+
 PASS=0
 FAIL=0
 check() { # check <描述> <期望> <实际>
@@ -83,7 +109,7 @@ read_admin_action
 check "过期 restart → 空动作" "" "$ACT"
 
 # ownerPid 隔离：多实例共享 state.json 时只认自己的请求（pi 的 ppid 就是本 supervisor）
-write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"ownerPid\":$$,\"targetSession\":\"/tmp/mine.jsonl\"}"
+write_state "{\"action\":\"restart\",\"timestamp\":$(now_ms),\"ownerPid\":$OUTER_OWNER_PID,\"targetSession\":\"/tmp/mine.jsonl\"}"
 read_admin_action
 check "ownerPid=自己 → 认领" "restart" "$ACT"
 check "ownerPid=自己 → 目标会话" "/tmp/mine.jsonl" "$TARGET"
@@ -143,7 +169,7 @@ check "没有时间戳 → 不算丢" "no" "$(lost none '' 1000000 1001000)"
 check "坏时间戳 → 不算丢（不崩）" "no" "$(lost none abc 1000000 1001000)"
 check "时间戳在未来（时钟回拨）→ 不算丢" "no" "$(lost none 9999999 1000000 1001000)"
 check "别人的日志（ownerPid=别的实例）→ 不算丢（多实例不能互相误报）" "no" "$(lost none 1000500 1000000 1001000 424242)"
-check "自己的日志（ownerPid=本实例）→ 照旧判定为丢" "yes" "$(lost none 1000500 1000000 1001000 $$)"
+check "自己的日志（ownerPid=本实例）→ 照旧判定为丢" "yes" "$(lost none 1000500 1000000 1001000 "$OUTER_OWNER_PID")"
 check "日志没有 ownerPid（老请求）→ 照旧判定为丢" "yes" "$(lost none 1000500 1000000 1001000 '')"
 
 echo ""
@@ -186,8 +212,10 @@ mark_recovery_restart_log pi_self
 check "有待执行动作时不抢日志（action 保留）" "restart" "$(state_field 's.action')"
 check "有待执行动作时不抢日志（restartLog 保留）" "old" "$(state_field 's.restartLog.reason')"
 rm -f "$PI_ADMIN_STATE_FILE"   # 先清掉上一个用例留下的待执行动作（否则函数会正确地拒绝抢日志）
+# 同一路径两种形式（bash 侧 /tmp/... 与 node 侧盘符形式）—— 断言用 node 侧实际写入的形式。
+SESS_X="$(WIN /tmp/sess-x.jsonl)"
 mark_recovery_restart_log pi_self /tmp/sess-x.jsonl
-check "恢复日志带上 targetSession（供新进程/审计定位）" "/tmp/sess-x.jsonl" "$(state_field 's.restartLog.targetSession')"
+check "恢复日志带上 targetSession（供新进程/审计定位）" "$SESS_X" "$(state_field 's.restartLog.targetSession')"
 
 echo ""
 echo "=== build_admin_args（重启续接参数，绝不能为空）==="
@@ -355,11 +383,14 @@ echo "=== apply_mode（模式解析：入库配置 + 会话记录）==="
 # modes-sessions.json（gitignored，键是会话文件绝对路径）。新会话没有记录 → default。
 # 这层契约必须由 bash 侧也锁住——模式解析在 lib-mode.sh，pi 侧在 mode/logic.ts，两边读同一组文件。
 # 用局部 AGENT_DIR 指向临时目录，避免污染真实 agent 目录（也避开救援 playbook 对真实路径的断言）。
-MODE_AGENT="$TMP/mode-agent"
+# 这一组的读取者是 `node -e`（lib-mode.sh 的 mode_resolve / mode_session_arg），
+# 故 MODE_AGENT 与两个会话文件都用**盘符形式**，并据此写 modes-sessions.json 的键。
+MODE_AGENT="$TMP/mode-agent"          # 供 bash 的 mkdir/写文件用
+MODE_AGENT_N="$(WIN "$MODE_AGENT")"   # 供 node 读取用（同一目录，两种写法）
 mkdir -p "$MODE_AGENT/modes"
-AGENT_DIR="$MODE_AGENT"
-SESS_A="$TMP/sess-a.jsonl"
-SESS_B="$TMP/sess-b.jsonl"
+AGENT_DIR="$MODE_AGENT_N"
+SESS_A="$(WIN "$TMP/sess-a.jsonl")"
+SESS_B="$(WIN "$TMP/sess-b.jsonl")"
 write_modes() { # write_modes [会话文件] [模式名]；不给参数 = 不写会话记录
   rm -f "$AGENT_DIR/modes-sessions.json"
   cat > "$AGENT_DIR/modes.json" <<'JSON'
@@ -392,7 +423,7 @@ check "无会话记录 → 导出 PI_SESSION_MODE（软来源）" "full" "$PI_SE
 write_modes "$SESS_A" roleplay
 apply_mode --session "$SESS_A"
 check "会话记录 roleplay → 模式名" "roleplay" "$MODE_NAME"
-check "会话记录 roleplay → 注入人设（绝对路径）" "--append-system-prompt $MODE_AGENT/modes/roleplay.md" "${MODE_ARGS[*]:-}"
+check "会话记录 roleplay → 注入人设（绝对路径）" "--append-system-prompt $MODE_AGENT_N/modes/roleplay.md" "${MODE_ARGS[*]:-}"
 check "会话记录 roleplay → 记忆命名空间" "roleplay" "$PI_MEMORY_NAMESPACE"
 check "会话记录 roleplay → PI_SESSION_MODE 同步" "roleplay" "$PI_SESSION_MODE"
 

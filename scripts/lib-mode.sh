@@ -42,8 +42,14 @@ mode_session_arg() {
   local prev="" a out=""
   for a in "$@"; do
     if [ "$prev" = "--session" ]; then
+      # 只认**绝对路径**：会话 id / 相对路径一律不解析，交给 pi 侧自愈再重启。
+      # 两条判据都要有 —— Windows 上参数传给原生 node.exe 时可能是盘符形式：
+      #   /tmp/x.jsonl      （MSYS/POSIX）
+      #   D:/Tmp/x.jsonl    （盘符形式）
+      # 只写 `/*` 会把后者当"不是绝对路径"丢掉，于是模式解析退回 default（实测 2026-10-13）。
       case "$a" in
         /*) out="$a" ;;
+        [A-Za-z]:/*) out="$a" ;;
       esac
       prev=""
       continue

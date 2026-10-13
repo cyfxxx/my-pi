@@ -491,7 +491,7 @@
 - `docs/BUG-REPLAYS.md` · #34 **Node 版本守门只在构建期、运行期没有 ⇒ 启动成功却在使用中崩（zstd 解压）**：`build.sh` 第 1 步与 `doctor.sh` 都有 Node >= 22.19 的逐段版本守门，但**运行期**没有同口径守 · 崩溃记录 `portable/agent/crashes.json` 里 `kind=uncaught_exception`、`message=zlib.createZstdDecompress is not a function`、栈顶是
 - `docs/BUG-REPLAYS.md` · #35 **PowerShell 参数集互斥参数写成一条 ⇒ 报错指向参数名而非真因**：`Set-Disk -Number N -IsOffline $false -IsReadOnly $false` 报 `无法使用指定的命名参数解析参 · 报 `AmbiguousParameterSet`；同一条命令拆成两行后立刻通过；用不存在的磁盘号 99 可复现并区分两类失败——报"找不到磁盘"说明**参数绑定已通过**，报"参数集"才是拼错
 - `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
-- `docs/BUG-REPLAYS.md` · #37 **[未解决 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：`SUPERVISOR_OWNER_P · supervisor 测试 16 项失败中，起因为此的是：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 resta
+- `docs/BUG-REPLAYS.md` · #37 **[部分修复 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPE · supervisor 测试里 8 项：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 restart → exit（
 
 ## 设计文档（177 条）
 
