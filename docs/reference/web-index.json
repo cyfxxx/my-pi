@@ -1,4147 +1,5754 @@
 {
  "source": "Chrome 书签导出 2026-10-11（已隐私过滤）",
- "note": "部分条目需外部网络；打不开不等于失效",
- "count": 690,
+ "note": "部分条目需外部网络；打不开不等于失效。desc 为预留说明字段，使用时逐步补充。",
+ "count": 821,
  "entries": [
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Telegram",
-   "url": "https://web.telegram.org/#/im"
+   "url": "https://web.telegram.org/#/im",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Discord",
-   "url": "https://discord.com/guild-discovery"
+   "url": "https://discord.com/guild-discovery",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Twitter",
-   "url": "https://mobile.twitter.com/home"
+   "url": "https://mobile.twitter.com/home",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Facebook",
-   "url": "https://www.facebook.com/"
+   "url": "https://www.facebook.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "V2EX",
-   "url": "https://www.v2ex.com/"
+   "url": "https://www.v2ex.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "4chan",
-   "url": "https://www.4chan.org/"
+   "url": "https://www.4chan.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Stack Overflow",
-   "url": "https://stackoverflow.com/"
+   "url": "https://stackoverflow.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "reddit",
-   "url": "https://www.reddit.com/"
+   "url": "https://www.reddit.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Quora",
-   "url": "https://www.quora.com/"
+   "url": "https://www.quora.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Instagram",
-   "url": "https://www.instagram.com/"
+   "url": "https://www.instagram.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "telegram中文搜索",
-   "url": "http://www.sssoou.com/"
+   "url": "http://www.sssoou.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Discord服务器列表",
-   "url": "https://disboard.org/zh-cn"
+   "url": "https://disboard.org/zh-cn",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "台湾论坛",
-   "url": "https://www.ptt.cc/bbs/index.html"
+   "url": "https://www.ptt.cc/bbs/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Telegram频道- TG 公众索引系统",
-   "url": "https://tgtw.cc/index.php?type=1"
+   "url": "https://tgtw.cc/index.php?type=1",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Telegram 台湾群组索引",
-   "url": "https://www.telegram.url.tw/"
+   "url": "https://www.telegram.url.tw/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "交流",
    "title": "Telegram TGStat",
-   "url": "https://cn.tgstat.com/"
+   "url": "https://cn.tgstat.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / Zlibrary",
    "title": "Z-library Project - eBook Library Z. Download free Books",
-   "url": "https://z-library.sk/"
+   "url": "https://z-library.sk/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / Zlibrary",
    "title": "Z-Library – 世界上最大的电子图书馆。自由访问知识和文化。",
-   "url": "https://zh.kid1412.ink/"
+   "url": "https://zh.kid1412.ink/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / Zlibrary",
    "title": "Z-Library Project",
-   "url": "https://z-lib.id/"
+   "url": "https://z-lib.id/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / Zlibrary",
    "title": "Z-Library – the world’s largest e-book library. Your gateway to knowledge and culture.",
-   "url": "https://z-lib.fm/"
+   "url": "https://z-lib.fm/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / 古籍",
    "title": "中医书籍_中医世家",
-   "url": "http://www.zysj.com.cn/lilunshuji/index.html"
+   "url": "http://www.zysj.com.cn/lilunshuji/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / 古籍",
    "title": "漢典古籍",
-   "url": "https://gj.zdic.net/"
+   "url": "https://gj.zdic.net/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / 古籍",
    "title": "书库 经部",
-   "url": "https://cnkgraph.com/Book"
+   "url": "https://cnkgraph.com/Book",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / 古籍",
    "title": "古籍善本_中国古籍网_古籍电子书",
-   "url": "http://book.shufaji.com/"
+   "url": "http://book.shufaji.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍 / 古籍",
    "title": "古籍館-中國最大的古籍圖書館",
-   "url": "https://gujiguan.com/"
+   "url": "https://gujiguan.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "Calibre-Web | 书籍",
-   "url": "https://www.aming.work:8083/"
+   "url": "https://www.aming.work:8083/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "安娜的档案",
-   "url": "https://annas-archive.org/"
+   "url": "https://annas-archive.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "安娜的档案",
-   "url": "https://ja.annas-archive.org/"
+   "url": "https://ja.annas-archive.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "LoreFree-去中心化免费电子书共享社区",
-   "url": "https://ebook2.lorefree.com/#"
+   "url": "https://ebook2.lorefree.com/#",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "第一图书网_PDF图书下载_PDF教材下载_免费PDF电子书下载",
-   "url": "http://www.tushu007.com/"
+   "url": "http://www.tushu007.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "绝版资料库 绝版PDF求助",
-   "url": "https://mtoou.info/jueban/qiuzhu/so/"
+   "url": "https://mtoou.info/jueban/qiuzhu/so/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "联图云.光盘",
-   "url": "http://discx.yuntu.io/"
+   "url": "http://discx.yuntu.io/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "电子书搜索",
-   "url": "https://www.giffox.com/"
+   "url": "https://www.giffox.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "苦瓜书盘",
-   "url": "https://kgbook.com/"
+   "url": "https://kgbook.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "云海免费电子图书馆",
-   "url": "http://www.pdfbook.cn/"
+   "url": "http://www.pdfbook.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "FreeMbook Search",
-   "url": "https://freembook.com/"
+   "url": "https://freembook.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "https://bk.hallowlib.org",
-   "url": "https://bk.hallowlib.org/"
+   "url": "https://bk.hallowlib.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "书享家",
-   "url": "http://shuxiangjia.cn/"
+   "url": "http://shuxiangjia.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "未来书籍搜索-免费电子书搜索引擎",
-   "url": "https://bks.thefuture.top/"
+   "url": "https://bks.thefuture.top/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "DigiLibraries.com - 免费电子书库",
-   "url": "https://digilibraries.com/"
+   "url": "https://digilibraries.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "图书馆创世纪",
-   "url": "http://libgen.rs/"
+   "url": "http://libgen.rs/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "免费在线书籍",
-   "url": "https://www.justfreebooks.info/"
+   "url": "https://www.justfreebooks.info/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "联机图书页面",
-   "url": "http://onlinebooks.library.upenn.edu/"
+   "url": "http://onlinebooks.library.upenn.edu/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "熊猫搜书",
-   "url": "https://xmsoushu.com/#/"
+   "url": "https://xmsoushu.com/#/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "Library Genesis",
-   "url": "https://libgen.li/index.php"
+   "url": "https://libgen.li/index.php",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "首页 - PDF下载之家",
-   "url": "https://downloadpdf.cn/index.html"
+   "url": "https://downloadpdf.cn/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "书籍",
    "title": "读书派",
-   "url": "https://www.dushupai.com/"
+   "url": "https://www.dushupai.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "医学百科全书",
-   "url": "http://www.a-hospital.com/w/%E9%A6%96%E9%A1%B5"
+   "url": "http://www.a-hospital.com/w/%E9%A6%96%E9%A1%B5",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "默沙东诊疗手册",
-   "url": "https://www.msdmanuals.cn/?ruleredirectid=14#mission"
+   "url": "https://www.msdmanuals.cn/?ruleredirectid=14#mission",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "果汁排行榜",
-   "url": "http://guozhivip.com/rank/index.html"
+   "url": "http://guozhivip.com/rank/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "中国大百科全书数据库",
-   "url": "https://h.bkzx.cn/"
+   "url": "https://h.bkzx.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "《中国大百科全书》第三版网络版",
-   "url": "https://www.zgbk.com/"
+   "url": "https://www.zgbk.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "中国近代影像资料库",
-   "url": "https://www.lzp360.com/"
+   "url": "https://www.lzp360.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "国家数据",
-   "url": "http://data.stats.gov.cn/easyquery.htm?cn=C01"
+   "url": "http://data.stats.gov.cn/easyquery.htm?cn=C01",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "我们的数据世界",
-   "url": "https://ourworldindata.org/"
+   "url": "https://ourworldindata.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "Windy （气象信息）",
-   "url": "https://www.windy.com/"
+   "url": "https://www.windy.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "指数",
-   "url": "http://www.xuan.cool/data.html"
+   "url": "http://www.xuan.cool/data.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "维基教科书",
-   "url": "https://en.wikibooks.org/wiki/Main_Page"
+   "url": "https://en.wikibooks.org/wiki/Main_Page",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "媒体维基",
-   "url": "https://www.mediawiki.org/wiki/MediaWiki"
+   "url": "https://www.mediawiki.org/wiki/MediaWiki",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "数据",
    "title": "维基文库，自由的图书馆",
-   "url": "https://zh.wikisource.org/wiki/Wikisource:%E9%A6%96%E9%A1%B5"
+   "url": "https://zh.wikisource.org/wiki/Wikisource:%E9%A6%96%E9%A1%B5",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "中国国家图书馆·",
-   "url": "http://www.nlc.cn/web/select.html"
+   "url": "http://www.nlc.cn/web/select.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "全国图书馆参考咨询联盟",
-   "url": "http://www.ucdrs.superlib.net/"
+   "url": "http://www.ucdrs.superlib.net/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "开放存取图书馆（OALib）",
-   "url": "http://www.oalib.com/"
+   "url": "http://www.oalib.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "浙江图书馆",
-   "url": "https://www.zjlib.cn/"
+   "url": "https://www.zjlib.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "广州图书馆·首页",
-   "url": "http://www.gzlib.org.cn/"
+   "url": "http://www.gzlib.org.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "佛山市图书馆",
-   "url": "https://www.fslib.com.cn/"
+   "url": "https://www.fslib.com.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "贵州数字图书馆",
-   "url": "http://www.gzlib.org/"
+   "url": "http://www.gzlib.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "绍兴图书馆-绍兴数字图书馆",
-   "url": "https://www.sxlib.com/"
+   "url": "https://www.sxlib.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 图书馆",
    "title": "美国数字公共图书馆",
-   "url": "https://dp.la/"
+   "url": "https://dp.la/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "SCI-HUB.Pub",
-   "url": "https://www.sci-hub.pub/"
+   "url": "https://www.sci-hub.pub/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "科普中心",
-   "url": "https://www.sci-hub.ren/"
+   "url": "https://www.sci-hub.ren/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "iData-知识检索",
-   "url": "https://www.cn-ki.net/"
+   "url": "https://www.cn-ki.net/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "gfsoso 学术搜索",
-   "url": "https://c3.glgoo.top/scholar/"
+   "url": "https://c3.glgoo.top/scholar/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "Google 学术搜索",
-   "url": "https://scholar.google.com.hk/?hl=zh-CN"
+   "url": "https://scholar.google.com.hk/?hl=zh-CN",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "淘链客",
-   "url": "https://www.taolinks.cc/s/"
+   "url": "https://www.taolinks.cc/s/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "文献部落",
-   "url": "http://459.org/"
+   "url": "http://459.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "学术搜索",
-   "url": "https://scholar.chongbuluo.com/"
+   "url": "https://scholar.chongbuluo.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "库问搜索",
-   "url": "http://www.koovin.com/"
+   "url": "http://www.koovin.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "学术搜索引擎",
-   "url": "http://www.xuan.cool/academic.html"
+   "url": "http://www.xuan.cool/academic.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "小鲸鱼文献",
-   "url": "http://www.9312.net/#/"
+   "url": "http://www.9312.net/#/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术 / 学术搜索",
    "title": "百度学术",
-   "url": "https://xueshu.baidu.com/"
+   "url": "https://xueshu.baidu.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "AMiner - 探索科学与技术的动力",
-   "url": "https://www.aminer.cn/"
+   "url": "https://www.aminer.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "汉斯期刊 开放获取",
-   "url": "https://www.hanspub.org/?btwaf=50626741"
+   "url": "https://www.hanspub.org/?btwaf=50626741",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "NSTL国家科技图书文献中心",
-   "url": "https://www.nstl.gov.cn/"
+   "url": "https://www.nstl.gov.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "中国科学院知识服务平台",
-   "url": "https://www.las.ac.cn/"
+   "url": "https://www.las.ac.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "ERIC - 教育资源信息中心",
-   "url": "https://eric.ed.gov/"
+   "url": "https://eric.ed.gov/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "科学知识平台",
-   "url": "https://www.x-mol.com/"
+   "url": "https://www.x-mol.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "小木虫",
-   "url": "http://muchong.com/"
+   "url": "http://muchong.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "中国知网",
-   "url": "https://www.cnki.net/?UID=WEEvREcwSlJHSldTTEYzVDhUQ05ZSi92MG54dkw2MXN1UXArcjdCUU9Xaz0%3d%249A4hF_YAuvQ5obgVAqNKPCYcEjKensW4IQMovwHtwkF4VYPoHbKxJw!!&PlatForm=kns"
+   "url": "https://www.cnki.net/?UID=WEEvREcwSlJHSldTTEYzVDhUQ05ZSi92MG54dkw2MXN1UXArcjdCUU9Xaz0%3d%249A4hF_YAuvQ5obgVAqNKPCYcEjKensW4IQMovwHtwkF4VYPoHbKxJw!!&PlatForm=kns",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学术",
    "title": "Litmaps 论文学习",
-   "url": "https://www.litmaps.com/"
+   "url": "https://www.litmaps.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源 / 网盘",
    "title": "云盘狗",
-   "url": "http://yunpangou.com/"
+   "url": "http://yunpangou.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源 / 网盘",
    "title": "网盘搜索，就用大力盘搜索",
-   "url": "https://www.dalipan.com/"
+   "url": "https://www.dalipan.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源 / 网盘",
    "title": "网盘搜索，就用大圣盘",
-   "url": "https://www.dashengpan.com/"
+   "url": "https://www.dashengpan.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源 / 网盘",
    "title": "我的小站-阿里云盘资源共享站",
-   "url": "https://pan666.net/"
+   "url": "https://pan666.net/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源 / 网盘",
    "title": "小马盘 - 网盘搜索引擎",
-   "url": "https://www.xiaomapan.com/#/main/search?restype=1"
+   "url": "https://www.xiaomapan.com/#/main/search?restype=1",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源 / 网盘",
    "title": "在 Google 云端硬盘中查找公共文件",
-   "url": "https://www.dedigger.com/#gsc.tab=0"
+   "url": "https://www.dedigger.com/#gsc.tab=0",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "互联网档案",
-   "url": "https://archive.org/"
+   "url": "https://archive.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "虚拟手稿图书馆",
-   "url": "http://www.e-codices.unifr.ch/en"
+   "url": "http://www.e-codices.unifr.ch/en",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "鸠摩搜索 - 文档搜索引擎",
-   "url": "https://www.jiumodiary.com/"
+   "url": "https://www.jiumodiary.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "点点文档搜索",
-   "url": "https://www.torrent.org.cn/bd"
+   "url": "https://www.torrent.org.cn/bd",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "CC 搜索门户",
-   "url": "https://search.creativecommons.org/"
+   "url": "https://search.creativecommons.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "Wiby.org-现代网络搜索门户",
-   "url": "https://wiby.org/"
+   "url": "https://wiby.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "Browse :: Nyaa",
-   "url": "https://nyaa.si/"
+   "url": "https://nyaa.si/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "资源",
    "title": "Browse :: Sukebei",
-   "url": "https://sukebei.nyaa.si/"
+   "url": "https://sukebei.nyaa.si/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "综合",
    "title": "Anime-Sharing Community",
-   "url": "https://www.anime-sharing.com/forum/"
+   "url": "https://www.anime-sharing.com/forum/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "综合",
    "title": "F95区",
-   "url": "https://f95zone.to/"
+   "url": "https://f95zone.to/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "综合",
    "title": "东半夏洛的小博客",
-   "url": "https://dl666123.github.io/"
+   "url": "https://dl666123.github.io/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "综合",
    "title": "EverythingMoe",
-   "url": "https://everythingmoe.com/"
+   "url": "https://everythingmoe.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "综合",
    "title": "Home • Wotaku.wiki by Duck",
-   "url": "https://wotaku.wiki/"
+   "url": "https://wotaku.wiki/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "书签地球",
-   "url": "https://www.bookmarkearth.com/"
+   "url": "https://www.bookmarkearth.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "V2方圆 – 发掘稀缺资源 v2fy zhaoolee",
-   "url": "https://www.v2fy.com/"
+   "url": "https://www.v2fy.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "聚BT - 聚合最优质的BT、磁力资源",
-   "url": "https://jubt12.xyz/cn/index.html"
+   "url": "https://jubt12.xyz/cn/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "爱达导航",
-   "url": "https://adzhp.cn/"
+   "url": "https://adzhp.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "网站资源合集",
-   "url": "https://nyxz166.cn/Web.php#id-4"
+   "url": "https://nyxz166.cn/Web.php#id-4",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "音速装机 - 群狼动力",
-   "url": "https://sonic.volf.club/"
+   "url": "https://sonic.volf.club/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "呲哩呲哩 （二次元）",
-   "url": "http://www.cilicili.cc/"
+   "url": "http://www.cilicili.cc/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "网站资源合集",
-   "url": "https://nyxz166.cn/Web.php#id-7"
+   "url": "https://nyxz166.cn/Web.php#id-7",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "合集网 | 信息资源大全",
-   "url": "https://233heji.com/"
+   "url": "https://233heji.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "Shortcuts Gallery - 少数派",
-   "url": "https://shortcuts.sspai.com/#/main/workflow"
+   "url": "https://shortcuts.sspai.com/#/main/workflow",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "NEET姬の私人小窝",
-   "url": "https://www.acy.moe/"
+   "url": "https://www.acy.moe/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "龙轩导航-做个有用的导航",
-   "url": "http://m.ilxdh.com/"
+   "url": "http://m.ilxdh.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "iMyShare - 收集免费实用有趣的东西，做最好的资源导航",
-   "url": "https://imyshare.com/navigation/"
+   "url": "https://imyshare.com/navigation/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "网站导航",
    "title": "萌姬导航",
-   "url": "https://www.accy.top/"
+   "url": "https://www.accy.top/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "信息",
    "title": "中国数字时代",
-   "url": "https://chinadigitaltimes.net/chinese/"
+   "url": "https://chinadigitaltimes.net/chinese/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "信息",
    "title": "今日热榜官网",
-   "url": "https://tophub.today/"
+   "url": "https://tophub.today/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "信息",
    "title": "鱼塘热榜",
-   "url": "https://mo.fish/?class_id=%E5%85%A8%E9%83%A8&hot_id=1065"
+   "url": "https://mo.fish/?class_id=%E5%85%A8%E9%83%A8&hot_id=1065",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "信息",
    "title": "Google快讯",
-   "url": "https://www.google.com.ph/alerts?hl=zh-CN&tab=33"
+   "url": "https://www.google.com.ph/alerts?hl=zh-CN&tab=33",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "信息",
    "title": "Google 趋势",
-   "url": "https://trends.google.com/trends/"
+   "url": "https://trends.google.com/trends/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "信息",
    "title": "兽野",
-   "url": "https://kemono.party/"
+   "url": "https://kemono.party/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "信息",
    "title": "掘金谷",
-   "url": "https://www.juejingu.com/"
+   "url": "https://www.juejingu.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 镜像源",
    "title": "中科大镜像源",
-   "url": "https://mirrors.ustc.edu.cn/"
+   "url": "https://mirrors.ustc.edu.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 镜像源",
    "title": "清华大学开源软件镜像站",
-   "url": "https://mirrors.tuna.tsinghua.edu.cn/"
+   "url": "https://mirrors.tuna.tsinghua.edu.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 镜像源",
    "title": "阿里巴巴开源镜像站",
-   "url": "https://developer.aliyun.com/mirror/?serviceType=mirror"
+   "url": "https://developer.aliyun.com/mirror/?serviceType=mirror",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Git中文教程",
-   "url": "https://git-scm.com/book/zh/v2"
+   "url": "https://git-scm.com/book/zh/v2",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "SVN中文手册",
-   "url": "http://svnbook.red-bean.com/nightly/zh/index.html"
+   "url": "http://svnbook.red-bean.com/nightly/zh/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "jQuery API中文文档",
-   "url": "https://jquery.cuishifeng.cn/"
+   "url": "https://jquery.cuishifeng.cn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Nginx中文文档",
-   "url": "https://www.nginx.cn/doc/index.html"
+   "url": "https://www.nginx.cn/doc/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Kafka中文文档",
-   "url": "https://kafka.apachecn.org/"
+   "url": "https://kafka.apachecn.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Mybatis中文文档",
-   "url": "https://mybatis.org/mybatis-3/zh/index.html"
+   "url": "https://mybatis.org/mybatis-3/zh/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "微信小程序官方文档",
-   "url": "https://developers.weixin.qq.com/miniprogram/dev/framework/"
+   "url": "https://developers.weixin.qq.com/miniprogram/dev/framework/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Nodejs中文教程文档",
-   "url": "http://nodejs.cn/learn/"
+   "url": "http://nodejs.cn/learn/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Apache Web Server文档",
-   "url": "http://httpd.apache.org/docs/"
+   "url": "http://httpd.apache.org/docs/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Spring文档中文版",
-   "url": "https://www.springcloud.cc/spring-reference.html"
+   "url": "https://www.springcloud.cc/spring-reference.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Golang标准库文档中文版",
-   "url": "https://studygolang.com/pkgdoc"
+   "url": "https://studygolang.com/pkgdoc",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Java 8官方文档",
-   "url": "https://docs.oracle.com/javase/8/docs/api/index.html"
+   "url": "https://docs.oracle.com/javase/8/docs/api/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Maven官方文档",
-   "url": "http://maven.apache.org/guides/"
+   "url": "http://maven.apache.org/guides/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Tomcat 8官方文档",
-   "url": "http://tomcat.apache.org/tomcat-8.0-doc/index.html"
+   "url": "http://tomcat.apache.org/tomcat-8.0-doc/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Spring Boot官方文档",
-   "url": "https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/"
+   "url": "https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "RabbitMQ官方文档",
-   "url": "https://www.rabbitmq.com/documentation.html"
+   "url": "https://www.rabbitmq.com/documentation.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "RocketMQ官方文档",
-   "url": "http://rocketmq.apache.org/docs/quick-start/"
+   "url": "http://rocketmq.apache.org/docs/quick-start/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Dubbo中文文档",
-   "url": "https://dubbo.apache.org/zh/docs/"
+   "url": "https://dubbo.apache.org/zh/docs/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Netty官方文档",
-   "url": "https://netty.io/wiki/index.html"
+   "url": "https://netty.io/wiki/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Elasticsearch官方文档",
-   "url": "https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html"
+   "url": "https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Spring Cloud官方文档",
-   "url": "https://spring.io/projects/spring-cloud"
+   "url": "https://spring.io/projects/spring-cloud",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Docker官方文档",
-   "url": "https://docs.docker.com/get-started/"
+   "url": "https://docs.docker.com/get-started/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "kubernetes中文文档",
-   "url": "https://kubernetes.io/zh/docs/home/"
+   "url": "https://kubernetes.io/zh/docs/home/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "thymeleaf官方文档",
-   "url": "https://www.thymeleaf.org/documentation.html"
+   "url": "https://www.thymeleaf.org/documentation.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Vue.js中文文档",
-   "url": "https://cn.vuejs.org/v2/guide/"
+   "url": "https://cn.vuejs.org/v2/guide/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "React.js官方文档",
-   "url": "https://reactjs.org/docs/getting-started.html"
+   "url": "https://reactjs.org/docs/getting-started.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程 / 在线文档",
    "title": "Jenkins中文文档",
-   "url": "https://www.jenkins.io/zh/doc/"
+   "url": "https://www.jenkins.io/zh/doc/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程",
    "title": "菜鸟教程",
-   "url": "https://www.runoob.com/"
+   "url": "https://www.runoob.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程",
    "title": "GitHub 入门级开源项目",
-   "url": "https://hellogithub.com/"
+   "url": "https://hellogithub.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程",
    "title": "基于项目的教程的精选列表",
-   "url": "https://github.com/practical-tutorials/project-based-learning"
+   "url": "https://github.com/practical-tutorials/project-based-learning",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程",
    "title": "build-your-own-x",
-   "url": "https://github.com/codecrafters-io/build-your-own-x#build-your-own-programming-language"
+   "url": "https://github.com/codecrafters-io/build-your-own-x#build-your-own-programming-language",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程",
    "title": "开发者搜索-beta",
-   "url": "https://kaifa.baidu.com/home"
+   "url": "https://kaifa.baidu.com/home",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "编程",
    "title": "在线打字测试（dazi.kukuw.com）",
-   "url": "https://dazi.kukuw.com/my_typing.php?do=index"
+   "url": "https://dazi.kukuw.com/my_typing.php?do=index",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "电路仿真",
    "title": "circuitjs电路仿真",
-   "url": "https://www.falstad.com/circuit/circuitjs.html"
+   "url": "https://www.falstad.com/circuit/circuitjs.html",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "电路仿真",
    "title": "Circuitjs web 在线电路模拟器",
-   "url": "https://cc.xiaogd.net/"
+   "url": "https://cc.xiaogd.net/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "电路仿真",
    "title": "Filter - 仿真",
-   "url": "https://phet.colorado.edu/zh_CN/simulations/filter?type=html,prototype"
+   "url": "https://phet.colorado.edu/zh_CN/simulations/filter?type=html,prototype",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "电路仿真",
    "title": "电工基础知识",
-   "url": "https://www.dgxue.com/"
+   "url": "https://www.dgxue.com/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "电路仿真",
    "title": "嘉立创EDA(专业版)",
-   "url": "https://pro.lceda.cn/editor"
+   "url": "https://pro.lceda.cn/editor",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "技术论坛",
    "title": "归档 -教程",
-   "url": "https://www.techxiaofei.com/post/"
+   "url": "https://www.techxiaofei.com/post/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "技术论坛",
    "title": "CSDN-专业IT技术社区",
-   "url": "https://www.csdn.net/"
+   "url": "https://www.csdn.net/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "技术论坛",
    "title": "果冻的猿宇宙 – Just Do IT，放胆做挨踢",
-   "url": "https://www.xiaogd.net/"
+   "url": "https://www.xiaogd.net/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学习",
    "title": "DeepWiki",
-   "url": "https://deepwiki.org/"
+   "url": "https://deepwiki.org/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学习",
    "title": "Github趋势报告",
-   "url": "https://www.githubs.cn/trending"
+   "url": "https://www.githubs.cn/trending",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学习",
    "title": "wikiHow （生活指导手册）",
-   "url": "https://zh.wikihow.com/%E9%A6%96%E9%A1%B5#"
+   "url": "https://zh.wikihow.com/%E9%A6%96%E9%A1%B5#",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学习",
    "title": "How To Cook  （做菜）",
-   "url": "https://cook.aiurs.co/"
+   "url": "https://cook.aiurs.co/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学习",
    "title": "浙江大学课程攻略共享计划",
-   "url": "https://qsctech.github.io/zju-icicles/"
+   "url": "https://qsctech.github.io/zju-icicles/",
+   "desc": ""
   },
   {
    "category": "学习与研究",
    "sub": "学习",
    "title": "IT 人必备工具箱",
-   "url": "https://666666.dev/"
+   "url": "https://666666.dev/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "DeepSeek",
-   "url": "https://www.deepseek.com/"
+   "url": "https://www.deepseek.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "通义千问",
-   "url": "https://www.qianwen.com/"
+   "url": "https://www.qianwen.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "Qwen",
-   "url": "https://chat.qwen.ai/"
+   "url": "https://chat.qwen.ai/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "豆包",
-   "url": "https://www.doubao.com/chat/"
+   "url": "https://www.doubao.com/chat/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "Bard",
-   "url": "https://bard.google.com/chat"
+   "url": "https://bard.google.com/chat",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "ChatGPT",
-   "url": "https://chat.openai.com/#pricing"
+   "url": "https://chat.openai.com/#pricing",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "Kimi.ai",
-   "url": "https://kimi.moonshot.cn/"
+   "url": "https://kimi.moonshot.cn/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "网页使用",
    "title": "克洛德",
-   "url": "https://claude.ai/chats"
+   "url": "https://claude.ai/chats",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "模型下载",
    "title": "模型库· 魔搭社区",
-   "url": "https://www.modelscope.cn/models"
+   "url": "https://www.modelscope.cn/models",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "模型下载",
    "title": "HF-Mirror",
-   "url": "https://hf-mirror.com/"
+   "url": "https://hf-mirror.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "模型下载",
    "title": "Hugging Face",
-   "url": "https://huggingface.co/"
+   "url": "https://huggingface.co/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "图像",
    "title": "Civitai",
-   "url": "https://civitai.com/"
+   "url": "https://civitai.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "图像",
    "title": "藏丹阁-NovelAI模型大全分享-第一层开放",
-   "url": "https://docs.qq.com/doc/DY0lFeWZuVXRCdUJU"
+   "url": "https://docs.qq.com/doc/DY0lFeWZuVXRCdUJU",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "图像",
    "title": "NovelAI",
-   "url": "https://www.yuque.com/longyuye/lmgcwy"
+   "url": "https://www.yuque.com/longyuye/lmgcwy",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "图像",
    "title": "CivArchive (CivitAI Archive)",
-   "url": "https://civarchive.com/"
+   "url": "https://civarchive.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "语音",
    "title": "首页",
-   "url": "http://www.timbremodel.com/#/index"
+   "url": "http://www.timbremodel.com/#/index",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "语音",
    "title": "RVC AI模型社区",
-   "url": "https://ai.bianshengruanjian.com/"
+   "url": "https://ai.bianshengruanjian.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "语音",
    "title": "AI二创资源中心",
-   "url": "https://ai.ai-hobbyist.org/"
+   "url": "https://ai.ai-hobbyist.org/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "语音",
    "title": "AI Hobbyist 交流社区",
-   "url": "https://www.ai-hobbyist.org/"
+   "url": "https://www.ai-hobbyist.org/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "语音",
    "title": "so-vits-svc-4.0模型",
-   "url": "https://huggingface.co/therealvul/so-vits-svc-4.0/tree/main"
+   "url": "https://huggingface.co/therealvul/so-vits-svc-4.0/tree/main",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "语音",
    "title": "So-VITS-SVC 4.1 整合包完全指南",
-   "url": "https://www.yuque.com/umoubuton/ueupp5"
+   "url": "https://www.yuque.com/umoubuton/ueupp5",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "酒馆",
    "title": "ny预设 gemini特辑",
-   "url": "https://rentry.org/ny-jailbreak-gemini"
+   "url": "https://rentry.org/ny-jailbreak-gemini",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "酒馆",
    "title": "janitorai",
-   "url": "https://janitorai.com/"
+   "url": "https://janitorai.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "酒馆",
    "title": "Character Tavern",
-   "url": "https://character-tavern.com/"
+   "url": "https://character-tavern.com/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "酒馆",
    "title": "SillyTavern 入门指北",
-   "url": "https://linux.do/t/topic/223253"
+   "url": "https://linux.do/t/topic/223253",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "酒馆",
    "title": "SillyTavern（酒馆）从入门到精通",
-   "url": "https://www.rainlain.com/index.php/2024/11/19/2645/"
+   "url": "https://www.rainlain.com/index.php/2024/11/19/2645/",
+   "desc": ""
   },
   {
    "category": "AI 与模型",
    "sub": "酒馆",
    "title": "AI 角色卡",
-   "url": "https://aicharactercards.com/"
+   "url": "https://aicharactercards.com/",
+   "desc": ""
   },
   {
    "category": "开发与工具",
    "sub": "",
    "title": "AI工具集",
-   "url": "https://ai-bot.cn/"
+   "url": "https://ai-bot.cn/",
+   "desc": ""
   },
   {
    "category": "开发与工具",
    "sub": "",
    "title": "LFS Linux",
-   "url": "https://www.linuxfromscratch.org/lfs/"
+   "url": "https://www.linuxfromscratch.org/lfs/",
+   "desc": ""
   },
   {
    "category": "开发与工具",
    "sub": "",
    "title": "RustDesk",
-   "url": "http://web.rustdesk.com/#/"
+   "url": "http://web.rustdesk.com/#/",
+   "desc": ""
   },
   {
    "category": "开发与工具",
    "sub": "",
    "title": "密的文件共享",
-   "url": "https://wormhole.app/"
+   "url": "https://wormhole.app/",
+   "desc": ""
   },
   {
    "category": "开发与工具",
    "sub": "",
    "title": "PairDrop",
-   "url": "https://pairdrop.net/"
+   "url": "https://pairdrop.net/",
+   "desc": ""
   },
   {
    "category": "开发与工具",
    "sub": "",
    "title": "",
-   "url": "https://www.cnblogs.com/twinblade-i/p/18797195"
+   "url": "https://www.cnblogs.com/twinblade-i/p/18797195",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 建站",
    "title": "Halo 建站",
-   "url": "https://halo.run/"
+   "url": "https://halo.run/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 建站",
    "title": "Wix.com",
-   "url": "https://manage.wix.com/dashboard/4a3e6137-c269-4e23-8215-a9504527e538/home?referralInfo=sidebar"
+   "url": "https://manage.wix.com/dashboard/4a3e6137-c269-4e23-8215-a9504527e538/home?referralInfo=sidebar",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 建站",
    "title": "WordPress.org",
-   "url": "https://cn.wordpress.org/"
+   "url": "https://cn.wordpress.org/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 建站",
    "title": "Hashnode",
-   "url": "https://hashnode.com/"
+   "url": "https://hashnode.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 建站",
    "title": "Nextra",
-   "url": "https://nextra.site/"
+   "url": "https://nextra.site/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 建站",
    "title": "weebly",
-   "url": "https://www.weebly.com/websites"
+   "url": "https://www.weebly.com/websites",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 托管",
    "title": "Cloudflare",
-   "url": "https://dash.cloudflare.com/2390a8da9d2186b6ad44b65b0151fb9f/workers-and-pages"
+   "url": "https://dash.cloudflare.com/2390a8da9d2186b6ad44b65b0151fb9f/workers-and-pages",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 托管",
    "title": "Dashboard – Vercel",
-   "url": "https://vercel.com/dashboard"
+   "url": "https://vercel.com/dashboard",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 托管",
    "title": "Render Dashboard",
-   "url": "https://dashboard.render.com/login?next=%2Fblueprint%2Fnew%3Frepo%3Dhttps%3A%2F%2Fgithub.com%2Fadams549659584%2Fgo-proxy-bingai"
+   "url": "https://dashboard.render.com/login?next=%2Fblueprint%2Fnew%3Frepo%3Dhttps%3A%2F%2Fgithub.com%2Fadams549659584%2Fgo-proxy-bingai",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 托管",
    "title": "probable-crib | Railway",
-   "url": "https://railway.app/project/b71554ae-e67d-4e89-aaef-92ab80ed1a1a"
+   "url": "https://railway.app/project/b71554ae-e67d-4e89-aaef-92ab80ed1a1a",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 托管",
    "title": "WordPress.com",
-   "url": "https://zh-cn.wordpress.com/"
+   "url": "https://zh-cn.wordpress.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 域名",
    "title": "Domain List for MCM43-FREE",
-   "url": "https://nic.eu.org/arf/en/"
+   "url": "https://nic.eu.org/arf/en/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 域名",
    "title": "找到您的免费​​域名",
-   "url": "https://www.dynadot.com/register-your-free-link-domain"
+   "url": "https://www.dynadot.com/register-your-free-link-domain",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 域名",
    "title": "域名特惠活动_腾讯云",
-   "url": "https://cloud.tencent.com/act/pro/domain-sales"
+   "url": "https://cloud.tencent.com/act/pro/domain-sales",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 域名",
    "title": "域名注册优惠_-华为云",
-   "url": "https://activity.huaweicloud.com/domain1.html?bd_vid=12312315054806570380"
+   "url": "https://activity.huaweicloud.com/domain1.html?bd_vid=12312315054806570380",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 域名",
    "title": "西部数码",
-   "url": "https://www.west.cn/m/active/one/"
+   "url": "https://www.west.cn/m/active/one/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 域名",
    "title": "哪煮米 - 全网域名,一站比价",
-   "url": "https://www.nazhumi.com/"
+   "url": "https://www.nazhumi.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 域名",
    "title": "发射台 - Spaceship",
-   "url": "https://www.spaceship.com/zh/launchpad/"
+   "url": "https://www.spaceship.com/zh/launchpad/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / VPS",
    "title": "RackNerd",
-   "url": "https://www.racknerd.com/"
+   "url": "https://www.racknerd.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / VPS",
    "title": "CloudCone",
-   "url": "https://cloudcone.com/"
+   "url": "https://cloudcone.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / VPS",
    "title": "BandwagonHost VPS",
-   "url": "https://bwh81.net/"
+   "url": "https://bwh81.net/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / VPS",
    "title": "Hostwinds",
-   "url": "https://www.hostwinds.com/"
+   "url": "https://www.hostwinds.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / VPS",
    "title": "Vultr.com",
-   "url": "https://www.vultr.com/"
+   "url": "https://www.vultr.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / 云服务器",
    "title": "AWS",
-   "url": "https://us-east-1.console.aws.amazon.com/console/home?region=us-east-1"
+   "url": "https://us-east-1.console.aws.amazon.com/console/home?region=us-east-1",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / 云服务器",
    "title": "阿里云",
-   "url": "https://www.aliyun.com/"
+   "url": "https://www.aliyun.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / 云服务器",
    "title": "百度云",
-   "url": "https://cloud.baidu.com/product/bcc.html#%E4%BA%A7%E5%93%81%E9%80%89%E5%9E%8B"
+   "url": "https://cloud.baidu.com/product/bcc.html#%E4%BA%A7%E5%93%81%E9%80%89%E5%9E%8B",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / 云服务器",
    "title": "华为云",
-   "url": "https://activity.huaweicloud.com/newyear_promotion/index.html?bd_vid=11285202775566348889"
+   "url": "https://activity.huaweicloud.com/newyear_promotion/index.html?bd_vid=11285202775566348889",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / 云服务器",
    "title": "腾讯云",
-   "url": "https://cloud.tencent.com/"
+   "url": "https://cloud.tencent.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / 云服务器",
    "title": "UCloud中立云计算服务商",
-   "url": "https://www.ucloud.cn/active/ulhost.html?invitation_code=C1xD0774E4BC648"
+   "url": "https://www.ucloud.cn/active/ulhost.html?invitation_code=C1xD0774E4BC648",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器 / 云服务器",
    "title": "云小站 - 硅云",
-   "url": "https://www.vpsor.cn/activity/cloudsite?userCode=wh2033f"
+   "url": "https://www.vpsor.cn/activity/cloudsite?userCode=wh2033f",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站 / 服务器",
    "title": "1Panel",
-   "url": "https://1panel.cn/"
+   "url": "https://1panel.cn/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站",
    "title": "Hexo",
-   "url": "https://hexo.io/zh-cn/index.html"
+   "url": "https://hexo.io/zh-cn/index.html",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站",
    "title": "站长工具 - 站长之家",
-   "url": "https://tool.chinaz.com/"
+   "url": "https://tool.chinaz.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网站",
    "title": "免费动态 DNS",
-   "url": "https://www.noip.com/"
+   "url": "https://www.noip.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "测速",
    "title": "Ookla的Speedtest-全球宽带速度测试",
-   "url": "https://www.speedtest.net/result/9275746231"
+   "url": "https://www.speedtest.net/result/9275746231",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "测速",
    "title": "测速网 - 在线网速测试,网络测速,网站观测,路由测试,Ping测试,5G测速 - SpeedTest.cn",
-   "url": "https://www.speedtest.cn/"
+   "url": "https://www.speedtest.cn/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "测速",
    "title": "中国科学技术大学测速网站",
-   "url": "https://test.ustc.edu.cn/"
+   "url": "https://test.ustc.edu.cn/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络工具",
    "title": "IPv6 测试（翻）",
-   "url": "http://www.test-ipv6.com/"
+   "url": "http://www.test-ipv6.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络工具",
    "title": "IPv6 测试",
-   "url": "http://testipv6.cn/mirrors.html.zh_CN"
+   "url": "http://testipv6.cn/mirrors.html.zh_CN",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络工具",
    "title": "IP地址归属地查询",
-   "url": "https://www.ip138.com/"
+   "url": "https://www.ip138.com/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络工具",
    "title": "IP地址查询",
-   "url": "https://www.ipip.net/ip.html"
+   "url": "https://www.ipip.net/ip.html",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络工具",
    "title": "ICANN 查询 --- ICANN Lookup",
-   "url": "https://lookup.icann.org/zh"
+   "url": "https://lookup.icann.org/zh",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络工具",
    "title": "IP address data",
-   "url": "https://ipinfo.io/"
+   "url": "https://ipinfo.io/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络工具",
    "title": "网络 BGP 工具包",
-   "url": "https://bgp.he.net/"
+   "url": "https://bgp.he.net/",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络",
    "title": "Cloudflare",
-   "url": "https://dash.cloudflare.com/2390a8da9d2186b6ad44b65b0151fb9f"
+   "url": "https://dash.cloudflare.com/2390a8da9d2186b6ad44b65b0151fb9f",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络",
    "title": "查找 Cloudflare 的干净 IP",
-   "url": "https://vfarid.github.io/cf-ip-scanner/?max=30"
+   "url": "https://vfarid.github.io/cf-ip-scanner/?max=30",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络",
    "title": "ZeroTier Central（内网穿透）",
-   "url": "https://my.zerotier.com/network"
+   "url": "https://my.zerotier.com/network",
+   "desc": ""
   },
   {
    "category": "网络与服务器",
    "sub": "网络",
    "title": "提高您的在线隐私安全 | BrowserScan",
-   "url": "https://www.browserscan.net/"
+   "url": "https://www.browserscan.net/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "病毒防护",
    "title": "卡巴斯基 免费版",
-   "url": "https://www.kaspersky.com.cn/free-antivirus"
+   "url": "https://www.kaspersky.com.cn/free-antivirus",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "病毒防护",
    "title": "卡巴斯基试用版下载",
-   "url": "https://www.kaspersky.com.cn/downloads"
+   "url": "https://www.kaspersky.com.cn/downloads",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "病毒防护",
    "title": "病毒清除工具-卡巴斯基",
-   "url": "https://www.kaspersky.com.cn/downloads/free-virus-removal-tool"
+   "url": "https://www.kaspersky.com.cn/downloads/free-virus-removal-tool",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "病毒防护",
    "title": "火绒安全",
-   "url": "https://www.huorong.cn/"
+   "url": "https://www.huorong.cn/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "病毒防护",
    "title": "火绒恶性木马专杀工具",
-   "url": "https://bbs.huorong.cn/thread-18575-1-1.html"
+   "url": "https://bbs.huorong.cn/thread-18575-1-1.html",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "病毒防护",
    "title": "360系统急救箱",
-   "url": "https://weishi.360.cn/jijiuxiang/"
+   "url": "https://weishi.360.cn/jijiuxiang/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "病毒防护",
    "title": "卡巴斯基和ESET版本选购指南",
-   "url": "https://tieba.baidu.com/p/9276773418"
+   "url": "https://tieba.baidu.com/p/9276773418",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "VirSCAN.org-多引擎在线病毒扫描网 v1.02，当前支持 47 款杀毒引擎",
-   "url": "https://www.virscan.org/language/zh-cn/"
+   "url": "https://www.virscan.org/language/zh-cn/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "卡巴斯基威胁情报门户–病毒扫描程序/检查程序",
-   "url": "https://opentip.kaspersky.com/"
+   "url": "https://opentip.kaspersky.com/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "VirSCAN.org - Free Multi-Engine Online Virus Scanner v1.02, Supports 47 AntiVirus Engines!",
-   "url": "https://www.virscan.org/"
+   "url": "https://www.virscan.org/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "腾讯哈勃分析系统",
-   "url": "https://habo.qq.com/"
+   "url": "https://habo.qq.com/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "VirusTotal",
-   "url": "https://www.virustotal.com/gui/"
+   "url": "https://www.virustotal.com/gui/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "MetaDefender云| 主页",
-   "url": "https://metadefender.opswat.com/?lang=en"
+   "url": "https://metadefender.opswat.com/?lang=en",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "关于Jotti的恶意软件扫描系统",
-   "url": "https://virusscan.jotti.org/"
+   "url": "https://virusscan.jotti.org/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "恶意软件分析 & URL链接扫描 免费在线病毒分析平台 | 魔盾安全分析",
-   "url": "https://maldun.com/dashboard/"
+   "url": "https://maldun.com/dashboard/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "文件查毒",
    "title": "WEBDIR+ - WebShell 扫描服务 - OpenRASP 团队",
-   "url": "https://scanner.baidu.com/#/pages/intro"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 软件",
-   "title": "Cloudflare Zero Trust",
-   "url": "https://one.dash.cloudflare.com/2390a8da9d2186b6ad44b65b0151fb9f/home/quick-start"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 软件",
-   "title": "1.1.1.1",
-   "url": "https://1.1.1.1/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 软件",
-   "title": "Tor Project | （暗网）",
-   "url": "https://www.torproject.org/zh-CN/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 软件",
-   "title": "SoftEther VPN 项目 - SoftEther VPN 项目",
-   "url": "https://www.softether.org/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 软件",
-   "title": "VPN Gate 下载",
-   "url": "https://www.vpngate.net/cn/download.aspx"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 软件",
-   "title": "蘑菇加速器官网",
-   "url": "https://www.mogu23.com/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 机场",
-   "title": "GLaDOS",
-   "url": "https://glados.rocks/console"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 机场",
-   "title": "购物车 - 棱角",
-   "url": "https://www.lengjiao.me/cart.php"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 机场",
-   "title": "穿云箭",
-   "url": "https://chuanyunjian.uk/index.php#/register?code=0llVyrrq"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 机场",
-   "title": "XYZ",
-   "url": "https://9.234456.xyz/abc.html"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 机场",
-   "title": "一分机场",
-   "url": "https://xn--4gqx1hgtfdmt.com/#/register?code=3xKWB2Lq"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 机场",
-   "title": "XYZ",
-   "url": "https://9.234456.xyz/abc.html"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 机场",
-   "title": "Tickcloud",
-   "url": "https://www.tickcloud.net/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 网络代理",
-   "title": "ProxySite.com - 免费网络代理网站",
-   "url": "https://www.proxysite.com/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 网络代理",
-   "title": "www.ddung.orgGlype®代理",
-   "url": "http://www.ddung.org/daili/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 网络代理",
-   "title": "免费网络代理和最先进的在线代理| 代理代理",
-   "url": "https://www.croxyproxy.com/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 网络代理",
-   "title": "最先进的安全且免费的网络代理 | 代理代理",
-   "url": "https://www.croxyproxy.rocks/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 网络代理",
-   "title": "Web代理服务器列表",
-   "url": "http://free-proxy.cz/zh/web-proxylist/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 网络代理",
-   "title": "4everproxy - 免费网络代理| 无限VPN",
-   "url": "https://www.4everproxy.com/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 网络代理",
-   "title": "KPROXY - 免费匿名网络代理 - 匿名代理",
-   "url": "https://kproxy.com/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "墻知乎 - 最全的翻墙知识聚集地",
-   "url": "https://wallzhihu.com/amp/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "ACL4SSR_在线订阅转换",
-   "url": "https://acl4ssr.netlify.app/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "Home - riseup.net",
-   "url": "https://riseup.net/en"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "DuyaoSS-机场测速和简介",
-   "url": "https://www.duyaoss.com/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "我们如何测试VPN-VPN报告",
-   "url": "https://www.vpnreports.com/how-we-test-vpn/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "VPN – 免费资源网路社群",
-   "url": "https://free.com.tw/tag/vpn/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "聪聪 Blog",
-   "url": "https://congcong0806.github.io/2018/04/20/SS/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "如何用 Tor 访问对 Tor 不友好的网站——扫盲“三重代理”及其它招数 @ 编程随想的博客",
-   "url": "https://program-think.blogspot.com/2020/08/Tor-Triple-Proxy.html"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "机场推荐与机场评测",
-   "url": "https://jichangtuijian.com/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理 / 教程",
-   "title": "Cloudflare CDN反代免费VPN高速上网，速度超快，千兆节点、解锁奈飞流媒体 - 科技小飞哥",
-   "url": "https://www.techxiaofei.com/post/vpn/cdn/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理",
-   "title": "openclash转换订阅网址",
-   "url": "https://sub-web.netlify.app/"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理",
-   "title": "v2ray free",
-   "url": "https://github.com/search?q=v2ray+free&type=repositories&s=stars&o=desc"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理",
-   "title": "订阅地址",
-   "url": "https://fofa.info/result?qbase64=Ym9keT0i6Ieq5Yqo5oqT5Y%20WdGfpopHpgZPjgIHorqLpmIXlnLDlnYDjgIHlhazlvIDkupLogZTnvZHkuIrnmoRzc%20OAgXNzcuOAgXZtZXNz44CBdHJvamFu6IqC54K55L%20h5oGvIg%3D%3D"
-  },
-  {
-   "category": "安全与取证",
-   "sub": "网络代理",
-   "title": "BridgeDB(网桥，翻）",
-   "url": "https://bridges.torproject.org/options"
+   "url": "https://scanner.baidu.com/#/pages/intro",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心 / Sync",
    "title": "🍊 新奇士 - Resilio Sync Keys 中文索引",
-   "url": "https://www.synckeys.com/"
+   "url": "https://www.synckeys.com/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心 / Sync",
    "title": "Resilio Sync Keys - NOVA",
-   "url": "https://nova.wodemo.net/keys"
+   "url": "https://nova.wodemo.net/keys",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心 / Sync",
    "title": "Resilio Sync License 授权文件下载",
-   "url": "https://iui.su/956/"
+   "url": "https://iui.su/956/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心 / 磁力",
    "title": "洪流搜索引擎| 1337x.to",
-   "url": "https://1337x.to/"
+   "url": "https://1337x.to/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心 / 磁力",
    "title": "btav",
-   "url": "https://m.838888.net/cb.php"
+   "url": "https://m.838888.net/cb.php",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心 / 磁力",
    "title": "GloDLS.to",
-   "url": "https://glodls.to/home.php"
+   "url": "https://glodls.to/home.php",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心",
    "title": "IPFS 为分布式网络提供动力",
-   "url": "https://ipfs.tech/"
+   "url": "https://ipfs.tech/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心",
    "title": "Sia - Get Started",
-   "url": "https://sia.tech/get-started"
+   "url": "https://sia.tech/get-started",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "去中心",
    "title": "自由未来的去中心化互联网 | 天网",
-   "url": "https://web3portal.com/"
+   "url": "https://web3portal.com/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "安全",
    "title": "病毒吧进吧导航",
-   "url": "https://docs.qq.com/doc/DTHZzdVlRVnFsZnNT"
+   "url": "https://docs.qq.com/doc/DTHZzdVlRVnFsZnNT",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "安全",
    "title": "检查您的电子邮件或用户名是否被泄露",
-   "url": "https://breachdirectory.org/#"
+   "url": "https://breachdirectory.org/#",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "安全",
    "title": "下载追踪",
-   "url": "https://iknowwhatyoudownload.com/en/link/"
+   "url": "https://iknowwhatyoudownload.com/en/link/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "安全",
    "title": "密码泄漏查询 | HaveIBeenPwned",
-   "url": "https://haveibeenpwned.com/"
+   "url": "https://haveibeenpwned.com/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "安全",
    "title": "你是匿名者吗？",
-   "url": "https://www.nothingprivate.ml/"
+   "url": "https://www.nothingprivate.ml/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "安全",
    "title": "查看您的个人信息是否已被泄露",
-   "url": "https://monitor.firefox.com/"
+   "url": "https://monitor.firefox.com/",
+   "desc": ""
   },
   {
    "category": "安全与取证",
    "sub": "安全",
    "title": "图片混淆",
-   "url": "https://fyhb.gitee.io/tphx/"
+   "url": "https://fyhb.gitee.io/tphx/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "工具箱",
    "title": "一个工具箱 - 好用的在线工具都在这里！",
-   "url": "http://www.atoolbox.net/"
+   "url": "http://www.atoolbox.net/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "工具箱",
    "title": "LaodiTeachTips",
-   "url": "https://ldtstore.net/?fw=intl-root"
+   "url": "https://ldtstore.net/?fw=intl-root",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "工具箱",
    "title": "U盘量产工具",
-   "url": "https://www.upantool.com/"
+   "url": "https://www.upantool.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "工具箱",
    "title": "图吧工具箱官方网站",
-   "url": "https://www.tbtool.cn/index.html"
+   "url": "https://www.tbtool.cn/index.html",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "悠久的小宝库",
-   "url": "https://u9baoku.xyz/"
+   "url": "https://u9baoku.xyz/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "脚本之家",
-   "url": "https://www.jb51.net/"
+   "url": "https://www.jb51.net/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "系统迷",
-   "url": "https://www.xitmi.com/"
+   "url": "https://www.xitmi.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "FOSSHUB",
-   "url": "https://www.fosshub.com/"
+   "url": "https://www.fosshub.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "不死鸟",
-   "url": "https://iui.su/win/"
+   "url": "https://iui.su/win/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "小众软件",
-   "url": "https://www.appinn.com/"
+   "url": "https://www.appinn.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "423Down",
-   "url": "https://www.423down.com/"
+   "url": "https://www.423down.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "脑袋瓜子",
-   "url": "https://www.naodai.org/"
+   "url": "https://www.naodai.org/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "FileCR",
-   "url": "https://filecr.com/en/?id=325048144000"
+   "url": "https://filecr.com/en/?id=325048144000",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "预激活软件",
-   "url": "https://getintoway.com/"
+   "url": "https://getintoway.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "CrackingPatching",
-   "url": "https://crackingpatching.com/"
+   "url": "https://crackingpatching.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "FTUApps.Dev",
-   "url": "https://ftuapps.dev/?1"
+   "url": "https://ftuapps.dev/?1",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "六音软件",
-   "url": "https://www.6yit.com/"
+   "url": "https://www.6yit.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "六音",
-   "url": "https://www.sixyin.com/"
+   "url": "https://www.sixyin.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "Nsane 论坛",
-   "url": "https://nsaneforums.com/leaderboard/"
+   "url": "https://nsaneforums.com/leaderboard/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "OSSSR.COM",
-   "url": "https://www.osssr.com/"
+   "url": "https://www.osssr.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "Puresys纯净系统-软件下载",
-   "url": "https://www.puresys.net/"
+   "url": "https://www.puresys.net/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "老殁",
-   "url": "https://www.mpyit.com/?btwaf=58698073"
+   "url": "https://www.mpyit.com/?btwaf=58698073",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件分享",
    "title": "雨糖科技",
-   "url": "https://raincandy.tech/software-projects/"
+   "url": "https://raincandy.tech/software-projects/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "A2Z APK（可下付费，优）",
-   "url": "https://a2zapk.com/"
+   "url": "https://a2zapk.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "APKPure官网（翻）",
-   "url": "https://apkpure.com/cn/"
+   "url": "https://apkpure.com/cn/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "5play（优）",
-   "url": "https://5play.ru/en/android/apps/"
+   "url": "https://5play.ru/en/android/apps/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "Android 台湾中文网",
-   "url": "https://apk.tw/forum.php"
+   "url": "https://apk.tw/forum.php",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "Android App Mods - 获取最新的 Mod/付费更新",
-   "url": "https://apkdone.com/app/"
+   "url": "https://apkdone.com/app/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "在线APK下载器",
-   "url": "https://apkcombo.com/zh-us/apk-downloader/"
+   "url": "https://apkcombo.com/zh-us/apk-downloader/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "APKMirror",
-   "url": "https://www.apkmirror.com/"
+   "url": "https://www.apkmirror.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "Aptoide - 另类 Android 应用商店",
-   "url": "https://en.aptoide.com/"
+   "url": "https://en.aptoide.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "Uptodown",
-   "url": "https://www.uptodown.com/"
+   "url": "https://www.uptodown.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "⚡ APKCombo",
-   "url": "https://apkcombo.com/zh/"
+   "url": "https://apkcombo.com/zh/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "适用于 Android 的开源应用 APK - OpenAPK",
-   "url": "https://www.openapk.net/"
+   "url": "https://www.openapk.net/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "APKImage",
-   "url": "https://apkimage.io/?q="
+   "url": "https://apkimage.io/?q=",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "TechLoky",
-   "url": "https://techloky.com/"
+   "url": "https://techloky.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "LITEAPKS - #1 MOD APK for Android",
-   "url": "https://liteapks.com/"
+   "url": "https://liteapks.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "安卓软件",
    "title": "ApkMos",
-   "url": "https://apkmos.com/"
+   "url": "https://apkmos.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "MSDN（系统下载）",
-   "url": "https://msdn.itellyou.cn/"
+   "url": "https://msdn.itellyou.cn/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "Ventoy（装机）",
-   "url": "https://www.ventoy.net/cn/doc_news.html"
+   "url": "https://www.ventoy.net/cn/doc_news.html",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "下载 Windows 10（系统下载）",
-   "url": "https://www.microsoft.com/zh-cn/software-download/windows10"
+   "url": "https://www.microsoft.com/zh-cn/software-download/windows10",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "FirPE Project – （PE系统）",
-   "url": "https://firpe.cn/"
+   "url": "https://firpe.cn/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "NEXT, ITELLYOU",
-   "url": "https://next.itellyou.cn/"
+   "url": "https://next.itellyou.cn/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "HelloWindows.cn - 精校 完整 极致 Windows系统下载仓储站",
-   "url": "https://hellowindows.cn/"
+   "url": "https://hellowindows.cn/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "FirPE 维护系统 - FirPE Project",
-   "url": "https://firpe.cn/page-247"
+   "url": "https://firpe.cn/page-247",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "系统",
    "title": "下载 Windows 11",
-   "url": "https://www.microsoft.com/zh-cn/software-download/windows11"
+   "url": "https://www.microsoft.com/zh-cn/software-download/windows11",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件",
    "title": "果核剥壳",
-   "url": "https://www.ghpym.com/category/all"
+   "url": "https://www.ghpym.com/category/all",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件",
    "title": "mefcl'blog",
-   "url": "https://www.mefcl.com/"
+   "url": "https://www.mefcl.com/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件",
    "title": "Microsoft Store 下载",
-   "url": "https://store.rg-adguard.net/"
+   "url": "https://store.rg-adguard.net/",
+   "desc": ""
   },
   {
    "category": "软件与系统",
    "sub": "软件",
    "title": "驱动天空 - 专业、方便的驱动下载站",
-   "url": "https://www.drvsky.com/index.htm"
+   "url": "https://www.drvsky.com/index.htm",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线表格转换工具",
-   "url": "https://tableconvert.com/"
+   "url": "https://tableconvert.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线多媒体转换器合集",
-   "url": "https://cn.office-converter.com/"
+   "url": "https://cn.office-converter.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "电子书格式转换",
-   "url": "https://toepub.com/zh/"
+   "url": "https://toepub.com/zh/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线视频切割机 - 剪切视频，剪切MP4，AVI，MPG，3GP",
-   "url": "https://online-video-cutter.com/"
+   "url": "https://online-video-cutter.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线文件转换器 - DocsPal",
-   "url": "https://www.docspal.com/"
+   "url": "https://www.docspal.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "免费和在线文件转换器 - ConvertFiles.com",
-   "url": "http://www.convertfiles.com/"
+   "url": "http://www.convertfiles.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线转换图片格式-在线图片转换器-100% 免费",
-   "url": "https://jinaconvert.com/cn/index.php"
+   "url": "https://jinaconvert.com/cn/index.php",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "PDF转Word-免费在线PDF转换成Word转换器 | 加加PDF官网 - 文电通",
-   "url": "https://www.addpdf.cn/pdf-to-word"
+   "url": "https://www.addpdf.cn/pdf-to-word",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线超级转换工具 - 免费转换",
-   "url": "https://www.wdku.net/"
+   "url": "https://www.wdku.net/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线转换文档，图像，视频，音频文件",
-   "url": "https://www.aconvert.com/cn/"
+   "url": "https://www.aconvert.com/cn/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "EPUB 转 PDF | CloudConvert",
-   "url": "https://cloudconvert.com/epub-to-pdf"
+   "url": "https://cloudconvert.com/epub-to-pdf",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "格式转换",
    "title": "在线文件转换器",
-   "url": "https://cdkm.com/cn/"
+   "url": "https://cdkm.com/cn/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 编辑",
    "title": "美图秀秀网页版",
-   "url": "http://xiuxiu.web.meitu.com/main.html"
+   "url": "http://xiuxiu.web.meitu.com/main.html",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 编辑",
    "title": "在线PS",
-   "url": "https://www.uupoop.com/#/old"
+   "url": "https://www.uupoop.com/#/old",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 编辑",
    "title": "Photopea",
-   "url": "https://www.photopea.com/"
+   "url": "https://www.photopea.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 编辑",
    "title": "免费的 OCR API V2023、在线 OCR、可搜索的 PDF 创建器、本地 OCR 软件",
-   "url": "https://ocr.space/"
+   "url": "https://ocr.space/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 编辑",
    "title": "Picdiet - 极速的在线图片压缩80%图片体积",
-   "url": "https://www.picdiet.com/zh-cn"
+   "url": "https://www.picdiet.com/zh-cn",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 编辑",
    "title": "在线抠图工具",
-   "url": "https://www.remove.bg/zh"
+   "url": "https://www.remove.bg/zh",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "百度识图, \"鉴\"你所见",
-   "url": "https://image.baidu.com/?fr=shitu"
+   "url": "https://image.baidu.com/?fr=shitu",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "以图搜图",
-   "url": "https://trace.moe/"
+   "url": "https://trace.moe/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "Xslist.org - 健康的宅男偶像专题网站",
-   "url": "https://xslist.org/zh"
+   "url": "https://xslist.org/zh",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "Dialogue.moe",
-   "url": "https://dialogue.moe/"
+   "url": "https://dialogue.moe/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "www.animequery.cn",
-   "url": "http://www.animequery.cn/"
+   "url": "http://www.animequery.cn/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "首頁 - Pixiv圖片代理",
-   "url": "https://pixiv.cat/"
+   "url": "https://pixiv.cat/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "TinEye Labs - Multicolr Search Lab",
-   "url": "http://labs.tineye.com/multicolr/"
+   "url": "http://labs.tineye.com/multicolr/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "图像搜索引擎",
-   "url": "https://www.everypixel.com/"
+   "url": "https://www.everypixel.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "多服务图像搜索",
-   "url": "https://3d.iqdb.org/"
+   "url": "https://3d.iqdb.org/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "多服务图像搜索",
-   "url": "https://iqdb.org/"
+   "url": "https://iqdb.org/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "SauceNAO反向图像搜索",
-   "url": "https://saucenao.com/"
+   "url": "https://saucenao.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "二维图像高级搜索",
-   "url": "https://ascii2d.net/"
+   "url": "https://ascii2d.net/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 搜图",
    "title": "图片搜索",
-   "url": "http://www.xuan.cool/picture.html"
+   "url": "http://www.xuan.cool/picture.html",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "简单的免费图像托管 - SM.MS - 简单的免费图像托管",
-   "url": "https://sm.ms/"
+   "url": "https://sm.ms/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "牛图网 - 免费图片空间,图片上传,免费传图,免费上传图片,免费图片存储,免费外链,免费空间,PNG上传,GIF上传,JPEG上传,最好的图片上传站",
-   "url": "https://niupic.com/"
+   "url": "https://niupic.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "ImgBB — 免费图片存取/上传图片",
-   "url": "https://imgbb.com/"
+   "url": "https://imgbb.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "MoeTu - 一个拥有全球 CDN 支持 HTTPS 的免费的图床",
-   "url": "https://moetu.org/"
+   "url": "https://moetu.org/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "聚合图床 - 免费无限图片上传, 一键分发, 多处备份",
-   "url": "https://www.superbed.cn/"
+   "url": "https://www.superbed.cn/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "Z4A图床-做国内最良心的免费图床 - Z4A图床",
-   "url": "https://www.z4a.net/"
+   "url": "https://www.z4a.net/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "贴图库 — 免费、高速、稳定、专业图片外链",
-   "url": "http://www.tietuku.com/"
+   "url": "http://www.tietuku.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "遇见图床 - 永久免费图床 专业图片上传 永久外链 全球CDN分发",
-   "url": "https://www.hualigs.cn/"
+   "url": "https://www.hualigs.cn/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "你好图床",
-   "url": "http://tc.hellohao.cn/"
+   "url": "http://tc.hellohao.cn/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "聚合图床 - 微博图床 - 免费图床 - 孟坤工具箱网页版",
-   "url": "http://tool.mkblog.cn/tuchuang/"
+   "url": "http://tool.mkblog.cn/tuchuang/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "路过图床 - 免费图片上传, 专业图片外链, 免费公共图床",
-   "url": "https://imgchr.com/"
+   "url": "https://imgchr.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "Imgur：互联网的魔力",
-   "url": "https://imgur.com/upload"
+   "url": "https://imgur.com/upload",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "PNG8图床 - 全球最快的图床没有之一",
-   "url": "https://www.png8.com/"
+   "url": "https://www.png8.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "图壳图床",
-   "url": "https://imgkr.com/"
+   "url": "https://imgkr.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "图像 / 图床",
    "title": "图片上传 | PicX 图床神器",
-   "url": "https://picx.xpoet.cn/"
+   "url": "https://picx.xpoet.cn/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "PDF",
    "title": "iLovePDF | 为PDF爱好者提供的PDF文件在线处理工具",
-   "url": "https://www.ilovepdf.com/zh-cn"
+   "url": "https://www.ilovepdf.com/zh-cn",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "PDF",
    "title": "PDF转Word | 免费在线PDF转Word | PDF转Word转换器 | PDF转化速度快 | 首页",
-   "url": "https://www.alltoall.net/"
+   "url": "https://www.alltoall.net/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "PDF",
    "title": "pdf在线处理套装2",
-   "url": "https://smallpdf.com/cn/pdf-tools"
+   "url": "https://smallpdf.com/cn/pdf-tools",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "PDF",
    "title": "pdf在线处理套装1",
-   "url": "https://tools.pdf24.org/zh/"
+   "url": "https://tools.pdf24.org/zh/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "词典",
    "title": "《欧路词典》（词典）",
-   "url": "https://www.eudic.net/v4/en/app/eudic"
+   "url": "https://www.eudic.net/v4/en/app/eudic",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "词典",
    "title": "Index of /(词典）",
-   "url": "https://downloads.freemdict.com/"
+   "url": "https://downloads.freemdict.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "词典",
    "title": "FreeMdict（词典）",
-   "url": "https://freemdict.com/"
+   "url": "https://freemdict.com/",
+   "desc": ""
   },
   {
    "category": "实用工具",
    "sub": "词典",
    "title": "FreeMdict Forum - （词典）",
-   "url": "https://forum.freemdict.com/"
+   "url": "https://forum.freemdict.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "免费透明背景图片素材",
-   "url": "http://pngimg.com/"
+   "url": "http://pngimg.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "Emoji表情搜索",
-   "url": "https://emoji.svend.cc/"
+   "url": "https://emoji.svend.cc/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "Emoji表情包下载",
-   "url": "https://emojiisland.com/"
+   "url": "https://emojiisland.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "open source icons",
-   "url": "https://feathericons.com/"
+   "url": "https://feathericons.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "阿里巴巴矢量图标库",
-   "url": "https://www.iconfont.cn/"
+   "url": "https://www.iconfont.cn/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "表情包在线网站",
-   "url": "https://fabiaoqing.com/"
+   "url": "https://fabiaoqing.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "极简壁纸",
-   "url": "https://bz.zzzmh.cn/"
+   "url": "https://bz.zzzmh.cn/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "Wallpaper Abyss壁纸",
-   "url": "https://wall.alphacoders.com/"
+   "url": "https://wall.alphacoders.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "免费PNG图片库",
-   "url": "https://pluspng.com/"
+   "url": "https://pluspng.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "Pixabay图片素材库",
-   "url": "https://pixabay.com/zh/"
+   "url": "https://pixabay.com/zh/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "Unsplash图片素材库",
-   "url": "https://unsplash.com/"
+   "url": "https://unsplash.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "Pexels图片素材库",
-   "url": "http://www.pexels.com/"
+   "url": "http://www.pexels.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "图像素材库",
    "title": "NASA图片视频素材库",
-   "url": "https://images.nasa.gov/"
+   "url": "https://images.nasa.gov/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "游戏素材",
    "title": "Unity 资源商店",
-   "url": "https://assetstore.unity.com/"
+   "url": "https://assetstore.unity.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "游戏素材",
    "title": "2D 游戏资产商店和免费 - CraftPix.net",
-   "url": "https://craftpix.net/"
+   "url": "https://craftpix.net/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "游戏素材",
    "title": "Free vector icons - SVG, PSD, PNG, EPS & Icon Font - Thousands of free icons",
-   "url": "https://www.flaticon.com/"
+   "url": "https://www.flaticon.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "Free Music Archive",
-   "url": "https://freemusicarchive.org/"
+   "url": "https://freemusicarchive.org/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "Jamendo音乐| 免费音乐下载",
-   "url": "https://www.jamendo.com/"
+   "url": "https://www.jamendo.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "活页乐谱，免版税和公共领域音乐| Musopen",
-   "url": "https://musopen.org/?__cf_chl_jschl_tk__=fa7ebb99080331e43ce4f4d9e56324b27f182319-1590376754-0-AfCyS50mC4L1HShqaf1QuZtp-rkb7_xi453YvTWTLOl45Q5aY8y1tHZla9E_Vf3IwAOWj5M6en-aQRPKhcc4-YlnRWSBXYMLd-z-X-NGnGNi277SxLTXh2mX7jgLaMdG9CFLPcZAdH6aviW2Ge1T2OSefIdW_rUu7wVbdkvU8yWb215gt35Zb2CJtfhYRX9UpyjXPBCpTVTUDp9-_5lZhBmDz6d1CwqLJL0cRjEyQQRHi_WUTCMxOabQ94PLdInlKXD9UHmdma7SVTThX1uoFcUvkpzsjy4SQLxI0bsqUXVcstryCOZ804kOzNXzOQeBgUrIBcDkvi7T5Ufhws4RPeU"
+   "url": "https://musopen.org/?__cf_chl_jschl_tk__=fa7ebb99080331e43ce4f4d9e56324b27f182319-1590376754-0-AfCyS50mC4L1HShqaf1QuZtp-rkb7_xi453YvTWTLOl45Q5aY8y1tHZla9E_Vf3IwAOWj5M6en-aQRPKhcc4-YlnRWSBXYMLd-z-X-NGnGNi277SxLTXh2mX7jgLaMdG9CFLPcZAdH6aviW2Ge1T2OSefIdW_rUu7wVbdkvU8yWb215gt35Zb2CJtfhYRX9UpyjXPBCpTVTUDp9-_5lZhBmDz6d1CwqLJL0cRjEyQQRHi_WUTCMxOabQ94PLdInlKXD9UHmdma7SVTThX1uoFcUvkpzsjy4SQLxI0bsqUXVcstryCOZ804kOzNXzOQeBgUrIBcDkvi7T5Ufhws4RPeU",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "国际乐谱库：曲谱PDF下载",
-   "url": "https://cn.imslp.org/wiki/Main_Page"
+   "url": "https://cn.imslp.org/wiki/Main_Page",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "perception is circumstantial",
-   "url": "https://cctrax.com/"
+   "url": "https://cctrax.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "Purple Planet Music",
-   "url": "https://www.purple-planet.com/"
+   "url": "https://www.purple-planet.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "BeatPick: Music licensing for Film, Tv and Advertising use (license pre-cleared music)",
-   "url": "http://www.beatpick.com/"
+   "url": "http://www.beatpick.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "Bensound",
-   "url": "https://www.bensound.com/"
+   "url": "https://www.bensound.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "MUSOPEN",
-   "url": "https://musopen.org/music/"
+   "url": "https://musopen.org/music/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "Generative.fm",
-   "url": "https://generative.fm/"
+   "url": "https://generative.fm/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "版税免费音频库 - 股票音乐，音效和循环 - Storyblocks音频",
-   "url": "https://www.audioblocks.com/"
+   "url": "https://www.audioblocks.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "TunePocket",
-   "url": "https://www.tunepocket.com/"
+   "url": "https://www.tunepocket.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "免版税音乐和声音效果| 流行声音",
-   "url": "https://www.epidemicsound.com/"
+   "url": "https://www.epidemicsound.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "Royalty-Free Stock Video and Music Library | Pond5",
-   "url": "https://www.pond5.com/"
+   "url": "https://www.pond5.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "下载免费的活页乐谱和乐谱。",
-   "url": "http://en.scorser.com/D/Sheet+music.html"
+   "url": "http://en.scorser.com/D/Sheet+music.html",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "Royalty Free Music - Download over 100,000 mp3 files free | Musopen",
-   "url": "https://musopen.org/music/?__cf_chl_jschl_tk__=7130b3c61c143f7277320305c5084321ae6658ff-1594004517-0-AQKGYGgMgs-35mcp2tDezoTSX2ixGI9QZhOPcApoeswfj0iWM_mxDcOPS81ssQ96TK40aRWPsd0lHTJ7tWaTlUmWfEAl2nlauHNhfdUisGDCFZNmxnSUDvecmawEMj7NnBwQy85PjDdylfho3R9ympxdM6DuYi9C7v_N03ATBXeNwaBQS2CVu1NQYL9skYA-wPBltkyknxzFZyguubxnIg3TdN4Qm3je2__zIs6E488Z_qlSlYzcxbb3_3rEghjxTpxNrS0kiQIr3296b9nVrojhqfGLP93Je0fSbXzXelej80iLCFSUdZBN5ZKWc9lFzF7hld7gYU-8cvC57eT5Twk"
+   "url": "https://musopen.org/music/?__cf_chl_jschl_tk__=7130b3c61c143f7277320305c5084321ae6658ff-1594004517-0-AQKGYGgMgs-35mcp2tDezoTSX2ixGI9QZhOPcApoeswfj0iWM_mxDcOPS81ssQ96TK40aRWPsd0lHTJ7tWaTlUmWfEAl2nlauHNhfdUisGDCFZNmxnSUDvecmawEMj7NnBwQy85PjDdylfho3R9ympxdM6DuYi9C7v_N03ATBXeNwaBQS2CVu1NQYL9skYA-wPBltkyknxzFZyguubxnIg3TdN4Qm3je2__zIs6E488Z_qlSlYzcxbb3_3rEghjxTpxNrS0kiQIr3296b9nVrojhqfGLP93Je0fSbXzXelej80iLCFSUdZBN5ZKWc9lFzF7hld7gYU-8cvC57eT5Twk",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "库存音乐和声音效果| 音频微",
-   "url": "https://www.audiomicro.com/"
+   "url": "https://www.audiomicro.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "版税免费音乐从DL声音",
-   "url": "https://www.dl-sounds.com/"
+   "url": "https://www.dl-sounds.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "下载免费的Bleep音效-Mixkit",
-   "url": "https://mixkit.co/free-sound-effects/bleep/"
+   "url": "https://mixkit.co/free-sound-effects/bleep/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权音乐",
    "title": "古典音乐频道",
-   "url": "http://www.ncpa-classic.com/"
+   "url": "http://www.ncpa-classic.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "Free Stock Footage Videos, 4k After Effects Templates and More!",
-   "url": "https://www.videezy.com/"
+   "url": "https://www.videezy.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "Mazwai",
-   "url": "http://mazwai.com/#/"
+   "url": "http://mazwai.com/#/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "FootageCrate",
-   "url": "https://footagecrate.com/"
+   "url": "https://footagecrate.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "Mixkit - 非凡的免费高清视频",
-   "url": "https://mixkit.co/"
+   "url": "https://mixkit.co/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "Free stock videos · Pexels Videos",
-   "url": "https://www.pexels.com/videos/"
+   "url": "https://www.pexels.com/videos/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "Mazwai",
-   "url": "http://mazwai.com/"
+   "url": "http://mazwai.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "Free Stock Video Footage & Motion Graphics Download HD & 4K",
-   "url": "https://www.videvo.net/"
+   "url": "https://www.videvo.net/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "Beautiful, Free Stock Video Footage For Your Homepage",
-   "url": "https://coverr.co/"
+   "url": "https://coverr.co/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "家-免费影视素材",
-   "url": "https://www.freestockfootage.com/"
+   "url": "https://www.freestockfootage.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "免费股票视频·像素视频",
-   "url": "https://www.pexels.com/videos"
+   "url": "https://www.pexels.com/videos",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "免版权视频",
    "title": "免费正版高清视频素材库 数千部优质视频素材可供免费使用和下载 - Pixabay",
-   "url": "https://pixabay.com/zh/videos/"
+   "url": "https://pixabay.com/zh/videos/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "免费音效| SoundJay.com",
-   "url": "https://www.soundjay.com/"
+   "url": "https://www.soundjay.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "爱给网_音效配乐_3D模型_视频素材_游戏素材_免费下载",
-   "url": "http://www.aigei.com/"
+   "url": "http://www.aigei.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "DUST-SOUNDS | ループ・BGMミュージックや効果音素材がフリー(無料)でダウンロードできるサイト",
-   "url": "http://dust-sounds.com/"
+   "url": "http://dust-sounds.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "伴奏网，5SING伴奏 - 中国原创音乐基地",
-   "url": "http://5sing.kugou.com/bz/index.shtml"
+   "url": "http://5sing.kugou.com/bz/index.shtml",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "500内部特权错误",
-   "url": "http://soundbible.com/"
+   "url": "http://soundbible.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "Royalty Free Loops Samples Sounds Wavs Beats Download",
-   "url": "https://www.looperman.com/loops"
+   "url": "https://www.looperman.com/loops",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "音笑网",
-   "url": "http://www.yisell.com/"
+   "url": "http://www.yisell.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "小森平",
-   "url": "https://taira-komori.jpn.org/freesoundcn.html"
+   "url": "https://taira-komori.jpn.org/freesoundcn.html",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "音效 音效网 声音网 音效素材 音效下载 游戏音效 - 爱给网",
-   "url": "http://www.aigei.com/sound/"
+   "url": "http://www.aigei.com/sound/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "Soundsnap",
-   "url": "https://www.soundsnap.com/"
+   "url": "https://www.soundsnap.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "尖叫声",
-   "url": "https://www.findsounds.com/ISAPI/search.dll?keywords=squeal+squealing&keywords=squeal+squealing"
+   "url": "https://www.findsounds.com/ISAPI/search.dll?keywords=squeal+squealing&keywords=squeal+squealing",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "TAM Music Factory - 使用フリーの音楽素材（MP3素材）・効果音素材",
-   "url": "https://www.tam-music.com/"
+   "url": "https://www.tam-music.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "站长素材音效下载",
-   "url": "http://sc.chinaz.com/yinxiao/"
+   "url": "http://sc.chinaz.com/yinxiao/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "按类别浏览",
-   "url": "https://www.soundsnap.com/browse"
+   "url": "https://www.soundsnap.com/browse",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "Sound Effects Downloads | Sounddogs.com",
-   "url": "https://www.sounddogs.com/"
+   "url": "https://www.sounddogs.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "くらげ工匠",
-   "url": "http://www.kurage-kosho.info/"
+   "url": "http://www.kurage-kosho.info/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "効果音源3｜ロイヤリティーフリーの効果音素材をダウンロード",
-   "url": "http://koukaongen.com/"
+   "url": "http://koukaongen.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "FindSounds",
-   "url": "https://www.findsounds.com/"
+   "url": "https://www.findsounds.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "音效分类音效下载- 商用音效-购买-音效素材 - 100Audio",
-   "url": "https://100audio.com/sound/"
+   "url": "https://100audio.com/sound/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "マンガ文字素材dddFont – 漫画的表現ができる素材をドドドっとストック",
-   "url": "https://dddfont.com/"
+   "url": "https://dddfont.com/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "FindSounds - Sound Types in Chinese",
-   "url": "https://www.findsounds.com/typesChinese.html"
+   "url": "https://www.findsounds.com/typesChinese.html",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "フリーBGM（音楽素材）無料ダウンロード｜DOVA-SYNDROME",
-   "url": "https://dova-s.jp/"
+   "url": "https://dova-s.jp/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "音效素材 - 各类音效素材,声音素材下载 - 数码资源网",
-   "url": "https://www.smzy.com/yinpin/"
+   "url": "https://www.smzy.com/yinpin/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "音效网_音效素材下载_音效素材网_音效库下载_素材吧",
-   "url": "https://www.sucaibar.com/yinxiao/"
+   "url": "https://www.sucaibar.com/yinxiao/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "OpenGameArt.org",
-   "url": "https://opengameart.org/"
+   "url": "https://opengameart.org/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "Freesound-声音浏览",
-   "url": "https://freesound.org/browse/"
+   "url": "https://freesound.org/browse/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "音效",
    "title": "免费的免版税音乐— Fugue",
-   "url": "https://icons8.com/music/"
+   "url": "https://icons8.com/music/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "字幕",
    "title": "字幕组机翻小助手",
-   "url": "https://tern.1c7.me/#/"
+   "url": "https://tern.1c7.me/#/",
+   "desc": ""
   },
   {
    "category": "素材与音频",
    "sub": "字幕",
    "title": "在线免费翻译字幕�!",
-   "url": "https://translate-subtitles.com/zh-CN"
+   "url": "https://translate-subtitles.com/zh-CN",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "Cкачать игры на ПК",
-   "url": "https://byrut.org/"
+   "url": "https://byrut.org/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "SE7EN.ws",
-   "url": "https://se7en.ws/?lang=en"
+   "url": "https://se7en.ws/?lang=en",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "FFF游戏  49423",
-   "url": "http://aiwan.jifen2345.cn/"
+   "url": "http://aiwan.jifen2345.cn/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "Igrovaya.org",
-   "url": "https://igrovaya.org/"
+   "url": "https://igrovaya.org/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "破解在线游戏",
-   "url": "https://online-fix.me/"
+   "url": "https://online-fix.me/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "小叽资源 – Free Share",
-   "url": "https://steamzg.com/"
+   "url": "https://steamzg.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "土豆",
-   "url": "http://www.tdtd.club/"
+   "url": "http://www.tdtd.club/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "PCGamesTorrents",
-   "url": "https://pcgamestorrents.com/"
+   "url": "https://pcgamestorrents.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "IGGGAMES",
-   "url": "https://igg-games.com/"
+   "url": "https://igg-games.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "Repack-Games",
-   "url": "https://repack-games.com/"
+   "url": "https://repack-games.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "CODEXPCGames",
-   "url": "https://codexpcgames.com/"
+   "url": "https://codexpcgames.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "Skidrow & Reloaded Games",
-   "url": "https://www.skidrowreloaded.com/"
+   "url": "https://www.skidrowreloaded.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "FitGirl Repack",
-   "url": "https://fitgirl-repack.com/"
+   "url": "https://fitgirl-repack.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "GBT游戏分享",
-   "url": "https://www.gbtgames.com/"
+   "url": "https://www.gbtgames.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "GBT乐赏游戏空间",
-   "url": "http://gbtgame.ysepan.com/"
+   "url": "http://gbtgame.ysepan.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "电脑游戏洪流下载",
-   "url": "https://rutor-org.games/"
+   "url": "https://rutor-org.games/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "flysheep资源避难所-一个免费的二次元风格下载站",
-   "url": "https://www.flysheep6.com/"
+   "url": "https://www.flysheep6.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 下载",
    "title": "Anime Garden",
-   "url": "https://animes.garden/resources/1?type=%E6%B8%B8%E6%88%8F"
+   "url": "https://animes.garden/resources/1?type=%E6%B8%B8%E6%88%8F",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "Nexus 模组和社区",
-   "url": "https://skyrim.nexusmods.com/"
+   "url": "https://skyrim.nexusmods.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "GGNETWORK",
-   "url": "https://ggntw.com/steam"
+   "url": "https://ggntw.com/steam",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "Skymods",
-   "url": "https://catalogue.smods.ru/"
+   "url": "https://catalogue.smods.ru/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "幻觉游戏卡",
-   "url": "https://illusioncards.booru.org//index.php?page=post&s=list"
+   "url": "https://illusioncards.booru.org//index.php?page=post&s=list",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "Lewd Patcher - 成人游戏补丁",
-   "url": "https://lewdpatcher.com/"
+   "url": "https://lewdpatcher.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "DLC",
-   "url": "https://patch.moe/"
+   "url": "https://patch.moe/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "FLiNG Trainer",
-   "url": "https://flingtrainer.com/"
+   "url": "https://flingtrainer.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "GameBuff官网-修改器",
-   "url": "https://gamebuff.cn/download.html"
+   "url": "https://gamebuff.cn/download.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "WeMod",
-   "url": "https://www.wemod.com/zh"
+   "url": "https://www.wemod.com/zh",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "一修大师游戏修改器下载_",
-   "url": "https://patch.ali213.net/showpatch/154685.html"
+   "url": "https://patch.ali213.net/showpatch/154685.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "单机游戏_游侠网",
-   "url": "https://www.ali213.net/"
+   "url": "https://www.ali213.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "3DM游戏网",
-   "url": "https://www.3dmgame.com/"
+   "url": "https://www.3dmgame.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "9dm玖大猫游戏mod论坛",
-   "url": "http://www.9dmdamaomod.net/"
+   "url": "http://www.9dmdamaomod.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 模组",
    "title": "人物卡",
-   "url": "https://db.bepis.moe/koikatsu"
+   "url": "https://db.bepis.moe/koikatsu",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "SteamPY_安全省钱的Steam游戏交易市场",
-   "url": "https://steampy.com/home"
+   "url": "https://steampy.com/home",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "SteamrepCN - 首页",
-   "url": "https://steamrepcn.com/"
+   "url": "https://steamrepcn.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Plati.Market",
-   "url": "https://plati.market/"
+   "url": "https://plati.market/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "China Play",
-   "url": "https://chinaplay.store/"
+   "url": "https://chinaplay.store/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Gama-Gama",
-   "url": "https://gama-gama.cn/"
+   "url": "https://gama-gama.cn/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "YUPLAY | You play for less with us!",
-   "url": "https://www.yuplay.com/"
+   "url": "https://www.yuplay.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "欢迎来到 Steam",
-   "url": "https://store.steampowered.com/"
+   "url": "https://store.steampowered.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Epic Games Store | Official Site",
-   "url": "https://www.epicgames.com/store/zh-CN/?lang=zh-CN"
+   "url": "https://www.epicgames.com/store/zh-CN/?lang=zh-CN",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "育碧",
-   "url": "https://store.ubi.com/cn/home"
+   "url": "https://store.ubi.com/cn/home",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "GOG.com",
-   "url": "https://www.gog.com/"
+   "url": "https://www.gog.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Electronic Arts",
-   "url": "https://www.ea.com/games/library/pc-download?isLocalized=true"
+   "url": "https://www.ea.com/games/library/pc-download?isLocalized=true",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "EA 協助中心：官方支援",
-   "url": "https://help.ea.com/tw/"
+   "url": "https://help.ea.com/tw/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Humble Bundle",
-   "url": "https://www.humblebundle.com/?hmb_source=navbar"
+   "url": "https://www.humblebundle.com/?hmb_source=navbar",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "方块游戏平台",
-   "url": "https://www.cubejoy.com/"
+   "url": "https://www.cubejoy.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Home | Riot Games",
-   "url": "https://www.riotgames.com/zh-cn"
+   "url": "https://www.riotgames.com/zh-cn",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Riot 账号管理",
-   "url": "https://account.riotgames.com/account#communication-preferences"
+   "url": "https://account.riotgames.com/account#communication-preferences",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "Origin",
-   "url": "https://www.origin.com/sgp/zh-tw/my-home"
+   "url": "https://www.origin.com/sgp/zh-tw/my-home",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "下载最新的独立游戏 - itch.io",
-   "url": "https://itch.io/"
+   "url": "https://itch.io/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "外星人竞技场",
-   "url": "https://www.alienwarearena.com/ucf/Giveaway"
+   "url": "https://www.alienwarearena.com/ucf/Giveaway",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 购买",
    "title": "赛睿游戏",
-   "url": "https://games.steelseries.com/home"
+   "url": "https://games.steelseries.com/home",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 信息",
    "title": "蒸汽数据库",
-   "url": "https://steamdb.info/"
+   "url": "https://steamdb.info/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 信息",
    "title": "IsThereAnyDeal(游戏信息)",
-   "url": "https://isthereanydeal.com/search/?q=Post+Scriptum"
+   "url": "https://isthereanydeal.com/search/?q=Post+Scriptum",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 信息",
    "title": "其乐 Keylol",
-   "url": "https://keylol.com/"
+   "url": "https://keylol.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 信息",
    "title": "匿名专用服务器组件",
-   "url": "https://steamdb.info/sub/17906/apps/"
+   "url": "https://steamdb.info/sub/17906/apps/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 加速器",
    "title": "Steam++ - 主页",
-   "url": "https://steampp.net/"
+   "url": "https://steampp.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 加速器",
    "title": "Steam++工具箱",
-   "url": "http://www.steamtool.net/"
+   "url": "http://www.steamtool.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 加速器",
    "title": "奇妙网游加速器",
-   "url": "https://www.qimiao.com/"
+   "url": "https://www.qimiao.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 加速器",
    "title": "流星游戏加速器",
-   "url": "https://www.liuxing.com/"
+   "url": "https://www.liuxing.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 加速器",
    "title": "Golink加速器",
-   "url": "https://www.golink.com/"
+   "url": "https://www.golink.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 加速器",
    "title": "香肠免费加速器",
-   "url": "https://www.xiangchang.com/"
+   "url": "https://www.xiangchang.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 加速器",
    "title": "战神游戏加速器",
-   "url": "https://www.zsspeed.com/"
+   "url": "https://www.zsspeed.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "网易云游戏平台（可网页）",
-   "url": "https://cg.163.com/#/mobile"
+   "url": "https://cg.163.com/#/mobile",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "在线 DOS 游戏",
-   "url": "https://dos.zczc.cz/"
+   "url": "https://dos.zczc.cz/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "小霸王，其乐无穷",
-   "url": "https://www.yikm.net/"
+   "url": "https://www.yikm.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "咪咕快游",
-   "url": "https://pc.migufun.com/"
+   "url": "https://pc.migufun.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "蘑菇云游（可网页）",
-   "url": "https://www.moguyouxi.cn/"
+   "url": "https://www.moguyouxi.cn/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "顺网云电脑（可网页）",
-   "url": "https://cpc.icloud.cn/"
+   "url": "https://cpc.icloud.cn/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "格来云游戏（可网页）",
-   "url": "https://www.gloud.cn/#/index"
+   "url": "https://www.gloud.cn/#/index",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "极云普惠官网",
-   "url": "https://www.ji-cloud.cn/"
+   "url": "https://www.ji-cloud.cn/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "海星云官网",
-   "url": "https://www.haixingcloud.com/#/Home"
+   "url": "https://www.haixingcloud.com/#/Home",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "胖鱼道炫（可网页）",
-   "url": "https://www.anygame.info/"
+   "url": "https://www.anygame.info/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "游戏 / 云游戏",
+   "title": "菜鸡-云游戏平台",
+   "url": "https://www.caijiyouxi.com/#pageOne",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "虎牙YOWA云游戏（可网页）",
-   "url": "https://yowa.huya.com/"
+   "url": "https://yowa.huya.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "斗鱼云游戏官网（可网页）",
-   "url": "https://cloudgame.douyu.com/home"
+   "url": "https://cloudgame.douyu.com/home",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "游戏 / 云游戏",
+   "title": "菜鸡-云游戏平台",
+   "url": "https://www.caijiyouxi.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "雷电云手机官网",
-   "url": "https://www.ldyunos.com/#/"
+   "url": "https://www.ldyunos.com/#/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "START-腾讯云游戏",
-   "url": "https://start.qq.com/"
+   "url": "https://start.qq.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 云游戏",
    "title": "GeForce NOW",
-   "url": "https://play.geforcenow.com/mall/#/layout/games"
+   "url": "https://play.geforcenow.com/mall/#/layout/games",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "PPSSPP - psp模拟器",
-   "url": "http://www.ppsspp.org/index-cn.html"
+   "url": "http://www.ppsspp.org/index-cn.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "老男人游戏网 | OldmanEmu.net",
-   "url": "https://www.oldmanemu.net/"
+   "url": "https://www.oldmanemu.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "Download game",
-   "url": "https://downloadgameps3.com/"
+   "url": "https://downloadgameps3.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "ROMS仓库_模拟MAX",
-   "url": "http://www.emumax.com/roms/"
+   "url": "http://www.emumax.com/roms/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "26VV - 一个自由分享与下载经典游戏和怀旧游戏的部落",
-   "url": "https://26vv.com/#"
+   "url": "https://26vv.com/#",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "ROMSPURE.COM - 新闻和下载 Nintendo 和 Playstation 游戏",
-   "url": "https://romspure.com/"
+   "url": "https://romspure.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "游戏年轮",
-   "url": "https://www.bibgame.com/"
+   "url": "https://www.bibgame.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "游戏下载_游戏资讯",
-   "url": "http://www.k73.com/tvg/"
+   "url": "http://www.k73.com/tvg/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "街机游戏_超能街机",
-   "url": "https://www.mamecn.com/"
+   "url": "https://www.mamecn.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "yuzu - Nintendo Switch Emulator",
-   "url": "https://yuzu-emu.org/"
+   "url": "https://yuzu-emu.org/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "WL.Event Game（模拟器下载）",
-   "url": "https://emulator.sumofents.net/"
+   "url": "https://emulator.sumofents.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "飞马前端",
-   "url": "https://pegasus-frontend.org/#downloads"
+   "url": "https://pegasus-frontend.org/#downloads",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "RetroArch 是模拟器",
-   "url": "https://www.retroarch.com/index.php"
+   "url": "https://www.retroarch.com/index.php",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏 / 主机游戏",
    "title": "GameKegs - GKinto",
-   "url": "http://gkinto.com/"
+   "url": "http://gkinto.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "游戏",
    "title": "丸子君的新基地尊享版教程",
-   "url": "https://docs.qq.com/aio/DSGdQc3htbFJjSFdO?p=DXpTjzl2kZwBjN7jlRMkRJ"
+   "url": "https://docs.qq.com/aio/DSGdQc3htbFJjSFdO?p=DXpTjzl2kZwBjN7jlRMkRJ",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "カクヨム",
-   "url": "https://kakuyomu.jp/"
+   "url": "https://kakuyomu.jp/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "轻之国度-专注分享的NACG社群",
-   "url": "https://www.lightnovel.us/cn/"
+   "url": "https://www.lightnovel.us/cn/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "魔笔小说",
-   "url": "https://www.mobinovels.com/"
+   "url": "https://www.mobinovels.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "轻之文库轻小说",
-   "url": "https://www.linovel.net/"
+   "url": "https://www.linovel.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "神凑轻小说",
-   "url": "http://m.shencou.com/"
+   "url": "http://m.shencou.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "神凑轻小说文库",
-   "url": "http://www.shencou.com/"
+   "url": "http://www.shencou.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "哔哩轻小说",
-   "url": "https://m.linovelib.com/"
+   "url": "https://m.linovelib.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "轻小说文库",
-   "url": "http://www.wenku8.net/index.php"
+   "url": "http://www.wenku8.net/index.php",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "轻书架",
-   "url": "https://www.acgdmzy.com/#/home"
+   "url": "https://www.acgdmzy.com/#/home",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "轻之国度",
-   "url": "https://www.lightnovel.us/"
+   "url": "https://www.lightnovel.us/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "小説家になろう",
-   "url": "https://syosetu.com/"
+   "url": "https://syosetu.com/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "小说 / 轻小说",
+   "title": "轻小说 - Animex动漫社",
+   "url": "http://www.animetox.com/category/source/lightnovel",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说 / 轻小说",
    "title": "圖書館的無限迴廊",
-   "url": "https://epub.love/wp/"
+   "url": "https://epub.love/wp/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "小说 / 轻小说",
+   "title": "轻小说 – 次元狗",
+   "url": "https://www.acgndog.com/category/qingxiaoshuo",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "阅读论坛 - Powered by Discuz!",
-   "url": "https://legado.cn/"
+   "url": "https://legado.cn/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "小说",
+   "title": "源仓库最新地址发布页",
+   "url": "https://yckceo.vip/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "小说",
+   "title": "源仓库",
+   "url": "http://www.yckceo.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "起点中文网_阅文集团旗下网站_首页",
-   "url": "https://m.qidian.com/"
+   "url": "https://m.qidian.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "AO3",
-   "url": "https://archiveofourown.org/"
+   "url": "https://archiveofourown.org/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "69书吧",
-   "url": "https://www.69shuba.com/"
+   "url": "https://www.69shuba.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "69书吧",
-   "url": "https://www.69shu.xyz/"
+   "url": "https://www.69shu.xyz/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "69书吧",
-   "url": "https://www.69shu.pro/"
+   "url": "https://www.69shu.pro/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "茄子搜书",
-   "url": "https://qiezi.gno.limo/"
+   "url": "https://qiezi.gno.limo/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "程序猿书吧",
-   "url": "https://www.cxysb.com/"
+   "url": "https://www.cxysb.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "全本免费小说",
-   "url": "https://m.qbmfxs.com/"
+   "url": "https://m.qbmfxs.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "台湾小说网",
-   "url": "https://twkan.com/"
+   "url": "https://twkan.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "繁体小说网",
-   "url": "https://www.xiaoshuo.com.tw/870224/"
+   "url": "https://www.xiaoshuo.com.tw/870224/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "得奇小说网",
-   "url": "https://www.deqixs.com/"
+   "url": "https://www.deqixs.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "69阅读",
-   "url": "https://www.69yd.top/index.html"
+   "url": "https://www.69yd.top/index.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "⚡ 天天看小说",
-   "url": "https://ttk.tw/"
+   "url": "https://ttk.tw/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "69阅读",
-   "url": "https://www.69yue.top/index.html"
+   "url": "https://www.69yue.top/index.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "爱下电子书_享受阅读的乐趣！",
-   "url": "https://ixdzs8.com/"
+   "url": "https://ixdzs8.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "铅笔小说_最值得书友收藏的网络小说阅读网",
-   "url": "https://www.23qb.com/"
+   "url": "https://www.23qb.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "小说",
    "title": "绝对之门-速读谷-魔性沧月小说-最新章节无错字免费阅读",
-   "url": "https://www.sudugu.org/1945/"
+   "url": "https://www.sudugu.org/1945/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 漫画",
    "title": "[pixiv]",
-   "url": "https://www.pixiv.net/"
+   "url": "https://www.pixiv.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 漫画",
    "title": "动漫之家（漫画）",
-   "url": "https://www.dmzj.com/"
+   "url": "https://www.dmzj.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 漫画",
    "title": "动漫之家漫画网",
-   "url": "https://manhua.dmzj.com/"
+   "url": "https://manhua.dmzj.com/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "动漫 / 漫画",
+   "title": "漫画DB",
+   "url": "https://www.manhuadb.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 漫画",
    "title": "搜漫_一站式漫画搜索引擎",
-   "url": "https://www.soman.com/"
+   "url": "https://www.soman.com/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "动漫 / 漫画",
+   "title": "漫画DB",
+   "url": "https://www.manhuadb.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 漫画",
    "title": "立读",
-   "url": "https://tachiyomi.org/"
+   "url": "https://tachiyomi.org/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "动漫 / 漫画",
+   "title": "异次元 - 源仓库",
+   "url": "https://www.yckceo.com/yiciyuan/tuyuan/index.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 漫画",
    "title": "拷贝漫画",
-   "url": "https://www.copymanga.site/comics?theme=baihe"
+   "url": "https://www.copymanga.site/comics?theme=baihe",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 漫画",
    "title": "Yuri漫画",
-   "url": "https://www.yinmh.com/tags/100780.html"
+   "url": "https://www.yinmh.com/tags/100780.html",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "动漫 / 论坛",
+   "title": "Animex动漫社",
+   "url": "http://www.animetox.com/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "动漫 / 论坛",
+   "title": "次元狗",
+   "url": "https://www.acgndog.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 论坛",
    "title": "吱吱物语岛！",
-   "url": "https://www.ziziu.cn/?__K=18618065abd5ca9d615a917938ba8c0de1610104871_12736"
+   "url": "https://www.ziziu.cn/?__K=18618065abd5ca9d615a917938ba8c0de1610104871_12736",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 论坛",
    "title": "萌幻之乡",
-   "url": "https://hmoe.top/"
+   "url": "https://hmoe.top/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "动漫 / 论坛",
+   "title": "维咔VikACG[V站] - 肥宅们的欢乐家园",
+   "url": "https://www.vikacg.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫 / 论坛",
    "title": "好萌动漫（原NekoPlus）—— 欢迎大家常来搜集与整理各类漫画、轻音乐、萌图、动漫、游戏等二次元资源！",
-   "url": "https://www.nicemoe.fun/"
+   "url": "https://www.nicemoe.fun/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "Bangumi 番组计划",
-   "url": "https://bgm.tv/"
+   "url": "https://bgm.tv/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "樱花动漫",
-   "url": "http://www.yhdm.tv/"
+   "url": "http://www.yhdm.tv/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "樱花动漫",
-   "url": "http://m.imomoe.in/"
+   "url": "http://m.imomoe.in/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "动漫岛",
-   "url": "http://www.dmd8.com/"
+   "url": "http://www.dmd8.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "哈哩哈哩",
-   "url": "http://halihali.li/acg/"
+   "url": "http://halihali.li/acg/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "动漫",
+   "title": "动画 – 次元狗",
+   "url": "https://www.acgndog.com/category/ac",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "趣动漫",
-   "url": "https://www.qdm66.com/dongmanplay/5647-1-1.html"
+   "url": "https://www.qdm66.com/dongmanplay/5647-1-1.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "AcgnHub - 你的二次元萌导航姬！",
-   "url": "http://www.acgfans.me/"
+   "url": "http://www.acgfans.me/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "AcFuns动漫网 - 全网高清动漫在线看",
-   "url": "https://www.acfuns.net/"
+   "url": "https://www.acfuns.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "动漫",
    "title": "蜜柑计划 - Mikan Project",
-   "url": "https://mikanani.me/"
+   "url": "https://mikanani.me/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "Index",
-   "url": "http://index.tsyuri.com/"
+   "url": "http://index.tsyuri.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "百合图",
-   "url": "https://yuriimg.com/"
+   "url": "https://yuriimg.com/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "百合",
+   "title": "热门小说阅读网",
+   "url": "https://www.rouwennp.club/search.html",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "百合会",
-   "url": "https://bbs.yamibo.com/forum.php?forumlist=1&mobile=2"
+   "url": "https://bbs.yamibo.com/forum.php?forumlist=1&mobile=2",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "变身百合小说论坛",
-   "url": "https://www.bianshenyuri.com/forum.php?forumlist=1&mobile=2"
+   "url": "https://www.bianshenyuri.com/forum.php?forumlist=1&mobile=2",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "ponpomu Hi！yuriyuri!",
-   "url": "https://www.ponpomu.com/"
+   "url": "https://www.ponpomu.com/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "百合",
+   "title": "百合 - 黑沼泽俱乐部",
+   "url": "https://zhaoze.icu/tag/%e7%99%be%e5%90%88/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "海棠文化线上文学城",
-   "url": "https://longmabookcn.com/"
+   "url": "https://longmabookcn.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "百合天国哈啦板- 巴哈姆特",
-   "url": "https://forum.gamer.com.tw/A.php?bsn=60405"
+   "url": "https://forum.gamer.com.tw/A.php?bsn=60405",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "百合",
+   "title": "女同 | Page 1 - ASMR Online",
+   "url": "https://www.asmr.one/works?keyword=%24tag%3A%E8%95%BE%E4%B8%9D%2F%E5%A5%B3%E5%90%8C%24",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "/ | yande.re",
-   "url": "https://yande.re/post"
+   "url": "https://yande.re/post",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "/ | konachan.com - Konachan.com Anime Wallpapers",
-   "url": "https://konachan.com/post"
+   "url": "https://konachan.com/post",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "百合",
    "title": "百合相关插画特辑一览",
-   "url": "https://www.pixivision.net/zh/s/?q=%E7%99%BE%E5%90%88"
+   "url": "https://www.pixivision.net/zh/s/?q=%E7%99%BE%E5%90%88",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "音乐",
+   "title": "ASMR Online（声音）",
+   "url": "https://www.asmr.one/works",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "音乐",
    "title": "MYFREEMP3 -（音乐下载）",
-   "url": "http://tool.liumingye.cn/music/?page=homePage"
+   "url": "http://tool.liumingye.cn/music/?page=homePage",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "音乐",
    "title": "无损音乐吧",
-   "url": "https://www.dtshot.com/"
+   "url": "https://www.dtshot.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "音乐",
    "title": "Spotify",
-   "url": "https://open.spotify.com/?flow_id=7a47b64d-eb63-4a66-9dab-aa7f20959c42%3A1689714283&creation_point=https%3A%2F%2Fopen.spotify.com%2F%3Fsp_cid%3Dcfdaaccfa5da9b65e796e1a54e878e1e"
+   "url": "https://open.spotify.com/?flow_id=7a47b64d-eb63-4a66-9dab-aa7f20959c42%3A1689714283&creation_point=https%3A%2F%2Fopen.spotify.com%2F%3Fsp_cid%3Dcfdaaccfa5da9b65e796e1a54e878e1e",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "音乐",
    "title": "GD音乐台",
-   "url": "https://music.gdstudio.xyz/"
+   "url": "https://music.gdstudio.xyz/",
+   "desc": ""
+  },
+  {
+   "category": "影音与娱乐",
+   "sub": "音乐",
+   "title": "ASMR Online",
+   "url": "https://asmr.one/works",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "NO视频",
-   "url": "https://www.novipnoad.com/"
+   "url": "https://www.novipnoad.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "茶杯狐 Cupfox",
-   "url": "https://www.cupfox.com/"
+   "url": "https://www.cupfox.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "555电影APP下载-555电影官网永久发布页",
-   "url": "https://app.jlghjy.com/"
+   "url": "https://app.jlghjy.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "低端影视 - 超清在线视频站",
-   "url": "https://ddrk.me/"
+   "url": "https://ddrk.me/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "电影狗",
-   "url": "http://www.dianyinggou.com/"
+   "url": "http://www.dianyinggou.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "Savieo-保存网络视频",
-   "url": "https://savieo.com/"
+   "url": "https://savieo.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "弹弹play - 全功能“本地视频+弹幕”播放器",
-   "url": "https://www.dandanplay.com/"
+   "url": "https://www.dandanplay.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "无名小站VIP视频解析网站_无名小站",
-   "url": "https://www.administrator5.com/"
+   "url": "https://www.administrator5.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "M3U8播放器",
-   "url": "https://m3u8play.com/"
+   "url": "https://m3u8play.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "M3U8在线解析",
-   "url": "https://m3u8.cachecha.com/"
+   "url": "https://m3u8.cachecha.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "assrt.net - 字幕下载",
-   "url": "https://assrt.net/"
+   "url": "https://assrt.net/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "影视资源采集网大合集",
-   "url": "https://caoniang.com/11396.html?hao.su"
+   "url": "https://caoniang.com/11396.html?hao.su",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "hdzyk,高清资源库",
-   "url": "https://1080zyk1.com/"
+   "url": "https://1080zyk1.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "Porn Dude",
-   "url": "https://theporndude.com/zh"
+   "url": "https://theporndude.com/zh",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "探探资源",
-   "url": "https://apittzy.com/"
+   "url": "https://apittzy.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "老王论坛",
-   "url": "https://5mhhae.com/forum.php?x=1025244&x=1025244"
+   "url": "https://5mhhae.com/forum.php?x=1025244&x=1025244",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "清纯唯美 - XO福利圖 - 海量图片平台",
-   "url": "https://mak803-ad398-dke3e.xofulitu765.xyz/arttype/2002/"
+   "url": "https://mak803-ad398-dke3e.xofulitu765.xyz/arttype/2002/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "12岁の乐园-12uhun.xyz/12d/",
-   "url": "https://nnononoyes.wbsaoyy-hee66.yachts/"
+   "url": "https://nnononoyes.wbsaoyy-hee66.yachts/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "秘密研究所 - 专属于宅男的秘密网址导航",
-   "url": "https://m.yanjiusuo51.top/%E7%88%B1%E5%AD%A6%E4%B9%A0/"
+   "url": "https://m.yanjiusuo51.top/%E7%88%B1%E5%AD%A6%E4%B9%A0/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "PornFind - 色情搜尋引擎",
-   "url": "https://www.pornfind.cc/"
+   "url": "https://www.pornfind.cc/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "第一导航",
-   "url": "https://diyyyy29.xyz/zz/?form=Ndr45&date=202522222"
+   "url": "https://diyyyy29.xyz/zz/?form=Ndr45&date=202522222",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "UAA.COM",
-   "url": "https://www.uaa.com/"
+   "url": "https://www.uaa.com/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "go-search | 狗狗AV",
-   "url": "https://gogo.pipigou708.top/go-search/%E7%99%BD%E8%99%8E/1/"
+   "url": "https://gogo.pipigou708.top/go-search/%E7%99%BD%E8%99%8E/1/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "影视",
    "title": "司机会所",
-   "url": "https://loopurl.com/sjhs"
+   "url": "https://loopurl.com/sjhs",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "娱乐",
    "title": "YouTube",
-   "url": "https://www.youtube.com/feed/trending?bp=6gQJRkVleHBsb3Jl"
+   "url": "https://www.youtube.com/feed/trending?bp=6gQJRkVleHBsb3Jl",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "娱乐",
    "title": "Twitch",
-   "url": "https://www.twitch.tv/"
+   "url": "https://www.twitch.tv/",
+   "desc": ""
   },
   {
    "category": "影音与娱乐",
    "sub": "娱乐",
    "title": "导航",
-   "url": "https://pipigou708.top/"
+   "url": "https://pipigou708.top/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "Cloudflare Zero Trust",
+   "url": "https://one.dash.cloudflare.com/2390a8da9d2186b6ad44b65b0151fb9f/home/quick-start",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "1.1.1.1",
+   "url": "https://1.1.1.1/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "Tor Project | （暗网）",
+   "url": "https://www.torproject.org/zh-CN/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "隐藏的维基| Tor .onion urls目录",
+   "url": "https://thehiddenwiki.org/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "Free Air – 自由上网",
+   "url": "https://tr3.freeair888.club/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "无界浏览",
+   "url": "http://m.wujieliulan.com/index.html#fanqiangnote",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "SoftEther VPN 项目 - SoftEther VPN 项目",
+   "url": "https://www.softether.org/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "VPN Gate 下载",
+   "url": "https://www.vpngate.net/cn/download.aspx",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "免费代理试用| 我的IPHide",
+   "url": "https://myiphide.com/free.html",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "最佳免费 VPN - 免费代理列表",
+   "url": "https://free-proxy-list.net/best-free-vpn.html",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "下载适用于 Windows 的免费 VPN 客户端 | 隐藏我",
+   "url": "https://hide.me/en/software/windows",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "免费 VPN 帐户 • 100% 免费 PPTP 和 OpenVPN 服务",
+   "url": "https://www.vpnbook.com/freevpn",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "猴王VPN",
+   "url": "https://www.houwang.xyz/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "起飞VPN",
+   "url": "https://www.departuresvpn.tk/app%E4%B8%8B%E8%BD%BD%E5%9C%B0%E5%9D%80",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 软件",
+   "title": "蘑菇加速器官网",
+   "url": "https://www.mogu23.com/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 机场",
+   "title": "GLaDOS",
+   "url": "https://glados.rocks/console",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 机场",
+   "title": "购物车 - 棱角",
+   "url": "https://www.lengjiao.me/cart.php",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 机场",
+   "title": "穿云箭",
+   "url": "https://chuanyunjian.uk/index.php#/register?code=0llVyrrq",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 机场",
+   "title": "XYZ",
+   "url": "https://9.234456.xyz/abc.html",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 机场",
+   "title": "一分机场",
+   "url": "https://xn--4gqx1hgtfdmt.com/#/register?code=3xKWB2Lq",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 机场",
+   "title": "XYZ",
+   "url": "https://9.234456.xyz/abc.html",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 机场",
+   "title": "Tickcloud",
+   "url": "https://www.tickcloud.net/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "ProxySite.com - 免费网络代理网站",
+   "url": "https://www.proxysite.com/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "www.ddung.orgGlype®代理",
+   "url": "http://www.ddung.org/daili/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "免费网络代理和最先进的在线代理| 代理代理",
+   "url": "https://www.croxyproxy.com/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "最先进的安全且免费的网络代理 | 代理代理",
+   "url": "https://www.croxyproxy.rocks/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "免费网络代理 • 解锁 YouTube",
+   "url": "https://www.vpnbook.com/webproxy",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "最快的免费代理| 隐藏我",
+   "url": "https://hide.me/en/proxy",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "Web代理服务器列表",
+   "url": "http://free-proxy.cz/zh/web-proxylist/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "4everproxy - 免费网络代理| 无限VPN",
+   "url": "https://www.4everproxy.com/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 网络代理",
+   "title": "KPROXY - 免费匿名网络代理 - 匿名代理",
+   "url": "https://kproxy.com/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "墻知乎 - 最全的翻墙知识聚集地",
+   "url": "https://wallzhihu.com/amp/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "ACL4SSR_在线订阅转换",
+   "url": "https://acl4ssr.netlify.app/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "Home - riseup.net",
+   "url": "https://riseup.net/en",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "DuyaoSS-机场测速和简介",
+   "url": "https://www.duyaoss.com/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "我们如何测试VPN-VPN报告",
+   "url": "https://www.vpnreports.com/how-we-test-vpn/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "VPN – 免费资源网路社群",
+   "url": "https://free.com.tw/tag/vpn/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "聪聪 Blog",
+   "url": "https://congcong0806.github.io/2018/04/20/SS/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "如何用 Tor 访问对 Tor 不友好的网站——扫盲“三重代理”及其它招数 @ 编程随想的博客",
+   "url": "https://program-think.blogspot.com/2020/08/Tor-Triple-Proxy.html",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "机场推荐与机场评测",
+   "url": "https://jichangtuijian.com/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理 / 教程",
+   "title": "Cloudflare CDN反代免费VPN高速上网，速度超快，千兆节点、解锁奈飞流媒体 - 科技小飞哥",
+   "url": "https://www.techxiaofei.com/post/vpn/cdn/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理",
+   "title": "openclash转换订阅网址",
+   "url": "https://sub-web.netlify.app/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理",
+   "title": "好梯子（Htizi.com）- 便宜实用的魔法上网机场推荐",
+   "url": "https://htizi.cc/",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理",
+   "title": "v2ray free",
+   "url": "https://github.com/search?q=v2ray+free&type=repositories&s=stars&o=desc",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理",
+   "title": "订阅地址",
+   "url": "https://fofa.info/result?qbase64=Ym9keT0i6Ieq5Yqo5oqT5Y%20WdGfpopHpgZPjgIHorqLpmIXlnLDlnYDjgIHlhazlvIDkupLogZTnvZHkuIrnmoRzc%20OAgXNzcuOAgXZtZXNz44CBdHJvamFu6IqC54K55L%20h5oGvIg%3D%3D",
+   "desc": ""
+  },
+  {
+   "category": "网络代理与翻墙",
+   "sub": "网络代理",
+   "title": "BridgeDB(网桥，翻）",
+   "url": "https://bridges.torproject.org/options",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "SMS-Activate是在线接受短信的虚拟号码服务",
+   "url": "https://sms-activate.org/cn///",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "2020最新短信验证码接收平台 - 免费接码平台",
+   "url": "http://www.zsrq.net/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "接码号 - 在线接收短信验证码",
+   "url": "https://jiemahao.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费短信验证码接收平台",
+   "url": "https://www.xinghai.party/?page=0",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "10分钟邮箱 - BccTo.ME",
+   "url": "https://bccto.me/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线云短信网页版 - 免费接码平台",
+   "url": "http://z-sms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费接码|短信验证码|在线接收短信|接码平台",
+   "url": "http://www.114sim.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "接收短信在线免费文本，美国，英国，德国，法国，意大利",
+   "url": "http://receivefreesms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线接收短信| 临时短信和一次性号码",
+   "url": "https://smsreceivefree.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费在线接收短信 - 英国，罗马尼亚，美国，西班牙，法国，德国，俄罗斯",
+   "url": "https://www.receive-sms-online.info/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Receive SMS Online",
+   "url": "https://receive-sms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线接收短信| 免费短信| 短信在线",
+   "url": "https://www.receivesmsonline.net/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费在线电话| 在线接收短信",
+   "url": "https://www.freeonlinephone.org/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Receive SMS Online | Voice call verification | SMS to email - SELLAITE",
+   "url": "http://sms.sellaite.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费接短信,在线接收短信验证码 - 云短信",
+   "url": "https://yunduanxin.net/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费接码|短信验证码|在线接收短信|接码平台",
+   "url": "http://www.shejiinn.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线接收短信 | 100% Working Temporary Phone Numbers for testing",
+   "url": "https://ch.freephonenum.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "无需手机验证 WhatsApp 或者 Facebook - 无需SIM卡或手机验证 | mytrashmobile.com",
+   "url": "https://zh.mytrashmobile.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Receive SMS online for Free - without a Phone or Registration",
+   "url": "https://sms-online.co/receive-free-sms",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线免费接收短信 | mytrashmobile.com",
+   "url": "https://zh.mytrashmobile.com/received",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "可以在线接收短信的国家,在线接收短信验证码 - 云短信",
+   "url": "https://yunduanxin.net/Countries/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线云短信网页版 - 免费接码平台",
+   "url": "http://www.z-sms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Free Receive SMS Online - GetFreeSMSNumber",
+   "url": "https://getfreesmsnumber.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线接收免费短信·7SIM.NET",
+   "url": "http://7sim.net/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费在线接收短信-英国，罗马尼亚，美国，西班牙，法国，德国，俄罗斯",
+   "url": "http://receive-sms-online.info/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Receiveasms.com-在线获取您的SMS消息",
+   "url": "https://receiveasms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费在线接收短信，免费在线接收短信，验证码临时电话",
+   "url": "https://temporary-phone-number.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "在线接收短信| 免费短信验证",
+   "url": "https://www.receivesms.co/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "接收免费短信| 在线接收短信",
+   "url": "https://receivefreesms.net/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Receive SMS online - France, Germany, Romania, Spain, United Kingdom, USA, and more ...",
+   "url": "https://sms-receive.net/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "ReceiveSMS.NET-在线接收SMS",
+   "url": "https://www.receivesms.net/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Receive SMS Online-cn - | PingMe.tel 免费接码平台",
+   "url": "https://pingme.tel/receive-sms-online-cn/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费接短信,在线接收短信验证码 - 短信云接收",
+   "url": "https://www.zusms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "免费接码平台-在线接收云短信验证码-Receive SMS Online China",
+   "url": "http://www.xnsms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "zero接码平台 - 零码 - 免费接码 - 免费短信验证码接收平台 - Free SMS Receive China And UK - 区块链",
+   "url": "https://xinghai.party/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "LotHelper|Free SMS Receiver|免费接码|免费手机号|免费短信验证码",
+   "url": "https://www.lothelper.com/cn",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 短信",
+   "title": "Send Free SMS | Free Text Messages Worldwide",
+   "url": "https://www.afreesms.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "美国地址生成，美国人虚构信息生成-世界各国虚拟身份信息、地址、信用卡生成",
+   "url": "http://www.haoweichi.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "在线个人信息生成器-随机个人信息在线生成工具",
+   "url": "http://www.jsons.cn/randuserinfo",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "Generate a Random Name - Fake Name Generator",
+   "url": "https://www.fakenamegenerator.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "Fake Name Generator | FauxID.com",
+   "url": "https://fauxid.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "Secure Fake Name Creator | fakena.me",
+   "url": "https://fakena.me/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "SSN Verification & Lookup Tool | SSN-Verify.com",
+   "url": "https://www.ssn-verify.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "免费的SSN生成器| SSN-Verify.com",
+   "url": "https://www.ssn-verify.com/generate",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 身份",
+   "title": "美国身份证生成",
+   "url": "https://www.shenfendaquan.com/",
+   "desc": ""
+  },
+  {
+   "category": "接码与临时身份",
+   "sub": "虚拟信息 / 帐号",
+   "title": "谷姐靓号网-最专业的Google Voice靓号销售网站",
+   "url": "https://www.goojie.eu/",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "游戏 / 交易",
+   "title": "海外服游戏币比价器及交易担保",
+   "url": "http://www.bijiaqi.com/#stock",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "游戏 / 交易",
+   "title": "Z2U网络游戏交易平台",
+   "url": "https://www.z2u.com/",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "游戏 / 交易",
+   "title": "G2G: World Leading Digital Marketplace Platform",
+   "url": "https://www.g2g.com/",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "游戏 / 交易",
+   "title": "悠悠游戏服务网uu898.com",
+   "url": "https://www.uu898.com/",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "游戏 / 交易",
+   "title": "DD373.com",
+   "url": "https://www.dd373.com/",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "破解软件",
+   "title": "RuTracker.org",
+   "url": "http://rutracker.org/forum/index.php",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "破解软件",
+   "title": "亿破姐",
+   "url": "https://www.ypojie.com/",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "破解软件",
+   "title": "乐享网",
+   "url": "https://www.lxapk.com/",
+   "desc": ""
+  },
+  {
+   "category": "破解与账号交易",
+   "sub": "破解软件",
+   "title": "吾爱破解",
+   "url": "https://www.52pojie.cn/member.php?mod=LSG_52register",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "白夜地址页，收藏我回家不迷路！",
+   "url": "https://www.by78.top/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "2DFan",
+   "url": "https://www.2dfan.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "2DFan",
+   "url": "https://2dfan.org/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "(*´∇｀*) 被你发现啦~",
+   "url": "https://cn.tiangal.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "维咔VikACG[V站]",
+   "url": "https://www.vikacg.com/resources/game",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "忧郁的loli_忧郁的弟弟",
+   "url": "https://www.ttloli.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "acgbuster发布页",
+   "url": "https://www.acgcbk.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "Q发发ACG资源网",
+   "url": "https://acg.htizi.com:8443/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "TouchGal 里世界",
+   "url": "https://dark.touchgal.co/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "GGBases-galgame BT/磁力链结下载仓库!(72729)",
+   "url": "https://www.ggbases.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "Otomi Games",
+   "url": "https://otomi-games.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "黄油游戏网站汇总",
+   "url": "https://dl666123.github.io/post/huang-you-you-xi-wang-zhan-hui-zong.html",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "真红小站",
+   "url": "https://www.shinnku.org/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "游戏 / H游戏",
+   "title": "彼岸星露-羽ACG-叶千羽",
+   "url": "https://seve.yugal.cc/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "艾利浩斯学院图书馆导航页",
+   "url": "https://alhs.live/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "PO18 臉紅心跳",
+   "url": "https://www.po18.tw/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "可穿戴科技",
+   "url": "https://wt.tepis.me/#",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "蔷薇后花园和黑沼泽俱乐部的最新地址",
+   "url": "https://doll-houhuayuan.github.io/latest_address/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "黑沼泽俱乐部-调教小说",
+   "url": "https://zhaoze.icu/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "肉文np-免费全本小说阅读网",
+   "url": "https://www.rouwennp.club/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "翻墙撸",
+   "url": "https://www.fanqianglu.com/free/cnnovel",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "肉肉屋_自由的小说阅读网",
+   "url": "https://www.rourouwu.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "肉文屋-免费小说无弹窗阅读",
+   "url": "https://www.c6k6.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "寂寞书屋→带你走出寂寞",
+   "url": "http://www.jmshuwu.net/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "色情小说-亚洲色吧",
+   "url": "https://yazhouse8.com/article.php",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "ESJ Zone",
+   "url": "https://www.esjzone.cc/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "全部小说小说-全部小说小说大全-18文学",
+   "url": "https://wap.po18.in/sort/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "八叉书库地址发布页，收藏我回家不迷路！",
+   "url": "https://8xsk.org/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "爱丽丝书屋发布页",
+   "url": "https://alicesw.click/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "小说 / H小说",
+   "title": "爱丽丝书屋",
+   "url": "https://www.alicesw.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "Hanime1.me - H动漫/里番/线上看",
+   "url": "https://hanime1.me/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "里番收藏夹 - 里番收藏夹官网",
+   "url": "http://lvmaojun.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "松鼠症倉庫-發佈頁",
+   "url": "http://riven.cfd/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "琉璃神社 ★ HACG.me",
+   "url": "https://www.liuli.cat/wp/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "nhentai",
+   "url": "https://nhentai.net/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "ACG.RW",
+   "url": "https://www.acgrw.net/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "H二次元动画",
+   "url": "https://m1.h18ani9.vip/v/138911-1-1/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "XVIDEOS",
+   "url": "https://www.xvideos.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "E-Hentai Forums",
+   "url": "https://forums.e-hentai.org/index.php",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "电子无尽画廊",
+   "url": "https://e-hentai.org/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "xHamster",
+   "url": "https://xhamster15.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "中文字幕第一页",
+   "url": "https://www.178sv.com/index.html",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "PicAcg-哔咔漫画下载",
+   "url": "https://download2.picacomiccn.xyz/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "哔咔漫画",
+   "url": "https://www.picacomic.com/",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "卡通片 色情视频 | xHamster",
+   "url": "https://zh.xhamster.com/categories/cartoon",
+   "desc": ""
+  },
+  {
+   "category": "成人内容",
+   "sub": "动漫 / 成人",
+   "title": "jmcomicgo.org",
+   "url": "https://jmcomicgo.org/",
+   "desc": ""
   }
  ]
 }

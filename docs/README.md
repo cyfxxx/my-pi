@@ -69,7 +69,7 @@
 
 | 文档 | 内容 |
 |------|------|
-| [reference/WEB-INDEX.md](reference/WEB-INDEX.md) | **外部网页资源索引**（690 条，按 9 类分节）：平时查资料时的定位入口；机器可读版为 `reference/web-index.json`（`{category,sub,title,url}`）。同目录 [reference/README.md](reference/README.md) 写明**隐私过滤纪律**（个人账号/内网地址/跟踪参数等如何剔除）。注意：很多条需外部网络才能访问，**打不开不等于失效** |
+| [reference/WEB-INDEX.md](reference/WEB-INDEX.md) | **外部网页资源索引**（821 条，按 13 类分节）：平时查资料时的定位入口。每条预留**说明位**（使用时逐步补充，约定见文首）；机器可读版为 `reference/web-index.json`（`{category,sub,title,url,desc}`）。同目录 [reference/README.md](reference/README.md) 写明**隐私过滤纪律**（个人账号/内网地址/跟踪参数等如何剔除）及「内容取舍 vs 隐私过滤」的区分。注意：很多条需外部网络才能访问，**打不开不等于失效** |
 
 ### 项目主文档（仓库根）
 
