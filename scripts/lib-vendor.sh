@@ -53,6 +53,43 @@ node_version_ok() {
   _pi_version_ok "$maj" "$min" "$pat"
 }
 
+# 校验某个 node 可执行文件存在且版本达标。用法：_pi_node_ok <路径或命令名>
+_pi_node_ok() {
+  [ -x "$1" ] || command -v "$1" >/dev/null 2>&1 || return 1
+  local v maj min pat
+  v="$("$1" -v 2>/dev/null)" || return 1
+  v="${v#v}"
+  maj="${v%%.*}"; v="${v#*.}"; min="${v%%.*}"; pat="${v#*.}"; pat="${pat%%-*}"
+  case "${maj}" in ""|*[!0-9]*) return 1 ;; esac
+  case "${min}" in ""|*[!0-9]*) min=0 ;; esac
+  case "${pat}" in ""|*[!0-9]*) pat=0 ;; esac
+  _pi_version_ok "$maj" "$min" "$pat"
+}
+
+# 解析出一个**可用的** node，打印其路径；找不到时返回 1 且不打印。
+#
+# 为什么要这个（真实事故，两次同源）：
+#   * 构建期只比主版本 → 22.14.0 被放行、构建中途崩（bug-027）
+#   * **运行期/守门期直接写裸 `node`** → PATH 上没有 node 时命令退出码 127，
+#     调用方若把"任何非 0"当成"内容有问题"，就会把「工具缺失」误报成「内容漂移」
+#     （bug-030 的同型：把 129「读不了」误报成「有改动」）。
+# 故此处统一口径：**先解析出满足下限的可执行文件**，调用方一律用它，不再裸调 node。
+#
+# 优先级：MY_PI_NODE（显式指定，便携启动器用）→ 便携布局 → PATH。
+# 便携布局按"与仓库同级的 runtime/node/"找（本盘布局：工具分区 /runtime/node）。
+pi_resolve_node() {
+  local c
+  if [ -n "${MY_PI_NODE:-}" ] && _pi_node_ok "$MY_PI_NODE"; then
+    printf '%s' "$MY_PI_NODE"; return 0
+  fi
+  local root="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  for c in     "$root/../runtime/node/node" "$root/../runtime/node/node.exe"     "$root/runtime/node/node" "$root/runtime/node/node.exe"; do
+    if _pi_node_ok "$c"; then printf '%s' "$c"; return 0; fi
+  done
+  if _pi_node_ok node; then printf '%s' node; return 0; fi
+  return 1
+}
+
 # 打印 Node 版本不达标的升级指引（build.sh / doctor.sh 共用，保持口径一致）
 node_version_hint() {
   echo "  当前：$(node -v 2>/dev/null || echo '未找到 node')；要求：Node.js >= ${PI_NODE_MIN}" >&2

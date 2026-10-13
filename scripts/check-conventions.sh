@@ -23,6 +23,16 @@ ok()   { echo "  ✓ $1"; }
 bad()  { echo "  ❌ $1"; FAIL=$((FAIL + 1)); }
 note() { echo "     $1"; }
 
+# Node 解析：本文件有 4 处要跑 .mjs，**不得裸调 node** —— PATH 上没有 node 时命令退出码 127，
+# 若把"任何非 0"当成"内容有问题"，就会把「工具缺失」误报成「内容漂移」（两个方向相反，见 bug-030/037）。
+. "$(dirname "${BASH_SOURCE[0]}")/lib-vendor.sh"
+NODE_BIN="$(pi_resolve_node || true)"
+if [ -z "$NODE_BIN" ]; then
+  echo "❌ 未找到可用 node（要求 >= ${PI_NODE_MIN}）——本守门需要它跑 .mjs"
+  command -v node >/dev/null 2>&1 && node_version_hint
+  exit 1
+fi
+
 echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对 / F 隐私边界） ==="
 
 # ── A. 运行时/每环境状态不入库 ──
@@ -242,7 +252,7 @@ done
 # JSON 语法合法性（2026-10-10 补的守门缺口）：packs/**、scripts/**、sync/** 下我们自己写的 .json。
 # 起因：一份**非法 JSON** 的 `packs/security-baseline/tiers.json` 一路提交成功 —— 因为**没有任何守门
 # 检查 JSON 语法**（文档链接/约定/死导出都不管它）。用 node 解析，跨平台、无外部依赖。
-if node -e '
+if "$NODE_BIN" -e '
   const fs=require("fs"),path=require("path");
   const walk=(d,out=[])=>{let es=[];try{es=fs.readdirSync(d)}catch{return out}
     for(const n of es){const f=path.join(d,n);let st;try{st=fs.statSync(f)}catch{continue}
@@ -260,21 +270,21 @@ else
 fi
 
 if [ -f scripts/knowledge-compile.mjs ]; then
-  if node scripts/knowledge-compile.mjs --check >/dev/null 2>&1; then
+  if "$NODE_BIN" scripts/knowledge-compile.mjs --check >/dev/null 2>&1; then
     ok "知识库与源证据一致（docs/knowledge/）"
   else
     bad "docs/knowledge/ 已漂移（跑 node scripts/knowledge-compile.mjs --update 后提交）"
   fi
 fi
 if [ -f scripts/gen-doc-index.mjs ]; then
-  if node scripts/gen-doc-index.mjs --check >/dev/null 2>&1; then
+  if "$NODE_BIN" scripts/gen-doc-index.mjs --check >/dev/null 2>&1; then
     ok "知识索引与源文档一致（docs/INDEX.md）"
   else
     bad "docs/INDEX.md 已漂移（跑 node scripts/gen-doc-index.mjs --update 后提交）"
   fi
 fi
 if [ -f scripts/gen-changes-ledger.mjs ]; then
-  if node scripts/gen-changes-ledger.mjs --check >/dev/null 2>&1; then
+  if "$NODE_BIN" scripts/gen-changes-ledger.mjs --check >/dev/null 2>&1; then
     ok "改动台账与 git 历史一致（docs/CHANGES.jsonl）"
   else
     bad "docs/CHANGES.jsonl 已漂移（跑 node scripts/gen-changes-ledger.mjs --update 后提交）"
