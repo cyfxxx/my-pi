@@ -675,34 +675,62 @@ def cmd_probe(args, cfg, rec: RunRecorder) -> dict:
     return {"roots": [str(r) for r in roots], "strategies": counts}
 
 
+def latest_probes(probes: list[dict]) -> list[dict]:
+    """把探测记录**按 book_id 去重**，每条取最后一次。
+
+    为什么需要（2026-10-13 实测）：`_probe.jsonl` 是**追加式日志**（每次 probe 都往后写），
+    而 report 原先直接 `len(probes)` 当书数。连续跑两次 probe 后，报告写出
+    "书库：2573 本 / 210.12 GB"，而真实是 1280 本 / 104.53 GB —— **数字翻倍且没有提示**。
+    日志追加本身是对的（要留历史），错的是"把日志行数当书籍数"。
+    去重后取最后一条，顺带让早期失败记录（如装 PyMuPDF 之前的 MissingPdfLib）
+    被后续成功记录覆盖，不再污染统计。
+    """
+    latest: dict[str, dict] = {}
+    for r in probes:
+        key = r.get("book_id")
+        if not key:
+            continue
+        latest[key] = r
+    return list(latest.values())
+
+
 def cmd_report(args, cfg, rec: RunRecorder) -> dict:
     out = Path(args.out)
     probes = read_jsonl(out / "_probe.jsonl")
     if not probes:
         raise SystemExit("尚无 _probe.jsonl：先跑 probe")
+    books = latest_probes(probes)
     strategies: dict[str, int] = {}
     fmts: dict[str, int] = {}
-    for r in probes:
+    for r in books:
         strategies[r.get("strategy", "?")] = strategies.get(r.get("strategy", "?"), 0) + 1
         fmts[r.get("format", "?")] = fmts.get(r.get("format", "?"), 0) + 1
     idx = sorted((out / "index").glob("*.jsonl")) if (out / "index").exists() else []
     idx_rows = sum(len(read_jsonl(p)) for p in idx)
     cache_files = sorted((out / "cache").glob("*/*.txt")) if (out / "cache").exists() else []
     cache_chars = sum(p.stat().st_size for p in cache_files)
+    total_mb = sum(r.get("size_mb", 0) or 0 for r in books)
     lines = [
         "# 书籍知识库 · 探测报告",
         "",
         f"- 生成时间：{now_iso()}    角色：`{cfg.get('role')}`    设备：`{hostname()}`",
         f"- 记录目录：`{out}`",
-        f"- 书库：{len(probes)} 本 / {sum(r.get('size_mb', 0) for r in probes) / 1024:.2f} GB",
+        f"- 书库：{len(books)} 本 / {total_mb / 1024:.2f} GB",
         f"- 格式：{', '.join(f'{k}×{v}' for k, v in sorted(fmts.items()))}",
         f"- 建议策略：{', '.join(f'{k}×{v}' for k, v in sorted(strategies.items()))}",
         f"- 已建索引：{len(idx)} 本 / {idx_rows} 章；已缓存：{len(cache_files)} 段 / {cache_chars / 1024:.1f} KB",
+    ]
+    if len(probes) != len(books):
+        lines.append(
+            f"- 注：探测日志共 {len(probes)} 行，按 book_id 去重后为 {len(books)} 本"
+            f"（日志是追加式的，重复跑 probe 会留历史；统计以去重结果为准）"
+        )
+    lines += [
         "",
         "| book_id | 页 | 目录条 | 文字层 | 体积MB | 策略 | 标题 |",
         "|---|---:|---:|:--:|---:|---|---|",
     ]
-    for r in sorted(probes, key=lambda x: x.get("strategy", "")):
+    for r in sorted(books, key=lambda x: (x.get("strategy", ""), x.get("book_id", ""))):
         lines.append(
             f"| `{r['book_id']}` | {r.get('pages', '?')} | {r.get('outline_entries', 0)} | "
             f"{'有' if r.get('text_layer') else '无'} | {r.get('size_mb', 0)} | {r.get('strategy')} | {r.get('title', '')} |"
@@ -712,7 +740,8 @@ def cmd_report(args, cfg, rec: RunRecorder) -> dict:
         (out / "_report.md").write_text(text, encoding="utf-8")
     rec.bump("reported")
     log(text)
-    return {"books": len(probes), "index_files": len(idx), "cache_files": len(cache_files)}
+    return {"books": len(books), "probe_lines": len(probes),
+            "index_files": len(idx), "cache_files": len(cache_files)}
 
 
 # ── selftest：零外部依赖的自检（合成 PDF） ─────────────────────────────────
@@ -811,6 +840,18 @@ def cmd_selftest(args, cfg, rec: RunRecorder) -> dict:
 
         rep = cmd_report(argparse.Namespace(out=str(out), dry_run=False), cfg2, rec)
         check("report 汇总探测/索引/缓存", rep["books"] == 2 and (out / "_report.md").exists())
+
+        # 回归（2026-10-13 实测缺陷）：`_probe.jsonl` 是**追加式日志**，而 report 原先直接数行，
+        # 导致重复跑 probe 后「书库 N 本」翻倍（实测 1280 本被报成 2573 本 / 210.12 GB）。
+        # 这里再跑一次 probe（日志必然翻倍），断言 report 仍报**去重后**的书籍数。
+        cmd_probe(argparse.Namespace(root=str(library), out=str(out), limit=None, json=False, dry_run=False), cfg2, rec)
+        probe_lines = len(read_jsonl(out / "_probe.jsonl"))
+        rep2 = cmd_report(argparse.Namespace(out=str(out), dry_run=False), cfg2, rec)
+        check(
+            "probe 日志翻倍后 report 仍报去重后的书籍数（不翻倍）",
+            probe_lines > 2 and rep2["books"] == 2 and rep2["probe_lines"] == probe_lines,
+            f"日志 {probe_lines} 行 → 报告 {rep2['books']} 本",
+        )
         # run log 由 main() 在命令结束后写入 → 这里用临时 recorder 验证同一机制（字段/计数/耗时）
         probe_rec = RunRecorder(Path(rec.out), "selftest-probe", cfg2, ["selftest"], False)
         probe_rec.bump("demo", 2)
