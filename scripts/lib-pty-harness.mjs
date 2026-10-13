@@ -39,6 +39,15 @@ export function sleep(ms) {
  * 场景运行环境自检：返回**不可运行的原因**（null = 可运行）。
  * 缺 util-linux 的 script/stty、或 vendor/pi dist 未构建时，调用方应打印 SKIP 并 exit 0，
  * 让调用方在日志里看到 SKIP，而不是悄悄变绿（与 test-web-terminal.mjs 的处理一致）。
+ *
+ * 关于 Windows/git-bash（2026-10-13 实测，供后人参考，避免重查）：
+ *   本 harness 用 `script -q -e -f -E never -c <cmd> /dev/null` 分配 pty，这是 **util-linux 专有**的。
+ *   Windows 的 Git for Windows 不提供 `script`（`/usr/bin` 下只有 stty.exe），故两个场景在此平台
+ *   必然 SKIP。已探过的替代方案都不可用：
+ *     · `winpty`（Git for Windows 自带 0.4.3）—— 一跑就 `Assertion failed`，且它是为**真控制台**
+ *       设计的，与本 harness 基于管道 stdio 的架构不兼容；
+ *     · 无 `unbuffer` / `expect`。
+ *   若要在 Windows 上跑这两个场景，需要另写一套基于 ConPTY 的实现（属独立工作，未做）。
  */
 export function ptyUnavailableReason({ cli = PI_CLI } = {}) {
   if (!existsSync(cli)) return `未构建 vendor/pi dist（先 bash scripts/build.sh）：${cli}`;
