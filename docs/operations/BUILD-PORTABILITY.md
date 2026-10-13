@@ -355,6 +355,61 @@ env -i SYSTEMROOT='C:\WINDOWS' \
 每台新机器需登记：`git config --global --add safe.directory <挂载点>/my-pi`
 （及其 `vendor/pi` 子仓库）。这与 exFAT 的属主问题同源，但触发原因不同。
 
+### 4.4 运行期的 Node 版本守门（§1 的漏网处）
+
+**§1 守的是构建期。运行期此前没有同口径守门**，于是同一个"Node 太旧"前提在运行期漏了：
+
+`pi-supervisor.sh` 各处直接写裸 `node`。当机器 PATH 上存在一个过旧 node 时
+（本机 `D:\App_X\Node` = **22.14.0**），`my-pi.sh` 能**正常启动、进入 TUI**，
+然后在收到 `Content-Encoding: zstd` 的 HTTP 响应时崩：
+
+```
+TypeError: zlib.createZstdDecompress is not a function
+    at .../undici/lib/web/fetch/index.js:2310
+```
+
+根因：`vendor/pi/node_modules/undici` **8.10.2** 解 zstd 响应时**无条件**调用
+`zlib.createZstdDecompress`，而该 API 要 **Node 22.15+**。实测对照：
+
+| node | `typeof zlib.createZstdDecompress` |
+|---|---|
+| 22.23.3（便携版） | `function` |
+| 22.14.0（宿主 PATH 上那个） | `undefined` → 崩 |
+
+**报错点离根因极远**（看起来像 pi 或网络层的 bug），且**只在服务器恰好用 zstd 压缩响应时发作**。
+
+#### 已做的修复
+
+`scripts/pi-supervisor.sh` 新增 `_pi_node_ok()` 与 `NODE_BIN` 解析器，优先级：
+
+1. `MY_PI_NODE` 环境变量（由 `run-my-pi.ps1` 传入盘内 node 的绝对路径）
+2. 便携布局 `<仓库>/../runtime/node/node`
+3. PATH 上的 `node`
+
+选中的可执行文件**必须通过版本校验**（复用 `lib-vendor.sh` 的 `_pi_version_ok`），
+通过后 `export NODE_BIN` 供所有子进程继承；无一个达标时用 `node_version_hint`
+打印升级指引并退出 —— **宁可拒绝启动，也不要启动后在使用中崩**。
+
+**一个必须注意的顺序问题（实测踩到）**：解析器必须放在**任何 node 调用之前**，
+包括 `scripts/pi-supervisor.sh` 的 **package 子命令直通**（`install|remove|uninstall|list|update`
+的 `exec`）。放晚了在 `set -u` 下会报 `NODE_BIN: unbound variable`。
+
+#### 可重跑证据
+
+```bash
+# 判据本身
+node -e "console.log(typeof require('zlib').createZstdDecompress)"   # 要 function
+
+# 正常路径（应打印 [supervisor] node: ... (v22.23.3) 且退出码 0）
+bash -c 'MY_PI_NODE=/g/runtime/node/node.exe ./my-pi.sh --version'
+
+# 反证：只有旧 node 时应在启动前即拒绝
+env MY_PI_NODE= PATH="/d/App_X/Node:/usr/bin:/mingw64/bin" bash -c './my-pi.sh --version'
+```
+
+> 相关：这是失败模式 **bug-034**；与 **bug-027**（构建期 minor 版本守门）同源，
+> 即"同一个版本前提在一处挡了、在另一处漏了"。
+
 ---
 
 ## 5. 预防：为什么这三条被写成守门而不是文档提醒

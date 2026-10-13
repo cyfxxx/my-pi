@@ -163,6 +163,19 @@ $pathMsys = ($pathParts -join ':')
 
 $quoted = ($PiArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
 
+# ★ 把 node 绝对路径显式交给 supervisor（MY_PI_NODE）。
+# 仅靠 PATH 不可靠：实测在便携 bash 里裸 `node` 会解析到宿主 PATH 上的旧版本
+# （本机 D:\App_X\Node = 22.14.0），而运行期崩溃点是
+#   zlib.createZstdDecompress is not a function   (undici 解 zstd 响应)
+# 项目要求 Node >= 22.19。pi-supervisor.sh 会校验并采用 MY_PI_NODE。
+if ($nodeDir -and (Test-Path (Join-Path $nodeDir 'node.exe'))) {
+    $env:MY_PI_NODE = (Resolve-Path -LiteralPath (Join-Path $nodeDir 'node.exe')).Path
+}
+# 同时把便携 node 目录前置到 PATH，供 supervisor 之外的子进程使用
+if ($nodeDir -and (Test-Path $nodeDir)) {
+    $env:PATH = "$nodeDir;$env:PATH"
+}
+
 # ★ 关键：bash -c（非登录）+ 显式 PATH。不可用 -l，见文件头说明。
 $inner = "cd '$repoMsys' && ./my-pi.sh $quoted"
 if ($pathMsys) { $inner = "export PATH='$pathMsys':`$PATH; $inner" }

@@ -44,7 +44,6 @@
 {"kind":"change","commit":"153a4514f","ts":"2026-10-08","subject":"docs(subagent): S1 完成 —— new_session 隔离确定性验证通过 + 纯冷启动 19.1s","files":["docs/design/SUBAGENT-POOL.md"],"heldOut":false}
 {"kind":"change","commit":"d57d3b5f0","ts":"2026-10-08","subject":"docs(subagent): 记 S1 实测进展 —— 热复用省 63%，但隔离结论未验证（附方法论纠错）","files":["docs/design/SUBAGENT-POOL.md"],"heldOut":false}
 {"kind":"change","commit":"9af403909","ts":"2026-10-08","subject":"docs(subagent): 立项文档 —— 常驻 RPC 池（对照 DSH 的最优优化）","files":["docs/design/SUBAGENT-POOL.md"],"heldOut":false}
-{"kind":"change","commit":"97ad9f165","ts":"2026-10-08","subject":"docs(browser): 把 __name 插桩的坑写进 README + 加 AST 守门（防第二次踩）","files":["custom/features/browser/README.md","custom/features/browser/__tests__/evaluate-no-named-functions.test.ts"],"heldOut":false}
 {"kind":"rejected","ts":"2026-10-08","proposal":"[2026-10-08] 三个未迁移子系统：**都不迁移**（用户批复第 3 项），但理由各不相同且都是实测","reason":"听起来很合理，**一验就被否掉**（剥掉前缀后 47 → 46 对，最高相似度仍 0.58–0.63）。","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-07","proposal":"[2026-10-07] fork 池化实测不成立：`new_session {parentSession}` 会\"收下但不分叉\"","reason":"`new_session {parentSession}`）需要各自验证，且复用键得带上父会话路径，本轮不做。","evidence":"","source":"DECISIONS.md"}
 {"kind":"rejected","ts":"2026-10-07","proposal":"[2026-10-07] 调研：重型工具\"只给子代理\"与 `deferred` + `tool_search` 两条路的实测结论（**暂不采用**）","reason":"并防止缓存失效。要求先分析可行性。查证过程分四步，最后一步的实测把方案否掉了。","evidence":"","source":"DECISIONS.md"}

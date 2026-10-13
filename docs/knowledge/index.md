@@ -6,7 +6,7 @@
 > 每页四件事：是什么 / 根因 / **确切命令序列** / **含确切语法的解法**；篇幅 **10–30 行**；只记可泛化的。
 > **本产物不自动进模型上下文、不改任何运行时行为**，只供人审阅。
 
-## 失败模式（33 条，来源：`docs/BUG-REPLAYS.md`）
+## 失败模式（34 条，来源：`docs/BUG-REPLAYS.md`）
 
 - [bug-001](patterns/bug-001.md): 切了模式、重启后没生效 + `modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` + `check-conventions`（状态不入库）+ 状态体检 `modes-legacy-current`；模式状态已迁到 gitignored 的 `modes-sessions.json`
 - [bug-002](patterns/bug-002.md): 模式解析"第 3 轮工厂执行后漂回 full" + `PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 + `mode-switch.test.ts` 的三轮回归 + `resolveStartupMode()` 单一写入点
@@ -41,6 +41,7 @@
 - [bug-031](patterns/bug-031.md): **便携工具链用 `bash -l` ⇒ 换机器后核心命令全没了** + 把 Git for Windows 复制到 U 盘做「盘内自带 bash」时，若以登录 shell 调用（`bash -lc` 或带 `-l`），便携 Git 的 `/etc/profile` 会注入**原安装机器的绝对路径**（如 `/d/App_X/Git/usr/bin`）⇒ 换到别的机器后 `dirname` / `mkdir` / `tail` 全部 `command not found`，`my-pi.sh` 第 7、16 行当场崩。**报错点离根因极远**：看起来像脚本有 bug，实为调用姿势问题。注意 `bash -c`（非登录）时 MSYS 会自行补 `/usr/bin`，核心工具正常可用——所以「本机能跑」不能证明「换机器也能跑」 + **已硬化为 `scripts/run-my-pi.ps1` 的唯一调用姿势**：`bash -c`（非登录）+ **显式 PATH** 指向便携工具链的 `usr/bin` `mingw64/bin` `cmd` 与 node 目录；实测 `env -i` 下完全零外部依赖通过；详见 `docs/operations/BUILD-PORTABILITY.md` §4.3
 - [bug-032](patterns/bug-032.md): **VeraCrypt 挂载的卷在 `Get-Volume` 里看不见 ⇒ 盘符探测静默落空（还被 `$ErrorActionPreference='Stop'` 放大成整体中断）** + 给便携启动器写「遍历所有卷找仓库」的逻辑时，`Get-Volume` **不列出 VeraCrypt 挂载的卷**（实测漏掉 M:），却会列出 0 容量的幽灵卷（如 H:）⇒ 对幽灵卷 `Join-Path` 抛 `DriveNotFoundException`；若脚本开头设了 `$ErrorActionPreference='Stop'`，该异常会**终止整个探测循环**，于是从仓库外启动时报「找不到仓库」，从仓库内启动却正常（`$PSScriptRoot` 短路了探测）——**故障只在特定入口出现**，极易误判成脚本逻辑错 + **已硬化**：`scripts/run-my-pi.ps1` 改为 `Get-PSDrive` 枚举 + 逐盘符 `Test-Path -LiteralPath` + `try/catch`，并**刻意不设** `$ErrorActionPreference='Stop'`（文件头注明原因）；找不到时给出「加密卷可能未挂载」的可操作提示而非静默失败；详见 `docs/operations/BUILD-PORTABILITY.md` §4.3
 - [bug-033](patterns/bug-033.md): **台账表格被空行割裂 ⇒ 下游按行解析会静默漏条** + `docs/BUG-REPLAYS.md` 的台账表在若干行之间插了空行（本文件 L53/L55 曾是），Markdown 渲染仍连成一张表，但**任何按「行以竖线开头」解析的工具都会把它当成多张表**——`knowledge-compile.mjs` 的 `readIncidents()` 正是这种逐行解析，漏掉的条目不会报错、只会静默少生成 pattern 页。属「格式看起来没问题、但机器读法与人眼读法不一致」的隐患 + **本次已修**（删除表格内 3 处空行，台账恢复为一张连续表）；**无自动守门**——建议后续给 `check-conventions.sh` 加一条「台账表体内不得出现空行」，否则同类割裂会再次静默漏条
+- [bug-034](patterns/bug-034.md): **Node 版本守门只在构建期、运行期没有 ⇒ 启动成功却在使用中崩（zstd 解压）** + `build.sh` 第 1 步与 `doctor.sh` 都有 Node >= 22.19 的逐段版本守门，但**运行期**没有同口径守门——`pi-supervisor.sh` 各处直接写裸 `node`。于是机器 PATH 上存在一个过旧 node 时（实测 `D:\App_X\Node` = 22.14.0），`my-pi.sh` 能正常启动、进入 TUI，然后在遇到 `Content-Encoding: zstd` 的 HTTP 响应时崩：`TypeError: zlib.createZstdDecompress is not a function`（`vendor/pi/node_modules/undici` 8.10.2 的 `fetch/index.js` 解 zstd 时**无条件**调用它，而该 API 要 Node 22.15+）。**报错点离根因极远**：看起来像 pi 自身或网络层有 bug。属第 27 条的同源延伸——同一个"版本前提"在构建期挡住了，在运行期漏了 + **已硬化**：`scripts/pi-supervisor.sh` 新增 `_pi_node_ok()` 与 `NODE_BIN` 解析器（优先级 `MY_PI_NODE` → 便携布局 `<ROOT>/../runtime/node/` → PATH），**放在任何 node 调用之前**（含 package 子命令直通，否则 `set -u` 下 `NODE_BIN: unbound variable`），校验通过后 `export NODE_BIN` 供子进程继承，不达标时用 `lib-vendor.sh` 的 `node_version_hint` 打印升级指引；`run-my-pi.ps1` 负责传入 `MY_PI_NODE`；详见 `docs/operations/BUILD-PORTABILITY.md` §4.4
 
 ## 被否提案（7 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 

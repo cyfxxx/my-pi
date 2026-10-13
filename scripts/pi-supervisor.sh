@@ -58,6 +58,56 @@ export PI_MEMORY_DIR="${PI_MEMORY_DIR:-$ROOT/portable/memory}"
 # 防 settings 被覆盖/重置后静默恢复上报。
 export PI_TELEMETRY=0
 
+
+# ── Node 解析：不许裸调 node ──────────────────────────────────────────────
+# 项目要求 Node >= 22.19（见 scripts/lib-vendor.sh 的 PI_NODE_MIN 与 build.sh 第 1 步守门），
+# 但**运行期**此前没有同口径守门：本文件各处直接写 `node`，于是机器 PATH 上存在一个过旧 node
+# 时（实测 22.14.0），启动会成功、随后在收到 Content-Encoding: zstd 的响应时崩：
+#   TypeError: zlib.createZstdDecompress is not a function
+#     at vendor/pi/node_modules/undici/lib/web/fetch/index.js
+# （undici 8.x 解 zstd 时无条件调用它，而该 API 在 Node 22.15+ 才有。）
+# 报错点离根因极远，故此处显式解析并校验，且导出给所有子进程继承。
+. "$ROOT/scripts/lib-vendor.sh"
+
+_pi_node_ok() {  # $1 = node 可执行文件；版本达标返回 0
+  [ -x "$1" ] || command -v "$1" >/dev/null 2>&1 || return 1
+  local v maj min pat
+  v="$("$1" -v 2>/dev/null)" || return 1
+  v="${v#v}"
+  maj="${v%%.*}"; v="${v#*.}"; min="${v%%.*}"; pat="${v#*.}"; pat="${pat%%-*}"
+  case "${maj}" in ""|*[!0-9]*) return 1 ;; esac
+  case "${min}" in ""|*[!0-9]*) min=0 ;; esac
+  case "${pat}" in ""|*[!0-9]*) pat=0 ;; esac
+  _pi_version_ok "$maj" "$min" "$pat"
+}
+
+NODE_BIN=""
+if [ -n "${MY_PI_NODE:-}" ] && _pi_node_ok "$MY_PI_NODE"; then
+  NODE_BIN="$MY_PI_NODE"
+  # 显式指定的可执行文件目录放到 PATH 最前，子进程里的裸 node 也走同一份
+  PATH="$(cd "$(dirname "$MY_PI_NODE")" && pwd):$PATH"; export PATH
+fi
+if [ -z "$NODE_BIN" ]; then
+  # 便携布局：与仓库同级（同盘）或 ROOT 下的 runtime/node/
+  for c in "$ROOT/../runtime/node/node" "$ROOT/runtime/node/node" "$ROOT/../runtime/node/node.exe" "$ROOT/runtime/node/node.exe"; do
+    if _pi_node_ok "$c"; then NODE_BIN="$c"; break; fi
+  done
+fi
+if [ -z "$NODE_BIN" ] && command -v node >/dev/null 2>&1 && _pi_node_ok node; then
+  NODE_BIN=node
+fi
+if [ -z "$NODE_BIN" ]; then
+  echo "❌ 未找到满足要求的 Node.js（需要 >= ${PI_NODE_MIN}）" >&2
+  node_version_hint
+  echo "  提示：可用 MY_PI_NODE=<node 绝对路径> 显式指定；" >&2
+  echo "        或把便携 Node 放到 <工具分区>/runtime/node/（便携布局会自动采用）。" >&2
+  exit 1
+fi
+export NODE_BIN
+if [ "$NODE_BIN" != "node" ]; then
+  echo "[supervisor] node: $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null))" >&2
+fi
+
 # ── 包管理子命令直通（install/remove/uninstall/list/update）──
 # pi 的包管理分发要求 argv[0] 就是子命令本身（package-manager-cli.ts 的
 # parsePackageCommand 直接取 args[0]，main.ts 用原始 argv 调用）。若先注入
@@ -70,7 +120,7 @@ case "${1:-}" in
       echo "❌ 未找到 $CLI，请先运行：bash scripts/build.sh" >&2
       exit 1
     fi
-    exec node "$CLI" "$@"
+    exec "$NODE_BIN" "$CLI" "$@"
     ;;
 esac
 
@@ -126,12 +176,12 @@ read_admin_action() {
   # detect_lost_restart 靠它判定"这一轮写下的重启请求被吞了"（见下方注释）。
   # ownerPid 过滤：多实例共享同一份 state.json 时，只认**自己的**请求（pi 的 ppid 就是这个
   # supervisor）；没有 ownerPid 的（老请求/手工写的）照旧认领，保持向后兼容。
-  out=$(node -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const me=+process.argv[2];const mine=!s.ownerPid||+s.ownerPid===me;const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=mine&&fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);const logTs=(s.restartLog&&+s.restartLog.timestamp)||0;const logOwner=(s.restartLog&&s.restartLog.ownerPid)||"";process.stdout.write([ok?s.action:"",ok?s.targetSession||"":"",ok?s.targetProvider||"":"",ok?s.targetModel||"":"",String(logTs),String(logOwner)].join("\u001f"))}catch{}' "$ADMIN_STATE_FILE" "${SUPERVISOR_OWNER_PID:-$$}" 2>/dev/null)
+  out=$("$NODE_BIN" -e 'try{const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const me=+process.argv[2];const mine=!s.ownerPid||+s.ownerPid===me;const fresh=Date.now()-(+s.timestamp||0)<300000;const ok=mine&&fresh&&["restart","switch_session","restart_hang","set_model"].includes(s.action);const logTs=(s.restartLog&&+s.restartLog.timestamp)||0;const logOwner=(s.restartLog&&s.restartLog.ownerPid)||"";process.stdout.write([ok?s.action:"",ok?s.targetSession||"":"",ok?s.targetProvider||"":"",ok?s.targetModel||"":"",String(logTs),String(logOwner)].join("\u001f"))}catch{}' "$ADMIN_STATE_FILE" "${SUPERVISOR_OWNER_PID:-$$}" 2>/dev/null)
   [ -n "$out" ] || return 0
   IFS=$'\x1f' read -r ACT TARGET PROV MODEL LTS LOWNER <<<"$out"
 }
 clear_admin_action() {
-  node -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
+  "$NODE_BIN" -e 'try{const fs=require("fs");const p=process.argv[1];const s=JSON.parse(fs.readFileSync(p,"utf8"));s.action="none";s.timestamp=0;fs.writeFileSync(p,JSON.stringify(s))}catch{}' "$ADMIN_STATE_FILE" 2>/dev/null || true
 }
 
 now_ms() {
@@ -222,7 +272,7 @@ build_admin_args() {
 # 绝不覆盖真正待执行的 action：那种情况下日志归 supervisor 的下一次重启所有。
 mark_recovery_restart_log() { # <crashClass> [sessionFile]
   local cls="${1:-unknown}" sf="${2:-}"
-  node -e '
+  "$NODE_BIN" -e '
     const fs = require("fs");
     const p = process.argv[1], cls = process.argv[2], sf = process.argv[3];
     let s = { action: "none", timestamp: 0, restartLog: null };
@@ -258,7 +308,7 @@ recovery_args() { # <lastSession> → ADMIN_ARGS
 health_check() {
   log "健康检查..."
   local hc_log="/tmp/my-pi-health-$$.log"
-  if timeout 90 node "$CLI" --no-extensions --no-skills --no-session -p 'Say exactly: ok' >"$hc_log" 2>&1; then
+  if timeout 90 "$NODE_BIN" "$CLI" --no-extensions --no-skills --no-session -p 'Say exactly: ok' >"$hc_log" 2>&1; then
     rm -f "$hc_log"
     return 0
   fi
@@ -305,7 +355,7 @@ run_fix_pi() {
   local append=()
   [ -f "$rescue" ] && append=(--append-system-prompt "$rescue")
   local rc=0
-  timeout "$FIX_TIMEOUT" node "$bin" --no-extensions --no-skills --no-session \
+  timeout "$FIX_TIMEOUT" "$NODE_BIN" "$bin" --no-extensions --no-skills --no-session \
     ${append[@]+"${append[@]}"} -p "$instruction" >"$fix_log" 2>&1 || rc=$?
   [ "$rc" -eq 124 ] && log "修复者超时（${FIX_TIMEOUT}s），已终止"
   [ -s "$fix_log" ] && log "修复输出: $(tail -3 "$fix_log" | tr '\n' ' ' | cut -c1-200)"
@@ -340,7 +390,7 @@ SELF_HASH="$(sha256sum "$SELF" 2>/dev/null | cut -c1-16)"
 
 if [ "${MY_PI_NO_SUPERVISOR:-0}" = "1" ]; then
   apply_mode "$@"
-  exec node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}"
+  exec "$NODE_BIN" "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}"
 fi
 
 if [ ! -f "$CLI" ]; then
@@ -392,7 +442,7 @@ while true; do
   # 事故复盘时连"上一轮为什么退出"都看不到（2026-10-06 实测）。只留最近 ROUND_LOG_KEEP 轮。
   ls -1t "$ROUND_LOG_DIR"/round-*.log 2>/dev/null | tail -n +$((ROUND_LOG_KEEP + 1)) | xargs -r rm -f 2>/dev/null || true
   log "启动 Pi...（第 $ROUND_INDEX 轮，模式 ${MODE_NAME}${MODE_NS:+ / ns=$MODE_NS}）"
-  node "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}" "${EXTRA_ARGS[@]}" 2>"$CRASH_LOG"
+  "$NODE_BIN" "$CLI" "${ORIG_ARGS[@]}" "${MODE_ARGS[@]}" "${EXTRA_ARGS[@]}" 2>"$CRASH_LOG"
   EXIT_CODE=$?
   ROUND_DUR_MS=$(( $(now_ms) - ROUND_START_MS ))
 
