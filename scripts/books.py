@@ -162,11 +162,66 @@ def runtime_config_path() -> Path:
     return Path(override) if override else DEFAULT_RUNTIME_CONFIG
 
 
+_GUARDED_ROOTS: list[Path] = []
+
+
+def guard_library_roots(roots: list[Path]) -> None:
+    """登记"书库根"，之后所有写入都会避开这些目录。
+
+    **绝对限制（用户 2026-10-13 明确要求）：绝不破坏书籍源文件。** 本函数是该限制的落点 ——
+    不是在文档里写一句"请勿修改"，而是让"写到书库"在代码上**不可能发生**（VISION §3.1：
+    反复有效的软引导必须硬化）。
+
+    为什么需要它：本工具对书库**只读**（`pymupdf.open()` 默认只读、`open("rb")`），
+    所有写入都指向 `out/`、缓存、运行配置与临时目录 —— 但这只是**现状**，原先没有任何
+    机制阻止误配。实测风险：把 `--out` 指到书库内（例如 `--out 'M:/文件'`），
+    `index/`、`_report.md`、`cache/` 就会写进书籍所在目录。
+
+    判定用 `Path.resolve()` 后的**前缀包含**，因此 `..` 穿越与相对路径都挡得住；
+    等于书库根本身、或其子路径，都拒绝。
+    """
+    _GUARDED_ROOTS[:] = [Path(r).resolve() for r in roots]
+
+
+def _inside_library(target: Path) -> Path | None:
+    """target 若落在任一已登记书库根内，返回该根；否则 None。"""
+    try:
+        t = Path(target).resolve()
+    except OSError:
+        return None
+    for root in _GUARDED_ROOTS:
+        if t == root or root in t.parents:
+            return root
+    return None
+
+
+def safe_write(target: Path, *, what: str) -> None:
+    """写入前守门：目标落在书库内则**拒绝并终止**，绝不静默跳过。
+
+    故意 `raise SystemExit` 而不是"改成写到别处"：静默改道会让用户以为产物在
+    `--out` 指定处，实际不知去向；显式失败才是可诊断的（与工具其它错误的处理一致）。
+    """
+    hit = _inside_library(target)
+    if hit is not None:
+        raise SystemExit(
+            f"拒绝写入：{what} 目标落在书库根内 —— 这会破坏书籍源文件（绝对限制）。\n"
+            f"  目标   : {target}\n"
+            f"  书库根 : {hit}\n"
+            f"  处理   : 把 --out / 缓存目录 / 配置文件指到书库**之外**（默认值即是如此）。"
+        )
+
+
+def guard_mkdir(target: Path, *, what: str) -> None:
+    """建目录前守门（同 `safe_write`：书库内一律拒绝）。"""
+    safe_write(target, what=what)
+
+
 def persist_roots(roots: list[Path], dry_run: bool) -> None:
     """把本次使用的书库根写进运行时配置（portable/memory/books/config.json），后续命令免重复 --root。"""
     if dry_run or not roots:
         return
     cfg_path = runtime_config_path()
+    safe_write(cfg_path, what="运行时配置")
     cur = {}
     if cfg_path.exists():
         try:
@@ -177,13 +232,15 @@ def persist_roots(roots: list[Path], dry_run: bool) -> None:
     old = list(cur.get("library_roots", []))
     if old != merged:
         cur["library_roots"] = merged
-        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        guard_mkdir(cfg_path.parent, what="运行时配置目录")
         cfg_path.write_text(json.dumps(cur, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def append_jsonl(path: Path, record: dict, dry_run: bool = False) -> None:
     if dry_run:
         return
+    safe_write(path, what="记录文件")
+    guard_mkdir(path.parent, what="记录目录")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -478,6 +535,8 @@ def cmd_index(args, cfg, rec: RunRecorder) -> dict:
             rows = epub_index_rows(path)
         if rows:
             if not args.dry_run:
+                safe_write(target, what="章节表索引")
+                guard_mkdir(target.parent, what="索引目录")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with target.open("w", encoding="utf-8") as fh:
                     for row in rows:
@@ -492,6 +551,8 @@ def cmd_index(args, cfg, rec: RunRecorder) -> dict:
     if not args.dry_run:
         # 这是"当前状态"文件（不是追加日志）：每次覆盖，便于两端核对哪些书还需要目录页 OCR
         target = out / "_needs_toc_ocr.jsonl"
+        safe_write(target, what="需目录页 OCR 状态文件")
+        guard_mkdir(target.parent, what="记录目录")
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("w", encoding="utf-8") as fh:
             for row in flagged:
@@ -654,6 +715,8 @@ def cmd_read(args, cfg, rec: RunRecorder) -> dict:
         metas = [{"page": 1, "method": "direct", "chars": len(text), "cjk_ratio": round(cjk_ratio(text), 3), "quality": "ok" if text else "unsupported"}]
 
     if not args.dry_run:
+        safe_write(cache, what="提页缓存")
+        guard_mkdir(cache.parent, what="缓存目录")
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(text, encoding="utf-8")
         append_jsonl(book_dir / "meta.jsonl", {
@@ -703,6 +766,9 @@ def parse_pages(spec: str) -> tuple[int, int]:
 
 def resolve_roots(args, cfg) -> list[Path]:
     roots = [Path(args.root)] if args.root else [Path(r) for r in cfg.get("library_roots", [])]
+    # 登记"绝对限制"守卫：**在过滤存在性之前**登记，这样即使 --root 指向不存在的路径，
+    # 之后任何试图写进该路径的动作也会被拒绝（不依赖目录当前是否存在）。
+    guard_library_roots(roots)
     roots = [r for r in roots if r.exists()]
     if not roots:
         raise SystemExit("没有可用书库根：用 --root 指定，或在配置里写 library_roots")
@@ -804,6 +870,7 @@ def cmd_report(args, cfg, rec: RunRecorder) -> dict:
         )
     text = "\n".join(lines) + "\n"
     if not args.dry_run:
+        safe_write(out / "_report.md", what="探测报告")
         (out / "_report.md").write_text(text, encoding="utf-8")
     rec.bump("reported")
     log(text)
@@ -934,6 +1001,39 @@ def cmd_selftest(args, cfg, rec: RunRecorder) -> dict:
             bool(logrows) and logrows[-1]["cmd"] == "selftest-probe" and logrows[-1]["counts"].get("demo") == 2 and "elapsed_ms" in logrows[-1],
             str(logrows[-1] if logrows else None)[:120],
         )
+
+        # ── 绝对限制回归（用户 2026-10-13：绝不破坏书籍源文件）──────────────────
+        # 断言四件事：①书库内的写入目标被拒绝；②拒绝是**显式终止**而非静默跳过；
+        # ③路径穿越（..）也挡得住（靠 resolve 后的前缀比较）；④不误伤书库外的写入。
+        # 全部在自检的临时目录内做：把"书库根"登记为 library，再试图往 library 里写。
+        blocked = False
+        try:
+            safe_write(library / "index" / "x.jsonl", what="自检用的越界写入")
+        except SystemExit as exc:
+            blocked = "拒绝写入" in str(exc)
+        check("绝对限制：写进书库被拒绝（显式终止，非静默跳过）", blocked)
+
+        # `..` 形式：library/a/../x.jsonl resolve 后就是 library/x.jsonl —— 必须同样被拒
+        try:
+            safe_write(library / "a" / ".." / "x.jsonl", what="自检用的穿越写入")
+            traversal_blocked = False
+        except SystemExit:
+            traversal_blocked = True
+        check("绝对限制：路径穿越（..）也被拒绝", traversal_blocked)
+
+        # 拒绝之后，书库目录里除原有的合成书外不应多出任何产物
+        extra = sorted(p.name for p in library.rglob("*") if p.is_file()
+                       and p.suffix.lower() in (".jsonl", ".md"))
+        check("绝对限制：被拒绝后书库内无残留写入", extra == [], str(extra[:4]))
+
+        # 守卫**不误伤**：书库外的写入正常通过
+        allowed = True
+        try:
+            safe_write(out / "guard-probe-ok.jsonl", what="自检用的合法写入")
+            (out / "guard-probe-ok.jsonl").write_text("ok", encoding="utf-8")
+        except SystemExit:
+            allowed = False
+        check("绝对限制：书库外的写入不受影响（不误伤）", allowed and (out / "guard-probe-ok.jsonl").exists())
         check("缓存跨设备可迁移（id 由内容指纹决定）", "-" in make_book_id(pdf) and content_fingerprint(pdf) == content_fingerprint(pdf))
     except MissingPdfLib as exc:
         # 缺 PDF 解析库时**跳过**而不是当失败：自检要造合成 PDF，缺库就无从造起。
@@ -978,6 +1078,13 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     args = build_parser().parse_args(argv)
     cfg = load_config(args.config)
+    # **绝对限制（用户 2026-10-13）：绝不破坏书籍源文件。**
+    # 在入口就登记所有已知书库根（含 --root 与配置里的全部条目），这样**每个子命令**——
+    # 包括不解析书库的 `report`——之后的任何写入都会被 safe_write 挡住。
+    # `resolve_roots` 里还会再登记一次（含"不存在也要保护"的路径），两者不冲突（登记为替换语义）。
+    guard_library_roots(
+        ([Path(args.root)] if args.root else []) + [Path(r) for r in cfg.get("library_roots", [])]
+    )
     out = Path(args.out)
     rec = RunRecorder(out, args.cmd, cfg, argv, args.dry_run)
     log(f"[books] {args.cmd}  role={cfg.get('role')}  out={out}")

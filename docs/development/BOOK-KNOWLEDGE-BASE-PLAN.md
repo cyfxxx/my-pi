@@ -74,8 +74,15 @@ L3 沉淀层（跨书复用）         记忆条目（category=reference/fact）
 **L2 `meta.json`**：`book_id/page_start/page_end/method(text|ocr|vision)/tool/tool_version/dpi/sha256_source/created_at/confidence/cjk_ratio`
 **引用格式**（Agent 输出强制）：`[《技术史·第1卷》第5章 p.120]`，并给出本地绝对路径便于人工核对。
 
-## 4. 关键设计决策（8 条）
+## 4. 关键设计决策（9 条）
 
+0. **⛔ 绝对限制：绝不破坏书籍源文件**（用户 2026-10-13 明确要求）。书库对 `books.py` **永远是只读输入**；
+   不修改/移动/重命名/删除书库文件，也不把产物写进书库目录。
+   **落点是代码而非文档**（VISION §3.1「反复有效的软引导必须硬化」）：所有写入点过 `safe_write()`，
+   目标落在任一已登记书库根内（含子路径与 `..` 穿越）即**显式终止**（`SystemExit`），
+   不做静默跳过或改道 —— 静默改道会让人以为产物在 `--out` 处，实际不知去向，不可诊断。
+   读取只经 `pymupdf.open()`（默认只读）与 `open("rb")`；产物一律落书库之外。
+   回归断言见 `books.py selftest` 的 4 项「绝对限制」用例；改动任何写入路径后必须跑。
 1. **目录优先，OCR 兜底**：先 `get_toc()`/EPUB nav → 23/36 本书零成本建索引；无 outline 才 OCR 目录页（每本 ≤20 页，约 10 分钟）。
 2. **页面预算**：单次提问最多提取 **8 页**（可配 `PI_BOOKS_PAGE_BUDGET`），先查 L2 缓存，未命中才提取；同一页永不重复 OCR。
 3. **缓存即资产**：L2 是唯一会随使用增值的数据 → 纳入 `sync-memory.sh` 加密同步与备份；原始书文件不入库、不复制。

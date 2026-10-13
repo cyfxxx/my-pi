@@ -679,7 +679,7 @@
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 1. 实测事实（2026-10-01，本机） · ### 1.1 环境与容量 · 数字: 7.5 GB / 1.4 GB / 105 GB / 51 GB
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 2. 三层落点（复用 my-pi 既有组件） · L1 索引层（进上下文，极小） 每本书 1 条记忆条目（卡片）+ 每本书 1 个 index.jsonl（章节表，不进上下文） · 数字: 1 条 / 1 个
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 3. 数据契约 · **L1 卡片（一条记忆条目）**——控制在 ~200 字符，因为它每一轮都会被注入计价：
-- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 4. 关键设计决策（8 条） · 1. **目录优先，OCR 兜底**：先 `get_toc()`/EPUB nav → 23/36 本书零成本建索引；无 outline 才 OCR 目录页（每本 ≤20 页，约 10 分钟）。 · 数字: 10 分钟
+- `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 4. 关键设计决策（9 条） · 0. **⛔ 绝对限制：绝不破坏书籍源文件**（用户 2026-10-13 明确要求）。书库对 `books.py` **永远是只读输入**； · 数字: 10 分钟
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 5. 成本与工时模型（用量级说话） · **哪些书值得 OCR**：`有文字层` → 直接抽；`有 outline 无文字层` → 索引免 OCR、正文按需 OCR（本方案主路径）； · 数字: 1.5 GB / 200 GB / 4 小时 / 9 分钟
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 6. 分期路线（每阶段都有可验证判据） · - **P0 只读体检（0.5 天）**：`scripts/books-probe.mjs` 输出"每本书：页数/文字层/outline/体积/是否疑似扫描/建议策略"， · 数字: 0.5 天 / 2 天 / 1 条 / 80%
 - `docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md` · 7. 风险与降级 · 数字: 1.4 GB / 51 GB
