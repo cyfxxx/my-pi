@@ -8,7 +8,28 @@ import { pruneToolOutput, resetOutputBudget, estimateTokens } from '../budget/bu
 const tmp = mkdtempSync(join(tmpdir(), 'my-pi-archive-'));
 process.env.PI_OUTPUT_ARCHIVE_DIR = tmp;
 
-beforeAll(() => { process.env.PI_OUTPUT_ARCHIVE_DIR = tmp; });
+/**
+ * 「必定写不进去」的路径 —— 用于验证归档失败时的 fail-open。
+ *
+ * 为什么不能写 `/dev/null/ov-impossible`（原来的写法，2026-10-13 修）：
+ *   `/dev/null` 是 **POSIX 专属**。Windows 上它不再是设备节点，而会被当成
+ *   **相对当前盘根的普通路径**（Node 在 MSYS/git-bash 下解析 `/dev/null/x` →
+ *   `<当前盘>:\dev\null\x`）。于是：
+ *     ① 目录**真的被创建出来**，归档成功，测试断言 `toBeNull()` 失败；
+ *     ② 在盘根留下 `\dev\null\...` 垃圾目录（实测在 M: 盘根留下一个）。
+ *   项目里已有同样的跨平台教训：`scripts/net-mirror.mjs` 明确写了"不使用 /dev/null
+ *   （POSIX 专属），一律写 os.tmpdir() 下的临时文件再删"。
+ *
+ * 改用"让路径穿过一个普通文件"：无论在 POSIX 还是 Windows，"在文件下面建目录"
+ * 都是确定性失败（ENOTDIR / ENOENT），且不会在盘根留下任何东西。
+ */
+const blockingFile = join(tmp, 'blocking-file');
+const impossibleDir = join(blockingFile, 'ov-impossible');
+
+beforeAll(() => {
+  process.env.PI_OUTPUT_ARCHIVE_DIR = tmp;
+  writeFileSync(blockingFile, 'this is a file, not a directory');
+});
 afterAll(() => {
   delete process.env.PI_OUTPUT_ARCHIVE_DIR;
   rmSync(tmp, { recursive: true, force: true });
@@ -39,7 +60,7 @@ describe('output-archive 工具输出归档', () => {
 
   it('写盘失败 fail-open 返回 null', () => {
     const prev = process.env.PI_OUTPUT_ARCHIVE_DIR;
-    process.env.PI_OUTPUT_ARCHIVE_DIR = '/dev/null/ov-impossible';
+    process.env.PI_OUTPUT_ARCHIVE_DIR = impossibleDir;
     const r = archiveOutput('x'.repeat(100));
     process.env.PI_OUTPUT_ARCHIVE_DIR = prev;
     expect(r).toBeNull();
@@ -50,7 +71,7 @@ describe('output-archive 工具输出归档', () => {
     expect(stub).toContain('[t 输出已截断]');
     expect(stub).toMatch(/已存档: .+\.txt$/);
     const prev = process.env.PI_OUTPUT_ARCHIVE_DIR;
-    process.env.PI_OUTPUT_ARCHIVE_DIR = '/dev/null/ov-impossible';
+    process.env.PI_OUTPUT_ARCHIVE_DIR = impossibleDir;
     const fallback = archivedStub('z'.repeat(2000), '[t 输出已裁剪]');
     process.env.PI_OUTPUT_ARCHIVE_DIR = prev;
     expect(fallback).toBe('[t 输出已裁剪]');
