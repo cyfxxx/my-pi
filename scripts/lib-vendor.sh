@@ -76,7 +76,8 @@ _pi_node_ok() {
 # 故此处统一口径：**先解析出满足下限的可执行文件**，调用方一律用它，不再裸调 node。
 #
 # 优先级：MY_PI_NODE（显式指定，便携启动器用）→ 便携布局 → PATH。
-# 便携布局按"与仓库同级的 runtime/node/"找（本盘布局：工具分区 /runtime/node）。
+# 便携布局优先找**仓库内** `<repo>/runtime/node/`（项目自包含、随项目移动），
+# 再退到与仓库同级的 `<repo>/../runtime/node/`（历史布局：工具分区 /runtime/node）。
 pi_resolve_node() {
   local c
   if [ -n "${MY_PI_NODE:-}" ] && _pi_node_ok "$MY_PI_NODE"; then

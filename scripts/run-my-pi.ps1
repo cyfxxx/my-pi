@@ -4,15 +4,21 @@
     ## 设计目标
     插到**任何** Windows 机器上都应直接可用，不依赖目标机器装过 Git 或 Node。
 
-    ## 盘上布局
-        <工具分区>:\runtime\PortableGit\   便携版 Git（bash + git + 核心工具）
-        <工具分区>:\runtime\node\          便携版 Node（>= 22.19）
-        <工具分区>\run-my-pi.ps1           本脚本（放在工具分区，便于直接启动）
-        <数据分区>:\my-pi\                 项目本体（可在 VeraCrypt 加密卷上）
+    ## 盘上布局（2026-10-13 起：工具链在仓库内，项目自包含）
+        <仓库>\runtime\PortableGit\   便携版 Git（bash + git + 核心工具）
+        <仓库>\runtime\node\          便携版 Node（>= 22.19）
+        <仓库>\scripts\run-my-pi.ps1  本脚本
+        <未加密分区>\VeraCrypt\       加密软件（**唯一必须留在明文分区的东西**）
 
-    工具链刻意放在**未加密**分区，因为：
-      1) VeraCrypt 便携版也在那儿 —— 必须先读到它才能挂载加密卷
-      2) 插到别的机器上，无需先解密即可取用工具
+    **工具链放在仓库内**，故与盘符无关：仓库能被找到，工具链就在。
+    加密卷换盘符（本机 M:，别的机器可能 N:）也照常工作。
+
+    **VeraCrypt 是唯一例外**，因为它与加密卷之间存在死锁：
+    要挂载加密卷得先运行 VeraCrypt，而它若在加密卷里就需要先挂载才能拿到它。
+    它是独立 GUI 程序，挂载不使用 bash/Node，所以该例外不牵连工具链。
+
+    （历史布局 `<工具分区>:\runtime\` 仍受支持：查找顺序见 `Find-Runtime`，
+      它最后会遍历所有盘符找 `<盘>:\runtime`。）
 
     ## 三个实测踩过的坑（都在这里修掉了）
     1) **不要用 `bash -l`（登录 shell）**。便携 Git 的 /etc/profile 会注入原安装机器的
@@ -26,8 +32,8 @@
        故统一改为"逐盘符 Test-Path + try/catch"探测。
 
     ## 用法
-        powershell -ExecutionPolicy Bypass -File <工具分区>\run-my-pi.ps1
         powershell -ExecutionPolicy Bypass -File <仓库>\scripts\run-my-pi.ps1
+        powershell -ExecutionPolicy Bypass -File <历史工具分区>\run-my-pi.ps1
         透传参数：  ... -File run-my-pi.ps1 --version
 #>
 [CmdletBinding()]
@@ -137,7 +143,7 @@ if (-not $bashExe -or -not (Test-Path $bashExe)) {
         if (Test-Path $cand) { $bashExe = $cand }
     }
     if (-not $bashExe) {
-        throw "未找到 bash。请确认工具分区存在 <工具分区>:\runtime\PortableGit\bin\bash.exe，或本机已安装 Git。"
+        throw "未找到 bash。请确认仓库内有 runtime\PortableGit\bin\bash.exe，或本机已安装 Git。"
     }
 }
 

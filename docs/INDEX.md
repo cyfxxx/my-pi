@@ -493,7 +493,7 @@
 - `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 
-## 设计文档（177 条）
+## 设计文档（178 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -651,6 +651,7 @@
 - `docs/design/UPGRADE-LEDGER.md` · 已完成：第三批（2026-10-01，同日续做） · 顺带修掉一个计时缺陷：`toolCallStarts` 原先按**工具名**作键，而 pi 默认并行执行工具， · 数字: 6 个 / 1103 条 / 1.4% / 25%
 - `docs/design/UPGRADE-LEDGER.md` · 转正通道执行（§3.1/§5，2026-10-01） · **结论：当前无合格候选；治理动作已执行。** · 数字: 61 条 / 518 B / 5 次 · 证据: 63e8d109 / da6380d3 / bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `docs/design/UPGRADE-LEDGER.md` · 效果复核（逐日实测，2026-10-01 取数） · 数据源：`portable/memory/context/.usage-diag.jsonl`（每轮用量）+ `portable/memory/logs/prefix-fingerprints.jsonl`（逐请求前缀指纹）。 · 数字: 97.21% / 0.3% / 80.66% / 0.9%
+- `docs/design/UPGRADE-LEDGER.md` · 已完成：第四批（2026-10-13） · > 该条属"用户明确要求 + 反复有效"的硬约束，故按 §3.1 沉淀至此。 · 数字: 278 GB / 278.63 GB / 0 条
 - `docs/design/UPGRADE-LEDGER.md` · 待评（明确未硬化，附原因与前置条件） · 数字: 14.5 KB / 32 条 / 18 条
 - `docs/design/UPGRADE-LEDGER.md` · 下一批复核 · - 每次日报（`node scripts/daily-health.mjs --print`）顺带看四项注入字节数；接近上限即启动降权评估。 · 证据: node scripts/daily-health.mjs --print
 - `docs/design/VISION.md` · 元信息 · ---

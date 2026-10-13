@@ -122,7 +122,7 @@ if [ -z "$NODE_BIN" ]; then
   echo "❌ 未找到满足要求的 Node.js（需要 >= ${PI_NODE_MIN}）" >&2
   node_version_hint
   echo "  提示：可用 MY_PI_NODE=<node 绝对路径> 显式指定；" >&2
-  echo "        或把便携 Node 放到 <工具分区>/runtime/node/（便携布局会自动采用）。" >&2
+  echo "        或把便携 Node 放到 <仓库>/runtime/node/（仓库内便携布局会自动采用）。" >&2
   exit 1
 fi
 export NODE_BIN
