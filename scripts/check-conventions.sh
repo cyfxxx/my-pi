@@ -124,7 +124,7 @@ GOLDEN_STEPS="$(head -n "${SMOKE_LINE:-99999}" scripts/golden-tasks.sh | grep -o
 # BUG-REPLAYS 台账：每行必须带**可执行命令**（防"注意一下"式的失效条目——台账的价值就在于可重跑）
 if [ -f docs/BUG-REPLAYS.md ]; then
   LEDGER_ROWS="$(grep -cE '^\| [0-9]+ \|' docs/BUG-REPLAYS.md)"
-  LEDGER_NO_CMD="$(grep -E '^\| [0-9]+ \|' docs/BUG-REPLAYS.md | grep -vE '(node |bash |npx |scripts/|my-pi\.sh)' || true)"
+  LEDGER_NO_CMD="$(grep -E '^\| [0-9]+ \|' docs/BUG-REPLAYS.md | grep -vE '(node |bash |npx |scripts/|my-pi\.sh|powershell |pwsh |python )' || true)"
   # 2026-10-10 补：**列数**也必须查 ✗ —— 只查"有没有可执行命令"是不够的：
   # 编译器要求 5 列（`cells.length >= 6`，knowledge-compile.mjs），而列数不足的行会被**静默跳过** ✗
   # ⇒ 症状是"守门全绿、知识库里却没有这条"（本会话真的发生过：第 17–19 行 3 列被静默丢弃 ✗✓）。
@@ -140,6 +140,24 @@ if [ -f docs/BUG-REPLAYS.md ]; then
     printf '%s\n' "$LEDGER_NO_CMD" | cut -c1-100 | sed 's/^/       /'
   else
     ok "BUG-REPLAYS 台账每行都带可执行命令（$LEDGER_ROWS 行）"
+  fi
+  # 换行守门（2026-10-13 补）：.gitattributes 声明了 *.sh=eol=lf / *.ps1=eol=crlf，
+  # 但此前**没有守门**，于是实测两次把 pi-supervisor.sh 的 LF 写成了 CRLF。
+  # 判据用 git 自己的口径（最权威），**两个方向都查**：
+  #   w/crlf 而约定 lf  → 违规（.sh 带 CR）
+  #   w/lf   而约定 crlf → 违规（.ps1 缺 CR）
+  EOL_BAD="$(git ls-files --eol '*.sh' '*.ps1' '*.md' '*.mjs' 2>/dev/null | awk '
+    {
+      attr = ""
+      for (i = 1; i <= NF; i++) if ($i == "attr/text") attr = $(i + 1)
+      if ($2 == "w/crlf" && attr != "eol=crlf") print $NF
+      else if ($2 == "w/lf" && attr == "eol=crlf") print $NF
+    }' || true)"
+  if [ -n "$EOL_BAD" ]; then
+    bad "以下文件的换行与 .gitattributes 不符（.sh 须 LF、.ps1 须 CRLF）："
+    printf '%s\n' "$EOL_BAD" | sed 's/^/       /'
+  else
+    ok "换行与 .gitattributes 一致（.sh 全 LF、.ps1 全 CRLF）"
   fi
 fi
 DOC_STEPS="$(grep -oE '行为防退化基准 \*\*[0-9]+ 步\*\*' scripts/README.md | grep -oE '[0-9]+' | head -1)"

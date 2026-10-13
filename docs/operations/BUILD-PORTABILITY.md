@@ -14,11 +14,15 @@
 |---|---|---|
 | `npm error Cannot read properties of null (reading 'edgesOut')` | 目标卷不支持符号链接（exFAT/FAT32），npm workspaces 无法链接工作区包 | 见 §2：换 NTFS 构建后复制产物回来 |
 | 构建中途 `TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts"` | Node 版本低于 22.19（`.ts` 直接执行需要内置类型剥离） | 见 §1：升级到 Node >= 22.19.0 |
+| 运行中崩 `TypeError: zlib.createZstdDecompress is not a function`（栈在 `undici/lib/web/fetch`） | 运行期用了低于 22.15 的 Node（该 API 要 22.15+），而 §1 只守构建期 | 见 §4.4：`MY_PI_NODE` + supervisor 版本校验 |
 | `npm error` + `canvas` + `cairo.h: No such file or directory` | `canvas` 是 devDependency，无预编译包时退化为 node-gyp 源码编译，需要 GTK/cairo | 见 §3：`NPM_CONFIG_IGNORE_SCRIPTS=1` |
 | `prebuild-install warn install unable to get local issuer certificate` | Node 自带 CA 链无法校验到下载源（中间人/自签代理）；`curl`/`git` 走 schannel 不受影响 | 见 §3 与 §4 |
+| 逻辑 **0.71 GB** 的项目实占 **43 GB**；`du` 数字远大于文件总量 | 卷的**分配单元是 1 MB**（每个文件至少占 1 MB，占用由文件数决定） | 见 [`VOLUME-REBUILD.md`](VOLUME-REBUILD.md) §1：重格式化为 4096 |
 
 > 关键结论：**能在 exFAT 上运行，但不能在 exFAT 上安装依赖。**
 > 运行只需要读取文件树；安装需要符号链接。
+
+> 盘本身怎么选、怎么重建、怎么验证数据没丢，见 [`VOLUME-REBUILD.md`](VOLUME-REBUILD.md)。
 
 ---
 
@@ -423,12 +427,14 @@ my-pi 的既定纪律是"反复有效的软引导必须硬化"（VISION §3.1）
 | §2 | `scripts/lib-vendor.sh` 的 `preflight_symlinks`，`build.sh` 第 1b 步在安装前调用 |
 | §3 | `build.sh` 头部注释给出旁路用法；无自动守门（属"可选依赖缺平台构建工具"，刻意不做成失败） |
 
-对应事故台账见 [`BUG-REPLAYS.md`](../BUG-REPLAYS.md) 第 27–29 条。
+对应事故台账见 [`BUG-REPLAYS.md`](../BUG-REPLAYS.md) 第 27–29 条；
+§4.4 对应第 34 条。
 
 ---
 
 ## 相关
 
+- 盘的选择与重建（簇大小陷阱 / 迁移验证 / 加密）：[`VOLUME-REBUILD.md`](VOLUME-REBUILD.md)
 - 上游同步流程：[`UPSTREAM-UPDATE.md`](UPSTREAM-UPDATE.md)
 - 多环境识别与数据隔离：[`ENVIRONMENTS.md`](ENVIRONMENTS.md)
 - 系统化排障入口：[`../TROUBLESHOOTING.md`](../TROUBLESHOOTING.md)

@@ -453,7 +453,7 @@
 - `PROGRESS.md` · 种子静默失效修复 + 守卫隔离（2026-10-11） · - 我的锅：ClamAV 种子只有 [name,prompt] ⇒ 被 isSeedLike（要求 type∈{interval,cron,once} 且 schedule 非空）过滤掉 ⇒ 永不注册且 · 数字: 3 个 / 5 个 / 6 条 / 5 条
 - `PROGRESS.md` · ClamAV 种子字段对齐（2026-10-11） · - 只改 scheduled-seeds.json 里「每日更新 ClamAV 病毒库」一条（prompt 逐字节未变、另 5 条逐字节未变、version/note 未变）； · 数字: 5 条 / 6 条 · 证据: b6ffc4599f04745e592d5270
 
-## 缺陷回放（34 条）
+## 缺陷回放（36 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -489,6 +489,8 @@
 - `docs/BUG-REPLAYS.md` · #32 **VeraCrypt 挂载的卷在 `Get-Volume` 里看不见 ⇒ 盘符探测静默落空（还被 `$ErrorActionPreference='Stop'` 放大成整体中断）**：给便携启动器写「遍历所有卷找仓库」的逻辑时，` · 实测：`Get-Volume` 列出的盘符不含 M:，而 `Test-Path M:\` 为 True、`Get-PSDrive -PSProvider FileSystem` 与 `[IO.DriveInfo]::GetDrives()`
 - `docs/BUG-REPLAYS.md` · #33 **台账表格被空行割裂 ⇒ 下游按行解析会静默漏条**：`docs/BUG-REPLAYS.md` 的台账表在若干行之间插了空行（本文件 L53/L55 曾是），Markdown 渲染仍连成一张表，但**任何按「行以竖线开头」解析的 · 表格行数与台账实际条数不符；或台账里两条之间夹着空行；`node scripts/knowledge-compile.mjs --check` 通过**也不能证伪**（它只比对已解析到的条目与已有页面，漏解析的条目在两边同时缺席） · 证据: node scripts/knowledge-compile.mjs --check
 - `docs/BUG-REPLAYS.md` · #34 **Node 版本守门只在构建期、运行期没有 ⇒ 启动成功却在使用中崩（zstd 解压）**：`build.sh` 第 1 步与 `doctor.sh` 都有 Node >= 22.19 的逐段版本守门，但**运行期**没有同口径守 · 崩溃记录 `portable/agent/crashes.json` 里 `kind=uncaught_exception`、`message=zlib.createZstdDecompress is not a function`、栈顶是
+- `docs/BUG-REPLAYS.md` · #35 **PowerShell 参数集互斥参数写成一条 ⇒ 报错指向参数名而非真因**：`Set-Disk -Number N -IsOffline $false -IsReadOnly $false` 报 `无法使用指定的命名参数解析参 · 报 `AmbiguousParameterSet`；同一条命令拆成两行后立刻通过；用不存在的磁盘号 99 可复现并区分两类失败——报"找不到磁盘"说明**参数绑定已通过**，报"参数集"才是拼错
+- `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
 
 ## 设计文档（177 条）
 
