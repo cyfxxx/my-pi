@@ -287,6 +287,74 @@ powershell -ExecutionPolicy Bypass -File scripts\run-my-pi.ps1            # 启�
 powershell -ExecutionPolicy Bypass -File scripts\run-my-pi.ps1 --version  # 只验证链路
 ```
 
+### 4.3 完全便携：把 bash 与 Node 放进盘里
+
+前述各节默认"目标机器装过 Git 和 Node"。要做到**插到任何 Windows 机器都能跑**，
+需要把工具链放在盘上。实测可行，且成本远比想象低。
+
+**盘上布局**（2026-10-13 实装验证）：
+
+```
+<工具分区>:\runtime\PortableGit\   便携版 Git（bash + git + 核心工具），逻辑 326 MB
+<工具分区>:\runtime\node\          便携版 Node 22.23.3，逻辑 95 MB
+<工具分区>\run-my-pi.ps1           启动器（放在工具分区，直接可启动）
+<数据分区>:\my-pi\                 项目本体（可在 VeraCrypt 加密卷上）
+```
+
+**工具链必须放在未加密的那一分区**，两个理由：
+1. VeraCrypt 便携版也在那儿 —— 必须先读到它才能挂载加密卷；
+2. 插到别的机器上，无需先解密即可取用工具。
+
+**成本实测（关键：簇大小决定一切）**：
+
+| 目标卷 | 文件系统 / 簇 | 逻辑 421 MB 的实占 |
+|---|---|---|
+| exFAT / 1 MB 簇 | 每个文件至少 1 MB | **9.49 GB**（6222+2032 文件 × 1 MB） |
+| **NTFS / 4 KB 簇** | 4 KB 对齐 | **447 MB** |
+
+即：**同一份工具链，在 NTFS 上只花 447 MB，在 1 MB 簇的 exFAT 上要花 9.49 GB（21 倍）**。
+这也是本盘改用 NTFS + 4096 的又一个理由。
+
+#### 三个必须避开的坑（均实测）
+
+**坑 1：不要用 `bash -l`（登录 shell）**
+
+便携版 Git 的 `/etc/profile` 会注入**原安装机器的绝对路径**（如 `/d/App_X/Git/usr/bin`），
+换机器后 `dirname` / `mkdir` / `tail` 全部 `command not found`，`my-pi.sh` 第 7、16 行直接崩。
+
+正确配方：`bash -c`（非登录）+ 显式 PATH。实测在 `env -i`（清空所有环境变量）下通过：
+
+```bash
+env -i SYSTEMROOT='C:\WINDOWS' \
+    PATH="<工具分区>/runtime/PortableGit/usr/bin:<工具分区>/runtime/PortableGit/mingw64/bin:<工具分区>/runtime/node" \
+    <工具分区>/runtime/PortableGit/bin/bash.exe -c 'cd <仓库> && ./my-pi.sh --version'
+# -> [supervisor] 启动 Pi...  1.0.4
+```
+
+**坑 2：`bash` 这个名字可能被 WSL 抢走**
+
+判断：`bash -c 'uname -s'` → `MINGW64_NT-*` 是 git-bash（认 `/m/my-pi`），
+`Linux` 是 WSL（认 `/mnt/m/...`，且需在 WSL 内另装 node）。
+
+**坑 3：VeraCrypt 挂载的卷不出现在 `Get-Volume` 里**
+
+实测 `Get-Volume` 列不出 VeraCrypt 挂载的卷（漏掉 M:），却含 0 容量幽灵卷（如 H:），
+对后者 `Join-Path` 会抛 `DriveNotFoundException`；配合 `$ErrorActionPreference='Stop'`
+会让探测循环整体中断。**改用 `Get-PSDrive` / `[IO.DriveInfo]` 枚举，并逐盘符
+`Test-Path -LiteralPath` + `try/catch`**。
+
+`scripts/run-my-pi.ps1` 已按上述三条实现，并从工具分区与仓库内两种位置各验证通过。
+
+#### 换 NTFS 换来的两个额外好处（本次实测）
+
+1. **执行位得以保留**：`my-pi.sh` 等脚本为 `-rwxr-xr-x`，git 索引中为 `100755`
+   （exFAT 无法记录执行位，此前需要 `core.fileMode=false` 打补丁绕过）。
+2. **元数据有日志**：抗不安全拔出导致的目录项损坏。
+
+代价：**VeraCrypt 卷的属主是 Administrators，git 会报 `dubious ownership`**，
+每台新机器需登记：`git config --global --add safe.directory <挂载点>/my-pi`
+（及其 `vendor/pi` 子仓库）。这与 exFAT 的属主问题同源，但触发原因不同。
+
 ---
 
 ## 5. 预防：为什么这三条被写成守门而不是文档提醒
