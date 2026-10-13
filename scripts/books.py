@@ -147,22 +147,37 @@ def load_config(explicit: str | None) -> dict:
 # ── 记录（run log / probe / meta） ──────────────────────────────────────────
 
 
+def runtime_config_path() -> Path:
+    """运行时配置路径（可用 `PI_BOOKS_RUNTIME_CONFIG` 覆盖）。
+
+    为什么需要覆盖（2026-10-13 实测缺陷）：`cmd_probe` 会无条件 `persist_roots`，
+    而它写的是**模块级常量**指向的全局配置文件。于是 `selftest` 把自己的**临时书库根**
+    写进了真实用户配置 —— 实测把 `library_roots` 冲成了
+    `D:\\Desktop\\Temp\\my-pi-books-selftest-xxx\\library`（该目录随后即被删除）。
+    `--out` 只覆盖记录目录，管不到这里，所以自检无法隔离。加此覆盖位后，
+    自检把持久化重定向到自己的临时目录，不再污染真实配置。
+    """
+    override = os.environ.get("PI_BOOKS_RUNTIME_CONFIG")
+    return Path(override) if override else DEFAULT_RUNTIME_CONFIG
+
+
 def persist_roots(roots: list[Path], dry_run: bool) -> None:
     """把本次使用的书库根写进运行时配置（portable/memory/books/config.json），后续命令免重复 --root。"""
     if dry_run or not roots:
         return
+    cfg_path = runtime_config_path()
     cur = {}
-    if DEFAULT_RUNTIME_CONFIG.exists():
+    if cfg_path.exists():
         try:
-            cur = json.loads(DEFAULT_RUNTIME_CONFIG.read_text(encoding="utf-8"))
+            cur = json.loads(cfg_path.read_text(encoding="utf-8"))
         except Exception:
             cur = {}
     merged = [str(r) for r in roots]
     old = list(cur.get("library_roots", []))
     if old != merged:
         cur["library_roots"] = merged
-        DEFAULT_RUNTIME_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-        DEFAULT_RUNTIME_CONFIG.write_text(json.dumps(cur, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        cfg_path.write_text(json.dumps(cur, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def append_jsonl(path: Path, record: dict, dry_run: bool = False) -> None:
@@ -843,6 +858,10 @@ def cmd_selftest(args, cfg, rec: RunRecorder) -> dict:
     rec.out = out  # 自检的 run log 也进临时目录，不污染真实记录
     library = tmp / "library"
     library.mkdir(parents=True)
+    # 运行时配置也重定向到临时目录：`cmd_probe` 会 persist_roots，默认写全局配置文件，
+    # 于是自检的**临时书库根**会覆盖用户真实的 `library_roots`（实测缺陷，见 runtime_config_path 注释）。
+    _prev_runtime_cfg = os.environ.get("PI_BOOKS_RUNTIME_CONFIG")
+    os.environ["PI_BOOKS_RUNTIME_CONFIG"] = str(tmp / "runtime-config.json")
     try:
         pdf = library / "synthetic-chinese-book.pdf"
         make_synthetic_pdf(pdf)
@@ -922,6 +941,10 @@ def cmd_selftest(args, cfg, rec: RunRecorder) -> dict:
         print(f"  - 跳过：{exc}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+        if _prev_runtime_cfg is None:
+            os.environ.pop("PI_BOOKS_RUNTIME_CONFIG", None)
+        else:
+            os.environ["PI_BOOKS_RUNTIME_CONFIG"] = _prev_runtime_cfg
 
     failed = [c for c in checks if not c[1]]
     for name, ok, detail in checks:
