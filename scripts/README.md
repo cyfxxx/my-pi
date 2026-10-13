@@ -105,3 +105,16 @@ sees the held-out results."*），理由是**如果我们按它调参，验收�
 
 - 脚本清单与职责总览：[../STRUCTURE.md](../STRUCTURE.md)
 - 构建/同步/体检深入：[../docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)
+
+## 外部依赖（非 npm，需手动安装）
+
+本目录下有两个 Python 脚本，它们的可选外部依赖**不在 npm/package.json 里**，
+缺了不影响主流程，但相关子命令会降级或跳过：
+
+| 依赖 | 用途 | 缺了会怎样 | 安装 |
+|---|---|---|---|
+| **PyMuPDF** | `books.py` 解析 PDF（页数/目录/文字层；`probe` / `index` / `read`） | `selftest` **跳过**并说明；PDF 类子命令不可用 | `python3 -m pip install pymupdf` |
+| **tesseract** | `books.py` 的 OCR（扫描件按需识别） | 扫描件提取跳过（自检里已有对应用例断言"缺则跳过"） | 系统包：`apt install tesseract-ocr` / Windows 装 UB-Mannheim 版 |
+
+> 注意 PyMuPDF 有两个导入名（新版 `pymupdf`、旧名 `fitz`），`books.py` 依次尝试。
+> 两者都缺时抛 `MissingPdfLib`，是**可预期的降级**，不是崩溃。

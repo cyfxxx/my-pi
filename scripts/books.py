@@ -71,6 +71,40 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _init_console() -> None:
+    """让 stdout/stderr 能吃下 ✓/❌/·/→ 这类符号。
+
+    实测（Windows 11 + 中文区域）：控制台默认 GBK，脚本里 15 行输出含 ✓/❌，
+    `print` 直接 `UnicodeEncodeError: 'gbk' codec can't encode character '\u2713'`
+    —— 连 `selftest` 都会崩在打印阶段，而不是崩在真正失败的检查上。
+    优先 reconfigure 成 UTF-8；不支持则退化为 errors='replace'（宁可显示成 ? 也不崩）。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+        except (AttributeError, ValueError, OSError):
+            try:
+                stream.reconfigure(errors="replace")  # type: ignore[union-attr]
+            except (AttributeError, ValueError, OSError):
+                pass
+
+
+_init_console()
+
+
+def hostname() -> str:
+    """跨平台取主机名。
+
+    `os.uname()` 是 POSIX-only —— Windows 上根本没有这个函数（实测
+    `AttributeError: module 'os' has no attribute 'uname'`），而本脚本有三处用它
+    写"设备/主机"字段（run log、探测记录、报告头），于是整条 selftest 会崩在收尾。
+    """
+    try:
+        return os.uname().nodename
+    except AttributeError:
+        return os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "unknown"
+
+
 def log(msg: str) -> None:
     print(msg, flush=True)
 
@@ -168,7 +202,7 @@ class RunRecorder:
             "ts": now_iso(),
             "cmd": self.cmd,
             "role": self.cfg.get("role"),
-            "host": os.uname().nodename,
+            "host": hostname(),
             "argv": self.argv,
             "counts": self.counts,
             "elapsed_ms": int((time.time() - self.t0) * 1000),
@@ -206,15 +240,24 @@ def make_book_id(path: Path) -> str:
 # ── PDF / EPUB 基础读取 ────────────────────────────────────────────────────
 
 
+class MissingPdfLib(RuntimeError):
+    """PDF 解析库缺失（PyMuPDF）。selftest 据此**优雅跳过**而非抛栈：
+    缺它只影响 PDF 相关自检，不影响其它子命令。安装：python3 -m pip install pymupdf
+    （依赖声明见 scripts/README.md 的"外部依赖"节）"""
+
+
 def pymupdf():
     try:
         import pymupdf  # type: ignore
 
         return pymupdf
     except ImportError:
-        import fitz  # type: ignore
+        try:
+            import fitz  # type: ignore
 
-        return fitz
+            return fitz
+        except ImportError as exc:
+            raise MissingPdfLib("缺少 PyMuPDF；安装：python3 -m pip install pymupdf") from exc
 
 
 def pdf_probe(path: Path, cfg: dict) -> dict:
@@ -554,7 +597,7 @@ def cmd_read(args, cfg, rec: RunRecorder) -> dict:
             "page_start": start,
             "page_end": end,
             "sha256_source": sha256_of(path),
-            "device": os.uname().nodename,
+            "device": hostname(),
             "role": cfg.get("role"),
             "elapsed_ms": int((time.time() - t0) * 1000),
             "pages": metas,
@@ -649,7 +692,7 @@ def cmd_report(args, cfg, rec: RunRecorder) -> dict:
     lines = [
         "# 书籍知识库 · 探测报告",
         "",
-        f"- 生成时间：{now_iso()}    角色：`{cfg.get('role')}`    设备：`{os.uname().nodename}`",
+        f"- 生成时间：{now_iso()}    角色：`{cfg.get('role')}`    设备：`{hostname()}`",
         f"- 记录目录：`{out}`",
         f"- 书库：{len(probes)} 本 / {sum(r.get('size_mb', 0) for r in probes) / 1024:.2f} GB",
         f"- 格式：{', '.join(f'{k}×{v}' for k, v in sorted(fmts.items()))}",
@@ -780,6 +823,11 @@ def cmd_selftest(args, cfg, rec: RunRecorder) -> dict:
             str(logrows[-1] if logrows else None)[:120],
         )
         check("缓存跨设备可迁移（id 由内容指纹决定）", "-" in make_book_id(pdf) and content_fingerprint(pdf) == content_fingerprint(pdf))
+    except MissingPdfLib as exc:
+        # 缺 PDF 解析库时**跳过**而不是当失败：自检要造合成 PDF，缺库就无从造起。
+        # 只记一条 check 说明原因，仍走 finally 清理，返回值照常带 failed 计数（为 0）。
+        checks.append(("PDF 解析库（PyMuPDF）——缺失则跳过自检", True, f"跳过：{exc}"))
+        print(f"  - 跳过：{exc}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

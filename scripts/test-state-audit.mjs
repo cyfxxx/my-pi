@@ -13,7 +13,7 @@
  * 用法：node scripts/test-state-audit.mjs
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -179,6 +179,14 @@ console.log('状态体检：重启/崩溃行为异常（recovery/rounds.jsonl）
   check('没有 rounds.jsonl（新设备/未跑过）→ 不告警', !has(agent(healthyFiles()).findings, 'rounds-corrupt-lines'));
 }
 
+// 平台判据：`countRunningInstances()` 读 /proc/<pid>/environ 数实例，而 state-audit.mjs 自己写明
+// "非 Linux（没有 /proc）或读不到时返回 undefined，**静默跳过**"——这是刻意的优雅降级。
+// 于是"真起两个进程再统计"这条 CLI 级用例在无 /proc 的平台上**必然** detected=0：
+// 失败的是测试没跟着跳过，而非产品行为（同文件上方 mock runningInstances 的纯逻辑用例照常跑）。
+if (!existsSync('/proc/self')) {
+  console.log('状态体检：多实例探测（CLI 级）');
+  console.log('  - 跳过：本平台无 /proc（该能力在 state-audit.mjs 里刻意优雅降级）');
+} else {
 console.log('状态体检：多实例探测（CLI 级，真起两个进程）');
 {
   const { spawn } = await import('node:child_process');
@@ -224,6 +232,7 @@ console.log('状态体检：多实例探测（CLI 级，真起两个进程）');
       /* 已退出 */
     }
   }
+}
 }
 
 console.log('状态体检：只读性 + 真值不漂移');
