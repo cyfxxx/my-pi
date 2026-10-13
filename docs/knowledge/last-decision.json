@@ -2,11 +2,10 @@
   "create_patterns": [],
   "update_patterns": [
     {
-      "name": "bug-037",
+      "name": "bug-036",
       "edits": [
         "根因 更新",
-        "命令 更新",
-        "指纹 更新"
+        "命令 更新"
       ]
     }
   ],

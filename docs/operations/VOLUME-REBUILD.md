@@ -169,7 +169,9 @@ robocopy 'E:\_备份\data' 'M:\' /E /COPY:DAT /DCOPY:DAT /R:2 /W:5 /XJ /MT:8 /NP
   /LOG:'E:\_备份\robocopy-restore.log'
 ```
 
-`/XD` 排除的三个目录是旧 exFAT 的损坏残留与系统目录，对 NTFS 无意义。
+`/XD` 排除的三个目录：`FOUND.000` 是旧 exFAT 的 chkdsk 残留；`System Volume Information` 与 `$RECYCLE.BIN` 是系统目录。三者对新盘都无意义。
+
+> 注意：`/XJ` 已跳过 reparse point，**火绒的反勒索诱饵目录（`PACKAGE187` / `ZDOCUMENT778`）因此不会被跟进**；若不用 `/XJ`，它们会被当作真实目录复制（§5.3）。
 
 ### 阶段 6：回迁后验证（用同一份清单）
 
@@ -244,14 +246,42 @@ robocopy 'E:\_备份\data' 'M:\' /E /COPY:DAT /DCOPY:DAT /R:2 /W:5 /XJ /MT:8 /NP
 
 **做法**：用 `Get-ChildItem -Recurse -File -Force` 或 Python `os.walk`。
 
-### 5.3 "不参与递归枚举"的目录：存在但看不见
+### 5.3 "不参与递归枚举"的目录 —— **它们是火绒的反勒索诱饵，不是损坏**
 
-本盘有两个目录（名带前导空格的 ` DOCUMENT873` 与 `ZUSER249`）：
-**能按名直接访问、文件完好，但递归枚举与资源管理器都看不见**。
+> **2026-10-13 更正**：本节原先写成"文件系统损坏 / 不动点损伤"，**那是误判**。
+> 实测查明：那两个目录是**火绒（Huorong）安全软件的反勒索诱饵目录**。
 
-后果：`Get-ChildItem -Recurse` 的总数比实际少；据此对账会得出"丢了 20 个文件"的错误结论。
+**诱饵的机制**（实测证据）：
 
-**做法**：对账时**按名补齐**这类目录，或在结论里明确说明它们的存在与数量。
+```
+<盘>:\PACKAGE187    → 该盘的 reparse point，指向 <盘>:\ProgramData\Huorong\Sysdiag\BaitRoot
+<盘>:\ZDOCUMENT778  → 同上
+属性：Hidden + System + NotContentIndexed    每个盘（含加密卷）根目录都有这两个
+```
+
+- 名字随机但**固定**（全盘同名同位置），并伪装成隐藏系统目录；
+- 里面放**合成的假文件**（`.docx/.xls/.mdb/.sql/.pem/.rtf/.txt/.jpg`），
+  文件头是**合法签名**（OLE / ZIP / JPEG / RTF / UTF-8 BOM / PEM），
+  后面用**大量重复字节**填充 —— 实测 4 KB 内只有 **10–16 个不同字节值**，
+  最常见字节重复 2811–3959 次。**零真实内容**，被加密也无所谓，这就是诱饵的目的。
+- 火绒运行时会**在每个卷重新创建**它们（含 VeraCrypt 挂载出的卷）。
+
+**所以"递归枚举看不到、但能按名访问"不等于数据损伤**，更不该据此推断"丢了文件"。
+
+**做法**：
+1. 不要删它们（删了火绒会重建；它们是保护机制的一部分）。
+2. 对账时把它们**显式排除**，不要让诱饵的 20 个假文件进统计：
+   ```powershell
+   Get-ChildItem 'M:\' -Recurse -File -Force |
+     Where-Object { $_.FullName -notmatch '\\(PACKAGE187|ZDOCUMENT778)\\' }
+   ```
+3. 备份/迁移时用 `robocopy /XJ`（跳过 reparse point），不要跟进诱饵内部。
+
+> **诚实标注**：本节原观察（"那两个具体目录在**旧 exFAT 卷**上递归枚举看不到"）
+> **已无法复现验证** —— 那块 exFAT 卷已按要求格式化。当前 NTFS 卷上，
+> `Get-ChildItem -Recurse -Force` **能**看到诱饵（不带 `-Force` 也能看到根目录下的）。
+> 因此"为何当时看不到"**尚无实测结论**，可能与该卷当时的枚举异常有关，
+> 但**确定的部分**是：那些文件是火绒诱饵，不是用户数据，也不构成损坏。
 
 ---
 
