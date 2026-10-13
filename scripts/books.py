@@ -57,7 +57,8 @@ DEFAULTS = {
     "page_budget": 8,
     "dpi": 200,
     # rapidocr：onnxruntime + PaddleOCR 模型，模型随 wheel 分发（离线可用），
-    # 本机实测 2.4-4.4 秒/页；tesseract 在本机 31-69 秒/页，慢一个数量级。
+    # 本机实测 3-5 秒/页（12 本各 12 页的抽样：426 s / 144 页）；
+    # tesseract 在本机 31-69 秒/页，慢一个数量级。
     "ocr_engine": "rapidocr",
     "ocr_langs": "chi_sim+eng",   # 仅 tesseract 用
     "ocr_psm": "6",               # 仅 tesseract 用

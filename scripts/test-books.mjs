@@ -28,4 +28,4 @@ if (r.status !== 0 || bad > 0) {
   console.error(`❌ 书籍框架自检失败（通过 ${ok} / 失败 ${bad}）`);
   process.exit(1);
 }
-console.log(`书籍知识库框架自检通过（${ok} 项；含 OCR 兜底，缺 tesseract 时该项显式跳过）`);
+console.log(`书籍知识库框架自检通过（${ok} 项；含 OCR 兜底与 report 去重回归）`);
