@@ -453,7 +453,7 @@
 - `PROGRESS.md` · 种子静默失效修复 + 守卫隔离（2026-10-11） · - 我的锅：ClamAV 种子只有 [name,prompt] ⇒ 被 isSeedLike（要求 type∈{interval,cron,once} 且 schedule 非空）过滤掉 ⇒ 永不注册且 · 数字: 3 个 / 5 个 / 6 条 / 5 条
 - `PROGRESS.md` · ClamAV 种子字段对齐（2026-10-11） · - 只改 scheduled-seeds.json 里「每日更新 ClamAV 病毒库」一条（prompt 逐字节未变、另 5 条逐字节未变、version/note 未变）； · 数字: 5 条 / 6 条 · 证据: b6ffc4599f04745e592d5270
 
-## 缺陷回放（30 条）
+## 缺陷回放（33 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -485,6 +485,9 @@
 - `docs/BUG-REPLAYS.md` · #28 **在 exFAT 卷上装依赖 ⇒ npm 报内部错误而非「不支持符号链接」**：U 盘（exFAT）无法创建符号链接（Windows junction 亦被拒），而 npm workspaces 必须把工作区包符号链接进 `nod · 同一个 `package.json`：NTFS 安装成功、exFAT 崩溃；`cmd /c 'mklink /D ...'` 回 `The device does not support symbolic links.`，`mklink /
 - `docs/BUG-REPLAYS.md` · #29 **canvas 原生构建挡住整个构建**：`vendor/pi/packages/ai` 的 `canvas@3.2.3` 是 **devDependency**（该包测试用），无预编译包时 npm 退化为 `node-gyp`  · 报错 `npm error path .../node_modules/canvas` + `command ... prebuild-install -r napi` + `cairo.h: No such file or directo
 - `docs/BUG-REPLAYS.md` · #30 **守门把「读不了仓库」误报成「有未提交的修改」，方向完全相反**：`check-isolation.sh` 检查 6 用 `if ! git diff --quiet 2>/dev/null` 判 `vendor/pi` 是否干净 · 报错说"有改动"，但 `git -C vendor/pi status --porcelain` 输出 **0 行**；`git -C vendor/pi diff --quiet; echo $?` 得 **129**（不是 1）；手动 
+- `docs/BUG-REPLAYS.md` · #31 **便携工具链用 `bash -l` ⇒ 换机器后核心命令全没了**：把 Git for Windows 复制到 U 盘做「盘内自带 bash」时，若以登录 shell 调用（`bash -lc` 或带 `-l`），便携 Git 的 · 同一份便携 Git：调用方机器上 `my-pi.sh --version` 正常，换机后报 `./my-pi.sh: line 7: dirname: command not found` / `line 16: mkdir: comman
+- `docs/BUG-REPLAYS.md` · #32 **VeraCrypt 挂载的卷在 `Get-Volume` 里看不见 ⇒ 盘符探测静默落空（还被 `$ErrorActionPreference='Stop'` 放大成整体中断）**：给便携启动器写「遍历所有卷找仓库」的逻辑时，` · 实测：`Get-Volume` 列出的盘符不含 M:，而 `Test-Path M:\` 为 True、`Get-PSDrive -PSProvider FileSystem` 与 `[IO.DriveInfo]::GetDrives()`
+- `docs/BUG-REPLAYS.md` · #33 **台账表格被空行割裂 ⇒ 下游按行解析会静默漏条**：`docs/BUG-REPLAYS.md` 的台账表在若干行之间插了空行（本文件 L53/L55 曾是），Markdown 渲染仍连成一张表，但**任何按「行以竖线开头」解析的 · 表格行数与台账实际条数不符；或台账里两条之间夹着空行；`node scripts/knowledge-compile.mjs --check` 通过**也不能证伪**（它只比对已解析到的条目与已有页面，漏解析的条目在两边同时缺席） · 证据: node scripts/knowledge-compile.mjs --check
 
 ## 设计文档（177 条）
 

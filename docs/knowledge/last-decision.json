@@ -1,5 +1,15 @@
 {
-  "create_patterns": [],
+  "create_patterns": [
+    {
+      "name": "bug-031"
+    },
+    {
+      "name": "bug-032"
+    },
+    {
+      "name": "bug-033"
+    }
+  ],
   "update_patterns": [],
   "update_index": true
 }
