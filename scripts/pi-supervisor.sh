@@ -36,7 +36,20 @@ ROUND_LOG_KEEP="${ROUND_LOG_KEEP:-20}"   # 只留最近 N 轮 crash log
 ROUNDS_MAX_LINES="${ROUNDS_MAX_LINES:-800}"   # rounds.jsonl 超过这么多行就轮转（只留最近一半）
 # 本实例的"身份"：admin 请求里的 ownerPid 要跟它比。缺省就是本 supervisor 的 pid；
 # 允许外部覆盖只为测试（`test-supervisor.sh` / restart-log 的跨语言契约测试要能钉住它）。
-SUPERVISOR_OWNER_PID="${SUPERVISOR_OWNER_PID:-$$}"
+# 身份：本实例的唯一标识，用于"admin 请求是否写给我"（多实例共享 state.json）。
+#
+# 为什么不能只靠 PID（真实事故，见 docs/BUG-REPLAYS.md 第 37 条）：
+#   pi 原先把 `process.ppid` 写进 ownerPid，认为"我的父进程就是拉起我的 supervisor"。
+#   这在 Linux 成立，但在 **Windows/MSYS 下不成立**：MSYS 每次启动 .exe 都会新建一个
+#   短命的中间进程，故 node 看到的父 PID **不是 bash/supervisor 的 PID**（实测同一 bash 里
+#   三次调用分别得到 33600 / 22048 / 39220，且与 `$$`、`/proc/$$/winpid` 都不等）。
+#   后果：supervisor 把**自家 pi** 写下的重启请求判为"别人的"而拒绝，主循环只跑一轮就退出且不报错。
+#
+# 正解：**父进程知道自己的身份，子进程用环境变量继承它** —— 与 PID 语义无关，跨平台一致。
+# 这里把身份 export 给 pi；pi 侧（autopilot/store/ops.ts）优先读该环境变量，读不到才回退 ppid
+# （回退只为兼容旧版/手工写的请求，在 PID 不可靠的平台上就是现状那个 bug）。
+export MY_PI_SUPERVISOR_PID="${MY_PI_SUPERVISOR_PID:-$$}"
+SUPERVISOR_OWNER_PID="${SUPERVISOR_OWNER_PID:-$MY_PI_SUPERVISOR_PID}"
 ROUND_INDEX=0
 RUN_SESSION=""
 LAST_SESSION=""   # 上一轮实际加载的会话（崩溃恢复用它精确续接，见 recovery_args）

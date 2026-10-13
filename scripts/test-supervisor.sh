@@ -29,17 +29,19 @@ WIN() { cygpath -m "$1" 2>/dev/null || printf '%s' "$1"; }
 # （见 docs/BUG-REPLAYS.md 第 37 条）。
 OWNER_PID="$(node -e 'process.stdout.write(String(process.ppid))' 2>/dev/null)"
 case "$OWNER_PID" in ''|*[!0-9]*) OWNER_PID=$$ ;; esac
-# 身份分两种语境，**不要混**（这是本文件最容易踩的地方）：
-#   · 直调用例（本进程内 source 了 supervisor，直接调 read_admin_action）：此时
-#     "supervisor 自己的 PID" 就是**本脚本的 PID** ⇒ 把 SUPERVISOR_OWNER_PID 设成本脚本的
-#     pid（不 export，只影响本进程）。
-#   · 子进程用例（真实跑 pi-supervisor.sh / stub）：它们会自行判定身份，**注入会把它们带错**
-#     （实测：export 本脚本的 $$ 后，end-to-end 主循环里 supervisor 认不出自家 pi 的请求，
-#      16 项里的 8 项正是这么红的）。
-# 之所以要分：MSYS 下 bash 的 `$$` 与 Windows PID 是**两套命名空间**，pi 写的是后者。
+# 身份分两种语境，**不要混**（本文件最容易踩的地方，见 docs/BUG-REPLAYS.md 第 37 条）：
+#   · 直调用例（本进程内 source 了 supervisor，直接调 read_admin_action）：
+#     此时"本实例身份"就是**本脚本的 PID**。用本进程的真实 PID（bash 的 $$ 与 Windows PID
+#     是两套命名空间，故取一个 node 子进程看到的父 PID，MSYS 下它才是本进程的真身）。
+#   · 子进程用例（真实跑 pi-supervisor.sh / stub）：它们**自行**判定身份，注入会把它们带错
+#     （实测 export 本脚本的 $$ 后，端到端主循环里 supervisor 认不出自家 pi 的请求）。
 OUTER_OWNER_PID="$(node -e 'process.stdout.write(String(process.ppid))' 2>/dev/null)"
 case "$OUTER_OWNER_PID" in ''|*[!0-9]*) OUTER_OWNER_PID=$$ ;; esac
 SUPERVISOR_OWNER_PID="$OUTER_OWNER_PID"   # 仅本进程；子进程会自行判定
+
+# 与生产同款：真 pi 写 ownerPid 时**优先取继承的环境变量** `MY_PI_SUPERVISOR_PID`
+# （supervisor 启动时 export），读不到才回退 ppid。stub 照抄该顺序，才能测出真实行为。
+stub_owner_pid_expr() { printf '%s' 'Number(process.env.MY_PI_SUPERVISOR_PID) || process.ppid'; }
 
 PASS=0
 FAIL=0
@@ -273,10 +275,11 @@ if (n === 0) {
     action: 'restart',
     targetSession: '/tmp/session-cur.jsonl',
     reason: '端到端测试',
-    // 生产里 pi 就是这么写的：ownerPid = 它的 ppid = 拉起它的 supervisor
-    ownerPid: process.ppid,
+    // 与生产同款（autopilot/store/ops.ts）：ownerPid 优先取继承的 MY_PI_SUPERVISOR_PID，
+    // 回退 ppid —— 后者在 Windows/MSYS 下不是 supervisor 的 PID（见 bug-037）
+    ownerPid: Number(process.env.MY_PI_SUPERVISOR_PID) || process.ppid,
     timestamp: Date.now(),
-    restartLog: { action: 'restart', reason: '端到端测试', ownerPid: process.ppid, timestamp: Date.now() },
+    restartLog: { action: 'restart', reason: '端到端测试', ownerPid: Number(process.env.MY_PI_SUPERVISOR_PID) || process.ppid, timestamp: Date.now() },
   }));
 }
 process.exit(0);
@@ -292,7 +295,7 @@ run_loop() {
 run_loop
 check "主循环跑满两轮" "2" "$(cat "$LOOP/runs")"
 check "第二轮收到 --session（续接原会话）" "yes" \
-  "$(grep -q -- '--session /tmp/session-cur.jsonl' "$LOOP/argv-1.txt" && echo yes || echo no)"
+  "$(grep -qF -- "--session $(WIN /tmp/session-cur.jsonl)" "$LOOP/argv-1.txt" && echo yes || echo no)"
 check "第二轮仍注入 bootstrap 扩展" "yes" \
   "$(grep -q -- '--extension .*custom/bootstrap.ts' "$LOOP/argv-1.txt" && echo yes || echo no)"
 check "第一轮不带 --session（基线）" "no" \
@@ -362,9 +365,9 @@ if (n === 0) {
     action: 'restart',
     targetSession: '/tmp/other-instance.jsonl',
     reason: '别的实例的请求',
-    ownerPid: process.ppid + 1,
+    ownerPid: (Number(process.env.MY_PI_SUPERVISOR_PID) || process.ppid) + 1,
     timestamp: Date.now(),
-    restartLog: { action: 'restart', reason: '别的实例的请求', ownerPid: process.ppid + 1, timestamp: Date.now() },
+    restartLog: { action: 'restart', reason: '别的实例的请求', ownerPid: (Number(process.env.MY_PI_SUPERVISOR_PID) || process.ppid) + 1, timestamp: Date.now() },
   }));
 }
 process.exit(0);

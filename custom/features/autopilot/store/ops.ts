@@ -214,9 +214,24 @@ export function writeRestartRequest(
   opts: RestartRequestOpts = {},
 ): void {
   const now = Date.now();
-  // ownerPid：pi 的父进程就是拉起它的 supervisor（`process.ppid`）。取不到就不写该字段
-  // （老的/手工写的请求没有 ownerPid → supervisor 照旧认领，保持向后兼容）。
-  const ownerPid = typeof process.ppid === 'number' && process.ppid > 0 ? process.ppid : undefined;
+  // ownerPid：**本实例的身份**，供 supervisor 判断"这条请求是不是写给我的"（多实例共享 state.json）。
+  //
+  // 取值顺序（2026-10-13 修，见 docs/BUG-REPLAYS.md 第 37 条）：
+  //   1) `MY_PI_SUPERVISOR_PID` —— supervisor 启动时 export 的身份，由本进程**继承**。
+  //      父进程知道自己的身份，子进程继承它，**与 PID 语义无关**，跨平台一致（正解）。
+  //   2) `process.ppid` 回退 —— "我的父进程就是拉起我的 supervisor"。这在 Linux 成立，
+  //      但在 **Windows/MSYS 下不成立**：MSYS 每次启动 .exe 都新建一个短命中间进程，
+  //      故 node 看到的父 PID 不是 supervisor 的 PID（实测同一 bash 里三次调用得到
+  //      33600 / 22048 / 39220，与 `$$`、`/proc/$$/winpid` 都不等）。回退只为兼容
+  //      未带该环境变量的旧启动方式；在 PID 不可靠的平台上它会让 supervisor 拒绝自家请求。
+  // 两者都取不到就不写该字段（老的/手工写的请求没有 ownerPid → supervisor 照旧认领，保持向后兼容）。
+  const fromEnv = Number(process.env.MY_PI_SUPERVISOR_PID);
+  const ownerPid =
+    Number.isInteger(fromEnv) && fromEnv > 0
+      ? fromEnv
+      : typeof process.ppid === 'number' && process.ppid > 0
+        ? process.ppid
+        : undefined;
   const withOwner = { ownerPid, ...opts };
   writeState({
     action,
