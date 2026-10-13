@@ -21,8 +21,13 @@ const SCAN_DIRS = ['.', 'docs', 'portable/agent'];
  *   `portable/memory/knowledge/books/_report.md` 里一本书的标题恰好含
  *   `《英汉汉英航海词典》[416974](090524)`，markdown 把 `[416974](090524)` 当成了链接。
  * 排除运行期目录后，本守门只校验"有意编写的文档"，与它「文档链接守门」的定位一致。
+ *
+ * `runtime` 是同日随"工具链移入仓库"补的：`<repo>/runtime/` 放的是**整份便携
+ * PortableGit + Node**（gitignored，随项目移动）。其中 git-lfs 自带的
+ * `git-lfs/README.md` 含指向包内并不存在的 `docs/spec.md`、`CONTRIBUTING.md` 等链接，
+ * 实测一次报 8 条。第三方分发的文档不该由本守门负责。
  */
-const SKIP = new Set(['node_modules', 'vendor', 'packs', '.git', 'memory']);
+const SKIP = new Set(['node_modules', 'vendor', 'packs', '.git', 'memory', 'runtime']);
 
 /**
  * 目录项类型判定（**不信任 dirent 类型标志**）。

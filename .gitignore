@@ -92,3 +92,8 @@ packs/drafts/*
 # Python 缓存（knowledge-fetch.py 等）
 __pycache__/
 *.pyc
+# 盘内便携工具链（bash + Node，约 441 MB；随项目移动，不入库）
+# 放在仓库内是为了"项目自包含"：仓库能被找到，工具链就在，无需按盘符猜。
+# 由 scripts/run-my-pi.ps1 的 Find-Runtime（优先 <repo>\runtime）与
+# scripts/pi-supervisor.sh 的便携布局查找共同识别。
+runtime/

@@ -79,8 +79,21 @@ function Find-Repo {
 }
 
 function Find-Runtime {
+    param([string]$Repo)
+    # 1) 优先**仓库内** <repo>\runtime\ —— 项目自包含、随项目移动（2026-10-13 起的主布局）
+    #    放在最前是因为它是唯一"跟着项目走"的位置：只要仓库能被找到，工具链就在。
+    if ($Repo) {
+        foreach ($sub in @('runtime', '..\runtime')) {
+            $p = Join-Path $Repo $sub
+            try {
+                if (Test-Path -LiteralPath (Join-Path $p 'PortableGit\bin\bash.exe') -ErrorAction Stop) {
+                    return (Resolve-Path -LiteralPath $p).Path
+                }
+            } catch { }
+        }
+    }
     $letters = Get-DriveLetters
-    # 优先卷标 TOOLS 的分区（需 Get-Volume 可用；不可用也不影响，下面还会遍历）
+    # 2) 卷标 TOOLS 的分区（历史布局：工具链单独放在未加密分区；需 Get-Volume 可用）
     try {
         $byLabel = @(Get-Volume -ErrorAction SilentlyContinue |
                      Where-Object { $_.FileSystemLabel -eq 'TOOLS' -and $_.DriveLetter })
@@ -91,7 +104,7 @@ function Find-Runtime {
             } catch { }
         }
     } catch { }
-    # 遍历所有盘符
+    # 3) 遍历所有盘符找 <盘>:\runtime
     foreach ($L in $letters) {
         $p = "${L}:\runtime"
         try {
@@ -107,7 +120,7 @@ if (-not $repo) {
 }
 $repo = (Resolve-Path -LiteralPath $repo).Path
 
-$runtime = Find-Runtime
+$runtime = Find-Runtime -Repo $repo
 $bashExe = $null
 $nodeDir = $null
 if ($runtime) {

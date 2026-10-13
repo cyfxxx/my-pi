@@ -97,17 +97,26 @@ _pi_node_ok() {  # $1 = node 可执行文件；版本达标返回 0
 NODE_BIN=""
 if [ -n "${MY_PI_NODE:-}" ] && _pi_node_ok "$MY_PI_NODE"; then
   NODE_BIN="$MY_PI_NODE"
-  # 显式指定的可执行文件目录放到 PATH 最前，子进程里的裸 node 也走同一份
-  PATH="$(cd "$(dirname "$MY_PI_NODE")" && pwd):$PATH"; export PATH
 fi
 if [ -z "$NODE_BIN" ]; then
-  # 便携布局：与仓库同级（同盘）或 ROOT 下的 runtime/node/
-  for c in "$ROOT/../runtime/node/node" "$ROOT/runtime/node/node" "$ROOT/../runtime/node/node.exe" "$ROOT/runtime/node/node.exe"; do
+  # 便携布局：ROOT 下的 runtime/node/，或与仓库同级（同盘）的 runtime/node/
+  # 顺序上把 `<repo>/runtime`（项目自包含的主布局）放在前面。
+  for c in "$ROOT/runtime/node/node" "$ROOT/runtime/node/node.exe" \
+           "$ROOT/../runtime/node/node" "$ROOT/../runtime/node/node.exe"; do
     if _pi_node_ok "$c"; then NODE_BIN="$c"; break; fi
   done
 fi
 if [ -z "$NODE_BIN" ] && command -v node >/dev/null 2>&1 && _pi_node_ok node; then
   NODE_BIN=node
+fi
+# 把解析到的 node 目录放到 PATH 最前 —— **对所有分支统一做**，不能只在 MY_PI_NODE 分支做。
+# 为什么必须统一（2026-10-13 实测缺陷）：`mode_resolve` 用**裸 `node -e`** 解析 modes.json。
+# 原先只有 MY_PI_NODE 分支会把它加进 PATH，于是"靠便携布局自动发现 node"时，
+# 监督器本身拿到了 node，但 PATH 里的裸 `node` 调不到 → `mode_resolve` 返回空 →
+# 启动行显示「模式 」（空）而不是「模式 full」。实测精简 PATH 下稳定复现 5/5，
+# 完整 PATH（或显式 MY_PI_NODE）下正常 —— 差别就在这一行 PATH。
+if [ -n "$NODE_BIN" ] && [ "$NODE_BIN" != "node" ]; then
+  PATH="$(cd "$(dirname "$NODE_BIN")" && pwd):$PATH"; export PATH
 fi
 if [ -z "$NODE_BIN" ]; then
   echo "❌ 未找到满足要求的 Node.js（需要 >= ${PI_NODE_MIN}）" >&2

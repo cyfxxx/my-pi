@@ -296,18 +296,43 @@ powershell -ExecutionPolicy Bypass -File scripts\run-my-pi.ps1 --version  # 只�
 前述各节默认"目标机器装过 Git 和 Node"。要做到**插到任何 Windows 机器都能跑**，
 需要把工具链放在盘上。实测可行，且成本远比想象低。
 
-**盘上布局**（2026-10-13 实装验证）：
+**盘上布局**（2026-10-13 实装验证；同日把工具链移入仓库，见下方"为什么不放工具分区"）：
 
 ```
-<工具分区>:\runtime\PortableGit\   便携版 Git（bash + git + 核心工具），逻辑 326 MB
-<工具分区>:\runtime\node\          便携版 Node 22.23.3，逻辑 95 MB
-<工具分区>\run-my-pi.ps1           启动器（放在工具分区，直接可启动）
-<数据分区>:\my-pi\                 项目本体（可在 VeraCrypt 加密卷上）
+<数据分区>:\my-pi\runtime\PortableGit\   便携版 Git（bash + git + 核心工具），逻辑 326 MB
+<数据分区>:\my-pi\runtime\node\          便携版 Node 22.23.3，逻辑 95 MB
+<数据分区>:\my-pi\scripts\run-my-pi.ps1  启动器（在仓库内，无需按盘符找）
+<未加密分区>:\VeraCrypt\                 加密软件（**唯一必须留在明文分区的东西**）
 ```
 
-**工具链必须放在未加密的那一分区**，两个理由：
-1. VeraCrypt 便携版也在那儿 —— 必须先读到它才能挂载加密卷；
-2. 插到别的机器上，无需先解密即可取用工具。
+**工具链放在仓库内**（`<repo>/runtime/`），因此**与盘符无关**：仓库能被找到，工具链就在。
+加密卷换盘符（本机 M:，别的机器可能 N:）也照常工作。
+
+**VeraCrypt 是唯一的例外**：它必须在未加密分区，因为存在死锁 ——
+要挂载加密卷得先运行 VeraCrypt，而 VeraCrypt 若在加密卷里就需要先挂载才能拿到它。
+VeraCrypt 是独立 GUI 程序，**挂载不需要 bash/Node/任何工具链**，所以这个例外不牵连工具链。
+
+> **为什么不放"工具分区"**：曾实装在 `<工具分区>:\runtime\` 并验证可用，但那样
+> **项目被拆成两半**（代码在加密卷、工具链在明文分区），迁移时要么两件都带、要么带不全；
+> 且"未加密即可取用工具"这一收益经确认**对本项目无价值**（my-pi 本来就必须先解密才能用）。
+> 移入仓库后：项目自包含、随加密卷整体移动、G: 腾出 441 MB。
+> 兼容性上启动器仍保留"遍历盘符找 `<盘>:\runtime`"作为**历史布局回退**。
+
+**三个解析点必须一致**（这是拆分布局时代暴露的真实缺陷，修于 2026-10-13）：
+
+| 解析点 | 行为 |
+|---|---|
+| `scripts/run-my-pi.ps1` 的 `Find-Runtime` | ①`<repo>\runtime` ②`<repo>\..\runtime` ③卷标 `TOOLS` 分区 ④遍历盘符 |
+| `scripts/pi-supervisor.sh` 的便携布局分支 | `<repo>/runtime/node/…` 与 `<repo>/../runtime/node/…` |
+| `scripts/lib-vendor.sh` 的 `pi_resolve_node` | `$MY_PI_NODE` → 上述便携布局 → PATH |
+
+两个踩过的坑：
+1. **相对路径跨不了盘符** —— `$ROOT/../runtime` 在 `ROOT=/m/my-pi` 时算成 `/m/runtime`。
+   拆分布局下（runtime 在 G:、仓库在 M:）**必然找不到**，只靠启动器显式传 `MY_PI_NODE` 兜着。
+2. **`MY_PI_NODE` 分支加 PATH、便携布局分支没加** —— 于是"自动发现 node"时，
+   监督器拿到了 node，但 `mode_resolve`（用裸 `node -e` 读 `modes.json`）调不到它，
+   启动行显示「模式 」（空）而非「模式 full」。实测精简 PATH 下稳定复现 5/5。
+   修法：把"把 node 目录前置进 PATH"提升为**对所有分支统一做**。
 
 **成本实测（关键：簇大小决定一切）**：
 
