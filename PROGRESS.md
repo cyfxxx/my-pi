@@ -3698,3 +3698,29 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - ★假覆盖揭穿：拉取后两个 pty 场景默认跳过，不带 --fast 也不跑，须显式 PI_GOLDEN_SCENARIO=1；而本次拉取改了 pi-supervisor.sh(+90) ⇒ 这两步
   按项目自己的要求"必须跑" ⇒ 待补跑。本次全量 golden 其余全绿（失败项：无，含书籍自检 ⇒ RapidOCR 生效）。
 - 子代理第三次误用 pkill -f 杀掉自己的 shell（已改用 job_kill）⇒ 纪律有效性再次验证。
+
+### 上游 pi 1.2 分析 + pty 场景补跑 + 失败任务实测闭环（2026-10-11）
+
+- 上游：我方 1.0.4（vendor/pi/packages/coding-agent/package.json，同步点 28dcce2b…）⇒ 上游 1.2.0（2026-10-12），中间 1.1.0，
+  落后两个 minor；分析见 docs/design/UPSTREAM-PI-1.2.md（118 行，来源 1.2.0 npm 包内 CHANGELOG 6263 行）。
+  ★两处 Breaking：before_agent_start 现在也为 sendMessage(triggerTurn) 触发且事件按 messageType 成联合（我方 6 个调用点须检查
+  event.messageType === "user"）；忙语义变更 + sendUserMessage 要求 deliverAs ⇒ 与我方中途注入(steer)直接相关、须重验。
+  需改补丁/适配：6 个 footer 补丁 + editor.ts 补丁上下文位移；011 与 reachesTools/aliases/searchTools 同文件相邻；主题 schema 迁移；
+  pi mcp list --json 形状；移除 experimental 栈与 @earendil-works/chord（须确认未 import）。建议不同步理由：无。
+  结论：建议同步但先干跑；上游修了多处与我们痛点同向的问题（-p 截断不再静默退 0，会改变定时任务判读口径；颜色泄漏；按键匹配；
+  会话切换后全屏选择残留）。工作量约半天。回滚：vendor/pi 是独立仓库 ⇒ git -C vendor/pi reset --hard 旧栈顶 + 恢复 LAST_SYNC_POINT
+  + 重建 dist/好 pi 缓存；注入面基线哈希必须有意义地更新并附理由。同步模型：scripts/sync-upstream.sh，patches 是唯一真值，
+  临时 worktree 重放补丁、全成功才移动 vendor 分支；开关 PI_SYNC_DRY_RUN/PI_SKIP_REBUILD/PI_SYNC_RUN_GOLDEN。
+  ★未核实：补丁能否重放未验证（npm tarball 只有 dist/bundle 没 src）⇒ 唯一手段 PI_SYNC_DRY_RUN=1 需 github，而本机两次探测失败
+  （一次失败≠不可达，择时复测；npm 通道当时通）。web_search 本会话不可用；未逐个核对 custom 是否 import 被移除包；未评估 typebox 1.3.27。
+- pty 场景补跑（本次拉取改到 supervisor +90 行 ⇒ 正属"必须跑"情形）：发现假覆盖 —— 第 19/20 步默认跳过，需 PI_GOLDEN_SCENARIO=1
+  （golden-tasks.sh:134/153；注释理由正当：各 4–8 分钟 + 留出集纪律）。实跑 331 秒：第 19 步通过 33 项（round-1 full / round-2 roleplay /
+  命名空间 roleplay / 会话精确续接 / 退出轮仍 roleplay / 无重启被吞 / 原会话文件未被顶掉）；第 20 步通过 33 项（A/B 互不污染 /
+  文本不串台 / B 的 pid 全程不变 / lostRestart 全 false / rounds.jsonl 按 session 区分 / crash log 按实例分开）⇒ golden 全部通过。
+  清理核对：tmux 无服务、pi 进程数 1、MemAvailable 1898 MB。
+- 真实会话后闭环：4/5 任务全部 success 且 failCount 归零（tool-stats-daily 0/51、knowledge-subscribe 0/39、daily-health 0/41、
+  golden-fast 0/46）⇒ 先前诊断被实测证实（失败确实是历史的）；ClamAV 任务已注册（字段齐全、nextRun 2026-10-15T06:15Z、lastRun None）；
+  漂移自证消除（种子与任务 prompt 逐字节相同 379/70c69c01；seed-drift.log 末行为项目自己写的"漂移已消除"）。
+- ★遗留真问题：daily-review 自 10-10 起从未再跑（failed、lastRun 陈旧、nextRun 逾期 3 天、enabled=True），而同一会话跑了其它 4 个
+  ⇒"它为什么没被调度"是新问题，单独立项。另一假设被证伪：scheduler.lock 存在但为三段格式且持有 PID 活着 ⇒ 是交互会话合法持锁，
+  daily-health 正确判为"调度锁=正常"⇒ ①d 检查器按设计工作。

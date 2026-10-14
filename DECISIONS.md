@@ -2,6 +2,57 @@
 
 ## 格式
 
+### [2026-10-11] 上游 pi 1.2 同步分析 ✓（**建议同步，先干跑**）+ pty 场景补跑全通过 ✓ + "4/5 失败任务"实测闭环 ✓
+
+**① 上游分析（结论先行 ✓）**：我方钉住 **pi 1.0.4** ✓（`vendor/pi/packages/coding-agent/package.json` ✓，14 个包同版 ✓；
+同步点 `vendor/pi/LAST_SYNC_POINT` = `28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9` ✓；上游 `earendil-works/pi-mono` ✓）；
+上游最新 **1.2.0**（2026-10-12 ✓）；中间还有 **1.1.0**（10-07 ✓）⇒ **落后两个 minor** ✓。分析写进 **`docs/design/UPSTREAM-PI-1.2.md`** ✓
+（118 行 ✓；来源 = 1.2.0 npm 包内 `CHANGELOG.md` 6263 行，**一手权威** ✓）。
+**★ 两处 Breaking 直击我们** ✗：**(a)** `before_agent_start` 现在**也为 `sendMessage(…,{triggerTurn:true})` 触发** ✓，
+`BeforeAgentStartEvent` 变成**按 `messageType` 的联合** ✓ ⇒ **只关心用户提示的处理器必须检查 `event.messageType === "user"`** ✓
+（**我方 6 个调用点** ✓ 需逐个检查 ✓）；**(b)** 忙语义变更 ✓（运行启动期间即算忙 ✓、`sendMessage` **排队**而不再以
+"already processing" 失败 ✓、**`sendUserMessage` 现在要求 `deliverAs`** ✓）⇒ **与我方"中途注入（steer）"机制直接相关** ✓
+⇒ **注入路径必须重验** ✓。
+**② 需改补丁/适配** ⚠：6 个 footer 补丁 + `editor.ts` 补丁的**上下文位移**（两文件在 1.1/1.2 都有改动 ✓）；
+011（tool-search CJK）与新增 `reachesTools`/`aliases`/`searchTools` **同文件相邻** ✓；主题 schema 迁移 ✓；
+`pi mcp list --json` 形状变更 ✓；**移除未发布的 experimental 栈与 `@earendil-works/chord`** ✓（需确认我方未 import ✓）。
+**③ 建议不同步的理由：无** ✗（未发现必须留在 1.0.4 的理由 ✓）。
+**★ 结论：建议同步，但先干跑** ✓ —— 上游修了多处**与我们痛点同向**的问题 ✓（`-p` 截断不再静默退 0 ✓（**会改变定时任务判读口径** ✓）；
+颜色泄漏 ✓；按键匹配 ✓；**会话切换后全屏选择残留** ✓）。**工作量约半天** ✓（干跑 10 分钟 ✓ / 补丁重放 10–30 分钟 ✓ /
+`custom/` 类型检查与修复 0.5–2 小时 ✓ / 全量 golden 20–30 分钟 ✓）。**回滚** ✓：`vendor/pi` 是独立 git 仓库 ✓ ⇒
+`git -C vendor/pi reset --hard <旧栈顶>` + 恢复 `LAST_SYNC_POINT` + 重建 dist/好 pi 缓存 ✓；
+**注入面基线哈希必须"有意更新并附理由"，不能为变绿而改** ✓✓。
+**同步模型** ✓（照项目流程、未自创 ✓）：`scripts/sync-upstream.sh` —— **`patches/` 是唯一真值** ✓；在临时 worktree **重放补丁** ✓，
+**全成功才移动 vendor 分支** ✓（否则 vendor 不变并报出失败补丁 ✓）；开关 `PI_SYNC_DRY_RUN=1` / `PI_SKIP_REBUILD=1` / `PI_SYNC_RUN_GOLDEN=1` ✓。
+**★ 未核实（关键 ✗）**：**补丁能否重放未验证** —— npm tarball **只有 `dist/`/`bundle/`、没有 `src/`** ✗ ⇒ 无法本地逐行比对；
+唯一可信手段是 **`PI_SYNC_DRY_RUN=1 bash scripts/sync-upstream.sh`** ✓，而它**需要 github** —— 本机两次探测均失败 ✗✓
+（**一次失败 ≠ 不可达** ✓，需另择时机复测 ✓；npm 通道当时是通的 ✓）。另：`web_search` 工具本会话不可用 ✗ ⇒
+全部依据 npm 包内 CHANGELOG ✓；未逐个核对 `custom/` 是否 import 被移除的包 ✓；未核对 `typebox 1.3.27` 兼容性 ✓（曾踩 `Type.Null` ✓）。
+
+**② pty 场景补跑（**这是本次拉取改到的层** ✓✓）**：★ 发现 **"假覆盖"** ✗ —— 第 19/20 步**默认跳过** ✓
+（`golden-tasks.sh:134/153` 要求显式 **`PI_GOLDEN_SCENARIO=1`** ✓；注释理由正当：各 4–8 分钟、会拉长 push 期连接 ✓，
+且带**留出集纪律**"开发期间不应查看本步结果" ✓）⇒ **不加 `--fast` 也不跑** ✗。
+★ **但本次正属它自己写明"必须跑"的情形** ✓：第 19 步注释写着"**改 mode/supervisor/生命周期 时必须跑**" ✓，
+而拉取**恰好改了 `scripts/pi-supervisor.sh`（+90 行）** ✓；第 19 步注释还记录 **2026-10-06 那次真实故障**
+（切模式后进程直退、模式没换）**在当时的全部门禁下都是绿的** ✗ ⇒ **只有这一层能挡住它** ✓✓。
+**结果（实跑 ✓，331 秒）**：**第 19 步 ✓ 通过（33 项）**（round-1 在 full ✓ / round-2 在 roleplay ✓ / 记忆命名空间=roleplay ✓ /
+会话精确续接同一路径 ✓ / 退出轮仍在 roleplay ✓ / **全程没有"重启请求被吞"** ✓ / 原会话文件未被顶掉 ✓）；
+**第 20 步 ✓ 通过（33 项）**（A/B 互不污染 ✓ / 文本互不串台 ✓ / **B 的 pi pid 全程不变** ✓ / `lostRestart` 全为 false ✓ /
+`rounds.jsonl` 按 session 区分 ✓ / per-round crash log 按实例分开 ✓）⇒ **`🎉 golden tasks 全部通过`** ✓。
+**清理核对** ✓：`tmux` 无服务 ✓、`pi` 进程数 **1**（与起跑前一致 ✓）、MemAvailable **1898 MB** ✓。
+
+**③ 你开真实会话后，之前那批"失败任务"实测闭环** ✓✓（这是"只能真跑才能闭环"那条 ✓）：**4/5 全部 `success` 且 `failCount` 归零** ✓
+（tool-stats-daily 0/51 ✓、knowledge-subscribe 0/39 ✓、daily-health 0/41 ✓、golden-fast 0/46 ✓）⇒ **先前诊断被实测证实：那批失败确实是历史的** ✓✓。
+**ClamAV 任务已注册** ✓✓（`type=cron` ✓/`schedule='15 6 * * *'` ✓/`useSubagent=True` ✓/`maxRunTime=900` ✓/`retries=1` ✓/`tags` ✓、`nextRun=2026-10-15T06:15Z` ✓、`lastRun=None` ✓）。
+**漂移已自证消除** ✓（种子与任务 prompt **逐字节相同** ✓ 379/FNV32 `70c69c01` ✓；`seed-drift.log` 末行 = 项目自己写的
+`[2026-10-11T14:52:50.092Z] 漂移已消除（本地任务与 seeds 重新一致）` ✓ —— **说明我加的"两侧摘要"在第一次真实漂移上就派上用场** ✓）。
+★ **遗留一个真问题** ✗：**`daily-review` 自 10-10 起从未再跑** ✗（`lastResult=failed` ✓、`lastRun=2026-10-10T10:39:44Z` 陈旧 ✓、
+`nextRun=2026-10-11T09:05Z` **逾期 3 天** ✓、`enabled=True` ✓）—— **而同一会话把其它 4 个都跑了** ✓ ⇒
+**"它为什么没被调度"是新问题** ✓（**不是**已修的那个根因 ✓）⇒ **单独立项** ✓。
+**另一个假设被证伪 ✓✓**：曾疑"调度器被陈旧锁卡死"（`scheduler.lock` 存在 ✗）⇒ 实测：锁为**新三段格式** ✓
+`16473:1791975994768:1601522584` ✓、PID **活着**（`/proc` 状态 `S` ✓、`kill -0` 通过 ✓）⇒ **那是交互会话合法持有的锁** ✓，
+且 `daily-health` **正确判为 `调度锁=正常`** ✓ ⇒ **①d 的检查器按设计工作** ✓✓。
+
 ### [2026-10-11] 上游 pi 1.2 同步分析 ✓（建议同步）+ ★ 真实会话让 4/5 失败任务**实测转绿** ✓ + 一个"假覆盖"被揭穿 ✗✓
 
 **★ 一、你开了真实交互会话后，实测闭环（这是此前"只能真跑"的那条 ✓✓）**：

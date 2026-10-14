@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（225 条）
+## 决策台账（226 条）
 
+- `DECISIONS.md` · [2026-10-11] 上游 pi 1.2 同步分析 ✓（**建议同步，先干跑**）+ pty 场景补跑全通过 ✓ + "4/5 失败任务"实测闭环 ✓ · **① 上游分析（结论先行 ✓）**：我方钉住 **pi 1.0.4** ✓（`vendor/pi/packages/coding-agent/package.json` ✓，14 个包同版 ✓； · 数字: 14 个 / 6 个 / 10 分钟 / 30 分钟 · 证据: 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9 / 70c69c01
 - `DECISIONS.md` · [2026-10-11] 上游 pi 1.2 同步分析 ✓（建议同步）+ ★ 真实会话让 4/5 失败任务**实测转绿** ✓ + 一个"假覆盖"被揭穿 ✗✓ · **★ 一、你开了真实交互会话后，实测闭环（这是此前"只能真跑"的那条 ✓✓）**： · 数字: 3 天 / 4 个 / 6 个 · 证据: 70c69c01 / 484a8b8c
 - `DECISIONS.md` · [2026-10-11] 新增 runbook：`docs/operations/books-ocr-selfcheck.md` ✓（让换机不再卡在"提交被拦" ✗→✓） · **为什么需要** ✗：拉取远端 26 笔后，本机守门**第 15 步书籍自检失败** ✗ ⇒ **任何提交都过不了 pre-commit** ✗✗； · 数字: 30 秒 / 789 条 / 166 个 / 9 个 · 证据: d89ab4f73
 - `DECISIONS.md` · [2026-10-11] 拉取远程 26 笔 ✓：**内容零丢失**（用内容比对证明 ✓）+ 收口遗留漂移 + 补装 OCR 引擎 ✓ · **拉取结果** ✓：`git pull --rebase origin main` **成功、无冲突** ✓；远端是 **`forced update`** ✗（另一台设备 **rebase 后强推** ✓）； · 数字: 37 条 / 7 条 · 证据: 35486062b / d89ab4f73
@@ -233,7 +234,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（223 条）
+## 进度记录（224 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -458,6 +459,7 @@
 - `PROGRESS.md` · 拉取远程 26 笔 + 收口漂移 + 补装 OCR 引擎（2026-10-11） · - 拉取：git pull --rebase 成功无冲突；远端 forced update（对方 rebase 后强推），共 26 笔（书籍库/RapidOCR/工具链移入 runtime/ · 证据: 35486062b / node scripts/test-books.mjs rc=0（20
 - `PROGRESS.md` · 新增 runbook：books-ocr-selfcheck（2026-10-11） · - 为什么：拉取 26 笔后第 15 步书籍自检失败 ⇒ 任何提交都被 pre-commit 拦；根因是 test-books.mjs（golden-tasks.sh:108，属 · 数字: 789 条 / 9 个 / 1 个
 - `PROGRESS.md` · 上游 pi 1.2 分析 + 4/5 任务实测转绿 + 假覆盖揭穿（2026-10-11） · - ★真实会话后 4/5 任务实测转绿：tool-stats-daily 0/51、knowledge-subscribe 0/39、daily-health 0/41、golden-fast 0/46 全 success； · 数字: 3 天 / 6 个 · 证据: 70c69c01 / 28dcce2b
+- `PROGRESS.md` · 上游 pi 1.2 分析 + pty 场景补跑 + 失败任务实测闭环（2026-10-11） · - 上游：我方 1.0.4（vendor/pi/packages/coding-agent/package.json，同步点 28dcce2b…）⇒ 上游 1.2.0（2026-10-12），中间 1.1.0， · 数字: 6 个 / 8 分钟 / 331 秒 / 1898 MB · 证据: 28dcce2b / 70c69c01
 
 ## 缺陷回放（37 条）
 
