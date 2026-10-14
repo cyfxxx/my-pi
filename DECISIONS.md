@@ -2,6 +2,50 @@
 
 ## 格式
 
+### [2026-10-11] 上游 1.2「人话版变更 + 不适合项」交付 ✓ + ★★ 最硬的适配点：我们**确有 `sendUserMessage` 未传 `deliverAs`** ✗
+
+**交付** ✓：`docs/design/UPSTREAM-PI-1.2.md` **原位追加「附二」**（原文保留 ✓，现 **209 行** ✓）——
+**上游 1.2 变更展示（人话版，按主题分组 ✓）+ 不适合本项目的更新与反向适配清单 ✓**；
+一手素材 = 上游 npm 包内 `packages/coding-agent/CHANGELOG.md` ✓（**从 npm 通道取得** ✓），**所有条目附 1.2.0/1.1.0 段落行号** ✓。
+
+**★★ 本轮最硬的发现（可立刻动手 ✓）**：1.2 要求 **`sendUserMessage` 必带 `deliverAs`** ✗，而**我方确有调用且未传** ✗ ——
+`custom/features/voice/index.ts:78`、`:344`、`:367` ✓，均经 `custom/adapters/ui-adapter.ts:185`/`:193` 包装 ✓，**只传了
+`expandPromptTemplates`** ✗ ⇒ **这是同步里最具体、最可立即适配的一点** ✓（选 `nextTurn` 还是立即 ⇒ 需按**语音语义**定 ✓）。
+
+**★ 隐私面被"加强"而非减弱** ✗：1.2 新增 **`sessionShareDestination` 设置**（`auto` / GitHub gist / Radius ✓，
+**默认 `auto`** ✗，`settings-defaults.ts:6` ✓）+ **三处新 `/bug` 通道** ✓（`interactive-mode.ts:136` 的 `import { reportBug }` ✓、
+`:2173` 提示 ✓、`:3242` 处理器 ✓）⇒ **我方补丁 010 只删了命令表两行 ⇒ 必须扩展** ✓；
+★ **并且**：**删掉 `/share` 后 `sessionShareDestination` 是否还有别的消费者** —— **未核实** ✗（若仍有 ⇒ **须显式置为不外发** ✓）。
+
+**★ 一处精确更正（避免文档写错 ✓✗）**：1.2 的 `### Removed` 写的是"**移除对 `@earendil-works/chord` 的依赖**" ✓，
+而 **`packages/chord/` 仍在仓库里** ✓ —— **两者不矛盾** ✓ ⇒ **不要把"chord 被删"写进结论** ✗✓
+（**也修正了我先前转述里的近似说法** ✓）。
+
+**⚠ 别忘了 6 个 `before_agent_start` 调用点** ✓：`"custom"` 事件**没有 `prompt`** ✗ ⇒ 只读 `event.prompt` 的处理器会拿到
+**`undefined`** ⇒ **静默行为变化** ✓（**正是本项目最忌的一类** ✓✓）。
+
+**其它判断（详见文档 B 表 ✓）**：`-p` 截断改**退 1** ⇒ 无头任务判读口径会变 ⚠（**与今天的"静默失效"修复同向** ✓，
+但**先前算成功的会变失败** ✗）；**忙语义/`steer` 注入路径需实测重验** ⚠（**可复用本会话既有实验** ✓）；
+**主题 schema 无影响** ✓（我方只用内建 `theme:"dark"`、**无 `$schema`** ✓）；**`mcp list --json` 无影响** ✓（**0 消费** ✓）；
+**移除的包/harness API 无影响** ✓（**0 引用** ✓）；**Node 下限 `22.19.0` 与我方常量一致** ✓（`lib-vendor.sh:21-24` ✓，本机 22.23.1 ✓），
+但 **Windows `runtime/` 的 Node 版本本机无法核对** ✗。
+
+**★ 立场核查（用户最关心的那条 ✓✓）**：1.2 **没有新增自动遥测/自动上传** ✓
+（`grep -i "telemetr|upload|analytics"` 在 **1.2.0 段落无命中** ✓；隐私相关新增**均为可选或本地** ✓：
+`PI_CLIPBOARD_OSC52` **默认关** ✓、OSC 7501 是**本地终端状态** ✓、llama.cpp 走**本地** `/v1/systemone` ✓、
+Decisions API 需 `OPENAI_API_KEY` ✓）；★ **唯一外发面就是 `/share` + `/bug`** ✓。我方 `PI_TELEMETRY=0` +
+`enableInstallTelemetry:false` **不受影响** ✓✓。
+
+**守门与边界** ✓：`check-conventions` 全绿 ✓、`check-doc-links` 一致（**168 md** ✓）、`gen-doc-index --check` ✓、
+本文件成对括号 **0** ✓；★ **未碰代码/`vendor/**`/`patches/**`/`scripts/**`/`DECISIONS`/`PROGRESS`** ✓；**无 git 写操作** ✓；
+★ **未用 `pkill -f`** ✓；★ 它**主动提醒**工作区有 `M custom/features/intervention/index.ts` **不是它改的** ✓（另一个子代理 ✓）
+⇒ **提交时只挑它的两个文件** ✓✓。
+
+**仍未核实（✗）**：① 上游**两版逐条全量未读完**（只读相关条目 ⇒ **可能漏冲突项** ✓）；② ★ **`sessionShareDestination` 在删
+`/share` 后的消费者未追** ✓（**决定第 2 条要不要动 `settings-defaults.ts`** ✓）；③ `durationMs`/`outputPad`/`aborted`/`reachesTools`/
+`aliases` 与**我方补丁的语义级**冲突未逐项验证 ✓（**重放已证 ✓、语义未证** ✗）；④ **`-p` 退 1 对定时任务的实际影响面未实测** ✓；
+⑤ **010 扩展的具体实现方案尚未产出** ✓（**属下一步 ✓**）。
+
 ### [2026-10-11] ★ 上游同步**编译面已清** ✓✓：11 个补丁应用到 pi 1.2 后，`custom/` 类型检查 **0 错误**
 
 **结论（这就是"能否编译过"的答案 ✓）**：**`custom/` 自身类型错误 = 0** ✓✓ ⇒ **两处 Breaking 没有破坏我们的类型面** ✓；

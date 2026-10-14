@@ -160,3 +160,50 @@ npm 通道通 ✓（`1.2.0`，走本机镜像 `registry.npmmirror.com` ✓）；
 ② 3 个失败补丁的**修复难度未评估** ✓；③ **非干跑路径未跑**（会移动 vendor 分支 ✗ ⇒ **需授权** ✓）；
 ④ 被移除的 `pi-client` / `pi-protocol` / `pi-server` / `chord` **是否被 `custom/` import 未核对** ✗。
 
+---
+
+## 附二：上游 1.2 变更展示（人话版）+ 不适合本项目的更新与反向适配清单
+
+**素材（一手 ✓）**：上游 npm 包内 `packages/coding-agent/CHANGELOG.md`（6263 行 ✓，本机从 npm 通道取得 ✓）；
+本文所有条目行号均指该文件 **1.2.0 / 1.1.0 段落**。核对我方事实时用的是 `/tmp/pi-sync-probe`（`6374c2baf` ✓）与本仓库文件 ✓。
+
+### A. 上游改了什么（按主题）
+
+| 主题 | 改了什么（人话） | 对我方影响 | 证据（CHANGELOG 行 / 文件:行） |
+|---|---|---|---|
+| **扩展 API：`before_agent_start`** | 它也**为 `sendMessage(...,{triggerTurn:true})` 启动的运行**触发了；事件变成**按 `messageType` 的联合**（`"user"` 有 `prompt`；**`"custom"` 没有 `prompt`** ✗） | ⚠ **需适配**（我只关心用户提示的处理器必须判 `messageType`） | 1.2.0 第 14 行 |
+| **会话与忙碌语义** | 运行**启动期即算忙**（含 `before_agent_start` 处理器执行中）⇒ `ctx.isIdle()` 为 false；`sendMessage()` **排队进正在启动的运行**（不再以 "Agent is already processing" 失败）；★ **`sendUserMessage()` 现在要求 `deliverAs`** ✗ | ⚠ **需适配 + 需重验**（直接关系我们的"中途注入"） | 1.2.0 第 15 行 |
+| **无头/打印模式** | `-p` 在**最终响应被输出上限截断**时**不再静默退 0** ⇒ 打印部分文本 + **stderr 警告** + **退 1** ✗ | ⚠ **需适配（口径变化）**（我们大量用 `-p`） | 1.2.0 第 42 行 |
+| **主题与设置 schema** | 发布 `https://pi.dev/schemas/*.schema.json`（models/settings/keybindings/themes）；**主题 schema 迁到 `theme.schema.json`**，且**启动期加载的主题也走校验** | ✅ **无影响**（我方 `settings.json` 只用内建 `theme: "dark"` ✓，**自带主题 = 无** ✓） | 1.2.0 第 13 行；`portable/agent/settings.json`（`theme` 键 ✓）；`theme.ts:386-388`（内建 `dark`/`light` ✓） |
+| **MCP** | `pi mcp list --json` 形状变更（`resources: true` 取代计数）；连接时不再列举资源 | ✅ **无影响**（我方**未消费** ✓） | 1.2.0 第 16 行；本仓库 `grep` 0 命中 ✓ |
+| **移除面** | 移除**未发布的 experimental server/client/plugin 栈**（`src/experimental`、`src/cli/experimental` 及其 `./client`/`./experimental/plugin` 导出）+ `pi-client`/`pi-protocol`/`pi-server` 三个包；★ **并"移除对 `@earendil-works/chord` 的依赖"**（**包本身仍在仓库里** ✓ 两者不矛盾 ✓） | ✅ **无影响**（我方 0 引用 ✓） | 1.2.0 第 52-54 行附近（`### Removed`）；`/tmp/pi-sync-probe/packages/chord/` 仍存在 ✓ |
+| **工具与搜索（加法）** | 工具定义新增 `reachesTools`；命名空间新增 `aliases` 且 `searchTools()` **匹配别名**；codemode 声明新增约束标签 | ⚠ **关注**（与我们补丁 011 的 tool-search CJK 同文件相邻 ✓；**重放已通过** ✓） | 1.2.0 第 30-31 行 |
+| **渲染与上下文（加法）** | `tool_execution_end` 与渲染上下文新增 **`durationMs`**（1.1.0 ✓）、上下文新增 **`outputPad`**（1.1.0 ✓）、`agent_settled` 新增 **`aborted`**（1.1.0 ✓） | ✅ **兼容**（纯加法；我们 4 个 `agent_settled` 调用点可选用 ✓） | 1.1.0 段落（`Added durationMs` / `Added outputPad` / `Added aborted` ✓） |
+| **模型与 provider** | 新增 Claude Haiku 5.5（自适应思考到 `xhigh`/`max`）✓；OpenRouter **按 key 列模型**（含价格/上下文/区域端点，**离线保存** ✓）；`classify()` 支持图片 + GPT-6 Luna（**需 `OPENAI_API_KEY`** ✓）；llama.cpp 决策模型走**本地** `/v1/systemone` ✓ | ✅ **兼容**（都是**可选**能力 ✓；我们默认 provider 未变 ✓） | 1.1.0 / 1.2.0 段落（`Added Claude Haiku 5.5` ✓、`per-key OpenRouter model lists` ✓、`native llama.cpp decision models` ✓） |
+| **终端/程序状态** | OSC 7501 **程序状态上报**（工作/受阻/完成/失败，`PI_PROGRAM_STATUS=1|0` 覆盖检测 ✓）；`PI_CLIPBOARD_OSC52=1` 时复制**额外**发 OSC 52 以便远端剪贴板 ✓ | ✅ **默认关/本地** ✓（不涉及外发 ✓） | 1.1.0 / 1.2.0 段落 ✓ |
+| **TUI 邻域修复** | Kitty 下 `+` 等**符号键绑定**不匹配 ✓；**分片颜色把十六进制漏进提示符并打开外部编辑器** ✓；`bash`/`PowerShell` 重载后丢 `Took` ✓；`!!` 命令头变暗色 ✓；★ **全屏文本选择在会话切换后残留** ✓ | ✅ **利好**（其中"会话切换残留"与我们的会话切换实验同向 ✓） | 1.1.0 / 1.2.0 段落 ✓ |
+| **其它修复（同向利好）** | `serializeConversation()`（压缩/分支摘要/**bug 报告**）**省略 thinking 块** ✓；Mistral 长思考被中途 abort ✓；worktree 里符号链接 `AGENTS.md` 不加载 ✓；standalone 二进制不再把启动目录 `.env*` 注入环境 ✓ | ✅ **多为利好** | 1.2.0 第 32 行等 ✓ |
+
+### B. 不适合本项目 / 需要反向适配的更新（逐条判断）
+
+| # | 判断 | 理由 | 证据 | 建议动作 |
+|---|---|---|---|---|
+| **1** | ★ **直接冲突** ✗ | 我方**刻意移除** `/share` 与 `/bug`（**隐私**：`/share` 会把**整个会话含 system prompt 与工具 schema** 先发 **Radius 网关**、失败回退 **GitHub gist**；`/bug` 会把诊断与会话内容**上传给上游开发者**）—— 而上游 1.2 **不但保留，还加强**：新增 **`sessionShareDestination` 设置**（`auto` / GitHub gist / Radius ✓，默认 `auto` ✗） | 我方补丁 `patches/010-disable-share-bug.patch:9-13`（原命令表两行 + 自注释说明外发路径 ✓）；`slash-commands.ts:27`/`:28`（上游仍在 ✓）；`settings-defaults.ts:6`（`sessionShareDestination: "auto"` ✓）；1.2.0 第 20 行（`Added the sessionShareDestination setting…` ✓）；`interactive-mode.ts:136`（`import { reportBug }` ✓）、`:2173`（提示 ✓）、`:3242`（`/bug` 处理器 ✓） | ★ **必须扩展 010** ⚠：① 继续删命令表两行 ✓ ② **新增覆盖**三处 `/bug` 通道 ✓ ③ **同时处理 `sessionShareDestination`**（默认 `auto` ⇒ 建议在设置默认或启动时**显式置为不外发**，或确认移除 `/share` 后该设置**无消费者** ✓）—— **"无外发通道"是我们一直守的线，不能因为同步而漏** ✗ |
+| **2** | ⚠ **需适配（具体可定位）** | 1.2 **要求 `sendUserMessage()` 带 `deliverAs`** ✗，而**我方确有调用且未传** | 调用点：`custom/features/voice/index.ts:78`、`:344`、`:367`（均经 `custom/adapters/ui-adapter.ts:185`/`:193` 的 `sendUserMessage(...)` ✓，只传了 `expandPromptTemplates` ✗）；1.2.0 第 15 行 ✓ | 给适配层/三处调用**补 `deliverAs`** ✓（选哪个值需按语义定：`nextTurn` vs 立即 ✓）；**这是本次同步里最"硬"的一处编译期/运行期双风险点** ✓ |
+| **3** | ⚠ **需重验（行为变更）** | 我方"**中途注入**"依赖"忙时必须给 `streamingBehavior`"那条路径 ✓，而 1.2 把**启动期也算忙**且 `sendMessage` **改为排队** ⇒ 时序与拒绝语义都变了 | 我方：`custom/features/intervention/index.ts:88-89`（`streamingBehavior === 'steer'` ✓）、`custom/features/subagent/core/runner.ts:320-328`（注释记录实测拒绝原文 + `streamingBehavior: 'steer'` ✓）、`custom/features/mode/index.ts:246-255`（改用 `sendMessage(..., {deliverAs:'nextTurn'})` ✓）；上游 1.2.0 第 15 行 ✓ | 同步后**重跑中途注入的实测**（本会话已有可复用实验：4 步任务 + t+5s 投递 + 断言副作用 ✓）⇒ 验收：仍 `disposition:"queued"` ✓ 且注入后仍有新 `turn_start` ✓ |
+| **4** | ⚠ **需适配（判读口径）** | `-p` 截断从"**静默退 0**"改为"**退 1 + stderr 警告**" ✗ ⇒ **我方无头任务的成败判读会变**（我们大量用 `-p`：autopilot / 定时任务 ✓）；★ 方向与我们今天的"静默失效"修复**一致** ✓，但**会让先前算成功的情形变成失败** ✗ | 1.2.0 第 42 行 ✓；我方 `-p` 使用面（autopilot/scheduler ✓） | ① 同步后**观察定时任务是否出现新的"退 1 失败"** ✓（并据此调 `suspect:`/健康口径 ✓）② 确认我们的"输出上限截断"预案（是否需要提高上限或分段 ✓） |
+| **5** | ⚠ **需适配（6 个调用点）** | `BeforeAgentStartEvent` 成**联合**且 `"custom"` **无 `prompt`** ✗ ⇒ 只读 `event.prompt` 的处理器会拿到 `undefined` ⇒ **静默行为变化** ✗ | 1.2.0 第 14 行 ✓；我方 `before_agent_start` 调用点（本会话早先统计 **6 处** ✓） | 逐个加 `event.messageType === 'user'` 判断 ✓；并**加一条测试**锁住"custom 运行不误用 prompt" ✓ |
+| **6** | ✅ **无影响（已核）** | 主题 schema 校验不影响我们——我方**没有自带主题**，只用内建名 | `portable/agent/settings.json`：`theme: "dark"` ✓、**无 `$schema`** ✓；1.2 内建 `dark`/`light` 仍在（`theme.ts:386-388` ✓） | 无需动作 ✓（**但若将来加自定义主题，必须按新 schema 写 `vars`** ✓） |
+| **7** | ✅ **无影响（已核）** | `mcp list --json` 形状变化只在消费它时才相关 | 本仓库 `grep` **0 命中** ✓ | 无需动作 ✓（将来若写消费者，按 `resources: true` 语义 ✓） |
+| **8** | ✅ **无影响（已核）** | 移除的都是**我们 0 引用**的东西 | `pi-client`/`pi-protocol`/`pi-server` **0/0/0** ✓；`pi-agent-core` experimental harness 符号（`AgentHarness`/`harness/`/`pico3`/`pi-durable`/`uuidv7`/`pi-telemetry`）**全 0** ✓ | 无需动作 ✓ |
+| **9** | ⚠ **待 Windows 侧核对** | 上游要 `engines.node >= 22.19.0` ✓；**本机 22.23.1 满足** ✓，且我方自己的下限常量**正好也是 22.19.0** ✓ ⇒ 一致 ✓；但 **Windows 工具链带的 Node 版本本机无法核对**（本机无 `runtime/` ✗，走历史布局回退 ✓） | `scripts/lib-vendor.sh:21-24`（`PI_NODE_MIN_MAJOR=22`/`MINOR=19`/`PATCH=0` ✓）；本机 `node -v` = v22.23.1 ✓ | 到 Windows 机上核 `runtime/node` 版本 ✓（若旧于 22.19.0 ⇒ 同步会**直接拒绝跑** ✗） |
+| **10** | ✅ **立场未被削弱（已核，且这是我们最关心的一条 ✓）** | 1.2 **没有新增自动遥测/自动上传**：隐私相关新增都是**可选或本地**（`PI_CLIPBOARD_OSC52` 默认关 ✓、OSC 7501 程序状态是**本地终端**上报 ✓、llama.cpp 走**本地** `/v1/systemone` ✓、Decisions API 需 `OPENAI_API_KEY` ✓）；★ **唯一的外发面就是 `/share`+`/bug` 那条**（见第 1 条 ✓） | 1.2.0 段落 `grep -i "telemetr\|upload\|analytics"` **无命中** ✓；我方立场：`scripts/pi-supervisor.sh:72`（`PI_TELEMETRY=0` ✓）、`scripts/dev.sh:13` ✓、`portable/agent/settings.json`（`enableInstallTelemetry: false` ✓） | 保持 `PI_TELEMETRY=0`/`enableInstallTelemetry:false` ✓；**同步后复跑一次"外发面审查"**（重点是 `sessionShareDestination` 与 `/bug` 三处 ✓） |
+
+### C. 本轮仍未核实（✗）
+
+1. 上游 1.1.0/1.2.0 的**逐条全量**未读完（只读了 `New Features`/`Breaking`/`Added`/`Changed`/`Fixed`/`Removed` 的**相关条目** ✓）⇒ **可能有遗漏的冲突项** ✗；
+2. **`sessionShareDestination` 在"删掉 `/share` 命令"之后是否仍有别的消费者** ✗（未追调用链 ✓）—— **这条决定第 1 条要不要额外处理 `settings-defaults.ts`** ✓；
+3. **`durationMs`/`outputPad`/`aborted`/`reachesTools`/`aliases` 与我方补丁是否存在同文件语义冲突**：本会话已证**11/11 补丁可干净重放** ✓，但**语义级**（渲染输出变化、搜索命中变化）未逐项验证 ✗；
+4. **`-p` 退 1 对我方定时任务的实际影响面**未实测 ✗（需同步后真跑 ✓）；
+5. **010 扩展的具体实现**（删 handler？改提示？去 `reportBug` 调用方？处理 `sessionShareDestination`？）**尚未产出** ✗ —— 属**下一步设计** ✓。
+

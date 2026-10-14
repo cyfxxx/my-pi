@@ -3806,3 +3806,26 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 三层判据齐了两层半：补丁层 11/11 可重放、引用层无必炸引用、编译层 custom/ 0 错误（源码面等价）⇒ 剩运行期：①扩展 010（上游新增
   三处 /bug 通道）②两处 Breaking 适配（before_agent_start 6 个调用点 + 忙语义/注入路径）③全量 golden（含 PI_GOLDEN_SCENARIO=1 的
   两个 pty 场景）⇒ 做完才谈真正执行同步（切 vendor 分支；失败显式、回滚已验证）。
+
+### 上游 1.2 人话版变更 + 不适合项交付（2026-10-11）
+
+- 交付 docs/design/UPSTREAM-PI-1.2.md 原位追加附二（原文保留，现 209 行）：按主题分组的上游变更展示 + 不适合项与反向适配清单；
+  一手素材 = 上游 npm 包内 packages/coding-agent/CHANGELOG.md，条目附 1.2.0/1.1.0 段落行号。
+- ★★最硬发现：1.2 要求 sendUserMessage 必带 deliverAs，而我方确有调用未传 —— custom/features/voice/index.ts:78/:344/:367，
+  经 custom/adapters/ui-adapter.ts:185/:193 包装，只传了 expandPromptTemplates ⇒ 最可立即适配的一点（选 nextTurn 还是立即按语音语义定）。
+- ★隐私面被加强：1.2 新增 sessionShareDestination 设置（auto/GitHub gist/Radius，默认 auto，settings-defaults.ts:6）+ 三处新 /bug 通道
+  （interactive-mode.ts:136 import { reportBug }、:2173 提示、:3242 处理器）⇒ 010 只删命令表两行必须扩展；删 /share 后
+  sessionShareDestination 是否还有消费者未核实（若有须显式置为不外发）。
+- ★精确更正：1.2 的 Removed 写的是"移除对 @earendil-works/chord 的依赖"，而 packages/chord/ 仍在仓库里 ⇒ 两者不矛盾，
+  不要把"chord 被删"写进结论（也修正我先前的近似说法）。
+- ⚠别忘了 6 个 before_agent_start 调用点：custom 事件没有 prompt ⇒ 只读 event.prompt 会拿到 undefined（静默行为变化）。
+- 其它：-p 截断改退 1（无头任务判读口径会变，与今天静默失效修复同向但先前算成功的会变失败）；忙语义/steer 注入路径需实测重验；
+  主题 schema 无影响（只用内建 theme:"dark" 无 $schema）；mcp list --json 无影响（0 消费）；移除的包/harness API 无影响（0 引用）；
+  Node 下限 22.19.0 与我方常量一致（lib-vendor.sh:21-24），但 Windows runtime/ 的 Node 版本本机无法核对。
+- ★立场核查：1.2 没有新增自动遥测/自动上传（1.2.0 段落 grep telemetr|upload|analytics 无命中；隐私新增均为可选或本地：
+  PI_CLIPBOARD_OSC52 默认关、OSC 7501 本地、llama.cpp 本地 /v1/systemone、Decisions API 需 OPENAI_API_KEY）；唯一外发面就是
+  /share + /bug；我方 PI_TELEMETRY=0 + enableInstallTelemetry:false 不受影响。
+- 守门：check-conventions 全绿、check-doc-links 一致（168 md）、gen-doc-index --check、成对括号 0；未碰代码/vendor/patches/scripts/
+  DECISIONS/PROGRESS；无 git 写操作；未用 pkill -f；主动提醒工作区 intervention/index.ts 不是它改的 ⇒ 提交只挑它的两个文件。
+- 未核实：两版逐条全量未读完（可能漏冲突项）；sessionShareDestination 删 /share 后的消费者未追；加法项的语义级冲突未逐项验证；
+  -p 退 1 对定时任务的实际影响未实测；010 扩展的具体实现未产出。
