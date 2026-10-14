@@ -1,5 +1,9 @@
 {
-  "create_patterns": [],
+  "create_patterns": [
+    {
+      "name": "fp-092844"
+    }
+  ],
   "update_patterns": [],
   "update_index": true
 }

@@ -58,11 +58,11 @@
 - [rej-38ab10](patterns/rej-38ab10.md): [2026-09-22] task-record/task-summarizer 改为适配迁移（取代同日"不迁移"口径） + **背景**：先前以"依赖整条未迁移数据链"为由暂缓；实际 `task-record` 生产者可确定性重建（agent_settled 写结构化记录），总结层可去掉 spawn 强依赖。 + 未实施（被否）
 - [rej-1d6971](patterns/rej-1d6971.md): [2026-09-25] 通知与入站通道：出站用 webhook、入站用 link（不迁移 notify.json / ntfy-relay） + **决策**：两者均**不迁移**，由既有能力取代： + 未实施（被否）
 
-## 反复失败的错误指纹（0 条，来源：`portable/memory/logs/error-fingerprints.jsonl`）
+## 反复失败的错误指纹（1 条，来源：`portable/memory/logs/error-fingerprints.jsonl`）
 
 > 判据第 ⑤ 条：**只记可泛化的**。这里只收 `remind===true`（已按 `REPAIR_THRESHOLDS {3,5,8}` 触发过修复提醒）或 `attempts>=3` 的指纹；**一次性手误不入库**。同一指纹一页（取最新一条）。
 
-- （该来源**已接线但当前没有达到收录门槛的记录**——指纹日志只在工具调用失败时追加，且要反复出现才入库）
+- [fp-092844](patterns/fp-092844.md): bash 反复失败 18 次 + 未触发提醒 + 命令/解法未记录
 
 ## 明确未接线的来源
 

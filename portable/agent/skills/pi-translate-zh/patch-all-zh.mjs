@@ -419,8 +419,17 @@ sections.push(() => {
 		],
 		['label: "Output padding"', "label: `输出内边距`"],
 		[
-			'description: "Horizontal padding for user messages, assistant messages, and thinking"',
-			"description: `用户消息、助手消息和思考内容的水平内边距`",
+			'description: "Horizontal padding for messages, tool output, and command output"',
+			"description: `消息、工具输出和命令输出的水平内边距`",
+		],
+		['label: "Session share destination"', "label: `会话分享目标`"],
+		[
+			'description: "Where to upload sessions with /share (auto prefers Radius when authenticated, otherwise GitHub Gist)"',
+			"description: `通过 /share 上传会话的目标位置（已认证时自动优先使用 Radius，否则使用 GitHub Gist）`",
+		],
+		[
+			'description: "Use the terminal cursor instead of Pi\'s drawn cursor"',
+			"description: `使用终端光标而非 Pi 绘制的光标`",
 		],
 		['label: "Show images"', "label: `显示图片`"],
 		['label: "Image width"', "label: `图片宽度`"],
@@ -716,6 +725,7 @@ sections.push(() => {
 			'"没有要移除的已存储凭据。/logout 只移除通过 /login 保存的凭据；环境变量和 models.json 配置不变。"',
 		],
 		['"No subscription providers available."', '"没有可用的订阅提供商。"'],
+		['"No login methods available."', '"没有可用的登录方式。"'],
 		['"No API key providers available."', '"没有可用的 API 密钥提供商。"'],
 		[
 			'"You can also use an AWS profile, IAM keys, or role-based credentials."',
