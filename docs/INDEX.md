@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（232 条）
+## 决策台账（233 条）
 
+- `DECISIONS.md` · [2026-10-11] ★ 更正：`daily-review` **已经跑了且成功** ✓（我先前"自 10-10 起从未再跑"**被现实推翻** ✗✓） · **实测（`tasks.json` 字段 diff vs `daily-health` ✓）**：`daily-review` 现在 `lastResult=**success**` ✓、 · 数字: 4 个 / 5 个
 - `DECISIONS.md` · [2026-10-11] ★ 010 **无需扩展**（"意图漂移"被证据推翻 ✗✓）+ 两处 Breaking 适配：**已做一处、另一处只差切换时加一个参数** ✓ · **① 010 扩展：实测**不需要** ✗✓** —— 上一轮转来的"三条新通道"**逐条核实后不成立** ✓： · 数字: 11 个 · 证据: db03484e2 / 28dcce2b
 - `DECISIONS.md` · [2026-10-11] 上游 1.2「人话版变更 + 不适合项」交付 ✓ + ★★ 最硬的适配点：我们**确有 `sendUserMessage` 未传 `deliverAs`** ✗ · **交付** ✓：`docs/design/UPSTREAM-PI-1.2.md` **原位追加「附二」**（原文保留 ✓，现 **209 行** ✓）—— · 数字: 6 个 / 2 条
 - `DECISIONS.md` · [2026-10-11] ★ 上游同步**编译面已清** ✓✓：11 个补丁应用到 pi 1.2 后，`custom/` 类型检查 **0 错误** · **结论（这就是"能否编译过"的答案 ✓）**：**`custom/` 自身类型错误 = 0** ✓✓ ⇒ **两处 Breaking 没有破坏我们的类型面** ✓； · 数字: 11 个 / 75 条 / 274 个 / 472 个 · 证据: 6374c2baf / db03484e2
@@ -240,7 +241,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（230 条）
+## 进度记录（231 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -472,6 +473,7 @@
 - `PROGRESS.md` · 上游同步编译面已清：11 补丁应用到 pi 1.2 后 custom/ 类型检查 0 错误（2026-10-11） · - 结论：custom/ 自身类型错误 = 0 ⇒ 两处 Breaking 未破坏类型面；顺带回答缺口③：pi-agent-core 通配别名在 1.2 下能解析。 · 数字: 75 条 / 274 个 / 6 个 / 2078 MB · 证据: 6374c2baf / db03484e2
 - `PROGRESS.md` · 上游 1.2 人话版变更 + 不适合项交付（2026-10-11） · - 交付 docs/design/UPSTREAM-PI-1.2.md 原位追加附二（原文保留，现 209 行）：按主题分组的上游变更展示 + 不适合项与反向适配清单； · 数字: 6 个
 - `PROGRESS.md` · 010 无需扩展 + 两处 Breaking 适配（2026-10-11） · - ★010 扩展实测不必要（意图漂移被推翻）：:136 只是 import（唯一调用点在 handler 内 ⇒ 不能删也不必删）；:2173 正是我们已重写的那处 · 证据: db03484e2 / 28dcce2b
+- `PROGRESS.md` · 更正：daily-review 已跑且成功（2026-10-11） · - 实测 tasks.json 字段 diff：daily-review 现在 lastResult=success、lastRun=2026-10-14T11:25:25Z（刚刚）、failCount=0（原 11→0）、 · 数字: 4 个 / 5 个
 
 ## 缺陷回放（37 条）
 

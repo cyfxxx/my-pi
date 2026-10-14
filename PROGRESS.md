@@ -3856,3 +3856,13 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   ⑤全量 golden（含 PI_GOLDEN_SCENARIO=1 的两个 pty 场景）+ 脚本 dist 路径的类型检查。
 - 未核实：1.2 event.message 负载形状（intervention 只做到不误记、未做到记对）；1.2 流式中不传 deliverAs 的运行期行为未实测（只证签名相同）；
   上游构建是否容忍 return 后不可达代码未逐字确认；未切 vendor、未跑全量 golden。
+
+### 更正：daily-review 已跑且成功（2026-10-11）
+
+- 实测 tasks.json 字段 diff：daily-review 现在 lastResult=success、lastRun=2026-10-14T11:25:25Z（刚刚）、failCount=0（原 11→0）、
+  runCount=32（原 30，又跑两次）、nextRun=2026-10-15T09:05Z（未来，不再逾期）；schedule='5 9 * * *'、enabled/useSubagent=True、
+  maxRunTime=900、retries=1；任务数=6（含「每日更新 ClamAV 病毒库」⇒ 已注册）。
+- ⇒ 它只是比那 4 个跑得晚 ⇒ 5 个定时任务现在全部健康。口径更正：我先前的结论当时准确（那时确实 failed/逾期），不是我说错，而是事实后来变了。
+- 未核实：它为何比其它 4 个晚（后续轮次 vs 自己的 09:05 时段被补上，未追）；11:25 那次是否真完成工作（success 只说明调度器认为成功，
+  与"报成功却没做事"是两回事）。
+- 方法论：'某件事没发生'这类结论最容易过期（本会话已多次：锁泄漏、没再失败 vs 没再运行、这次从未再跑）⇒ 报告此类结论必须附"截至何时"。
