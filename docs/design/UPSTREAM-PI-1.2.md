@@ -116,3 +116,47 @@
 - 未逐个核对 `custom/` 是否 import 被移除的 `pi-client` / `pi-protocol` / `pi-server` / `chord`。
 - 未核对上游 `docs/extensions.md` 与 1.0.4 的逐字差异（只读到 1.2.0 版本）。
 - 未评估 `typebox 1.3.27` 与我方适配器的兼容性（我方曾因 typebox 1.3.x 缺 `Type.Null` 而修过 `tool-adapter.ts`）。
+
+---
+
+## 附：复核轮 —— 一处说法被证伪 + 补丁重放实测（2026-10-11）
+
+**★ 被证伪的说法** ✗✓（保留原文作对照）：本文上文说"**唯一可信手段是 `PI_SYNC_DRY_RUN=1` 干跑**" ✗ ——
+**实测：干跑只打印计划、不重放** ✗。它只输出 `[dry-run] … 目标 6374c2baf…（未改动任何内容）` +
+"将在此基线上重新应用 patches/：11 个" ⇒ **它不回答"补丁能否重放"** ✗。
+
+**★ 可达性也被更正** ✗✓：上轮记"`git ls-remote` 两次探测均失败 ⇒ 疑似不可达" ✗ —— **实测是通的** ✓：
+`git ls-remote https://github.com/earendil-works/pi-mono.git` **两次 rc=0、约 2.3 s** ✓；`codeload` tarball **200** ✓；
+npm 通道通 ✓（`1.2.0`，走本机镜像 `registry.npmmirror.com` ✓）；`ssh:443` 报 `Permission denied (publickey)` ⇒
+**那是凭据问题、不是可达性** ✓。⇒ **又一次"一次失败 ≠ 不可达"** ✓✓。
+
+**★ 目标不是 tag** ✗：干跑把上游拉到 `28dcce2ba..6374c2baf main -> upstream/main` ✓（含 tags `v1.1.0` / `v1.2.0` ✓），
+**目标 = `6374c2baf432419ccb4541a99ce4958ecd03dae0` = `v1.2.0-37-g6374c2baf`** ✓ ⇒
+**upstream/main 比 `v1.2.0` tag 多 37 笔** ⇒ **决策时须明确选哪个** ✓。
+
+**★ 干跑确实只读（已验证 ✓✓）**：`vendor/pi` HEAD 未变（`db03484e20f1bf5b6ad7f3f64e3e271652040404` = `local: 011-tool-search-cjk` ✓）、
+`LAST_SYNC_POINT` 仍 `28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9` ✓、无残留 worktree ✓、主仓干净 ✓。
+
+**★★ 补丁重放实测（真正只读的方法 ✓）**：`git clone --shared vendor/pi /tmp/pi-sync-probe`（**9.7 s、仓库本体不动** ✓）→
+`checkout 6374c2baf` → 按 `patches/*.patch` **顺序**逐个 `git apply --check` + `git apply`（**累计** ✓）⇒
+**成功 8 / 失败 3（共 11）** ✗✓：
+| 结果 | 补丁 | 失败位置与含义 |
+|---|---|---|
+| ✅ **干净重放 8 个** | **003–009 + 011** ✓ | ★ **上文判断"风险最高"的 6 个 footer 补丁 + `editor.ts` 补丁实际全部通过** ✗✓；011（tool-search CJK）亦通过 ✓ |
+| ✗ 失败 | **001-branding** | `patch failed: package.json:1` ⇒ **根 manifest 变了** ✓ |
+| ✗ 失败 | **002-local-pi-mods** | `patch failed: packages/coding-agent/tsconfig.build.json:16` ⇒ **构建 tsconfig 变了** ✓ |
+| ✗ 失败 | **010-disable-share-bug** | `patch failed: packages/coding-agent/src/core/slash-commands.ts:24` ⇒ **斜杠命令表那一片变了** ✓（与上游 1.1/1.2 的命令/事件改动一致 ✓） |
+
+**结论修正** ✓：**不能"整体同步"** ✗，但**失败都是小的、局部的**（**一个根 manifest + 一个构建 tsconfig + 一处斜杠命令表** ✓），
+**且未级联** ✓（001/002 失败后 003+ 仍成功 ⇒ TUI 族不依赖它们 ✓；010 失败后 011 成功 ⇒ 也不依赖 010 ✓）
+⇒ **人工重做这 3 个补丁 = 可预期的工作量** ✓✓。**风险排序也随之更正** ✓：真正的失败点在 **001/002/010** ✓，
+**不是** TUI/footer 族 ✗✓。
+
+**证据（可复核 ✓）**：`/tmp/sync-dryrun.log` ✓；**可复跑的重放克隆 `/tmp/pi-sync-probe`** ✓（可进内直接 `git apply --check` ✓）；
+`/tmp/vendor-head-before.txt` ✓。
+
+**本轮仍未核实（✗）**：① 我用的是 `git apply`（含 `--check` ✓），而 `sync-upstream.sh` 在 worktree 里的**具体应用命令
+（是否 `git am` 提交）只见 worktree 建立那段、未见应用循环**（在 125 行之后 ✓）⇒ **内容等价、命令未逐字核对** ✓；
+② 3 个失败补丁的**修复难度未评估** ✓；③ **非干跑路径未跑**（会移动 vendor 分支 ✗ ⇒ **需授权** ✓）；
+④ 被移除的 `pi-client` / `pi-protocol` / `pi-server` / `chord` **是否被 `custom/` import 未核对** ✗。
+

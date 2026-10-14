@@ -2,6 +2,53 @@
 
 ## 格式
 
+### [2026-10-11] 上游同步**可行性实测** ✓：干跑只打印计划（原说法被证伪 ✗）⇒ 改用**只读重放演算** ⇒ **8/11 干净、3 个局部失败** ✓
+
+**★ 一、"可疑推送"查明：是我自己** ✓✓（**无越界** ✓）：`0bf7d62d3` 的作者/提交者 = `cyfxxx` ✓；
+`reflog` 直接给出 `646a0cdf1 commit:` → `6d234d459 commit (amend)` → **`0bf7d62d3 commit (amend)`** ⇒
+**同一笔被 `--settle` amend 了两次** ✓；在 `origin/main` 里 ✓、本地==远端 ✓、主仓干净 ✓。
+⇒ ★ **记一条我自己的记账缺陷** ✗✓：**`--settle` 会 amend ⇒ 改掉我记下的 SHA** ⇒ **"最后推送 SHA"记录天然不可靠** ✓
+—— **这与本会话早先那次"误判分叉"同源** ✓✓（以后应在 **settle 之后**再记 SHA ✓，或避免对已推送提交 amend ✓）。
+
+**★ 二、干跑的关键发现（证伪文档原话 ✗✓）**：`PI_SYNC_DRY_RUN=1` **只打印计划、不重放** ✗ ——
+它只输出 `[dry-run] … 目标 6374c2baf…（未改动任何内容）` + "将在此基线上重新应用 patches/：11 个" ✓
+⇒ **它不回答"补丁能否重放"** ✗ ⇒ `docs/design/UPSTREAM-PI-1.2.md` 里"唯一可信手段是干跑"**已被就地更正** ✓（**原文保留作对照** ✓）。
+
+**★ 三、可达性被更正（又一次"一次失败 ≠ 不可达" ✓✓）**：上轮记"两次探测失败 ⇒ 疑似不可达" ✗ ⇒ **实测是通的** ✓：
+`git ls-remote https://github.com/earendil-works/pi-mono.git` **两次 rc=0、约 2.3 s** ✓；`codeload` tarball **200** ✓；
+npm 通 ✓（`1.2.0`，走本机镜像 `registry.npmmirror.com` ✓）；`ssh:443` 是 **`Permission denied (publickey)`** ⇒ **凭据问题、非可达性** ✓。
+
+**★ 四、目标不是 tag** ✗：干跑把上游拉到 `28dcce2ba..6374c2baf main -> upstream/main` ✓（tags `v1.1.0`/`v1.2.0` ✓），
+**目标 = `6374c2baf432419ccb4541a99ce4958ecd03dae0` = `v1.2.0-37-g6374c2baf`** ⇒ **upstream/main 比 `v1.2.0` tag 多 37 笔** ✓
+⇒ **决策时须明确选哪个** ✓。
+
+**★ 五、干跑确实只读（已验证 ✓✓）**：`vendor/pi` HEAD 未变（`db03484e20f1bf5b6ad7f3f64e3e271652040404` = `local: 011-tool-search-cjk` ✓）、
+`LAST_SYNC_POINT` 仍 `28dcce2b…` ✓、无残留 worktree ✓、主仓干净 ✓。
+
+**★★ 六、补丁重放实测（**真正只读**的方法 ✓✓）**：`git clone --shared vendor/pi /tmp/pi-sync-probe`（**9.7 s、仓库本体不动** ✓）→
+`checkout 6374c2baf` ✓ → 按 `patches/*.patch` **顺序**逐个 `git apply --check` + `git apply`（**累计** ✓）
+⇒ **成功 8 / 失败 3（共 11）** ✗✓：
+- ✅ **干净重放：003–009 + 011** ✓✓ ⇒ ★ **我们原先判断"风险最高"的 6 个 footer 补丁 + `editor.ts` 补丁实际全部通过** ✗✓
+  （**风险排序被实测更正** ✓），011（tool-search CJK）亦通过 ✓；
+- ✗ **001-branding** ⇒ `patch failed: package.json:1`（**根 manifest 变了** ✓）；
+- ✗ **002-local-pi-mods** ⇒ `patch failed: packages/coding-agent/tsconfig.build.json:16`（**构建 tsconfig 变了** ✓）；
+- ✗ **010-disable-share-bug** ⇒ `patch failed: packages/coding-agent/src/core/slash-commands.ts:24`
+  （**斜杠命令表那一片变了** ✓，与上游 1.1/1.2 的命令/事件改动一致 ✓）。
+**结论** ✓：**不能"整体同步"** ✗，但**失败都是小的、局部的**（**一个根 manifest + 一个构建 tsconfig + 一处斜杠命令表** ✓），
+**且未级联** ✓（001/002 失败后 003+ 仍成功 ⇒ TUI 族**不依赖**它们 ✓；010 失败后 011 成功 ⇒ **也不依赖** 010 ✓）
+⇒ **人工重做这 3 个 = 可预期的工作量** ✓✓。
+**证据（可复核 ✓）**：`/tmp/sync-dryrun.log` ✓；**可复跑的重放克隆 `/tmp/pi-sync-probe`** ✓（可进内 `git apply --check` ✓）；
+`/tmp/vendor-head-before.txt` ✓。
+
+**仍未核实（✗）**：① 我用的是 `git apply`（含 `--check` ✓），而 `sync-upstream.sh` 在 worktree 里的**具体应用命令**
+（是否 `git am` 提交）**只见 worktree 建立那段、未见应用循环**（在 125 行之后 ✓）⇒ **内容等价、命令未逐字核对** ✓；
+② 3 个失败补丁的**修复难度未评估** ✓；③ **非干跑路径未跑**（会移动 vendor 分支 ✗ ⇒ **需授权** ✓）；
+④ 被移除的 `pi-client`/`pi-protocol`/`pi-server`/`chord` **是否被 `custom/` import 未核对** ✗。
+
+**待你决策（✓）**：**A 推进同步**（重做 3 个补丁 + 两处 Breaking 适配 ⇒ 半天量级 ✓、失败显式、可回滚 ✓）／
+**B 先只写"3 个补丁的重做方案"**（不碰 vendor ✓，我推荐先 B 再 A ✓）／**C 暂缓**（差距继续累积 ✓）；
+**以及**：同步目标选 **`v1.2.0` tag** 还是 **`upstream/main`（+37 笔）** ✓。
+
 ### [2026-10-11] 上游 pi 1.2 同步分析 ✓（**建议同步，先干跑**）+ pty 场景补跑全通过 ✓ + "4/5 失败任务"实测闭环 ✓
 
 **① 上游分析（结论先行 ✓）**：我方钉住 **pi 1.0.4** ✓（`vendor/pi/packages/coding-agent/package.json` ✓，14 个包同版 ✓；

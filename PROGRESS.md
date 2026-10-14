@@ -3724,3 +3724,21 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - ★遗留真问题：daily-review 自 10-10 起从未再跑（failed、lastRun 陈旧、nextRun 逾期 3 天、enabled=True），而同一会话跑了其它 4 个
   ⇒"它为什么没被调度"是新问题，单独立项。另一假设被证伪：scheduler.lock 存在但为三段格式且持有 PID 活着 ⇒ 是交互会话合法持锁，
   daily-health 正确判为"调度锁=正常"⇒ ①d 检查器按设计工作。
+
+### 上游同步可行性实测：8/11 干净、3 个局部失败（2026-10-11）
+
+- 可疑推送查明是我自己：0bf7d62d3 的 reflog 是 646a0cdf1 commit → 6d234d459 amend → 0bf7d62d3 amend（--settle 的 amend 链），
+  无越界。★ 记账缺陷：--settle amend 会改掉我记下的 SHA ⇒ "最后推送 SHA"天然不可靠（与早先"误判分叉"同源）。
+- 干跑只打印计划不重放（证伪文档原话"唯一可信手段是干跑"）⇒ 已就地更正 UPSTREAM-PI-1.2.md（原文保留作对照）。
+- 可达性被更正（又一次一次失败≠不可达）：git ls-remote https 两次 rc=0 约 2.3s；codeload 200；npm 通（1.2.0，registry.npmmirror.com）；
+  ssh:443 是凭据问题（Permission denied (publickey)）。目标 = 6374c2baf = v1.2.0-37（upstream/main 比 tag 多 37 笔）。
+  干跑确实只读（vendor HEAD db03484e2 未变、LAST_SYNC_POINT 仍 28dcce2b、无残留 worktree）。
+- ★★ 补丁重放实测（git clone --shared 到 /tmp/pi-sync-probe，仓库本体不动，9.7s；checkout 6374c2baf；按序 git apply --check+apply 累计）：
+  成功 8 / 失败 3。成功 = 003–009 + 011（★原先判断风险最高的 6 个 footer 补丁 + editor 补丁实际全部通过，风险排序被实测更正）；
+  失败 = 001-branding（package.json:1 根 manifest 变了）、002-local-pi-mods（tsconfig.build.json:16 构建 tsconfig 变了）、
+  010-disable-share-bug（slash-commands.ts:24 斜杠命令表变了）。未级联（001/002 失败后 003+ 仍成功；010 失败后 011 成功）。
+- 结论：不能整体同步，但失败都是小的、局部的（一个根 manifest + 一个构建 tsconfig + 一处斜杠命令表）⇒ 人工重做这 3 个 = 可预期工作量。
+  证据：/tmp/sync-dryrun.log、可复跑的 /tmp/pi-sync-probe、/tmp/vendor-head-before.txt。
+- 未核实：git apply 与脚本实际应用命令未见逐字（内容等价）；3 个失败补丁的修复难度未评估；非干跑路径未跑（需授权）；
+  被移除的 pi-client/pi-protocol/pi-server/chord 是否被 custom/ import 未核对。
+- 待决策：A 推进同步（半天量级、失败显式、可回滚）/ B 先写 3 个补丁的重做方案（我推荐先 B 再 A）/ C 暂缓；以及目标选 v1.2.0 tag 还是 upstream/main（+37 笔）。
