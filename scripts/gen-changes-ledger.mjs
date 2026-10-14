@@ -23,9 +23,15 @@
  *
  * 用法：`node scripts/gen-changes-ledger.mjs --update` ｜ `--check`
  *
- * **循环规避**：台账不记录"改动了 `docs/CHANGES.jsonl` 本身"的提交——否则它在提交那一刻
- * 就与自己的历史不一致（pre-commit 能过、pre-push 必红）。判定只依据该提交的改动文件列表，
- * 与台账内容无关，所以不存在自指循环。
+ * **循环规避（两道）**：
+ * 1. 台账不记录"改动了 `docs/CHANGES.jsonl` 本身"的提交——否则它在提交那一刻就与自己的历史不一致
+ *    （pre-commit 能过、pre-push 必红）。判定只依据该提交的改动文件列表，与台账内容无关。
+ * 2. **台账不记录 HEAD 本身**（2026-10-11 修缺陷）：`--settle` 的"重生成 → amend"必须到达不动点，
+ *    而 amend **会换掉提交号**。若 HEAD 参与记录，则它的 commit 字段每轮都变 ⇒ 台账永远追不上自己
+ *    ⇒ 实测表现为 `❌ 4 轮仍未收敛`（触发条件：某笔提交**没有改动台账**——例如只改 `DECISIONS.md`
+ *    叙事而生成结果不变 ⇒ 它不碰台账 ⇒ 被当作记录 ⇒ 换号 ⇒ 两态极限环）。
+ *    排除 HEAD 后，台账描述"**HEAD 之前**的历史"：任何提交之后它都**立即一致**，
+ *    HEAD 那一条会在**下一次**生成时进入台账。
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -50,6 +56,8 @@ function changes() {
   // **硬校验（2026-10-08 修缺陷）**：块解析曾漏掉一条"自己碰过台账"的提交（实测提交 2d1741860
   // 明明含 docs/CHANGES.jsonl 却被记入），后果是**每次提交后台账必漂移、要 amend 两次才收敛**。
   // 故不再只依赖 split('\n\n') 的切块结果——**逐条**再问一次 git。
+  // HEAD 不参与记录（见文件头"循环规避"第 2 条）：台账描述 HEAD 之前的历史，从而与 amend 解耦。
+  const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
   const touchesCache = new Map();
   const commitTouchesLedger = (shortSha) => {
     if (touchesCache.has(shortSha)) return touchesCache.get(shortSha);
@@ -72,6 +80,7 @@ function changes() {
     // **循环规避**：台账从 git 历史生成，而"引入/修改台账的那条提交"本身会改变历史 ⇒
     // 它一落盘就自我漂移（pre-commit 通过、pre-push 必失败）。故**不记录这些提交**。
     // 判定只看该提交改了哪些文件，与台账内容无关 ⇒ 不存在自指循环。
+    if (hash === headSha) continue; // HEAD 不进台账（否则 amend 换号 ⇒ 永不收敛）
     if (files.includes('docs/CHANGES.jsonl')) continue;
     if (commitTouchesLedger(hash.slice(0, 9))) continue; // 硬校验兜底（见上）
     out.push({
