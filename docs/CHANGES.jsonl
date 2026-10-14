@@ -1,3 +1,4 @@
+{"kind":"change","commit":"0658cd01a","ts":"2026-10-15","subject":"docs: 补充 TUI 翻译四项（output-padding/share-destination/show-hardware-cursor/No login methods available）","files":["docs/knowledge/index.md","docs/knowledge/last-decision.json","docs/knowledge/patterns/fp-092844.md","portable/agent/skills/pi-translate-zh/patch-all-zh.mjs"],"heldOut":false}
 {"kind":"change","commit":"2dbe66c91","ts":"2026-10-14","subject":"fix(scripts): 修台账 --settle 不收敛（❌4 轮仍未收敛）—— changes() 不记录 HEAD","files":["DECISIONS.md","PROGRESS.md","docs/INDEX.md","scripts/gen-changes-ledger.mjs"],"heldOut":false}
 {"kind":"change","commit":"da7db6476","ts":"2026-10-14","subject":"docs: 上游 1.2 人话版变更展示 + 不适合项与反向适配清单（附二）","files":["DECISIONS.md","PROGRESS.md","docs/INDEX.md","docs/design/UPSTREAM-PI-1.2.md"],"heldOut":false}
 {"kind":"change","commit":"7cf3157c8","ts":"2026-10-14","subject":"chore: tool stats 2026-10-14","files":["portable/memory/stats/tool-count-localhost.json"],"heldOut":false}
