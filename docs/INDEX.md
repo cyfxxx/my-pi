@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（227 条）
+## 决策台账（228 条）
 
+- `DECISIONS.md` · [2026-10-11] 上游同步**准备就绪** ✓：无"必炸引用" + 3 个失败补丁实测**只剩 2 处 hunk** ⇒ **成本远低于原估** · **① ④ 的结论：没有"同步必炸"的引用** ✓✓（**附搜索面 ✓**，非照转述 ✓）： · 数字: 1 条 / 2 条 / 6 条 / 2 小时 · 证据: 6374c2baf
 - `DECISIONS.md` · [2026-10-11] 上游同步**可行性实测** ✓：干跑只打印计划（原说法被证伪 ✗）⇒ 改用**只读重放演算** ⇒ **8/11 干净、3 个局部失败** ✓ · **★ 一、"可疑推送"查明：是我自己** ✓✓（**无越界** ✓）：`0bf7d62d3` 的作者/提交者 = `cyfxxx` ✓； · 数字: 11 个 / 6 个 / 3 个 · 证据: 0bf7d62d3 / 646a0cdf1
 - `DECISIONS.md` · [2026-10-11] 上游 pi 1.2 同步分析 ✓（**建议同步，先干跑**）+ pty 场景补跑全通过 ✓ + "4/5 失败任务"实测闭环 ✓ · **① 上游分析（结论先行 ✓）**：我方钉住 **pi 1.0.4** ✓（`vendor/pi/packages/coding-agent/package.json` ✓，14 个包同版 ✓； · 数字: 14 个 / 6 个 / 10 分钟 / 30 分钟 · 证据: 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9 / 70c69c01
 - `DECISIONS.md` · [2026-10-11] 上游 pi 1.2 同步分析 ✓（建议同步）+ ★ 真实会话让 4/5 失败任务**实测转绿** ✓ + 一个"假覆盖"被揭穿 ✗✓ · **★ 一、你开了真实交互会话后，实测闭环（这是此前"只能真跑"的那条 ✓✓）**： · 数字: 3 天 / 4 个 / 6 个 · 证据: 70c69c01 / 484a8b8c
@@ -235,7 +236,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（225 条）
+## 进度记录（226 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -462,6 +463,7 @@
 - `PROGRESS.md` · 上游 pi 1.2 分析 + 4/5 任务实测转绿 + 假覆盖揭穿（2026-10-11） · - ★真实会话后 4/5 任务实测转绿：tool-stats-daily 0/51、knowledge-subscribe 0/39、daily-health 0/41、golden-fast 0/46 全 success； · 数字: 3 天 / 6 个 · 证据: 70c69c01 / 28dcce2b
 - `PROGRESS.md` · 上游 pi 1.2 分析 + pty 场景补跑 + 失败任务实测闭环（2026-10-11） · - 上游：我方 1.0.4（vendor/pi/packages/coding-agent/package.json，同步点 28dcce2b…）⇒ 上游 1.2.0（2026-10-12），中间 1.1.0， · 数字: 6 个 / 8 分钟 / 331 秒 / 1898 MB · 证据: 28dcce2b / 70c69c01
 - `PROGRESS.md` · 上游同步可行性实测：8/11 干净、3 个局部失败（2026-10-11） · - 可疑推送查明是我自己：0bf7d62d3 的 reflog 是 646a0cdf1 commit → 6d234d459 amend → 0bf7d62d3 amend（--settle 的 amend 链）， · 数字: 6 个 / 3 个 · 证据: 0bf7d62d3 / 646a0cdf1
+- `PROGRESS.md` · 上游同步准备就绪：无必炸引用 + 3 个失败补丁只剩 2 处 hunk（2026-10-11） · - ④ 无同步必炸引用（附搜索面）：pi-client/pi-protocol/pi-server 命中 0/0/0 且已不在 packages/；★更正我规格的不准确—— · 数字: 6 条 / 2 小时 / 6 个 · 证据: 6374c2baf
 
 ## 缺陷回放（37 条）
 
@@ -503,7 +505,7 @@
 - `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 
-## 设计文档（187 条）
+## 设计文档（193 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -673,6 +675,12 @@
 - `docs/design/UPSTREAM-PI-1.2.md` · 6. 回滚方案 · 1. `vendor/pi` 是**独立 git 仓库**，补丁栈是**本地提交** ⇒ 回到旧顶：`git -C vendor/pi reset --hard <旧补丁栈顶>`； · 证据: 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9
 - `docs/design/UPSTREAM-PI-1.2.md` · 7. 仍未核实 · - **补丁能否重放未验证**：npm 发布的 tarball **只有 `dist/` 与 `bundle/`，没有 `src/`**，因此**无法在本地对补丁目标文件做逐行比对**；
 - `docs/design/UPSTREAM-PI-1.2.md` · 附：复核轮 —— 一处说法被证伪 + 补丁重放实测（2026-10-11） · **★ 被证伪的说法** ✗✓（保留原文作对照）：本文上文说"**唯一可信手段是 `PI_SYNC_DRY_RUN=1` 干跑**" ✗ —— · 数字: 11 个 / 8 个 / 6 个 / 3 个 · 证据: 6374c2baf / 28dcce2ba
+- `docs/design/UPSTREAM-SYNC-PLAN.md` · 0. 先决结论（先看这三行） · 1. **可以同步**，但**不能整体套用**：11 个补丁重放 **8 个干净**、**3 个需重做**（见 §2）。 · 数字: 11 个 / 8 个 / 3 个 / 1 个
+- `docs/design/UPSTREAM-SYNC-PLAN.md` · 1. 依赖面核对（决定"会不会直接编译失败"） · **被上游 1.1/1.2 移除的包**（从 `/tmp/pi-sync-probe` 内的 CHANGELOG 与本机文件确认，非转述）：`pi-client`、`pi-protocol`、`pi-server` · 数字: 1 条 / 2 条
+- `docs/design/UPSTREAM-SYNC-PLAN.md` · 2. 三个失败补丁：意图 / 上游新形态 / 重做证据 / 难度 · ### 2.1 `001-branding.patch` —— ✅ **三方合并即干净通过**（难度：小） · 数字: 2 条
+- `docs/design/UPSTREAM-SYNC-PLAN.md` · 3. 目标选择：`v1.2.0` tag 还是 `upstream/main`（+37 笔） · - 脚本当前指向 **`upstream/main` = `6374c2baf`**（比 `v1.2.0` tag **多 37 笔**）。 · 证据: 6374c2baf
+- `docs/design/UPSTREAM-SYNC-PLAN.md` · 4. 执行清单（可勾选） · - [ ] **0. 备份与回滚点**：记录 `git -C vendor/pi rev-parse HEAD`（本次为 `db03484e20f1bf5b6ad7f3f64e3e271652040404`） · 数字: 8 个 / 6 个 · 证据: db03484e20f1bf5b6ad7f3f64e3e271652040404 / 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9
+- `docs/design/UPSTREAM-SYNC-PLAN.md` · 5. 仍未核实（不要当成已知） · 1. `scripts/sync-upstream.sh` 在 worktree 里的**实际应用命令**（`git apply` / `git am`）**未逐字读到**（只看到 worktree 建立段落）
 - `docs/design/VISION.md` · 元信息 · ---
 - `docs/design/VISION.md` · 目录 · - 一、终极目标
 - `docs/design/VISION.md` · 一、终极目标 · 构建可以自主进化的全能型私人助手。

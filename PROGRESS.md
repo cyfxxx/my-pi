@@ -3742,3 +3742,25 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 未核实：git apply 与脚本实际应用命令未见逐字（内容等价）；3 个失败补丁的修复难度未评估；非干跑路径未跑（需授权）；
   被移除的 pi-client/pi-protocol/pi-server/chord 是否被 custom/ import 未核对。
 - 待决策：A 推进同步（半天量级、失败显式、可回滚）/ B 先写 3 个补丁的重做方案（我推荐先 B 再 A）/ C 暂缓；以及目标选 v1.2.0 tag 还是 upstream/main（+37 笔）。
+
+### 上游同步准备就绪：无必炸引用 + 3 个失败补丁只剩 2 处 hunk（2026-10-11）
+
+- ④ 无同步必炸引用（附搜索面）：pi-client/pi-protocol/pi-server 命中 0/0/0 且已不在 packages/；★更正我规格的不准确——
+  @earendil-works/chord 并未移除（仍在 packages/chord/），我方仅 3 处类型别名（custom/tsconfig.json:11-13）无害；真正被移除的是
+  pi-agent-core 的 experimental harness API（AgentHarness/harness//experimental/pico3/pi-durable/uuidv7/pi-telemetry 全 0 命中）；
+  pi-agent-core 5 处命中实际只有 1 注释（subagent/core/types.ts:3）+2 路径别名（custom/tsconfig.json:14/15）；残余风险低（通配别名
+  可能失去目标，但 0 处 import ⇒ 仅影响类型解析）。
+- 三个失败补丁在 /tmp 试验场真跑（3-way）：001-branding 用 git apply -3 直接干净通过（根 package.json 改名 my-pi、piConfig 写入第 5 行），
+  难度小、意图不变、不应删（上游无等价物）；002-local-pi-mods 只剩 1 处冲突 hunk（tsconfig.build.json，上游现有 6 条 paths + rootDir/
+  include/exclude 含 src/experimental），check-model-data.ts 干净、secrets.ts 直接应用 ⇒ 只需重锚一个 hunk，难度小-中，不应删；
+  010-disable-share-bug 只剩 1 处冲突 hunk（slash-commands.ts），interactive-mode.ts 全干净；★上游 share/bug 两条仍在（:28/:29）⇒
+  隐私意图仍成立 ⇒ 必须重做不能删，难度中。
+- ★工作量更正：补丁重做只剩 2 处 hunk（约 1-2 小时）；真正时间在两处 Breaking 适配（before_agent_start 6 个调用点；忙语义/注入重验）。
+- 方案文档 docs/design/UPSTREAM-SYNC-PLAN.md（100 行）：目标建议先按 v1.2.0 tag 同步（脚本现指向 upstream/main +37；指定 tag 的开关名
+  未逐字确认）；执行清单含备份/回滚点、重做补丁、两处 Breaking、干跑→实跑→全量 golden、PI_GOLDEN_SCENARIO=1 的两个 pty 场景必须跑、
+  回滚预案；★注入面基线哈希若变必须有意更新并写理由（绝不为变绿而改）；重做补丁必须保留 Patch (NNN-name): 自标记；★复用试验场前
+  必须先清（/tmp/pi-sync-probe 现为混合态：8 补丁已应用 + 2 处 UU 冲突 ⇒ reset --hard 6374c2baf && clean -fdx）。
+- 守门：check-conventions 全绿、check-doc-links 一致（168 md）、gen-doc-index --check 一致；改动仅新文档 + INDEX；未碰 vendor/patches/
+  custom/scripts；主仓库无 git 写操作；★未用 pkill -f（本会话首次全程守住）。
+- 未核实：脚本实际应用命令未逐字读到（-3 结论为内容层等价）；指定 tag 的开关名未确认；002/010 两处 hunk 的重写文本尚未产出（已批准继续）；
+  pi-agent-core 通配别名在 1.2 下能否解析未验证；非干跑路径未执行（需授权）。

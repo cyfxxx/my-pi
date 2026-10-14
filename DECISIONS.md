@@ -2,6 +2,49 @@
 
 ## 格式
 
+### [2026-10-11] 上游同步**准备就绪** ✓：无"必炸引用" + 3 个失败补丁实测**只剩 2 处 hunk** ⇒ **成本远低于原估**
+
+**① ④ 的结论：没有"同步必炸"的引用** ✓✓（**附搜索面 ✓**，非照转述 ✓）：
+- `pi-client` / `pi-protocol` / `pi-server` ⇒ **命中 0 / 0 / 0** ✓（且已不在 `packages/` ✓）；
+- ★ **更正我规格里的一处不准确** ✗✓：**`@earendil-works/chord` 并未被移除** ✓（仍在 `packages/chord/` ✓）——
+  我方仅 **3 处命中**，全是 `custom/tsconfig.json:11-13` 的**类型路径别名** ⇒ **无害** ✓；
+- ★ **真正被移除的是 `pi-agent-core` 的 experimental harness API** ✓（**不是包名** ✓）：`AgentHarness` / `harness/` /
+  `experimental/pico3` / `pi-durable` / `uuidv7` / `pi-telemetry` ⇒ **全为 0 命中** ✓✓ ⇒ **我方完全没用** ✓；
+- `pi-agent-core` 的 5 处命中**实际只有 1 条注释**（`custom/features/subagent/core/types.ts:3` ✓）+ **2 条路径别名**
+  （`custom/tsconfig.json:14/15` ✓）；**残余风险（低）**：它被收窄为只有 `Agent`+loop+proxy 类型 ✓，移除了 `./node` / `./harness/*` /
+  `./experimental/pico3` 子路径导出 ⇒ 我方那条**通配别名**可能失去目标（我方 **0 处 import** 它 ⇒ **仅影响类型解析** ✓）。
+
+**② 三个失败补丁：在 `/tmp` 试验场里**真的试过**（三方合并 ✓）**：
+- ✅ **001-branding：`git apply -3` 直接干净通过** ✓✓（`Applied patch to 'package.json' cleanly` ✓）—— 应用后**根 `package.json`
+  已改名 `my-pi`** ✓、**`piConfig` 已写入**（第 5 行 ✓）⇒ **难度：小** ✓；**意图不变** ✓；**不应删**（**上游无等价物** ✓）；
+- ⚠️ **002-local-pi-mods：只剩 1 处冲突 hunk** ✓ —— 3-way 下 `check-model-data.ts` **干净** ✓、`secrets.ts`（新文件）**直接应用** ✓，
+  **只有 `tsconfig.build.json` 冲突** ✗（上游该处现为 6 条 `paths`（agent-core×2 / ai×2 / tui×2）+ `rootDir/include/exclude`（含
+  `src/experimental`）✓）⇒ **只需重锚这一个 hunk** ✓ ⇒ **难度：小–中** ✓；**不应删**（README / secrets / check-model-data 是**我方独有** ✓）；
+- ⚠️ **010-disable-share-bug：只剩 1 处冲突 hunk** ✓ —— 3-way 下 `interactive-mode.ts` **全部干净** ✓，
+  **只有 `slash-commands.ts` 冲突** ✗；★ 上游 **`share`/`bug` 两条仍在**（`:28`/`:29` ✓）⇒ **隐私意图仍成立 ⇒ 必须重做、不能删** ✓
+  （冲突未解时两行仍在，与现象一致 ✓）⇒ **难度：中** ✓。
+⇒ ★ **工作量更正** ✓：原估"半天"中**补丁重做的大头其实只剩 2 处 hunk**（约 **1–2 小时** ✓）；
+**真正的时间在两处 Breaking 适配**（`before_agent_start` **6 个调用点** ✓；**忙语义/注入路径重验** ✓✓）。
+
+**③ 其它要点（都写进 `docs/design/UPSTREAM-SYNC-PLAN.md` ✓，100 行）**：
+- **目标建议** ✓：**先按 `v1.2.0` tag 同步**（变化面小、有 changelog 对照 ✓），验证后再考虑跟进 `main` ✓
+  （**脚本当前指向 `upstream/main` = 比 tag 多 37 笔** ✗；★ **指定 tag 的开关名未逐字确认** ✗）；
+- **执行清单** ✓：备份/回滚点 ✓、重做补丁 ✓、两处 Breaking ✓、干跑→实跑→全量 golden ✓、
+  ★ **`PI_GOLDEN_SCENARIO=1` 的两个 pty 场景必须跑** ✓（这次刚被"假覆盖"教过一次 ✓）、回滚预案 ✓；
+- ★ **两道闸门的处置** ✓：**注入面基线哈希若变必须有意更新并写明理由**（**绝不为变绿而改** ✗✓）；
+  重做补丁时**必须保留** `Patch (NNN-name):` **自标记** ✓；
+- ★ **复用试验场前必须先清** ✗：`/tmp/pi-sync-probe` 现在是**混合态**（8 个补丁已应用 + 2 处 `UU` 冲突 ✓）⇒
+  **先 `reset --hard 6374c2baf && clean -fdx`** ✓。
+
+**④ 守门与边界** ✓：`check-conventions` 全绿 ✓；`check-doc-links` 一致（**168 md** ✓）；`gen-doc-index --check` 一致 ✓；
+改动仅 `?? docs/design/UPSTREAM-SYNC-PLAN.md` + `M docs/INDEX.md` ✓；**未碰 `vendor/**` / `patches/**` / `custom/**` / `scripts/**`** ✓；
+**主仓库无任何 git 写操作** ✓；★ **未用 `pkill -f`** ✓✓（**本会话首次全程守住** ✓）。
+
+**⑤ 仍未核实（✗）**：① `sync-upstream.sh` 在 worktree 里的**实际应用命令**（`git apply` vs `git am`）**未逐字读到** ✓
+⇒ 其 `-3` 结论是**内容层面**等价验证 ✓；② **指定 tag 的开关名未确认** ✓；③ ★ **`002`/`010` 两处冲突 hunk 的具体重写文本尚未产出** ✗
+（已完成"冲突定位 + 意图确认 + 上游新形态取证" ✓ ⇒ **已批准继续把它改通** ✓）；④ `pi-agent-core` **通配别名在 1.2 下能否解析**未验证 ✓；
+⑤ **非干跑路径未执行**（需授权 ✓）。
+
 ### [2026-10-11] 上游同步**可行性实测** ✓：干跑只打印计划（原说法被证伪 ✗）⇒ 改用**只读重放演算** ⇒ **8/11 干净、3 个局部失败** ✓
 
 **★ 一、"可疑推送"查明：是我自己** ✓✓（**无越界** ✓）：`0bf7d62d3` 的作者/提交者 = `cyfxxx` ✓；
