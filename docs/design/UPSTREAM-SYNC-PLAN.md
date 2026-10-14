@@ -98,3 +98,40 @@
 3. `002`/`010` 两处冲突 hunk 的**具体重写文本**尚未产出（只完成了"冲突定位 + 意图确认 + 上游新形态取证"）。
 4. `pi-agent-core` 通配别名在 1.2 下**是否仍能解析**未验证。
 5. 非干跑路径未执行（会移动 vendor 分支，需单独授权）。
+
+---
+
+## 附二：002 / 010 两处冲突**已在 `/tmp` 试验场改通** ✓（2026-10-11，未动主仓库）
+
+**试验场** ✓：`/tmp/pi-sync-probe`（`git clone --shared vendor/pi` 的一次性克隆 ✓，`6374c2baf` ✓，**主仓库 `vendor/**` 一字未动** ✓）。
+**基线复现** ✓：清空（`reset --hard 6374c2baf` + `clean -fdx`）后按序重放 ⇒ **001（用 `-3`）干净** ✓、
+**002 与 010 冲突** ✗、**其余 8 个干净** ✓（与上一轮一致 ✓）。
+
+### 002-local-pi-mods ✓ 小
+- **原意图** ✓（补丁内 hunk ✓）：把 `packages/coding-agent/tsconfig.build.json` 的 `exclude` 加上 **`src/custom`** ✓
+  （并另有 README.md / `check-model-data.ts` / `secrets.ts` 三处 ✓）。
+- **冲突真因** ✗：上游把该行**简化**了 —— 现在是
+  `"exclude": ["node_modules", "dist", "src/experimental"]` ✗（原来还有 `src/client`、`src/cli/experimental` ✓）。
+- **改法** ✓：只把 hunk 的**上下文行**换成上游现状（`-` 行改为新的上游行 ✓），**`+` 行仍追加 `src/custom`** ✓ ⇒ **意图不变** ✓。
+- **证据** ✓：修好的补丁存 `/tmp/patches-fixed/002-local-pi-mods.patch` ✓，`git apply --check` ⇒ **通过** ✓✓；整体重放 ⇒ **✓ 应用成功** ✓。
+- **难度**：**小** ✓（一行上下文 ✓）。
+- **是否建议删除**：**否** ✗（`src/custom` 排除是本地结构的真实需求 ✓）。
+
+### 010-disable-share-bug ✓ 小（但**意图需扩展** ⚠）
+- **原意图** ✓（补丁内 hunk ✓）：**移除 `/share` 与 `/bug`**（隐私：不外发会话 ✓）—— 命令表两行 + `interactive-mode.ts` 三处文案 ✓。
+- **冲突真因** ✗：上游把 `share` 的描述改成 **"Share session via a Radius artifact or a GitHub gist"** ✓
+  （补丁里期待的是旧文案 "…as a secret GitHub gist" ✓）。
+- **前提仍成立** ✓✓：上游 **`share` / `bug` 两条仍在**（`slash-commands.ts:27` / `:28`）✓ ⇒ **隐私意图仍成立 ⇒ 必须重做、不能删** ✓。
+- **改法** ✓：只把该 hunk 的 `-` 上下文行换成上游新文案 ✓，**仍删除两行** ✓；
+  **其余锚点全部仍在** ✓（`Run /bug to report it` ✓、`run /bug. The crash details` ✓、`Persist a crash so the next start can point the user at` ✓）。
+- **证据** ✓：`/tmp/patches-fixed/010-disable-share-bug.patch` ✓，`git apply --check` ⇒ **通过** ✓✓；整体重放 ⇒ **✓ 应用成功** ✓。
+- **难度**：**小** ✓。
+- ★ **但发现"意图漂移"** ✗✓：上游**新增**了三处 `/bug` 通道 —— `interactive-mode.ts` **`:136`**（`import { reportBug }` ✓）、
+  **`:2173`**（"…/bug sends a report to the developers" 提示 ✓）、**`:3242`**（`/bug` 处理器 ✓）⇒ **原补丁覆盖不到** ✗
+  ⇒ **要真正保住"无外发通道"的意图，须扩展 010**（**中等**难度 ⚠）—— **这是本轮最重要的新发现** ✓✓。
+
+**仍未核实（✗）**：① 010 的**扩展**（新增三处 `/bug` 通道）**未实现** —— 需要设计（删 handler？改提示？去掉 import 的调用方？✓）；
+② 001 用 `-3` 成功，但**三方合并会产生何种内容**（是否有冲突标记残留 ✓）**未逐字检查** ✗；
+③ 全部 11 个重放后**未跑 `custom/` 的类型检查**（那才是"同步能不能编译过"的判据 ✓）✗；
+④ 试验场状态：**`6374c2baf` + 001(-3) + 002/010(修好版) 已应用**，其余看运行顺序（**报告里已说明** ✓）。
+
