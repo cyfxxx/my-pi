@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（224 条）
+## 决策台账（225 条）
 
+- `DECISIONS.md` · [2026-10-11] 上游 pi 1.2 同步分析 ✓（建议同步）+ ★ 真实会话让 4/5 失败任务**实测转绿** ✓ + 一个"假覆盖"被揭穿 ✗✓ · **★ 一、你开了真实交互会话后，实测闭环（这是此前"只能真跑"的那条 ✓✓）**： · 数字: 3 天 / 4 个 / 6 个 · 证据: 70c69c01 / 484a8b8c
 - `DECISIONS.md` · [2026-10-11] 新增 runbook：`docs/operations/books-ocr-selfcheck.md` ✓（让换机不再卡在"提交被拦" ✗→✓） · **为什么需要** ✗：拉取远端 26 笔后，本机守门**第 15 步书籍自检失败** ✗ ⇒ **任何提交都过不了 pre-commit** ✗✗； · 数字: 30 秒 / 789 条 / 166 个 / 9 个 · 证据: d89ab4f73
 - `DECISIONS.md` · [2026-10-11] 拉取远程 26 笔 ✓：**内容零丢失**（用内容比对证明 ✓）+ 收口遗留漂移 + 补装 OCR 引擎 ✓ · **拉取结果** ✓：`git pull --rebase origin main` **成功、无冲突** ✓；远端是 **`forced update`** ✗（另一台设备 **rebase 后强推** ✓）； · 数字: 37 条 / 7 条 · 证据: 35486062b / d89ab4f73
 - `DECISIONS.md` · [2026-10-11] ClamAV 种子字段对齐 ✓（并查实：`notifyMain`/`waitForUserOnLocal` **无消费点** ✗） · **改动范围（严格 ✓）**：`portable/agent/scheduled-seeds.json` **只有「每日更新 ClamAV 病毒库」那一条被改** ✓ · 数字: 5 条 / 48MB / 3 条 / 1 次 · 证据: b6ffc4599f04745e592d5270
@@ -232,7 +233,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（222 条）
+## 进度记录（223 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -456,6 +457,7 @@
 - `PROGRESS.md` · ClamAV 种子字段对齐（2026-10-11） · - 只改 scheduled-seeds.json 里「每日更新 ClamAV 病毒库」一条（prompt 逐字节未变、另 5 条逐字节未变、version/note 未变）； · 数字: 5 条 / 6 条 · 证据: b6ffc4599f04745e592d5270
 - `PROGRESS.md` · 拉取远程 26 笔 + 收口漂移 + 补装 OCR 引擎（2026-10-11） · - 拉取：git pull --rebase 成功无冲突；远端 forced update（对方 rebase 后强推），共 26 笔（书籍库/RapidOCR/工具链移入 runtime/ · 证据: 35486062b / node scripts/test-books.mjs rc=0（20
 - `PROGRESS.md` · 新增 runbook：books-ocr-selfcheck（2026-10-11） · - 为什么：拉取 26 笔后第 15 步书籍自检失败 ⇒ 任何提交都被 pre-commit 拦；根因是 test-books.mjs（golden-tasks.sh:108，属 · 数字: 789 条 / 9 个 / 1 个
+- `PROGRESS.md` · 上游 pi 1.2 分析 + 4/5 任务实测转绿 + 假覆盖揭穿（2026-10-11） · - ★真实会话后 4/5 任务实测转绿：tool-stats-daily 0/51、knowledge-subscribe 0/39、daily-health 0/41、golden-fast 0/46 全 success； · 数字: 3 天 / 6 个 · 证据: 70c69c01 / 28dcce2b
 
 ## 缺陷回放（37 条）
 
@@ -497,7 +499,7 @@
 - `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 
-## 设计文档（178 条）
+## 设计文档（186 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -658,6 +660,14 @@
 - `docs/design/UPGRADE-LEDGER.md` · 已完成：第四批（2026-10-13） · > 该条属"用户明确要求 + 反复有效"的硬约束，故按 §3.1 沉淀至此。 · 数字: 278 GB / 278.63 GB / 0 条
 - `docs/design/UPGRADE-LEDGER.md` · 待评（明确未硬化，附原因与前置条件） · 数字: 14.5 KB / 32 条 / 18 条
 - `docs/design/UPGRADE-LEDGER.md` · 下一批复核 · - 每次日报（`node scripts/daily-health.mjs --print`）顺带看四项注入字节数；接近上限即启动降权评估。 · 证据: node scripts/daily-health.mjs --print
+- `docs/design/UPSTREAM-PI-1.2.md` · 0. 现状版本（附证据） · ⇒ **落后两个 minor（1.0.4 → 1.1.0 → 1.2.0）**。 · 数字: 14 个 · 证据: 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9
+- `docs/design/UPSTREAM-PI-1.2.md` · 1. 同步模型（照项目自带流程，不自创） · `scripts/sync-upstream.sh`：**`patches/` 是唯一真值**；vendor 分支 = 上游基线 + 每个补丁一个本地 commit；
+- `docs/design/UPSTREAM-PI-1.2.md` · 2. 我方与之耦合的面（实测） · 数字: 11 个 / 6 个 / 35 个
+- `docs/design/UPSTREAM-PI-1.2.md` · 3. 上游 1.1.0 与 1.2.0 内容（与我们相关的部分） · ### 3.1 破坏性变更（**直击我们**） · 数字: 6 个 / 4 个 / 1 个
+- `docs/design/UPSTREAM-PI-1.2.md` · 4. 影响面三档 · 数字: 6 个 / 1 个
+- `docs/design/UPSTREAM-PI-1.2.md` · 5. 结论与理由 · **建议同步**，理由：① 上游修了多处与我们痛点同向的问题（`-p` 截断静默成功、颜色泄漏、按键匹配、会话切换残留）； · 数字: 10 分钟 / 30 分钟 / 2 小时 · 证据: 8493be6d
+- `docs/design/UPSTREAM-PI-1.2.md` · 6. 回滚方案 · 1. `vendor/pi` 是**独立 git 仓库**，补丁栈是**本地提交** ⇒ 回到旧顶：`git -C vendor/pi reset --hard <旧补丁栈顶>`； · 证据: 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9
+- `docs/design/UPSTREAM-PI-1.2.md` · 7. 仍未核实 · - **补丁能否重放未验证**：npm 发布的 tarball **只有 `dist/` 与 `bundle/`，没有 `src/`**，因此**无法在本地对补丁目标文件做逐行比对**；
 - `docs/design/VISION.md` · 元信息 · ---
 - `docs/design/VISION.md` · 目录 · - 一、终极目标
 - `docs/design/VISION.md` · 一、终极目标 · 构建可以自主进化的全能型私人助手。

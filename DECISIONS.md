@@ -2,6 +2,69 @@
 
 ## 格式
 
+### [2026-10-11] 上游 pi 1.2 同步分析 ✓（建议同步）+ ★ 真实会话让 4/5 失败任务**实测转绿** ✓ + 一个"假覆盖"被揭穿 ✗✓
+
+**★ 一、你开了真实交互会话后，实测闭环（这是此前"只能真跑"的那条 ✓✓）**：
+| 任务 | lastResult | lastRun | fail/run |
+|---|---|---|---|
+| `tool-stats-daily` | **success** ✓ | 2026-10-14T11:08:05Z | **0**/51 ✓ |
+| `knowledge-subscribe` | **success** ✓ | 2026-10-14T11:12:29Z | **0**/39 ✓ |
+| `daily-health` | **success** ✓ | 2026-10-14T11:13:06Z | **0**/41 ✓ |
+| `golden-fast` | **success** ✓ | 2026-10-14T11:12:43Z | **0**/46 ✓ |
+| ✗ **`daily-review`** | **failed** ✗ | **2026-10-10T10:39:44Z（陈旧）** | 11/30 ✗ |
+⇒ **先前的诊断被实测证实** ✓✓（那批失败**确实是历史的** ✓）；**"没再失败"与"没再运行"的歧义彻底消除** ✓✓。
+★ **唯一遗留的新问题**：`daily-review` **自 10-10 起从未再跑** ✗（`enabled=True` ✓、`nextRun=2026-10-11T09:05Z` **逾期 3 天** ✗，
+**而同一会话把其它 4 个都跑了** ✓）⇒ **"它为什么没被调度"是新问题** ✓（**不是**之前修的那个根因 ✓）⇒ **单独立项** ✓。
+
+**★ 二、ClamAV 任务已注册** ✓✓（**这条线闭合** ✓）：实测 `enabled=True` ✓、`type=cron` ✓、`schedule='15 6 * * *'` ✓、
+**`useSubagent=True`** ✓、`maxRunTime=900` ✓、`retries=1` ✓、`tags=['security','daily']` ✓、`nextRun=2026-10-15T06:15Z` ✓、
+`lastRun=None` ✓（**尚未首跑，符合预期** ✓）。
+
+**★ 三、漂移自证消除** ✓✓（**我原计划的"清漂移"不需要做了** ✓）：实测种子与本地任务 prompt **逐字节相同** ✓
+（长度 **379** / FNV32 **70c69c01** ✓ 两侧一致 ✓）；`seed-drift.log` 最后一行是项目自己写的
+`[2026-10-11T14:52:50.092Z] 漂移已消除（本地任务与 seeds 重新一致）` ✓。
+**顺带印证** ✓：`14:45` 那条**新摘要格式当场生效** ✓（`本地 484a8b8c/19 ≠ 种子 3489d607/379` ✓）⇒ **我加的"两侧摘要"第一次真实漂移就派上用场** ✓✓。
+（子代理**只做了备份、未改一字** ✓。）
+
+**★ 四、一个假设被证伪，且顺带验证了我们的检查器** ✓：它怀疑"调度器被陈旧锁卡死"（因 `scheduler.lock` **存在** ✗）⇒ **实测证伪** ✓ ——
+锁内容是**新三段格式** ✓ `16473:1791975994768:1601522584` ✓、PID **16473 活着** ✓、mtime 11:06 ✓ ⇒
+**那是你交互会话合法持有的锁** ✓✓；且 `daily-health` **正确判为 `调度锁=正常`** ✓（不是 `stale` ✓）⇒ **①d 的检查器按设计工作** ✓✓。
+（附带 ✗：`ps` 的 `etimes` 返回 `4294967295` —— 与本机 `/proc` 时钟异常**同源** ✓。）
+
+**★ 五、上游 pi 1.2 同步分析（交付 `docs/design/UPSTREAM-PI-1.2.md`，118 行 ✓）**：
+- **现状（我已独立复核 ✓）**：`vendor/pi` coding-agent = **1.0.4** ✓、`LAST_SYNC_POINT` = **`28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9`** ✓、
+  上游 `earendil-works/pi-mono` ✓；上游最新 **1.2.0**（2026-10-12 ✓），中间还有 **1.1.0**（2026-10-07 ✓）⇒ **落后两个 minor** ✓；
+  上游 `engines.node >= 22.19.0` ✓、依赖含 **typebox 1.3.27** ✓（我们曾因 1.3.x 缺 `Type.Null` 修过 `tool-adapter.ts` ✓）；
+- **同步模型（照 `scripts/sync-upstream.sh` ✓，未自创）**：**`patches/` 是唯一真值** ✓；在**临时 worktree** 重放补丁 ✓，
+  **全成功才移动 vendor 分支** ✓（否则 vendor 不变、报出失败补丁 ✓）；开关 `PI_SYNC_DRY_RUN=1` / `PI_SKIP_REBUILD=1` / `PI_SYNC_RUN_GOLDEN=1` ✓；
+- ★ **两处 Breaking 直击我们** ✗：① **`before_agent_start`** 现在**也为 `pi.sendMessage(…,{triggerTurn:true})` 触发** ✓ 且
+  `BeforeAgentStartEvent` **变成按 `messageType` 的联合** ✓（`"user"` 有 `prompt`/`images` ✓；`"custom"` **没有 `prompt`** ✗）
+  ⇒ **我方 6 个调用点必须逐个检查 `event.messageType === 'user'`** ✗；② **忙语义变更** ✓（启动期即算忙 ⇒ `ctx.isIdle()` false ✓；
+  `pi.sendMessage()` **排队进正在启动的运行** ✓；**`pi.sendUserMessage()` 现在要求 `deliverAs`** ✗）
+  ⇒ **与我们"中途注入（steer）"机制直接相关 ⇒ 注入路径必须重验** ✓✓；
+  另有：主题 schema 移到 `pi.dev/schemas/…` ✓、`mcp list --json` 形状变更 ✓、**移除** experimental server/client/plugin 栈与
+  `@earendil-works/chord` + `pi-client`/`pi-protocol`/`pi-server` ✓（**未逐个核对**我方是否 import ✗）；
+- **同向利好** ✓：**print 模式 `-p` 在最终响应被输出上限截断时不再静默退 0** ✓ ⇒ 打印部分文本 + stderr 警告 + **退 1** ✗
+  —— **与我们今天修的"报成功却没做事"同向** ✓✓，但**会改变无头任务的成败判读口径** ✗（我们大量用 `-p` ✓）；
+- **风险最高** ⚠：**6 个 footer 补丁 + `editor.ts` 补丁**所在文件在 1.1/1.2 都有改动 ✓（上下文位移 ✓）；
+  **011（tool-search CJK）**与新增的 `reachesTools`/`aliases`/`searchTools()` 相邻 ✓；
+- **结论** ✓：**建议同步**（**③建议不同步：无** ✗），但**先 `PI_SYNC_DRY_RUN=1` 干跑** ✓；工作量 **半天量级** ✓
+  （干跑 10 min ✓；补丁重放 10–30 min ✓；`custom/` 类型检查与修复 **0.5–2 h** ✓；全量 golden 20–30 min ✓）；
+- **回滚** ✓：`git -C vendor/pi reset --hard <旧补丁栈顶>` ✓ + 恢复 `LAST_SYNC_POINT` = `28dcce2b…` ✓ + 重建 dist 与"好 pi"缓存 ✓；
+  ★ **注入面基线哈希必须有意更新并附理由**（**不能为变绿而改** ✗✓）；
+- **仍未核实（✗）**：**补丁能否重放本地无法预判** ✗ —— npm tarball **只有 `dist/`+`bundle/`、没有 `src/`** ✗
+  ⇒ 唯一可信手段是**干跑**，而它**需要 github** ✗（`git ls-remote` **两次探测均失败** ✗ ⇒ **须另择时机复测** ✓，
+  **一次失败不等于不可达** ✓）；`web_search` 本会话**不可用** ✓ ⇒ 内容全部来自 npm 包内 `CHANGELOG.md`（**一手** ✓）与本仓库 ✓；
+  未核对 `docs/extensions.md` 逐字差异 ✓；未评估 **typebox 1.3.27** 兼容性 ✓。
+
+**★ 六、"假覆盖"被揭穿（重要 ✗✓）**：拉取进来的改动把**两个 pty 场景改成默认跳过** ✗ ⇒
+**不带 `--fast` 也不会跑** ✓，必须显式 **`PI_GOLDEN_SCENARIO=1`** ✓（第 19/20 步的说明文字已写明 ✓）⇒
+**而这次拉取恰好改了 `pi-supervisor.sh`（+90 行）** ✗✓ ⇒ 按它自己的要求**这两步"必须跑"** ✓ ⇒ **待补跑** ✓。
+**另**：本次全量 golden（未加 `--fast`）**其余全部通过** ✓（**失败项：无** ✓），**含第 15 步书籍自检** ✓ = **RapidOCR 装好了** ✓✓。
+
+**七、子代理再次自曝同一个坑** ✗✓：它**又一次误用 `pkill -f` 杀掉自己的 shell** ✓（本会话**第三次** ✓）⇒ 已改用 `job_kill` ✓
+—— **"绝不 `pkill -f`"这条纪律的有效性再次被验证** ✓。
+
 ### [2026-10-11] 新增 runbook：`docs/operations/books-ocr-selfcheck.md` ✓（让换机不再卡在"提交被拦" ✗→✓）
 
 **为什么需要** ✗：拉取远端 26 笔后，本机守门**第 15 步书籍自检失败** ✗ ⇒ **任何提交都过不了 pre-commit** ✗✗；

@@ -3681,3 +3681,20 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   并逐个复核文档引用的四个行号均成立。
 - 未核实：只覆盖 Linux 路径与版本（Windows/macOS 未验证）；版本号为当时实测值（判据以 test-books rc=0 为准）；
   .pth 可见性全局（系统 python3 会多看到 opencv/numpy/Pillow，未实测版本冲突）；守卫相反降级策略未查到设计依据（只记录不改）。
+
+### 上游 pi 1.2 分析 + 4/5 任务实测转绿 + 假覆盖揭穿（2026-10-11）
+
+- ★真实会话后 4/5 任务实测转绿：tool-stats-daily 0/51、knowledge-subscribe 0/39、daily-health 0/41、golden-fast 0/46 全 success；
+  唯 daily-review 仍 failed 且 lastRun 停在 2026-10-10T10:39Z、nextRun 逾期 3 天 ⇒ 新问题（为何未被调度），单独立项。
+- ClamAV 任务已注册（useSubagent=True 等字段齐全，nextRun=2026-10-15T06:15Z，尚未首跑）。
+- 漂移自证消除（种子与本地 prompt 逐字节相同，长度 379 / FNV32 70c69c01；日志有项目自己的"漂移已消除"行）；我原计划的清漂移无需做。
+- 陈旧锁假设被证伪：锁是三段格式且 PID 活着（用户会话合法持有），daily-health 正确判"调度锁=正常"⇒ 检查器按设计工作。
+- 上游 pi 1.2 分析交付 docs/design/UPSTREAM-PI-1.2.md（118 行）：现状 1.0.4 / LAST_SYNC_POINT 28dcce2b（已独立复核）；上游最新 1.2.0
+  （落后两个 minor）；两处 Breaking 直击我们：before_agent_start 变 messageType 联合（6 个调用点须检查）与忙语义变更+sendUserMessage
+  需 deliverAs（注入路径须重验）；移除 pi-client/pi-protocol/pi-server/chord（未逐一核对）；-p 截断改退 1（与我们修的静默失效同向，但改
+  任务判读口径）；风险最高是 6 个 footer 补丁+editor 补丁的上下文位移与 011 与 reachesTools/aliases 相邻；结论建议同步（无"不建议同步"项），
+  先干跑；工作量半天量级；回滚 vendor 分支+LAST_SYNC_POINT；注入面基线哈希必须有意更新且附理由。未核实：补丁重放无法本地预判（tarball
+  无 src），干跑需 github 而 ls-remote 两次失败（须另择时机复测）；web_search 本会话不可用；typebox 1.3.27 兼容性未评估。
+- ★假覆盖揭穿：拉取后两个 pty 场景默认跳过，不带 --fast 也不跑，须显式 PI_GOLDEN_SCENARIO=1；而本次拉取改了 pi-supervisor.sh(+90) ⇒ 这两步
+  按项目自己的要求"必须跑" ⇒ 待补跑。本次全量 golden 其余全绿（失败项：无，含书籍自检 ⇒ RapidOCR 生效）。
+- 子代理第三次误用 pkill -f 杀掉自己的 shell（已改用 job_kill）⇒ 纪律有效性再次验证。
