@@ -46,11 +46,18 @@ export function register(pi: ExtensionAPI): void {
     event: 'before_agent_start',
     handler: async (event) => {
       try {
-        const e = event as { prompt?: string };
-        if (lastAborted && Date.now() - lastAborted.ts <= CORRECTIVE_WINDOW_MS) {
-          linkCorrective(file, lastAborted.id, e.prompt ?? '');
+        // 兼容 pi 1.0.4 与 1.2：1.2 起 `before_agent_start` 也会在
+        // `sendMessage(..., { triggerTurn: true })` 触发的"custom 运行"上触发，
+        // 而该形态**没有 `prompt`**（只有起始 message）⇒ 若照旧读 `e.prompt ?? ''`
+        // 会**静默记录一个空 prompt**（本项目最忌的静默失真）。
+        // 1.0.4 没有 `messageType` 字段 ⇒ 视为用户回合，行为与之前完全一致。
+        const e = event as { prompt?: string; messageType?: string };
+        const isUserTurn = e.messageType === undefined || e.messageType === 'user';
+        const promptText = isUserTurn && typeof e.prompt === 'string' ? e.prompt : '';
+        if (isUserTurn && lastAborted && Date.now() - lastAborted.ts <= CORRECTIVE_WINDOW_MS) {
+          linkCorrective(file, lastAborted.id, promptText);
         }
-        currentRun = { prompt: e.prompt ?? '', startedAt: Date.now(), tools: [] };
+        currentRun = { prompt: promptText, startedAt: Date.now(), tools: [] };
         lastSteering = [];
       } catch {
         /* 静默 */

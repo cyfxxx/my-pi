@@ -2,6 +2,62 @@
 
 ## 格式
 
+### [2026-10-11] ★ 010 **无需扩展**（"意图漂移"被证据推翻 ✗✓）+ 两处 Breaking 适配：**已做一处、另一处只差切换时加一个参数** ✓
+
+**① 010 扩展：实测**不需要** ✗✓** —— 上一轮转来的"三条新通道"**逐条核实后不成立** ✓：
+| 被点名 | 实况 |
+|---|---|
+| `interactive-mode.ts:136` `import { reportBug }` | **只是 import** ✓；其**唯一调用点在 handler 内** ⇒ **不能删**（`noUnusedLocals` 会报错 ✗）也**不必删** ✓ |
+| `:2173` 提示文案 | **正是我们已经重写的那一处** ✓（1.2 的新行号 ✓） |
+| `:3242` 处理器 / `:3237` 分发 | 分发仍会调 handler ✓，而 ★ **我们的 handler 在调用之前就 `return`** ✓ |
+★ **断链证据**（在 `/tmp` 的"已打 11 补丁的 1.2"树上 ✓）：
+```
+6630:   return;          ← 在 shareSession( 之前 ✓
+6644:   return;          ← 在 reportBug(  之前 ✓
+handler 之外的 reportBug(/shareSession( 调用次数 = 0 ✓✓
+```
+**③ `sessionShareDestination`：无需补丁** ✓（1.2 里它的消费者**全是设置管道/UI** ✓：`settings-manager.ts:808-816` ✓、
+`settings-defaults.ts:6` ✓、`settings-schema.ts:224-228` ✓、`settings-selector.ts:74/520` ✓、`interactive-mode.ts:4941` ✓
+⇒ **没有外发方读它** ✗✓；且 ★ **唯一的 `shareSession(` 调用就在我们已提前 `return` 的 handler 内** ✓（`:6631` ✓）⇒ **不构成外发通道** ✓）。
+
+**★ 一处它按门禁正确处理的冲突** ✗✓：我的任务书允许改 `patches/010-*.patch` ✓，但**门禁要求 `patches/*.patch` 必须能应用到当前
+vendor（1.0.4）** ✗（`golden-tasks.sh:59-69` ✓）⇒ **把 1.2 版补丁放进 `patches/` 会当场让门禁变红** ✗✗ ⇒
+它**没有改 `patches/`** ✓，1.2 版留在 `/tmp/patches-fixed/` ✓，并给出**可复现的生成法**（清空 + `-3` 重放 + `git diff` ✓）
+⇒ **切换 vendor 时换入** ✓✓（**这正是"发现规格与门禁冲突时先停下报告、不硬来"的正确做法** ✓）。
+
+**② 适配 1（`before_agent_start`）：已做，且与 1.0.4 双兼容** ✓✓ —— ★ **六个调用点只有一处真受影响** ✗
+（其余读 `systemPromptOptions`/`systemPrompt`/无参 ✓，**实测读 `event.prompt` 次数 = 0** ✓✓）：
+```ts
+const e = event as { prompt?: string; messageType?: string };
+const isUserTurn = e.messageType === undefined || e.messageType === 'user';   // 1.0.4 无此字段 ⇒ 原行为 ✓
+const promptText = isUserTurn && typeof e.prompt === 'string' ? e.prompt : '';
+```
+⇒ **1.0.4 下逐字不变** ✓；**1.2 的 custom 运行不再把空串当用户意图** ✓（改动：`custom/features/intervention/index.ts` ✓，11 增 4 删 ✓）。
+
+**② 适配 2（忙语义 / `sendUserMessage(deliverAs)`）：只差"切换时加一个显式参数"** ✓ ——
+★ **签名实测相同** ✓：1.2 `agent-session.ts:2397` 与 1.0.4 `:2353` **完全一致**（`deliverAs?` 可选 ✓）⇒
+**changelog 的"要求"不是类型层面** ✗；★ 我方三处调用（`voice/index.ts:78/344/367` ✓ 经 `ui-adapter.ts:185` 包装 ✓）只传 `expandPromptTemplates` ✗；
+★★ **加它为什么零风险** ✓：**我们自己的适配器类型就声明了 `deliverAs?: 'steer' | 'followUp'`** ✓（`ui-adapter.ts:189` ✓），
+**pi 1.0.4 也接受** ✓ ⇒ **两个版本都能编译** ✓✓；★ **取值建议 `steer`** ✓（语音 = 用户**此刻**在说话 ⇒ 立即生效 ✓；依据：1.2 把
+`deliverAs` **直接映射为 `streamingBehavior`** ✓）；★ **我们的中途注入路径不受影响** ✓✓（始终发 `streamingBehavior:'steer'` ✓，
+且 **`undefined` 不被视为拒绝** ✓（`assertPromptAccepted:342-345` ✓）⇒ 1.2"排队而非报错"**不会让我们误判** ✓✓）。
+
+**验证** ✓：相关单测（intervention+subagent+mode）**18 files / 217 passed + 1 skipped** ✓；全量 `tsc -p custom/` **rc=0** ✓；
+`golden --fast` **全绿** ✓（含 `patches` 11 个可应用 ✓ + 补丁行为自标记 ✓ + 约定守门 ✓）；`check-doc-links` 168 md ✓；
+`gen-doc-index --check` ✓；**`vendor/**` 一字未动** ✓（HEAD `db03484e2` ✓、`LAST_SYNC_POINT` 仍 `28dcce2b…` ✓）；
+**主仓库无任何 git 写操作** ✓；★ **全程未用 `pkill -f`** ✓✓（**连续四轮守住** ✓）；未碰 `docs/design/UPSTREAM-PI-1.2.md` ✓。
+
+**★ "切换 vendor 时必须一起做"的清单** ✓：① **换入 1.2 版 010** ✓（`-3` 重放 + `git diff` 生成 ✓；★ 保留 `Patch (NNN-name):` 自标记 ✓；
+★ **注入面基线哈希若变必须有意更新并写明理由** ✗✓）；② **`voice/index.ts:78/344/367` 加 `deliverAs:'steer'`** ✓；
+③ 若要**记对** custom 运行的正文 ⇒ 需先核实 1.2 `event.message` 负载形状 ✗（否则维持"**不记录**"✓）；
+④ `sessionShareDestination` **无需处理** ✓（附证据 ✓）；⑤ **全量 golden（含 `PI_GOLDEN_SCENARIO=1` 的两个 pty 场景 ✓）**
++ 脚本那条 **dist 路径**的类型检查 ✓。
+
+**仍未核实（✗）**：① 1.2 **`event.message` 负载形状** ✗ ⇒ `intervention` 只做到"**不误记**"、**没做到"记对"** ✗；
+② 1.2 的 `sendUserMessage` **流式中不传 `deliverAs` 的运行期行为未实测** ✗（**只证了签名相同 ✓，不是行为相同** ✗）；
+③ 上游自身构建是否容忍 `return` 后的**不可达代码未逐字确认** ✗（`custom/` 类型检查 0 错误 ✓、`allowUnreachableCode` 默认允许 ✓）；
+④ **未切 vendor、未跑全量 golden** ✓（属"切换后"的验证 ✓）。
+
 ### [2026-10-11] 上游 1.2「人话版变更 + 不适合项」交付 ✓ + ★★ 最硬的适配点：我们**确有 `sendUserMessage` 未传 `deliverAs`** ✗
 
 **交付** ✓：`docs/design/UPSTREAM-PI-1.2.md` **原位追加「附二」**（原文保留 ✓，现 **209 行** ✓）——

@@ -3829,3 +3829,30 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   DECISIONS/PROGRESS；无 git 写操作；未用 pkill -f；主动提醒工作区 intervention/index.ts 不是它改的 ⇒ 提交只挑它的两个文件。
 - 未核实：两版逐条全量未读完（可能漏冲突项）；sessionShareDestination 删 /share 后的消费者未追；加法项的语义级冲突未逐项验证；
   -p 退 1 对定时任务的实际影响未实测；010 扩展的具体实现未产出。
+
+### 010 无需扩展 + 两处 Breaking 适配（2026-10-11）
+
+- ★010 扩展实测不必要（意图漂移被推翻）：:136 只是 import（唯一调用点在 handler 内 ⇒ 不能删也不必删）；:2173 正是我们已重写的那处
+  （1.2 新行号）；:3242/:3237 分发仍调 handler 但★我们的 handler 在调用前就 return ⇒ 断链证据：6630: return;（在 shareSession( 之前）、
+  6644: return;（在 reportBug( 之前）、handler 之外 reportBug(/shareSession( 调用次数 = 0。
+- ★sessionShareDestination 无需补丁：1.2 里消费者全是设置管道/UI（settings-manager.ts:808-816、settings-defaults.ts:6、
+  settings-schema.ts:224-228、settings-selector.ts:74/520、interactive-mode.ts:4941）⇒ 没有外发方读它；唯一的 shareSession( 调用就在
+  我们已提前 return 的 handler 内（:6631）。
+- ★按门禁正确处理的冲突：任务书允许改 patches/010-*.patch，但门禁要求 patches/*.patch 必须能应用到当前 vendor(1.0.4)（golden-tasks.sh:59-69）
+  ⇒ 1.2 版放进 patches/ 会当场让门禁变红 ⇒ 未改 patches/，1.2 版留在 /tmp/patches-fixed/ 并给出可复现生成法（清空 + -3 重放 + git diff），
+  切换 vendor 时换入。
+- 适配 1（before_agent_start）已做且与 1.0.4 双兼容：六个调用点只有一处真受影响（其余读 systemPromptOptions/systemPrompt/无参，
+  实测读 event.prompt 次数 = 0）；改为 isUserTurn = messageType === undefined || === 'user'，promptText 仅 isUserTurn 且字符串时取
+  ⇒ 1.0.4 下逐字不变，1.2 的 custom 运行不再把空串当用户意图（custom/features/intervention/index.ts，11 增 4 删）。
+- 适配 2（忙语义/sendUserMessage(deliverAs)）只差切换时加显式参数：签名实测相同（1.2 agent-session.ts:2397 vs 1.0.4 :2353，deliverAs?
+  可选）⇒ changelog 的"要求"不是类型层面；我方三处调用（voice/index.ts:78/344/367 经 ui-adapter.ts:185 包装）只传 expandPromptTemplates；
+  ★加它零风险：我们自己的适配器类型就声明了 deliverAs?: 'steer'|'followUp'（ui-adapter.ts:189），pi 1.0.4 也接受 ⇒ 两版本都能编译；
+  取值建议 steer（语音=此刻在说话；1.2 把 deliverAs 直接映射为 streamingBehavior）；★我们的中途注入路径不受影响（始终发
+  streamingBehavior:'steer'，且 undefined 不被视为拒绝（assertPromptAccepted:342-345）⇒ 1.2 排队而非报错不会让我们误判）。
+- 验证：相关单测 18 files/217 passed+1 skipped；全量 tsc rc=0；golden --fast 全绿；check-doc-links 168 md；gen-doc-index --check；
+  vendor/** 未动（HEAD db03484e2、LAST_SYNC_POINT 28dcce2b）；主仓库无 git 写操作；★全程未用 pkill -f（连续四轮守住）。
+- 切换 vendor 时清单：①换入 1.2 版 010（保留 Patch (NNN-name): 自标记；注入面基线哈希若变必须有意更新并写理由）②voice 三处加
+  deliverAs:'steer' ③若要记对 custom 运行正文需先核实 1.2 event.message 负载形状（否则维持不记录）④sessionShareDestination 无需处理
+  ⑤全量 golden（含 PI_GOLDEN_SCENARIO=1 的两个 pty 场景）+ 脚本 dist 路径的类型检查。
+- 未核实：1.2 event.message 负载形状（intervention 只做到不误记、未做到记对）；1.2 流式中不传 deliverAs 的运行期行为未实测（只证签名相同）；
+  上游构建是否容忍 return 后不可达代码未逐字确认；未切 vendor、未跑全量 golden。

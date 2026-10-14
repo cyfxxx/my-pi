@@ -181,3 +181,108 @@
 ② 运行期行为（6 个 `before_agent_start` 调用点 + 忙语义/注入路径 ✓）未验证 ✓；③ `001` 的 `--3way` 合并结果**语义**未逐字复核 ✓
 （只确认了**无冲突标记** ✓ + 上一轮已确认改名与 `piConfig` 生效 ✓）；④ 探针用完未删（**按路径可随时清** ✓）。
 
+---
+
+## 附四：同步前两项的执行结果（2026-10-11，**未切 vendor** ✓）
+
+### ① 扩展 010：**实测不需要扩展** ✓（原先"意图漂移"的判断被证据推翻 ✗✓）
+
+父代理转来的疑虑是"1.2 新增三处 `/bug` 通道，原 010 覆盖不到" ✗；逐条核实后**不成立** ✓：
+
+| 被点名的"新通道" | 实况 |
+|---|---|
+| `interactive-mode.ts:136` `import { reportBug }` | **只是 import** ✓；其**唯一调用点**就在 `handleBugCommand` 内 ✓（`ui-adapter` 无关 ✓）⇒ **不能删**（删了会因 `noUnusedLocals` 报错 ✗），**也不必删** ✓ |
+| `:2173` 提示文案 | **正是我们已重写的那一处** ✓（1.2 的新行号 ✓） |
+| `:3242` 处理器 / `:3237` 分发 | 分发仍会把 `/share` `/bug` 交给 handler ✓，而**我们的 handler 在调用之前就 `return`** ✓ |
+
+**决定性的"断链"证据** ✓（在 `/tmp` 已打 11 补丁的 1.2 探针里）：
+```
+6627: private async handleShareCommand() {
+6628:   // Patch (010-disable-share-bug): …
+6629:   this.showWarning("此命令在 my-pi 中已禁用：会话内容不外发");
+6630:   return;                       ← 在调用之前 ✓
+6631:   await shareSession({
+…
+6641: private async handleBugCommand(hint) {
+6643:   this.showWarning("此命令在 my-pi 中已禁用：不向外部上报会话内容");
+6644:   return;                       ← 在调用之前 ✓
+6645:   await reportBug(
+⇒ 两个 handler 之外的 reportBug(/shareSession( 调用次数 = 0 ✓✓
+```
+⇒ **1.2 版 010 用现有 7 处编辑即可** ✓（上下文按 1.2 重锚 ✓ —— 该版本已由 `git apply -3` 在 1.2 树上生成，
+存 `/tmp/patches-fixed/010-disable-share-bug.patch` ✓；**可随时用"清空 + `-3` 重放 + `git diff`"复现** ✓）。
+
+### ★ 一个必须说明的**冲突**（我按门禁办 ✗✓）
+
+任务书允许我改仓库里的 `patches/010-disable-share-bug.patch` ✓，**但门禁要求 `patches/*.patch` 必须能应用到"当前 vendor（1.0.4）"** ✗
+（`scripts/golden-tasks.sh:59-69`：「patches 全部可应用/已应用」✓）⇒ **1.2 版补丁一旦放进 `patches/`，门禁当场变红** ✗✓
+⇒ 故本轮**没有**改动 `patches/`：**1.2 版留在 `/tmp`** ✓，**切换 vendor 时**再把它换进去 ✓（换法：`git apply -3` 重放 + `git diff` 生成 ✓）。
+
+### ② 适配 1：`before_agent_start`（**已做，且与 1.0.4 双兼容** ✓✓）
+
+六个调用点逐个核实 ✓ —— ★ **只有一处真的读 `event.prompt`** ✗：
+
+| 调用点 | 读什么 | 是否受影响 |
+|---|---|---|
+| `context/index.ts:442` / `:479` | `systemPromptOptions` ✓ | 否 ✓ |
+| `context/index.ts:571` / `memory/index.ts:371` | 无参 ✓ | 否 ✓ |
+| `mode/index.ts:309` | `systemPrompt` ✓ | 否 ✓ |
+| ★ **`intervention/index.ts:46`** | **`event.prompt`** ✗ | **是**（1.2 的 custom 运行没有 `prompt` ⇒ 会**静默记录空 prompt** ✗） |
+
+**改法（`custom/features/intervention/index.ts`，11 增 4 删 ✓）**：
+```ts
+const e = event as { prompt?: string; messageType?: string };
+const isUserTurn = e.messageType === undefined || e.messageType === 'user';   // 1.0.4 无此字段 ⇒ 视为用户回合 ✓
+const promptText = isUserTurn && typeof e.prompt === 'string' ? e.prompt : '';
+if (isUserTurn && lastAborted && …) linkCorrective(file, lastAborted.id, promptText);
+currentRun = { prompt: promptText, startedAt: Date.now(), tools: [] };
+```
+⇒ **1.0.4 下行为逐字不变** ✓（`messageType` 不存在 ⇒ 走原路径 ✓）；**1.2 的 custom 运行不会再把空串当成用户意图** ✓
+（**未把 custom 运行的正文当 prompt 记录** ✗ —— 那需要 `event.message` 的负载形状，**未核实** ✗，见下）。
+**验证** ✓：相关单测 **18 files / 217 passed + 1 skipped、0 失败** ✓；全量 `tsc -p custom/` **rc=0** ✓；
+★ 其余五个调用点实测 **读 `event.prompt` 次数 = 0** ✓✓；`golden-tasks.sh --fast` **全绿**（含补丁状态 + 行为自标记 ✓）。
+
+### ② 适配 2：忙语义 / `sendUserMessage(deliverAs)`（**只差"切换时加一处显式参数"** ✓）
+
+- ★ **签名实测相同** ✓：1.2 与 1.0.4 的 `sendUserMessage` 都是
+  `options?: { deliverAs?: "steer" | "followUp"; expandPromptTemplates?: boolean }` ✓（1.2 `agent-session.ts:2397` ✓ / 1.0.4 `:2353` ✓）
+  ⇒ changelog 所说"要求 `deliverAs`"**不是类型层面的** ✗（1.2 里它传给 `prompt({ streamingBehavior: options?.deliverAs })` ✓）。
+- ★ **我方调用点** ✗：`custom/features/voice/index.ts:78`、`:344`、`:367` ✓（经 `custom/adapters/ui-adapter.ts:185` 包装 ✓）
+  **只传了 `expandPromptTemplates`** ✗。
+- ★ **为什么"切换时加参数"是零风险的** ✓：**我们自己的适配器类型就声明了 `deliverAs?: 'steer' | 'followUp'`** ✓（`ui-adapter.ts:189` ✓），
+  且 **pi 1.0.4 的类型也接受它** ✓ ⇒ **两个版本下都能编译** ✓✓（但 `custom/features/voice/**` 不在本轮允许范围内 ✗ ⇒ **列入清单** ✓）。
+- ★ **取值建议：`steer`** ✓ —— 理由：语音输入 = 用户**此刻**在说话，意图是**立即生效**（与"敲字回车"等价 ✓）；
+  若希望**不打断当前回合**则用 `followUp` ✓（更温和 ✓）。**依据**：1.2 里 `deliverAs` 直接映射为该消息的 `streamingBehavior` ✓
+  （`steer` ⇒ 注入当前运行 ✓ / `followUp` ⇒ 本轮后 ✓）。
+- **我们的"中途注入"路径（子代理）不受影响** ✓✓：我们**始终**发 `streamingBehavior:'steer'` ✓
+  （`subagent/core/runner.ts:328` ✓），且 ★ **只把 `success === false` 视为拒绝、`undefined` 不视为拒绝** ✓
+  （`assertPromptAccepted`，`:342-345` ✓）⇒ 1.2 的"排队而非报错"语义**不会**让我们误判 ✓✓
+  （我们**从不依赖"忙时被拒"** ✓ —— 那只用于**检测假装成功** ✓）。
+
+### ★ "切换 vendor 时必须一起做"的清单（本轮唯一未完成项 ✓）
+
+1. **换入 1.2 版 010** ✓：`git apply -3` 重放 11 个补丁（001 用 `-3` ✓、002/010 用 `/tmp/patches-fixed/` ✓）⇒ 从 `git diff` 生成新 `patches/010-*.patch` ✓；
+   ★ **必须保留** `Patch (NNN-name):` **自标记** ✓；★ **注入面基线哈希若变，必须有意更新并写明理由** ✗✓。
+2. **`voice/index.ts` 三处加 `deliverAs`** ✓：`:78`、`:344`、`:367` ⇒ `{ expandPromptTemplates: false, deliverAs: 'steer' }` ✓（理由见上 ✓）。
+3. **复核 `intervention` 的 custom 运行语义** ✗：若要把 custom 运行的正文记进 `currentRun.prompt` ⇒ 需先核实 1.2 `event.message` 的**负载形状** ✓
+   （**本轮未核实** ✗）⇒ 否则保持"不记录" ✓（现状 ✓）。
+4. **`sessionShareDestination` 无需处理** ✓（见下 ✓）。
+5. 全量 golden（**含 `PI_GOLDEN_SCENARIO=1` 的两个 pty 场景** ✓）+ `custom/` 类型检查（脚本的 **dist 路径**版本 ✓）。
+
+### ③ `sessionShareDestination`（设置层隐私面）：**无需补丁** ✓（有证据 ✓）
+
+1.2 里它的**全部消费者**都是**设置管道/UI** ✓，**没有外发方读它** ✗：
+`settings-manager.ts:808-816`（get/set ✓）、`settings-defaults.ts:6`（`"auto"` ✓）、`settings-schema.ts:224-228` ✓、
+`settings-selector.ts:74`/`:520`（**设置界面** ✓）、`interactive-mode.ts:4941`（把值交给设置界面 ✓）。
+而 ★ **1.2 里唯一的 `shareSession(` 调用**就在**我们已提前 return 的** `handleShareCommand` 内 ✓（`:6631` ✓）。
+⇒ **结论**：**它只是设置项，不构成外发通道** ✓ ⇒ **不加补丁** ✓。
+（**可选**（未做 ✗）：把设置界面里这一项一并隐藏 ✓ —— 纯 UI 卫生、**不影响外发面** ✓，若要做得单独评估 ✗。）
+
+### 仍未核实（✗）
+
+① 1.2 `event.message`（custom 运行的起始消息）**负载形状**未核实 ✓ ⇒ `intervention` 只做到"不误记" ✓、**没做到"记对"** ✗；
+② 1.2 的 `sendUserMessage` 在**流式中**不传 `deliverAs` 的**运行期**行为未实测 ✓（结论是"签名相同" ✓，不是"行为相同" ✗）；
+③ `handleBugCommand`/`handleShareCommand` 早期 `return` 之后的代码**不可达** ✓（`allowUnreachableCode` 默认允许 ✓，`custom/` 类型检查 0 错误 ✓）；
+   ★ 但**上游自身构建**（`tsconfig.build.json`）是否允许**未逐字确认** ✗ ⇒ 切换时的 dist 构建会给出答案 ✓；
+④ 本轮**未切 vendor** ✓、**未跑全量 golden（含两个 pty 场景）** ✗ —— 那属于"切换后"的验证 ✓。
+
