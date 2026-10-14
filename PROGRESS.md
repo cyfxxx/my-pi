@@ -3782,3 +3782,27 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 未核实：010 扩展未实现（三处新 /bug 通道需设计）；001 的 -3 合并结果未逐字检查；★★11 个全部重放后未跑 custom/ 类型检查（这才是"能否编译过"
   的真正判据，建议下一步）；试验场最终状态已写明（6374c2baf + 001(-3) 已应用；002/010 --check 通过未留树里）。
 - 结论：补丁层面已确认可行（11/11）；真正的未知只剩编译与运行期（类型检查 + 两处 Breaking 适配 + 全量 golden）。
+
+### 上游同步编译面已清：11 补丁应用到 pi 1.2 后 custom/ 类型检查 0 错误（2026-10-11）
+
+- 结论：custom/ 自身类型错误 = 0 ⇒ 两处 Breaking 未破坏类型面；顺带回答缺口③：pi-agent-core 通配别名在 1.2 下能解析。
+- 方法（零风险复刻，全程 /tmp，仓库 vendor/** 未动）：脚本检查= npx tsc --noEmit -p custom/（sync-upstream.sh:160-161），但
+  custom/tsconfig.json 的 paths 硬编码指向 ../vendor/pi ⇒ 不能直接查另一棵树；于是在 /tmp/pi-typecheck-probe（clone --shared +
+  checkout 6374c2baf）应用全部 11 补丁（11/11 成功、无冲突标记残留，顺带补掉缺口②），写探针内 tsconfig 用绝对路径把
+  @earendil-works/* 的 paths 指向探针 1.2 源码（packages/*/src/index.ts，无需构建 dist），include 指向仓库 custom/**/*.ts（不写仓库文件），
+  再跑 tsc --noEmit -p <探针>/tc-custom.json。
+- 结果：75 条错误全在探针（上游源码）内部，且没有一条落在被打补丁的文件上（editor.ts/slash-commands.ts/interactive-mode.ts/
+  package.json/tsconfig.build.json/tui-main-screen.ts 全空）；错误类型 43×TS2307 + 23×TS7016 + 3×TS2339 + 1×TS7006 + 1×TS2678 +
+  1×TS2561 ⇒ 多数是"直接检查上游源码、未走正常构建"的产物。
+- 反证：--listFiles 证明 custom/ 有 274 个文件进入程序（上游 472）⇒ 非真空通过；75 条无一涉及补丁文件；仓库 1.0.4 对照 rc=0/0 错误；
+  ★它自己判为无效并丢弃的一次对照（sed 报 unknown option to 's' ⇒ 那次"75"不可信，不作证据）。
+- ★边界：方法与脚本真实检查不同（paths 指源码 vs 脚本构建 dist 后用 d.ts 检查 ⇒ API 面相同、解析路径不同 ⇒ 强证据但非逐字等价）；
+  类型通过 ≠ 运行期正确（before_agent_start 的 messageType 联合是运行期语义变更 ⇒ 只证类型面没破，不证 6 个处理器行为正确）。
+- 交付/现场：只改文档（UPSTREAM-SYNC-PLAN.md 原位追加附三、原文保留 + INDEX）；守门 check-conventions 全绿、check-doc-links 一致
+  （168 md）、gen-doc-index --check；仓库 vendor/** 未动（HEAD db03484e2、LAST_SYNC_POINT 28dcce2b、status 干净）；主仓库无 git 写操作；
+  ★全程未用 pkill -f（连续三轮守住）；内存 1800-2078 MB 可用无冲突；探针与日志 /tmp/pi-typecheck-probe、/tmp/tc-out2.log、/tmp/tc-repo.log。
+- 未核实：脚本"构建 dist 后再检查"的逐字路径未复现（本条为源码面等价）；运行期行为未验证；001 的 --3way 合并语义未逐字复核；
+  探针未删（可按路径清）。
+- 三层判据齐了两层半：补丁层 11/11 可重放、引用层无必炸引用、编译层 custom/ 0 错误（源码面等价）⇒ 剩运行期：①扩展 010（上游新增
+  三处 /bug 通道）②两处 Breaking 适配（before_agent_start 6 个调用点 + 忙语义/注入路径）③全量 golden（含 PI_GOLDEN_SCENARIO=1 的
+  两个 pty 场景）⇒ 做完才谈真正执行同步（切 vendor 分支；失败显式、回滚已验证）。
