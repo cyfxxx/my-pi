@@ -3666,3 +3666,18 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 我的错误：用 git commit … | tail -2 && echo "committed" ⇒ 管道掩盖提交失败（说谎状态同类）⇒ 改为逐条检查退出码。
 - 未核实：远端为何强推（本次保住内容，但强推共享分支有风险）；<repo>/runtime 本机不存在 ⇒ 走历史布局回退，工具链仍可用；
   venv+.pth 属本机环境改动（不入库，换机需重做，值得写 runbook）。
+
+### 新增 runbook：books-ocr-selfcheck（2026-10-11）
+
+- 为什么：拉取 26 笔后第 15 步书籍自检失败 ⇒ 任何提交都被 pre-commit 拦；根因是 test-books.mjs（golden-tasks.sh:108，属
+  pre-commit）硬依赖 rapidocr_onnxruntime（默认引擎 books.py:62）⇒ 缺引擎从可跳过变硬失败 ⇒ 换机时以"提交被拦"形式表现。
+- 交付 docs/operations/books-ocr-selfcheck.md（7 节：速查表/症状→根因/安装/无害告警/替代开关/回滚/一行工具链 + 未覆盖）；
+  体例照 VOLUME-REBUILD.md 与 BUILD-PORTABILITY.md，未自创；安装路线明令不用 --break-system-packages，用 venv + .pth 桥接，
+  写明路径含 python3.12、回滚 = 删 .pth，并说明回滚后自检重新变红属预期。
+- 检查：gen-doc-index --update（789 条）/check-doc-links 一致（166 md）/gen-doc-index --check 一致/check-conventions 全绿；
+  git status 仅 1 项；未碰代码/scripts/packs/台账/其它 docs；无 git 写操作；未重装任何东西。
+- ★ 顺手核实：docs/INDEX.md 没收该文件不是遗漏 —— gen-doc-index.mjs:166-167 只扫 docs/design 与 docs/development，
+  docs/operations 本就不是索引源（9 个 operations 文档只有 1 个被索引，是因被引用）⇒ --check 绿正确，无需改索引；
+  并逐个复核文档引用的四个行号均成立。
+- 未核实：只覆盖 Linux 路径与版本（Windows/macOS 未验证）；版本号为当时实测值（判据以 test-books rc=0 为准）；
+  .pth 可见性全局（系统 python3 会多看到 opencv/numpy/Pillow，未实测版本冲突）；守卫相反降级策略未查到设计依据（只记录不改）。

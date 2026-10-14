@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（223 条）
+## 决策台账（224 条）
 
+- `DECISIONS.md` · [2026-10-11] 新增 runbook：`docs/operations/books-ocr-selfcheck.md` ✓（让换机不再卡在"提交被拦" ✗→✓） · **为什么需要** ✗：拉取远端 26 笔后，本机守门**第 15 步书籍自检失败** ✗ ⇒ **任何提交都过不了 pre-commit** ✗✗； · 数字: 30 秒 / 789 条 / 166 个 / 9 个 · 证据: d89ab4f73
 - `DECISIONS.md` · [2026-10-11] 拉取远程 26 笔 ✓：**内容零丢失**（用内容比对证明 ✓）+ 收口遗留漂移 + 补装 OCR 引擎 ✓ · **拉取结果** ✓：`git pull --rebase origin main` **成功、无冲突** ✓；远端是 **`forced update`** ✗（另一台设备 **rebase 后强推** ✓）； · 数字: 37 条 / 7 条 · 证据: 35486062b / d89ab4f73
 - `DECISIONS.md` · [2026-10-11] ClamAV 种子字段对齐 ✓（并查实：`notifyMain`/`waitForUserOnLocal` **无消费点** ✗） · **改动范围（严格 ✓）**：`portable/agent/scheduled-seeds.json` **只有「每日更新 ClamAV 病毒库」那一条被改** ✓ · 数字: 5 条 / 48MB / 3 条 / 1 次 · 证据: b6ffc4599f04745e592d5270
 - `DECISIONS.md` · [2026-10-11] 种子静默失效修复 ✓ + ★ 守卫隔离缺陷（**守卫在惩罚正确的改动** ✗✓） · **★ 我自己的锅（先认 ✓）**：`portable/agent/scheduled-seeds.json` 里那条 **「每日更新 ClamAV 病毒库」只有 `['name','prompt']`** · 数字: 5 条 / 3 个 / 6 条
@@ -231,7 +232,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（221 条）
+## 进度记录（222 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -454,6 +455,7 @@
 - `PROGRESS.md` · 种子静默失效修复 + 守卫隔离（2026-10-11） · - 我的锅：ClamAV 种子只有 [name,prompt] ⇒ 被 isSeedLike（要求 type∈{interval,cron,once} 且 schedule 非空）过滤掉 ⇒ 永不注册且 · 数字: 3 个 / 5 个 / 6 条 / 5 条
 - `PROGRESS.md` · ClamAV 种子字段对齐（2026-10-11） · - 只改 scheduled-seeds.json 里「每日更新 ClamAV 病毒库」一条（prompt 逐字节未变、另 5 条逐字节未变、version/note 未变）； · 数字: 5 条 / 6 条 · 证据: b6ffc4599f04745e592d5270
 - `PROGRESS.md` · 拉取远程 26 笔 + 收口漂移 + 补装 OCR 引擎（2026-10-11） · - 拉取：git pull --rebase 成功无冲突；远端 forced update（对方 rebase 后强推），共 26 笔（书籍库/RapidOCR/工具链移入 runtime/ · 证据: 35486062b / node scripts/test-books.mjs rc=0（20
+- `PROGRESS.md` · 新增 runbook：books-ocr-selfcheck（2026-10-11） · - 为什么：拉取 26 笔后第 15 步书籍自检失败 ⇒ 任何提交都被 pre-commit 拦；根因是 test-books.mjs（golden-tasks.sh:108，属 · 数字: 789 条 / 9 个 / 1 个
 
 ## 缺陷回放（37 条）
 

@@ -2,6 +2,40 @@
 
 ## 格式
 
+### [2026-10-11] 新增 runbook：`docs/operations/books-ocr-selfcheck.md` ✓（让换机不再卡在"提交被拦" ✗→✓）
+
+**为什么需要** ✗：拉取远端 26 笔后，本机守门**第 15 步书籍自检失败** ✗ ⇒ **任何提交都过不了 pre-commit** ✗✗；
+根因 = `d89ab4f73` 让 `node scripts/test-books.mjs`（由 `golden-tasks.sh:108` 调用、属 **pre-commit** ✓）
+**硬依赖** `rapidocr_onnxruntime` ✓（默认引擎 `books.py:62` ✓）⇒ "缺引擎"从**可跳过**变成**硬失败** ✗。
+⇒ 换机/新环境若无此依赖，**会以"提交被拦"的形式表现出来** ✓（症状与根因相隔很远 ✓）⇒ **必须写成 runbook** ✓。
+
+**交付** ✓：`docs/operations/books-ocr-selfcheck.md`（新建 ✓，kebab-case ✓）—— **体例照** `docs/operations/VOLUME-REBUILD.md`
+（`# …（Runbook）` + `>` 适用/分工说明 + "每一步都有验证门槛" + `---` 分节 ✓）与 `BUILD-PORTABILITY.md`
+（"症状 → 根因 → 判据/验证 → 本机实测" ✓）⇒ **未自创体例** ✓。
+**结构（7 节、可执行 ✓）**：0 **速查表**（两种现象 → 一行处置 ✓，并点明"**tesseract 缺失 ⇒ 跳过 / rapidocr 缺失 ⇒ 硬失败**"
+这条**相反降级** ✓）；1 **症状 → 根因**（贴那次 golden 尾部**逐字输出** ✓ + 三条根因 ✓ + **30 秒判据** ✓）；
+2 **安装**（**明令不用 `--break-system-packages`** ✗（PEP 668 ✓）⇒ venv `/opt/pi-books-venv` ✓ → `pip install
+rapidocr-onnxruntime onnxruntime` ✓（**实测 1.4.4 / 1.31.0** ✓、清华镜像 ✓、会连带 opencv/numpy/Pillow ✓）→
+**`.pth` 桥接** ✓（并写明**路径含 `python3.12`、换版本必须改** ✓）→ **验证门槛** ✓）；3 **无害告警**（`onnxruntime` 的
+`GPU device discovery failed … /sys/class/drm … Permission denied` ⇒ 走 CPU、**无害**、别据此以为装失败 ✓）；
+4 **替代开关**（`PI_BOOKS_OCR_ENGINE=tesseract` ✓，并写明"**这只是让自检别硬失败，不等于装了 OCR 引擎**" ✓）；
+5 **回滚**（`rm -f …/zz-pi-books-venv.pth` 断开桥接 ✓ + `rm -rf /opt/pi-books-venv` ✓，并说明**回滚后自检重新变红属预期** ✓）；
+6 **一行**提到本机无 `<repo>/runtime/` 时走历史布局回退（`lib-vendor.sh:87` ✓，**只一行** ✓）；7 **未覆盖/存疑** ✓。
+
+**检查（全实跑 ✓）**：`gen-doc-index --update`（生成 789 条 ✓）｜`check-doc-links` **一致（166 个 md）** ✓｜
+`gen-doc-index --check` **一致** ✓｜`check-conventions.sh` **全部通过** ✓；`git status` **仅 1 项**（新文件 ✓）；
+**未碰**代码/`scripts/**`/packs/台账/其它 docs ✓；**无任何 git 写操作** ✓；**未重装任何东西** ✓。
+
+**★ 它顺手核实的一处（避免误判 ✓✓）**：`docs/INDEX.md` **没有**收录该文件，但**不是遗漏** ✓ ——
+`gen-doc-index.mjs:166-167` 表明生成器**只扫 `docs/design/` 与 `docs/development/`** ✓ ⇒ **`docs/operations/**` 本来就不是索引源** ✓
+（既有 9 个 operations 文档里只有 1 个被索引，还是因为它被某个 design/development 文档**引用**了 ✓）⇒ **`--check` 绿是正确的** ✓，**无需改索引** ✓。
+**并逐个复核了文档引用的四个行号均成立** ✓：`golden-tasks.sh:108` ✓、`books.py:62` ✓、`books.py:141` ✓、`lib-vendor.sh:87` ✓。
+
+**未核实（✗，已写进文末 ✓）**：① 只覆盖 **Linux**（/opt + 系统 dist-packages）路径与版本 ✓，**Windows/macOS 未验证** ✗；
+② 版本号是**当时实测值** ✓（判据以 `test-books.mjs rc=0` 为准 ✓）；③ **`.pth` 桥接的可见性是全局的** ✓
+（系统 `python3` 会多看到 opencv/numpy/Pillow ✓ —— 已提醒，但**未实测**与其它依赖的版本冲突 ✗）；
+④ **守卫为何对两种 OCR 引擎采用相反降级策略，未查到设计依据** ✗ ⇒ **文中只记录现象、不改守卫** ✓。
+
 ### [2026-10-11] 拉取远程 26 笔 ✓：**内容零丢失**（用内容比对证明 ✓）+ 收口遗留漂移 + 补装 OCR 引擎 ✓
 
 **拉取结果** ✓：`git pull --rebase origin main` **成功、无冲突** ✓；远端是 **`forced update`** ✗（另一台设备 **rebase 后强推** ✓）；
