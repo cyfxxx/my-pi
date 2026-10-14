@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（234 条）
+## 决策台账（235 条）
 
+- `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
 - `DECISIONS.md` · [2026-10-11] ★ 更正：`daily-review` **已经跑了且成功** ✓（我先前"自 10-10 起从未再跑"**被现实推翻** ✗✓） · **实测（`tasks.json` 字段 diff vs `daily-health` ✓）**：`daily-review` 现在 `lastResult=**success**` ✓、 · 数字: 4 个 / 5 个
 - `DECISIONS.md` · [2026-10-11] ★ 010 **无需扩展**（"意图漂移"被证据推翻 ✗✓）+ 两处 Breaking 适配：**已做一处、另一处只差切换时加一个参数** ✓ · **① 010 扩展：实测**不需要** ✗✓** —— 上一轮转来的"三条新通道"**逐条核实后不成立** ✓： · 数字: 11 个 · 证据: db03484e2 / 28dcce2b
@@ -242,7 +243,7 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 
-## 进度记录（232 条）
+## 进度记录（233 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -476,6 +477,7 @@
 - `PROGRESS.md` · 010 无需扩展 + 两处 Breaking 适配（2026-10-11） · - ★010 扩展实测不必要（意图漂移被推翻）：:136 只是 import（唯一调用点在 handler 内 ⇒ 不能删也不必删）；:2173 正是我们已重写的那处 · 证据: db03484e2 / 28dcce2b
 - `PROGRESS.md` · 更正：daily-review 已跑且成功（2026-10-11） · - 实测 tasks.json 字段 diff：daily-review 现在 lastResult=success、lastRun=2026-10-14T11:25:25Z（刚刚）、failCount=0（原 11→0）、 · 数字: 4 个 / 5 个
 - `PROGRESS.md` · 修缺陷：台账 --settle 不收敛（2026-10-11） · - 症状：改 DECISIONS（不改生成结果）→ update → commit → settle ⇒ "❌ 4 轮仍未收敛" + --check 报漂移 ⇒ pre-push 拦推送； · 数字: 4 轮 / 120 条 / 1 轮
+- `PROGRESS.md` · ★ 上游 pi 1.2 同步已执行（2026-10-11） · - 结果：vendor/pi HEAD db03484e2 → c3bc10e24 local: 011-tool-search-cjk；LAST_SYNC_POINT 28dcce2b → 6374c2baf； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf（第一位置参数=目标；UPSTREAM_URL
 
 ## 缺陷回放（37 条）
 

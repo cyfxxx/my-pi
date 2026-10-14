@@ -6,7 +6,7 @@ index 934de40a6..a331c5c16 100644
  	{ name: "scoped-models", description: "Enable/disable models for Ctrl+P cycling" },
  	{ name: "export", description: "Export session (HTML default, or specify path: .html/.jsonl)" },
  	{ name: "import", description: "Import and resume a session from a JSONL file" },
--	{ name: "share", description: "Share session as a secret GitHub gist" },
+-	{ name: "share", description: "Share session via a Radius artifact or a GitHub gist" },
 -	{ name: "bug", description: "Report a bug to the Pi developers", argumentHint: "<description>" },
 +	// Patch (010-disable-share-bug): my-pi 是私人助手，不提供会话外发通道。
 +	// /share 会把整个会话（含 system prompt 与工具 schema）先发 Radius 网关、失败回退 GitHub gist；

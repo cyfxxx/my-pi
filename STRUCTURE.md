@@ -27,7 +27,7 @@ my-pi/
 **永不直接修改**，所有改动通过 `patches/` 管理。
 
 - 上游 remote：`upstream` = `https://github.com/earendil-works/pi-mono.git`
-- 锁定 commit：`vendor/PINNED_COMMIT`（当前 `28dcce2ba`，版本 v1.0.4）
+- 锁定 commit：`vendor/PINNED_COMMIT`（当前 `6374c2baf`，版本 v1.2.0）
 - `LAST_SYNC_POINT`：上次同步的上游 commit SHA
 - 本地补丁以 commit 形式叠加在上游之上；通过 `scripts/sync-upstream.sh` 更新
 

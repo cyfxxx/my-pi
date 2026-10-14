@@ -146,6 +146,6 @@ index b747af7b8..7c85b8edb 100644
  		"rootDir": "./src"
  	},
  	"include": ["src/**/*.ts", "src/**/*.d.ts"],
--	"exclude": ["node_modules", "dist", "src/client", "src/experimental", "src/cli/experimental"]
+-	"exclude": ["node_modules", "dist", "src/experimental"]
 +	"exclude": ["node_modules", "dist", "src/client", "src/experimental", "src/cli/experimental", "src/custom"]
  }

@@ -2,6 +2,51 @@
 
 ## 格式
 
+### [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓
+
+**结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓；
+`LAST_SYNC_POINT` **`28dcce2b…` → `6374c2baf432419ccb4541a99ce4958ecd03dae0`** ✓；`vendor/PINNED_COMMIT` 同步更新 ✓；
+`vendor/pi/packages/coding-agent/package.json` 版本 **1.2.0** ✓；dist 重建 ✓（bundle 80 files / 8.7 MiB ✓）+ 崩溃自愈缓存刷新（`v1.2.0 @ c3bc10e24` ✓）。
+
+**执行方式（照 `docs/operations/PI-1.2-SWITCH.md` ✓，目标显式传入 ✓）**：`bash scripts/sync-upstream.sh 6374c2baf…` ✓
+（脚本的第一个位置参数就是目标 commit ✓ —— **`UPSTREAM_URL` 只在 vendor 缺 `upstream` remote 时才生效** ✓，所以复用既有 remote ✓）。
+**★ 首次真跑（仍是 1.0.4 版 002/010）⇒ 如 runbook 所述"失败显式、vendor 不动"** ✓✓：
+`补丁：已应用 9，已存在 0，失败 2`（002 / 010 ✓）⇒ `❌ 有补丁无法应用…`、rc=1 ✓ ⇒ 复核 **vendor 一字未动** ✓
+（HEAD 仍 `db03484e2` ✓、`LAST_SYNC_POINT` 仍 `28dcce2b…` ✓、无残留 worktree ✓、主仓库干净 ✓）；
+⇒ 换入 **`patches-next/1.2/` 的 002/010** ✓（**各自自标记 `Patch (010-disable-share-bug):` 均在场 ✓**，002 本无自标记、其门禁由文件级检查覆盖 ✓）
+⇒ **第二次真跑 ⇒ 11/11 全成功** ✓✓ ⇒ 脚本自行完成"移动 vendor 分支 → 重建 dist → **`🔍 类型检查 custom/` → `✅ 上游同步完成`**" ✓✓
+（★ 这一步正是此前**做不到的"dist 路径"类型检查** ✓ —— 现在**通过了** ✓）。
+
+**★ 网络受限与合规绕行（如实披露 ✓）**：执行时 **github 不可达** ✗（`git fetch upstream` 报
+`OpenSSL SSL_read: unexpected eof` ✓；随后 **3 次 `git ls-remote` 全失败** ✗、codeload 失败 ✗ —— 而 **npmmirror 200 ✓**）
+⇒ 而 ★ **目标 commit 早已在本地 vendor 里** ✓（`upstream/main` 就是 `6374c2baf` ✓，来自更早那次成功的 fetch ✓）
+⇒ 遂**建一个本地裸镜像** ✓（`git clone --bare vendor/pi /tmp/pi-upstream-mirror` + `update-ref refs/heads/main 6374c2baf…` ✓ ——
+**同一 commit，内容以 hash 证明一致** ✓），**临时**把 vendor 的 `upstream` URL 指向它 ✓ ⇒ fetch 变为**纯本地操作** ✓
+⇒ 同步照常执行 ✓ ⇒ 结束后**已恢复原 URL** ✓（`https://github.com/earendil-works/pi-mono.git` ✓，现场已核 ✓）。
+⇒ **披露**：本次 fetch 的**字节不是现从 github 取的** ✗，但**目标 commit 就是本地已有的那个** ✓，
+且"11/11 补丁可重放"此前**已在同一 commit 上用只读演算独立验证过** ✓ ⇒ **不改变结论** ✓。
+
+**适配（runbook 第 5 步 ✓）**：`custom/features/voice/index.ts` 的 **三处** `sendUserMessage(pi, r.text, {…})` ✓
+加 **`deliverAs: 'steer'`** ✓（`:78` / `:344` / `:367` ✓，替换 **3/3** ✓）—— 依据：1.2 把 `deliverAs` **直接映射为
+`streamingBehavior`** ✓、语音=用户**此刻**在说话 ⇒ 立即生效 ✓；★ **零风险**已由类型面证明（`ui-adapter.ts:189` 本就声明该可选参数 ✓）。
+
+**验证（按 runbook 顺序 ✓，全绿 ✓）**：
+- 脚本自带 **`类型检查 custom/`** ✓（dist 路径 ✓）；
+- 全量 **`tsc --noEmit -p custom/`** ⇒ **rc=0** ✓（1.2 dist 下 ✓）；
+- 全量 **vitest** ⇒ **108 files / 1146 passed + 6 skipped** ✓✓ —— **与 1.0.4 时逐数字相同** ✓（无回归 ✓）；
+- **`golden --fast` 20 步全绿** ✓ —— 含 ★ **第 6 步「patches 全部可应用/已应用（11 个）」** ✓、
+  ★ **第 7 步「补丁行为标记齐全」** ✓、★ **第 8 步「注入面基线一致」** ✓✓
+  ⇒ **`8493be6d…` 未变** ✓✓（**上游 1.2 没有改动被注入的那一面** ⇒ **无需"有意更新基线哈希"** ✓，最好的结果 ✓）；
+- **`PI_GOLDEN_SCENARIO=1` 全量 golden**（含两个 pty 场景）⇒ ★ **两个 pty 场景都通过（各 33 项）** ✓✓ ——
+  「模式切换：真实 pty 下 `/mode` 切档确实重启并换档，且不触发多余回合」✓、
+  「两实例隔离：共享 agent 目录下 A 的重启不越界到 B，且重启日志归属判定在真链上成立」✓
+  ⇒ **supervisor / 重启 / 归属判定这一层在 1.2 上仍然成立** ✓✓（这正是本次拉取改动过 `pi-supervisor.sh` 后最该验证的一层 ✓）；
+  ☆ 该轮唯一红项 = **`docs/INDEX.md 已漂移`** ✗（本会话新增文档所致 ✓，非切换引起 ✓）⇒ 随本次提交一并重生成 ✓。
+
+**仍未核实（✗）**：① 1.2 `event.message` 负载形状（`intervention` 只做到"不误记" ✓）；
+② 1.2 流式中不传 `deliverAs` 的**运行期行为**（只证签名相同 ✓）；③ 上游构建是否容忍 `return` 后的不可达代码 ✓；
+④ 留出集新鲜度：两个 pty 场景**此前已被查看过一次** ✓（见本台账同日记录 ✓）。
+
 ### [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓
 
 **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒

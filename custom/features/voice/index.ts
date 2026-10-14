@@ -75,7 +75,7 @@ export function register(pi: ExtensionAPI): void {
   const dictation = createDictation(cfg, dictationDeps, {
     onAutoComplete: (r) => {
       sendMessage(pi, { customType: 'voice-dictation', content: r.message, display: true });
-      if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false });
+      if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false, deliverAs: 'steer' });
     },
     onReady: () => {
       sendMessage(pi, { customType: 'voice-dictation', content: '🎤 录音中', display: true });
@@ -341,7 +341,7 @@ export function register(pi: ExtensionAPI): void {
         if (op === 'stop' || (op === 'toggle' && dictation.isRecording())) {
           const r = await dictation.stop();
           ctx.ui.notify(r.message, r.text ? 'info' : 'warning');
-          if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false });
+          if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false, deliverAs: 'steer' });
           return;
         }
         ctx.ui.notify(dictation.start(), 'info');
@@ -364,7 +364,7 @@ export function register(pi: ExtensionAPI): void {
       if (dictation.isRecording()) {
         const r = await dictation.stop();
         if (ctx.hasUI) ctx.ui.notify(r.message, r.text ? 'info' : 'warning');
-        if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false });
+        if (r.text) sendUserMessage(pi, r.text, { expandPromptTemplates: false, deliverAs: 'steer' });
       } else {
         const msg = dictation.start();
         if (ctx.hasUI) ctx.ui.notify(msg, 'info');

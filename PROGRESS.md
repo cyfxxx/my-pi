@@ -3880,3 +3880,25 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 证据（/tmp/lr-touch 同构复现：133 笔、最近 120 笔中 104 笔碰台账）：改前 red —— 不碰台账的提交后 settle ⇒ ❌4 轮未收敛 +
   check 报漂移（与真实仓库一致）；改后 green —— ✅ 第 1 轮收敛 + check rc=0；★反向断言：注入假记录 ⇒ rc=1；清空台账 ⇒ rc=1；
   恢复 ⇒ rc=0（证明没把守门改瞎）。仓库内：修后 --check 在当前 HEAD 上仍 rc=0。
+
+### ★ 上游 pi 1.2 同步已执行（2026-10-11）
+
+- 结果：vendor/pi HEAD db03484e2 → c3bc10e24 local: 011-tool-search-cjk；LAST_SYNC_POINT 28dcce2b → 6374c2baf；
+  PINNED_COMMIT 同步；dist 版本 1.2.0；dist 重建（80 files/8.7 MiB）+ 自愈缓存刷新（v1.2.0 @ c3bc10e24）。
+- 方式：bash scripts/sync-upstream.sh 6374c2baf（第一位置参数=目标；UPSTREAM_URL 仅在缺 upstream remote 时生效，故复用既有 remote）。
+  首次真跑（1.0.4 版 002/010）⇒ 已应用 9 / 失败 2（002、010）⇒ rc=1 且 vendor 一字未动（复核对齐 runbook 的"失败显式"）；换入
+  patches-next/1.2 的 002/010（自标记在场）⇒ 第二次真跑 11/11 成功 ⇒ 脚本完成移分支+重建 dist+类型检查 custom/ ⇒ ✅ 上游同步完成。
+- ★网络受限与合规绕行（披露）：执行时 github 不可达（fetch 报 OpenSSL SSL_read: unexpected eof；随后 3 次 ls-remote 全失败、
+  codeload 失败；npmmirror 200）；而目标 commit 早已在本地 vendor（upstream/main = 6374c2baf，来自更早成功的 fetch）⇒ 建本地裸镜像
+  （clone --bare + update-ref main=6374c2baf，同 commit 内容以 hash 证明一致）并临时把 upstream URL 指向它 ⇒ fetch 变为纯本地；
+  结束后恢复原 URL（已核）。披露：本次 fetch 字节非现从 github 取，但目标 commit 就是本地已有那个，且 11/11 可重放此前已在同一
+  commit 上用只读演算独立验证 ⇒ 不改变结论。
+- 适配：voice/index.ts 三处（:78/:344/:367）加 deliverAs:'steer'（3/3 替换）；依据 1.2 把 deliverAs 直接映射为 streamingBehavior，
+  语音=此刻在说话；零风险由类型面证明（ui-adapter.ts:189 本就声明该可选参数）。
+- 验证：脚本自带类型检查 ✓；全量 tsc rc=0；全量 vitest 108 files/1146 passed+6 skipped（与 1.0.4 逐数字相同 ⇒ 无回归）；
+  golden --fast 20 步全绿（第 6 步 11 个补丁可应用、第 7 步自标记、第 8 步注入面基线 8493be6d… 未变 ⇒ 无需有意更新）；
+  PI_GOLDEN_SCENARIO=1 全量 golden ⇒ ★两个 pty 场景都通过（各 33 项）：模式切换（真 pty 下 /mode 切档确实重启并换档、不触发多余回合）、
+  两实例隔离（共享 agent 目录下 A 的重启不越界到 B、归属判定在真链上成立）⇒ supervisor/重启/归属判定层在 1.2 上仍成立；
+  该轮唯一红项 = docs/INDEX.md 已漂移（本会话新增文档所致，随提交重生成）。
+- 未核实：1.2 event.message 负载形状（intervention 只做到不误记）；1.2 流式中不传 deliverAs 的运行期行为（只证签名相同）；
+  上游构建是否容忍 return 后不可达代码；两个 pty 场景留出集新鲜度此前已消耗一次。

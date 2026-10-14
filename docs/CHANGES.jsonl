@@ -1,3 +1,4 @@
+{"kind":"change","commit":"2dbe66c91","ts":"2026-10-14","subject":"fix(scripts): 修台账 --settle 不收敛（❌4 轮仍未收敛）—— changes() 不记录 HEAD","files":["DECISIONS.md","PROGRESS.md","docs/INDEX.md","scripts/gen-changes-ledger.mjs"],"heldOut":false}
 {"kind":"change","commit":"da7db6476","ts":"2026-10-14","subject":"docs: 上游 1.2 人话版变更展示 + 不适合项与反向适配清单（附二）","files":["DECISIONS.md","PROGRESS.md","docs/INDEX.md","docs/design/UPSTREAM-PI-1.2.md"],"heldOut":false}
 {"kind":"change","commit":"7cf3157c8","ts":"2026-10-14","subject":"chore: tool stats 2026-10-14","files":["portable/memory/stats/tool-count-localhost.json"],"heldOut":false}
 {"kind":"change","commit":"da7d5a51b","ts":"2026-10-13","subject":"feat(scripts): 启动器支持盘内便携工具链（bash+Node 全自足）+ 文档补充","files":["docs/operations/BUILD-PORTABILITY.md","scripts/run-my-pi.ps1"],"heldOut":false}
