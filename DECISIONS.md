@@ -2,6 +2,45 @@
 
 ## 格式
 
+### [2026-10-11] 拉取远程 26 笔 ✓：**内容零丢失**（用内容比对证明 ✓）+ 收口遗留漂移 + 补装 OCR 引擎 ✓
+
+**拉取结果** ✓：`git pull --rebase origin main` **成功、无冲突** ✓；远端是 **`forced update`** ✗（另一台设备 **rebase 后强推** ✓）；
+共拉入 **26 笔**（书籍库落地 ✓、RapidOCR 接入 ✓、工具链移入仓库 `<repo>/runtime` ✓、Windows 平台缺口修复 ✓、
+`ownerPid` 环境变量继承修 Windows admin 重启静默失效 ✓ 等 ✓）。
+
+**★ 内容零丢失（用内容比对，而非 sha ✓✓）**：我本地那笔 **`35486062b`（种子字段对齐）不在新历史的祖先里** ✗，
+但 `git diff 35486062b HEAD -- portable/agent/scheduled-seeds.json` **为空** ✓ ⇒ **内容一字不差地在当前 HEAD 里** ✓✓
+（`rebase` 判它为**已应用的重复补丁**而跳过 ✓ —— **正确行为，不是丢失** ✓）。
+**工作区实测确认** ✓：ClamAV 种子 = `type:'cron'` ✓、`schedule:'15 6 * * *'` ✓、**`useSubagent:true`** ✓、`maxRunTime:900` ✓、
+`retries:1` ✓、`tags:['security','daily']` ✓ ⇒ **我那笔的全部改动都在** ✓✓。
+（注：该文件顶层键是 **`tasks`** 而非 `seeds` ✓ —— 我第一次核查时用错了键而误判"没找到" ✗✓，**又是"检查方法出错"** ✓。）
+
+**拉取带进来的漂移（已收口 ✓）**：守门报 **`docs/knowledge/ 已漂移`** ✗ ⇒ 按守门口径跑 `knowledge-compile.mjs --update` ✓
+（`create 0 / update 0 / 失败模式 37 条 + 被否提案 7 条` ✓，改了 `docs/knowledge/index.md` + `last-decision.json` ✓）；
+`gen-doc-index` / `gen-changes-ledger` 亦重生成 ✓ ⇒ 四项一致性检查全绿 ✓（`knowledge-compile --check` ✓、`gen-doc-index --check` ✓、
+`gen-changes-ledger --check` ✓、`check-seeds-headless` ✓、`check-doc-links` ✓）。
+
+**★ 但拉进来的提交把本机守门搞红了** ✗✓（**不是我的改动** ✓）：golden 第 15 步 **书籍框架自检失败** ✗ ——
+`d89ab4f73 feat(books): OCR 引擎接 RapidOCR` ✓ 让自检**硬依赖** `rapidocr_onnxruntime` ✓，而本机没装 ✗ ⇒
+**本机任何提交都过不了 pre-commit** ✗✗。
+★ **并暴露一处明显不一致** ✗✓（值得对方修 ✓）：**tesseract 缺失 ⇒ 跳过** ✓，**rapidocr 缺失 ⇒ 硬失败** ✗ ——
+**同为"OCR 引擎不可用"，降级策略相反** ✓（本机因此"想提交也提交不了" ✗）。
+**处置（已批准并执行 ✓）**：装 `rapidocr-onnxruntime` + `onnxruntime` ✓ ——
+**但不用 `--break-system-packages`** ✗（Debian PEP 668 会拒 ✓，硬闯有风险 ✓）⇒ 改用 **venv + `.pth` 桥接** ✓：
+venv 在 **`/opt/pi-books-venv`** ✓（`rapidocr-onnxruntime 1.4.4` / `onnxruntime 1.31.0` ✓，走清华镜像 ✓），
+并写 **`/usr/local/lib/python3.12/dist-packages/zz-pi-books-venv.pth`** ✓ 让系统 `python3` 可见 ✓（**删该文件即可回滚** ✓✓）。
+**验证** ✓：`python3 -c "import rapidocr_onnxruntime, onnxruntime"` 均可导入 ✓；`node scripts/test-books.mjs` ⇒ **rc=0** ✓
+（"书籍知识库框架自检通过（20 项；含 OCR 兜底与 report 去重回归）" ✓；`onnxruntime` 的 GPU 发现警告无害 ✓ ——
+`/sys/class/drm` 无权限 ⇒ 走 CPU ✓）。
+
+**我自己的一个错误（记录 ✓）** ✗✓：我用 `git commit … | tail -2 && echo "committed"` ⇒ **管道把提交失败掩盖了** ✗
+（`tail` 成功即打印 ✓）—— **正是它自己记过的"说谎状态"同类** ✓ ⇒ 已改为**逐条检查退出码** ✓。
+
+**仍未核实（✗）**：① 远端为何强推（对方 rebase 流程 ✓，本次**保住了我的内容** ✓，但**强推共享分支仍有风险** ✓）；
+② `<repo>/runtime/` 在本机**不存在** ✓ ⇒ 走历史布局回退（`scripts/lib-vendor.sh:87` 依次找 `<repo>/runtime/node/` →
+`<repo>/../runtime/node/` ✓）⇒ **本机工具链仍可用** ✓（除上述 OCR 那步外守门全通 ✓）；③ **venv + `.pth` 属于本机环境改动** ✓
+（**不在仓库内** ✓，故不入库 ✓；换机需重做 ✓ —— 这一点值得写进 runbook ✓）。
+
 ### [2026-10-11] ClamAV 种子字段对齐 ✓（并查实：`notifyMain`/`waitForUserOnLocal` **无消费点** ✗）
 
 **改动范围（严格 ✓）**：`portable/agent/scheduled-seeds.json` **只有「每日更新 ClamAV 病毒库」那一条被改** ✓

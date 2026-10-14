@@ -3647,3 +3647,22 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   真实 tasks.json 仍无 ClamAV ⇒ daily-health 仍报种子失配=1，待下次真实会话自动注册。
 - 验证：check-seeds-headless rc=0（6 条全绿含 ClamAV）；只有一条变；真实数据零改动（sha256=b6ffc4599f04745e592d5270 基线、无残留锁）；
   check-conventions 全绿；golden --fast 20 步全绿（含第 11 步）。
+
+### 拉取远程 26 笔 + 收口漂移 + 补装 OCR 引擎（2026-10-11）
+
+- 拉取：git pull --rebase 成功无冲突；远端 forced update（对方 rebase 后强推），共 26 笔（书籍库/RapidOCR/工具链移入 runtime/
+  Windows 缺口/ownerPid 继承等）。
+- ★ 内容零丢失（内容比对而非 sha）：本地 35486062b（种子字段对齐）不在新历史祖先里，但 git diff 35486062b HEAD 对该文件为空
+  ⇒ 内容一字不差在 HEAD（rebase 判为已应用重复补丁跳过，正确行为）。工作区实测：ClamAV 种子 type=cron、schedule=15 6 * * *、
+  useSubagent=true、maxRunTime=900、retries=1、tags=[security,daily] 全在。注：文件顶层键是 tasks 不是 seeds（我第一次核查用错键误判）。
+- 拉取带来的漂移已收口：knowledge-compile --update（create 0/update 0、失败模式 37 + 被否提案 7），改 index.md 与 last-decision.json；
+  gen-doc-index/gen-changes-ledger 重生成 ⇒ 四项一致性检查全绿。
+- ★ 但拉进来的提交把本机守门搞红（非我改动）：golden 第 15 步书籍自检失败 —— RapidOCR 接入让自检硬依赖 rapidocr_onnxruntime，
+  本机没装 ⇒ 任何提交都过不了 pre-commit；并暴露不一致：tesseract 缺失跳过、rapidocr 缺失硬失败（同为引擎不可用，降级相反）。
+- 处置（已批准）：装 rapidocr-onnxruntime + onnxruntime，但不用 --break-system-packages（PEP 668 会拒、硬闯有风险）⇒ venv + .pth
+  桥接：venv 在 /opt/pi-books-venv（rapidocr 1.4.4 / onnxruntime 1.31.0，清华镜像），写
+  /usr/local/lib/python3.12/dist-packages/zz-pi-books-venv.pth 让系统 python3 可见（删该文件即回滚）。验证：import 均可；
+  node scripts/test-books.mjs rc=0（20 项通过；GPU 发现警告无害，走 CPU）。
+- 我的错误：用 git commit … | tail -2 && echo "committed" ⇒ 管道掩盖提交失败（说谎状态同类）⇒ 改为逐条检查退出码。
+- 未核实：远端为何强推（本次保住内容，但强推共享分支有风险）；<repo>/runtime 本机不存在 ⇒ 走历史布局回退，工具链仍可用；
+  venv+.pth 属本机环境改动（不入库，换机需重做，值得写 runbook）。
