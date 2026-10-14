@@ -5,7 +5,7 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（235 条）
+## 决策台账（236 条）
 
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
@@ -242,8 +242,9 @@
 - `DECISIONS.md` · [2026-10-01] 上游更新前必须体检；不想要的变更**不回退基线，而是加补丁** · **背景**：2026-09-30 把 vendored pi 从 v0.87.0 一次跳到 v0.99.1（130 提交 / 744 文件 / +90664-24881），**同步后**才发现默认主题改了 `system`、工具链换成 T · 数字: 9 个 / 1 个 / 40 条
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
+- `DECISIONS.md` · [2026-10-14] 会话切换守卫：`/new`、`/resume` 不再打断在跑的那一轮（在 pi 的事件层等，不改上游语义） · **背景**（用户实测）：TUI 里"创建新会话或切换会话会导致正在运行的会话中断"。两问定范围后确认：
 
-## 进度记录（233 条）
+## 进度记录（234 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -478,8 +479,9 @@
 - `PROGRESS.md` · 更正：daily-review 已跑且成功（2026-10-11） · - 实测 tasks.json 字段 diff：daily-review 现在 lastResult=success、lastRun=2026-10-14T11:25:25Z（刚刚）、failCount=0（原 11→0）、 · 数字: 4 个 / 5 个
 - `PROGRESS.md` · 修缺陷：台账 --settle 不收敛（2026-10-11） · - 症状：改 DECISIONS（不改生成结果）→ update → commit → settle ⇒ "❌ 4 轮仍未收敛" + --check 报漂移 ⇒ pre-push 拦推送； · 数字: 4 轮 / 120 条 / 1 轮
 - `PROGRESS.md` · ★ 上游 pi 1.2 同步已执行（2026-10-11） · - 结果：vendor/pi HEAD db03484e2 → c3bc10e24 local: 011-tool-search-cjk；LAST_SYNC_POINT 28dcce2b → 6374c2baf； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf（第一位置参数=目标；UPSTREAM_URL
+- `PROGRESS.md` · 修"创建/切换会话打断在跑的那一轮"：会话切换守卫（2026-10-14） · - **需求（用户实测）**：TUI 里"创建新会话或切换会话会导致正在运行的会话中断"。定位用两个问题定死范围： · 数字: 5 条 · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
 
-## 缺陷回放（37 条）
+## 缺陷回放（38 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -518,8 +520,9 @@
 - `docs/BUG-REPLAYS.md` · #35 **PowerShell 参数集互斥参数写成一条 ⇒ 报错指向参数名而非真因**：`Set-Disk -Number N -IsOffline $false -IsReadOnly $false` 报 `无法使用指定的命名参数解析参 · 报 `AmbiguousParameterSet`；同一条命令拆成两行后立刻通过；用不存在的磁盘号 99 可复现并区分两类失败——报"找不到磁盘"说明**参数绑定已通过**，报"参数集"才是拼错
 - `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
+- `docs/BUG-REPLAYS.md` · #38 **创建/切换会话打断在跑的那一轮**：TUI 里 `/new`（新建会话）或 `/resume`（会话选择器）会把当前会话**正在跑的那一轮直接中止** —— 用户视角是「我刚让它做的事被打断、结果丢了」。**根因在 pi 内部* · 切换前 pane 有工作指示器；切换后**旧会话文件末条是 `stopReason=aborted` / 空 content 的 assistant 记录**；同一轮本该落盘的回复**永远不再出现**在旧会话文件里；PID 不变（不是重启） · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
 
-## 设计文档（197 条）
+## 设计文档（198 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -545,6 +548,7 @@
 - `docs/design/CODING-TRAPS.md` · 4. 为"模拟缺工具"而清空 `PATH` ⇒ 连自己的工具一起弄没 · - **症状**：报 `timeout: command not found` / `grep: command not found`，**看起来像被测代码失败**，其实是测试方法错。
 - `docs/design/CODING-TRAPS.md` · 5. 新引入一种"我写的文件格式"⇒ 必须同时引入一条校验它的守门 · - **症状**：一份**非法 JSON** 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS ⇒ **没人看 `.json` 语法**）。
 - `docs/design/CODING-TRAPS.md` · 6. 改语义前，先读断言本身表达的契约——测试可能是 bug 的保护壳 · - **症状**：一个 bug 长期存活，因为**既有测试把错误行为写成了期望**（实例：`it('shutdown 回收空闲与在租的全部 worker')`
+- `docs/design/CODING-TRAPS.md` · 7. 真 pty 场景里，用"切片里没有某段文本"做断言 ⇒ 被 TUI 全屏重绘污染成**假失败** · - **症状**：断言"发 `/new` 之后 pane 里还没有 `New session started`"失败，而行为其实完全正确； · 数字: 2 次 / 3 分钟
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条

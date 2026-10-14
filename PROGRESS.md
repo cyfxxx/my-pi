@@ -3902,3 +3902,49 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   该轮唯一红项 = docs/INDEX.md 已漂移（本会话新增文档所致，随提交重生成）。
 - 未核实：1.2 event.message 负载形状（intervention 只做到不误记）；1.2 流式中不传 deliverAs 的运行期行为（只证签名相同）；
   上游构建是否容忍 return 后不可达代码；两个 pty 场景留出集新鲜度此前已消耗一次。
+
+### 修"创建/切换会话打断在跑的那一轮"：会话切换守卫（2026-10-14）
+
+- **需求（用户实测）**：TUI 里"创建新会话或切换会话会导致正在运行的会话中断"。定位用两个问题定死范围：
+  入口 = `/new` 与会话选择器 `/resume`；被中断的 = **当前会话正在跑的那一轮**。
+- **根因（代码级，非 my-pi 缺陷）**：pi 的会话替换三条入口（`newSession`/`switchSession`/`importFromJsonl`）
+  都先走 `teardownCurrent()` → `await this.session.abort()`
+  （`vendor/pi/packages/coding-agent/src/core/agent-session-runtime.ts:167-177`，调用点 `:212`/`:245`/`:299`/`:391`）
+  ⇒ 上游把"切换会话"与"打断在跑的一轮"实现成了同一个动作。`patches/` 里**没有**任何补丁改这条路径
+  （`grep "^+++" patches/*.patch` 面无该文件）。
+- **可拦截点**：扩展事件 `session_before_switch`（同文件 `:133-148`，在 `teardownCurrent()` **之前**发出、
+  任一 handler 返回 `{cancel:true}` 即中止本次替换）。
+- **做法（选"等"而不是"取消 + 自己重发"）**：忙碌时在 handler 里等到回合结束再**放行** ⇒ pi 继续它原本的
+  替换流程，`abort()` 此刻打不到任何东西。为什么不用 `ctx.newSession()` 自己重发：事件 handler 的
+  `ExtensionContext` 上**没有** `newSession`/`switchSession`（两者只在 `ExtensionCommandContext`，
+  `core/extensions/types.ts:401-431`）⇒ 要么进程重启（本机实测 ≈40s）要么伪造命令注入，都更贵且多一条
+  要长期验证的通道。**不碰 pi 核心**：改上游 abort 语义属"改运行期默认值"，且补丁栈要长期跟随该文件漂移。
+- **非阻塞的证据（不是推断）**：TUI 的 editor 调 `onSubmit` **不 await**
+  （`packages/tui/src/components/editor.ts:1377` 的字段类型就是 `(text: string) => void`）⇒ 等待期间
+  Esc（`app.interrupt` → `session.abort()`，`interactive-mode.ts:3070-3072`）与输入照常工作；
+  真 pty 场景 E 段实测证明了这条路。
+- **交付**：`custom/features/mode/session-switch-guard.ts`（纯逻辑：开关/预算/文案/可注入时钟的等待循环）
+  + `mode/index.ts` 接线。**放 mode 的理由**：会话替换对每个档位都一样，而 roleplay/minimal 里没有
+  autopilot 等更"合身"的功能；mode 是唯一恒注册功能（`bootstrap.ts:61`）。边界：空闲立即放行；
+  无 UI（RPC/`-p` 无头）一路放行；重复请求取消后一条；超预算只取消切换（**绝不**替用户中断回合）；
+  守卫异常 fail-open（不许因为守卫的 bug 让 `/new` 失效）；`PI_SESSION_SWITCH_GUARD=off` 恢复上游行为。
+- **实测（可重跑）**：单测 + 接线 **20/20**（`npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts`），
+  其中"忙碌时在回合结束前绝不放行"是改前必红判据；**反向探针**：改成直接放行 ⇒ 该用例变红；
+  超时路径改成 `return undefined` ⇒ 超时用例变红（两次都已复原并核对与探针前逐字节相同）。
+  mode 全量 **98 passed / 7 files**；`tsc -p custom/` rc=0；死导出守门 ✓；
+  **注入面基线未变**（`8493be6d5712cc715641496dacaf37bb208abce592f5209b7349dab91b1bb8a2` ⇒ 守卫不注入任何 system 文本）。
+- **端到端（真 pty + 真 supervisor + 真 pi + 假 provider）**：新增 `scripts/test-scenario-session-switch.mjs`。
+  守卫开 **18/18**；**对照实验（= 改前）** `PI_SESSION_SWITCH_GUARD=off` ⇒ **13/18**，红的正是判别性 5 条：
+  无"已延后"提示、在飞那一轮的回复**没落进旧会话文件**（工作丢了）、旧会话留下 `stopReason=aborted` /
+  空 content 的 assistant 记录、挂住的请求 + `/new` 被立刻中止。开守卫时：回复落进旧会话文件且末条是
+  正常 assistant、无空记录、回合结束后 pi 自己完成切换（另建会话文件并收到回复）、全程 PID 不变（进程内替换）。
+- **顺带得到的教训（已入 `docs/design/CODING-TRAPS.md` #7）**：pi 的 TUI 是**全屏重绘**的、`pty.output`
+  是累积流 ⇒ `slice(mark)` 里出现旧文本**不代表事件刚发生**；"切片里没有某段文本"会被重绘污染成假失败，
+  而"等某段文本出现"会提前命中（实测 E4 提前返回 ⇒ E3b 在 pi 持久化之前读盘 ⇒ 假失败）。
+  ⇒ **决定性断言必须落在盘上产物 / provider 侧事实上**。
+- **未覆盖（如实）**：`/fork` 与分支导航（走 `session_before_fork`，是选择器自己持有的 UI 事务，
+  另有 `skipConversationRestore` 语义）；`admin_switch_session`（走进程重启通道，是显式确认过的重启，
+  不是进程内替换）；`/reload` 在回合进行中同样会打断，本次未动。
+  **未验证**：等待期间用户继续输入并触发新回合时守卫会连等（"等所有在途工作"）——无场景覆盖；
+  超预算路径只在单测里覆盖（场景未设预算）。
+- 证据现场：`/tmp/my-pi-switch-scenario-7qCVCh`（`PI_SCENARIO_KEEP=1` 保留的成功现场）。

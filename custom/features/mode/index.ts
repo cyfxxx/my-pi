@@ -35,6 +35,14 @@ import {
   formatModeSwitchNotice,
   MODE_NOTICE_TTL_MS,
 } from './logic';
+import {
+  isSwitchGuardEnabled,
+  switchWaitBudgetMs,
+  waitForIdleStep,
+  formatSwitchWaitNotice,
+  formatSwitchBusyNotice,
+  formatSwitchTimeoutNotice,
+} from './session-switch-guard';
 // 重启请求由 supervisor 消费，属跨功能基础设施；本项目约定跨功能引用只走对方 logic.ts。
 // （若将来出现第三个消费者，应上移到 custom/core/。）
 // `readState`/`consumeRestartLog` 只在"取自己那条待注入通知"时用到（见 takePendingModeNotice）。
@@ -299,6 +307,78 @@ export function register(pi: ExtensionAPI): void {
       }
       if (activeMode === 'full') return;
       ctx.ui.notify(`[模式] ${activeMode}: ${activeConfig.description}`, 'info');
+    },
+  });
+
+  // ── 会话切换守卫：`/new`、`/resume` 不再中止在跑的那一轮 ──
+  //
+  // 机制、根因（pi 的 `teardownCurrent()` → `session.abort()`）、以及为什么不改 pi 核心，
+  // 全部写在 `session-switch-guard.ts` 的文件头。这里只放接线与"必须放在这一层"的理由：
+  // **为什么在 mode**：会话替换对每个档位都一样，而 roleplay/minimal 里没有 autopilot 等更
+  // "合身"的功能；mode 是唯一**恒注册**的功能（`bootstrap.ts:61`），放这里才能全模式生效。
+  let switchWaits = 0;
+  // `isIdle()` 在会话正在关闭时可能抛：抛了当**空闲** ⇒ 放行并保持上游行为。
+  // 绝不能当"忙"——那会让守卫在会话已关闭时死等一个永不发生的 settle。
+  const idleOrUnknown = (ctx: { isIdle?: () => boolean }): boolean => {
+    try {
+      return ctx?.isIdle?.() !== false;
+    } catch {
+      return true;
+    }
+  };
+
+  registerHook(pi, {
+    event: 'session_before_switch',
+    handler: async (event, ctx) => {
+      try {
+        const e = event as { reason?: string; targetSessionFile?: string };
+        const reason = typeof e?.reason === 'string' ? e.reason : 'new';
+        const target = typeof e?.targetSessionFile === 'string' ? e.targetSessionFile : undefined;
+        if (!isSwitchGuardEnabled()) return; // 显式关闭：恢复上游行为
+        if (!ctx?.hasUI) return; // RPC / `-p` 无头 / 子代理：不改非交互路径
+        if (idleOrUnknown(ctx)) return; // 空闲：零延迟放行，不引入任何副作用
+        if (switchWaits > 0) {
+          // 已经在等：不重复开等待（否则回合一结束会连切两次），取消这一条并如实说明。
+          try {
+            ctx.ui?.notify?.(formatSwitchBusyNotice(), 'info');
+          } catch {
+            /* 通知失败不影响判定 */
+          }
+          return { cancel: true };
+        }
+        const budgetMs = switchWaitBudgetMs();
+        try {
+          ctx.ui?.notify?.(formatSwitchWaitNotice({ reason, targetSessionFile: target, budgetMs }), 'info');
+        } catch {
+          /* 同上 */
+        }
+        switchWaits++;
+        let outcome: 'idle' | 'timeout';
+        const startedAt = Date.now();
+        try {
+          outcome = await waitForIdleStep({ isIdle: () => idleOrUnknown(ctx), budgetMs });
+        } finally {
+          switchWaits--;
+        }
+        if (outcome === 'timeout') {
+          // 超预算只取消切换，**不**代替用户中断回合（否则等于换个方式丢失工作）
+          try {
+            ctx.ui?.notify?.(
+              formatSwitchTimeoutNotice({ reason, targetSessionFile: target, waitedMs: Date.now() - startedAt }),
+              'warning',
+            );
+          } catch {
+            /* 同上 */
+          }
+          return { cancel: true };
+        }
+        // 回合已结束 ⇒ 放行：pi 继续它原本的会话替换流程，`teardownCurrent()` 里的 abort 此刻打不到任何东西。
+        return;
+      } catch (err) {
+        // fail-open：守卫自身出错时保持上游行为。宁可回到"会中断"的旧行为，也不能让 `/new` 失效。
+        console.warn(`[模式] 会话切换守卫异常，按原行为放行：${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
     },
   });
 

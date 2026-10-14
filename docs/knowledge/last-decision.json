@@ -1,9 +1,12 @@
 {
-  "create_patterns": [
+  "create_patterns": [],
+  "update_patterns": [
     {
-      "name": "fp-092844"
+      "name": "bug-038",
+      "edits": [
+        "命令 更新"
+      ]
     }
   ],
-  "update_patterns": [],
   "update_index": true
 }

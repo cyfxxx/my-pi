@@ -66,13 +66,15 @@
 - 命令：`/mode <list|help|模式名>`
 - 钩子：`session_start`（按**本会话**应有的模式做一致性校验，不一致就自愈重启；非 full 时提示当前模式；
   若本次启动正是为模式切换而重启的，则按新模式注入一条模型侧通知——见下文"切换后的注入通知"）
+- 钩子：`session_before_switch`（**会话切换守卫**：忙碌时等到回合结束再放行——见下文同名章节）
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `index.ts` | 注册命令/钩子；切换、自动重启请求、按会话的一致性校验与自愈、消费并注入切换通知 |
+| `index.ts` | 注册命令/钩子；切换、自动重启请求、按会话的一致性校验与自愈、消费并注入切换通知、会话切换守卫接线 |
 | `logic.ts` | 模式定义/读写/归一化、`resolveEffectiveMode`/`resolveStartupMode`、会话记录表、`isFeatureEnabled`、`applyModeRuntime`、`formatModeSwitchNotice` |
+| `session-switch-guard.ts` | 会话切换守卫的**纯逻辑**（开关/预算/通知文案/可注入时钟的等待循环），零 Pi 依赖 |
 
 ## 数据：配置、会话记录、进程来源**三者分开**
 
@@ -193,6 +195,50 @@ pi 的新会话文件**在首条 user/assistant 消息之前不落盘**（`Sessi
 以及 bash 解析不出会话的启动形态（`-c` / `-r` / 部分 uuid）。`PI_AGENT_MODE_SOURCE=env`
 （外部硬覆盖）时跳过——那是用户/测试的显式强制，不是异常；`PI_SESSION_MODE`（软来源）**不跳过**，
 因为 bash 也可能解析错。
+
+## 会话切换守卫：`/new`、`/resume` 不再中止在跑的那一轮（2026-10-14）
+
+**问题**（用户实测）：在 TUI 里 `/new`（新建会话）或 `/resume`（会话选择器）时，当前会话**正在跑的
+那一轮**会被中止。根因在 pi 内部，不是本功能的缺陷：会话替换的三条入口
+（`newSession` / `switchSession` / `importFromJsonl`）都先走 `teardownCurrent()` →
+`await this.session.abort()`（`vendor/pi/packages/coding-agent/src/core/agent-session-runtime.ts:167-177`，
+调用点 `:212` / `:245` / `:299` / `:391`）——上游把"切换会话"与"打断在跑的一轮"实现成了同一个动作。
+
+**做法**：挂 pi 的扩展事件 `session_before_switch`（同文件 `:133-148`，在 `teardownCurrent()`
+**之前**发出、且可 `cancel`）。忙碌时**在 handler 里等到回合结束再放行**（`waitForIdleStep`），
+于是 `teardownCurrent()` 里的 `abort()` 打不到任何东西，而切换仍由 pi 自己走完（`withSession` /
+`rebindSession` 等既有语义全部保留）。
+
+**为什么是"等"而不是"取消 + 自己重发"**：事件 handler 拿到的 `ExtensionContext` 上**没有**
+`newSession` / `switchSession`（两者只在 `ExtensionCommandContext`，见 `core/extensions/types.ts:401-431`）；
+自己重发要么走进程重启（本机实测 ≈40s），要么伪造一次命令注入——都比"晚一点放行"代价大，
+且要多一条需要长期验证的通道。
+
+**等待是非阻塞的**：TUI 的 editor 调 `onSubmit` 时**不 await**（`packages/tui/src/components/editor.ts:1377`
+的字段类型就是 `(text: string) => void`），所以等待期间 Esc（`app.interrupt` → `session.abort()`，
+`interactive-mode.ts:3070-3072`）与正常输入照常工作。**Esc 就是"立刻中断并切换"的逃生口**
+（真 pty 场景 E 段验证）。
+
+| 情形 | 行为 |
+|---|---|
+| 空闲时 `/new`、`/resume` | 立即放行（不引入任何延迟或提示） |
+| 忙碌时 | 提示"已延后…；按 Esc 可立刻中断并切换"，等回合结束再放行 |
+| 等待期间再次请求 | 取消后一条并说明"上一条还在等"（避免回合结束后连切两次） |
+| 等待超预算（`PI_SESSION_SWITCH_WAIT_MS`，默认 0 = 不设上限） | **取消切换**并告警；**绝不**替用户中断回合 |
+| 无 UI（RPC / `-p` 无头 / 子代理） | 一律放行，不改变非交互路径 |
+| 守卫自身异常 | 放行（fail-open：不许因为守卫的 bug 让 `/new` 失效） |
+| `PI_SESSION_SWITCH_GUARD=off` | 恢复上游行为（立刻中止并切换） |
+
+**放在 mode 的原因**：会话替换对每个档位都一样，而 roleplay/minimal 里没有 autopilot 等更"合身"的
+功能；`mode` 是唯一**恒注册**的功能（`bootstrap.ts:61`），放这里才能全模式生效。
+
+**未覆盖**：`/fork` 与分支导航（走 `session_before_fork`，是选择器自己持有的 UI 事务，另有一套
+`skipConversationRestore` 语义）；本次只覆盖用户报告的 `/new` 与 `/resume`（`/import` 复用
+`reason: 'resume'`，一并被覆盖）。
+
+**验证**：`session-switch-guard.test.ts`（20 项：开关/预算/注入时钟的等待逻辑/通知文案，
+外加真实 feature 接线的 9 项，含"忙碌时在回合结束前绝不放行"这条改前必红的判据）；
+真实场景 `scripts/test-scenario-session-switch.mjs`（16 项，真 pty + 真 supervisor + 真 pi + 假 provider）。
 
 ## 为什么不做热重载（结论与依据）
 

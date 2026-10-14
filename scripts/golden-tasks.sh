@@ -161,8 +161,25 @@ else
   if node scripts/test-scenario-two-instances.mjs >/tmp/golden-scenario-two.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario-two.log)"; else fail "两实例隔离场景（见 /tmp/golden-scenario-two.log）"; tail -20 /tmp/golden-scenario-two.log; fi
 fi
 
+step "21. 会话切换场景（真 pty + supervisor + pi，约 4 分钟）"
+# 用户报告的那条路径：TUI 里 `/new`（或 `/resume` 选择器）会**中止当前会话正在跑的那一轮**
+# （pi 原生：会话替换先 teardownCurrent() → session.abort()）。本步用真 pty 断言守卫确实
+# "等到回合结束再放行"：在飞那一轮的回复**落进旧会话文件**、旧会话没有 aborted/空 assistant 记录、
+# 回合结束后 pi 自己完成切换（另建文件并收到回复）、PID 不变；并覆盖逃生口（Esc 立刻中断并切换）。
+# **本步不是"新鲜留出集"**：它是 2026-10-14 那次改动的开发期检查，其留出集价值对该改动已消耗；
+# 第 19/20 步的留出集纪律（开发期间不看结果）不变。
+if [ "$FAST" = "1" ]; then
+  skip "会话切换场景（--fast 跳过）"
+elif [ "${PI_GOLDEN_SCENARIO:-0}" != "1" ]; then
+  skip "会话切换场景（默认跳过；PI_GOLDEN_SCENARIO=1 开启 —— 改 mode/会话切换/生命周期 时必须跑）"
+elif [ "${PI_SCENARIO_SKIP:-0}" = "1" ]; then
+  skip "会话切换场景（PI_SCENARIO_SKIP=1）"
+else
+  if node scripts/test-scenario-session-switch.mjs >/tmp/golden-scenario-switch.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario-switch.log)"; else fail "会话切换场景（见 /tmp/golden-scenario-switch.log）"; tail -20 /tmp/golden-scenario-switch.log; fi
+fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "21. 无头会话冒烟"
+  step "22. 无头会话冒烟"
   # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
   # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，
