@@ -14,7 +14,7 @@ import { PI_TO_DSH_EVENTS, assertEventsMapped, mappingSummary, resolveDshEvent }
 import { createDshExtensionApi } from '../facade';
 import { deriveSessionInfo, makeDshListener, mapToolCallDecision, mapToolResultDecision, withSessionContext } from '../hooks';
 import { toDshToolPayload } from '../tool';
-import type { DshContext, DshDefineToolOptions, DshEventListener } from '../types';
+import type { DshCommandDefinition, DshContext, DshDefineToolOptions, DshEventListener } from '../types';
 
 // ── 假 DSH ctx（记录注册与订阅，模拟 waterfall 调用）─────────────────────────
 
@@ -22,16 +22,19 @@ interface FakeDsh {
   ctx: DshContext;
   tools: DshDefineToolOptions[];
   unregistered: string[];
+  commands: DshCommandDefinition[];
   listeners: Map<string, DshEventListener[]>;
   disposeListeners: string[];
 }
 
-function makeFakeDsh(options: { withTools?: boolean } = {}): FakeDsh {
+function makeFakeDsh(options: { withTools?: boolean; withCommands?: boolean } = {}): FakeDsh {
   const withTools = options.withTools ?? true;
+  const withCommands = options.withCommands ?? false;
   const fake: FakeDsh = {
     ctx: {} as DshContext,
     tools: [],
     unregistered: [],
+    commands: [],
     listeners: new Map(),
     disposeListeners: [],
   };
@@ -49,8 +52,16 @@ function makeFakeDsh(options: { withTools?: boolean } = {}): FakeDsh {
         },
       }
     : undefined;
+  const commands = withCommands
+    ? {
+        register: (definition: DshCommandDefinition): (() => void) => {
+          fake.commands.push(definition);
+          return () => undefined;
+        },
+      }
+    : undefined;
   // 一次性构造（`DshContext.tools` 是 readonly，不能先建对象再赋值）
-  fake.ctx = tools ? { on, tools } : { on };
+  fake.ctx = { on, ...(tools ? { tools } : {}), ...(commands ? { commands } : {}) };
   return fake;
 }
 
@@ -317,6 +328,77 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
     expect(listener).toBeDefined();
     await listener?.({ agent: { session: { id: 'sess-7', header: { id: 'sess-7', cwd: '/work/w' } } } });
     expect(seen).toEqual(['sess-7']);
+  });
+});
+
+describe('命令映射（pi 形状 → DSH CommandDefinition）', () => {
+  /** pi 形状的命令定义（我们的 ui-adapter 就是这么注册的） */
+  const piCommand = (overrides: Record<string, unknown> = {}) => ({
+    description: '切换模式',
+    handler: async (args: string, ctx: unknown) => {
+      (piCommand.seen as unknown[]).push({ args, ctx });
+    },
+    ...overrides,
+  });
+  piCommand.seen = [] as unknown[];
+
+  it('名称规范化（去斜杠 + 小写）并上报；description 缺失时用命令名兜底', () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m) => reports.push(m) });
+    facade.api.registerCommand('Mode' as never, { handler: async () => undefined } as never);
+    expect(fake.commands[0]?.name).toBe('mode');
+    expect(fake.commands[0]?.description).toBe('mode');
+    expect(reports).toContain('command.Mode.name');
+    expect(reports).toContain('command.mode.description');
+  });
+
+  it('handler 收到 rawInput，并返回 {kind:"success"}；上下文带会话身份', async () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const facade = createDshExtensionApi(fake.ctx, { cwd: '/base' });
+    piCommand.seen = [];
+    // 注意：注册的是**构造出的定义**（`piCommand()`），不是工厂函数本身
+    facade.api.registerCommand('mode', piCommand() as never);
+    const result = await fake.commands[0]?.handler({
+      rawInput: ' roleplay',
+      agent: { session: { id: 's-1', header: { id: 's-1', cwd: '/work' } } },
+    });
+    expect(result).toEqual({ kind: 'success' });
+    const seen = piCommand.seen[0] as { args: string; ctx: { cwd?: string; sessionManager?: { getSessionId?: () => string | undefined } } };
+    expect(seen.args).toBe(' roleplay'); // 原文透传（含前导空白）
+    expect(seen.ctx.sessionManager?.getSessionId?.()).toBe('s-1');
+    expect(seen.ctx.cwd).toBe('/work');
+  });
+
+  it('handler 抛错 ⇒ 映射为 {kind:"error"}，消息带命令名与原因', async () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const facade = createDshExtensionApi(fake.ctx);
+    facade.api.registerCommand('boom', {
+      description: 'x',
+      handler: async () => {
+        throw new Error('配置损坏');
+      },
+    } as never);
+    const result = await fake.commands[0]?.handler({ rawInput: '' });
+    expect(result).toEqual({ kind: 'error', text: expect.stringContaining('配置损坏') });
+  });
+
+  it('getArgumentCompletions 在 DSH 无对应 ⇒ 上报（其余照常注册）', () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m) => reports.push(m) });
+    facade.api.registerCommand('todo', { description: '待办', getArgumentCompletions: () => null, handler: async () => undefined } as never);
+    expect(fake.commands).toHaveLength(1);
+    expect(reports).toContain('command.todo.getArgumentCompletions');
+  });
+
+  it('命令服务缺失时上报 unsupported（不静默丢弃）', () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m) => reports.push(m) });
+    facade.api.registerCommand('mode', piCommand() as never);
+    expect(reports).toContain('registerCommand');
+    expect(facade.surfaceReport().find((e) => e.member === 'registerCommand')?.status).toBe('unsupported');
   });
 });
 

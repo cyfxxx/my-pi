@@ -21,7 +21,7 @@ dsh/
     my-pi.patch.yml  # 插进 DSH profile 的覆盖层（`insert:` 语义；相对路径以本文件为锚点）
   spike/
     package.json     # spike 用的 DSH 依赖（gitignored node_modules）
-    spike.ts         # 源码级端到端（A1–A9，含真实搜索/拦截语义/全量 bootstrap）
+    spike.ts         # 源码级端到端（A1–A10，含真实搜索/拦截语义/全量 bootstrap/命令服务）
     smoke-built.mjs  # **产物级**冒烟（纯 node，无 tsx）
 ```
 
@@ -29,7 +29,7 @@ dsh/
 
 ```bash
 bash scripts/dsh-build.sh            # 打包 + 产物冒烟（纯 node 加载 dist，断言 54 工具 / 0 失败）
-bash scripts/dsh-spike.sh            # 源码级 spike（A1–A9，真实 @deepseek-ai 包 + pi shim）
+bash scripts/dsh-spike.sh            # 源码级 spike（A1–A10，真实 @deepseek-ai 包 + pi shim）
 bash scripts/dsh-smoke-profile.sh    # 真实 launcher 的 profile 组合干跑（隔离 DSH_HOME，--dump-config）
 bash scripts/dsh-baseline.sh --check # 工具声明面漂移守门（P6 第一块；漂移 ⇒ exit 1）
 ```

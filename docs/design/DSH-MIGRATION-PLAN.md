@@ -57,6 +57,7 @@ adapters/**（唯一接触底座的地方）
 | 16 | **`pi-shims/` 让"零 pi 依赖"也成立** | 两个 specifier 别名到本仓 shim 后：`import('@earendil-works/pi-tui')` 只导出 7 个符号、`pi-coding-agent` 只导出 2 个（实测）⇒ A9 仍 **54 工具 / 0 失败** | ✓✓ 别名机制可用 shim 承载；漂移由单测守着 |
 | 17 | **打包产物**可行且足够小：只含本仓代码（712 KB），外部包全部 external | `scripts/dsh-build.sh` + `dsh/spike/smoke-built.mjs`（纯 node，无 tsx）⇒ 54 工具 / 0 失败 | ✓ 交付物形态确定 |
 | 18 | **真实 launcher 的 profile 组合**：`id:` 形式是"覆盖已有条目"，**插入新插件要用 `insert:`** | 隔离 DSH_HOME 干跑：`- id: my-pi` ⇒ `patch: entry "my-pi" not found`；`- insert: [{id: my-pi, name: …}]` ⇒ 组合树出现 `file:///…/my-pi-plugin.mjs` | ✓✓ P5② 的落地方式确定；Host 启动仍未做 ✗ |
+| 18-e | **命令契约与 pi 的差异只有三处**（`description` 必填 / `name` 小写无斜杠 / handler 必须返回 `CommandResult`） | spike A10（真实 `@deepseek-ai/dsh-commands`）：注册名 `spike-cmd`、`find()` 命中、`rawInput=" arg1"` 原文透传、会话身份 `s-9`、成功 `success`、抛错映射 `error` | ✓✓ 计划 §5 第 1 条（命令契约未读）消解；✗ `commands.execute()` 需真 agent、参数补全 DSH 没这个概念 |
 | 18-d | **会话身份必须显式派生**：DSH 的 `SessionHeader` 只有 `id`/`createdAt`/`cwd`，**没有会话文件路径**（`dsh-session/lib/types/types.d.ts`）——而 pi 的处理器都从第二个参数取 `sessionManager.getSessionFile()` | `hooks.ts` 新增 `deriveSessionInfo`/`withSessionContext`，读三种真实负载形状（`session/created` 的 `{session}`、`agent/created` 的 `{agent.session}`、日志信封 `{header}`）；**不伪造 `getSessionFile()`**，只补 `getSessionId()`/`getSessionCwd()`；`mode` 的会话键收拢到新模块 `session-key.ts`（有路径用路径，否则 `dsh-session:<id>`），重启请求只在**确实是路径**时写 `targetSession` | ✓ 单测：三种负载形状 + 「读不出就原样返回、不编造」+ 经外观层端到端（`session_start` 处理器拿到 `sess-7`）；mode 既有 **98 项**测试无回归；✗ `--session <文件>` 这类**基于路径**的续接在 DSH 上没有对应物（要另设计） |
 | 18-c | **压缩事件：观察可用、干预不可** ——`compaction/start` 是**会话日志事件**（`dsh-compaction` 的 `SessionEventMap`，`types.d.ts:21`），经 `session/event` 追加派发 | 真实 bootstrap：`session_before_compact` 从"服务替换（unsupported）"改为 `session/event` + `type==='compaction/start'` 派发；A9 的事件桥接台账实测 **13 直接 / 5 降级 / 0 无等价**，其中 `session_before_compact=degraded` | ✓ 我们唯一那处是**观察型**（压缩前落快照+记账）⇒ 够用；✗ "取消压缩"仍不可（要换 `CompactionEngine` 服务）|
 | 18-b | **注入面必须显式接线**：pi 的 `APPEND_SYSTEM.md` 在 DSH 上没有等价约定，只有 `SystemPrompt.section()` 服务 | 真实 harness：`section({name:'my-pi:append-system', order:2500, text, interpolate:false})` ⇒ `renderPrompt(assemble())` 含 1274 B 且**是渲染结果结尾**（0 字符在其后） | ✓✓ 不接这一步，那段指令在 DSH 上不会出现**且不报错**；现由 `dsh/baseline/system-prompt.json` 守漂移 |
@@ -149,7 +150,15 @@ pi 侧的 11 个补丁是"底座替换"的账；换到 DSH 后**没有"能不能
 
 ## 5. 未核实（✗，本轮开工时如实登记）
 
-1. `@deepseek-ai/dsh-commands` 的命令契约**未读** ⇒ `registerCommand`（14 处）能否干净映射待验；
+1. ~~`@deepseek-ai/dsh-commands` 的命令契约**未读**~~ **已补读并实测（2026-10-16）**：
+   `ctx.commands.register({name, description, input?, recordInput?, handler})`；handler 收
+   `{commandId, agent, rawInput, attachments, signal}` 且**必须返回** `{kind:'success',text?}|{kind:'error',text}`
+   （`dsh-commands/lib/types/index.d.ts:38-56`、`types.d.ts:20-41`）。与 pi 的三处差异都已在
+   `facade.ts` 抹平并上报：① `description` 在 DSH **必填**（缺省用命令名兜底）；② `name` 必须**小写无斜杠**
+   （规范化并上报）；③ 返回值形态（pi 返回 void → `CommandResult`，抛错映射为 `{kind:'error'}`）。
+   另外 pi 的 `getArgumentCompletions` 在 DSH **无对应**（`input` 只有 `hint`/`attachments`）✗。
+   实测：spike **A10** 用真实命令服务验通（`find()` 命中、`rawInput` 原文透传、会话身份注入、抛错映射）；
+   ✗ `commands.execute(agent, line, …)` 需要**真 agent**，属 Host 级，未验；
 2. 快捷键在**内核无对应**（属客户端层）⇒ 4 处可能需要"不迁移"或改用 DSH 客户端方案；
 3. 事件 `@mode` 注解的**实际驱动方**未逐个回源确认（映射表按注解口径）；
 4. ~~`session/event` 观察是"提交后"⇒ 需要决策的钩子（如 `input` 改写）只能用**步级瀑布**（`agent/pre-step`）~~

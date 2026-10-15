@@ -99,11 +99,53 @@ export interface DshContext {
   readonly tools?: DshToolRegistry;
   /** cordis 事件订阅（返回 disposer） */
   on?(event: string, listener: DshEventListener): DshDisposer;
-  /** 命令服务（`@deepseek-ai/dsh-commands`）——**契约未读** ✗，故只做形状探测 */
-  readonly commands?: { register(name: string, definition: unknown): DshDisposer };
+  /** 命令服务（`@deepseek-ai/dsh-commands`；契约见 `DshCommandRuntime`） */
+  readonly commands?: DshCommandRuntime;
   /** 会话事件信封（用于 `session/event` 派发：`event.type` 是日志事件类型） */
   readonly [service: string]: unknown;
 }
+
+/**
+ * 命令服务（`@deepseek-ai/dsh-commands` 的 `CommandRuntime extends TypertRemoteService`）。
+ *
+ * 出处：`dsh-commands/lib/types/index.d.ts:80-106` 与 `types.d.ts:20-41`（2026-10-16 读）。
+ * ★ 契约要点（与 pi 的差异都在这里）：
+ *   - **注册需要 `description`（必填）**，pi 侧是可选的；
+ *   - `name` 必须**小写、不带前导斜杠**；
+ *   - handler 收到的是 `{commandId, agent, rawInput, attachments, signal}`（pi 是 `(args, ctx)`）；
+ *   - **必须返回 `CommandResult`**：`{kind:'success', text?} | {kind:'error', text}`（pi 返回 void）；
+ *   - 输入补全（pi 的 `getArgumentCompletions`）只有 `input.hint`/`attachments` 两个字段 ⇒ 无对应 ✗。
+ */
+export interface DshCommandRuntime {
+  register(definition: DshCommandDefinition): DshDisposer;
+  list?(agent: unknown): readonly unknown[];
+}
+
+/** `CommandDefinition` 的最小快照 */
+export interface DshCommandDefinition {
+  readonly definitionId?: string;
+  /** 小写、无前导斜杠 */
+  readonly name: string;
+  readonly description: string;
+  readonly input?: { readonly hint: string; readonly attachments?: boolean };
+  readonly recordInput?: boolean;
+  readonly handler: (invocation: DshCommandInvocation) => DshCommandResult | Promise<DshCommandResult>;
+}
+
+/** `CommandInvocation` 的最小快照 */
+export interface DshCommandInvocation {
+  readonly commandId?: unknown;
+  readonly agent?: { readonly session?: unknown };
+  /** 命令名之后的原文（**含分隔空白**） */
+  readonly rawInput: string;
+  readonly attachments?: readonly unknown[];
+  readonly signal?: AbortSignal;
+}
+
+/** `CommandResult`（DSH 侧必须给，pi 的 handler 返回 void） */
+export type DshCommandResult =
+  | { readonly kind: 'success'; readonly text?: string }
+  | { readonly kind: 'error'; readonly text: string };
 
 /**
  * 系统提示词服务（`@deepseek-ai/dsh-system-prompt` 的 `SystemPrompt extends Service`）。

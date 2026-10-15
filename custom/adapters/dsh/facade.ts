@@ -30,7 +30,15 @@ import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil
 import { assertEventsMapped, resolveDshEvent } from './events';
 import { makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
 import { toDshToolPayload, type UnsupportedReporter } from './tool';
-import type { DshContext, DshDisposer, DshEventListener, DshEventVia } from './types';
+import type {
+  DshCommandDefinition,
+  DshCommandInvocation,
+  DshCommandResult,
+  DshContext,
+  DshDisposer,
+  DshEventListener,
+  DshEventVia,
+} from './types';
 
 /** 成员的可用性判定 */
 export type SurfaceStatus = 'supported' | 'degraded' | 'unsupported';
@@ -210,10 +218,55 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   };
 
   // ── 命令 / 快捷键 / 渲染器 / 标志 ──────────────────────────────────────────
+  /**
+   * pi 形状命令 → DSH `CommandDefinition`（契约 `dsh-commands/lib/types/index.d.ts:38-56`）。
+   *
+   * 三处形态差异（都在这里抹平，且**显式上报**不可表达的字段）：
+   *   ① `description` 在 DSH 是**必填**（pi 可选）⇒ 缺省用命令名兜底；
+   *   ② `name` 必须小写、不带前导斜杠 ⇒ 规范化并把改动上报；
+   *   ③ handler 形态：pi 是 `(args, ctx) => Promise<void>`，DSH 是
+   *      `(invocation) => CommandResult|Promise<CommandResult>` ⇒ 透传 `rawInput`、用
+   *      `withSessionContext` 把 `invocation.agent.session` 合进 pi 上下文，并把抛错映射成
+   *      `{kind:'error', text}`（否则 DSH 侧只会看到一个没有说明的失败）。
+   * 另外：pi 的 `getArgumentCompletions` 在 DSH 无对应（`input` 只有 `hint`/`attachments`）✗。
+   */
   const registerCommand = (name: string, definition: unknown): void => {
     ledger.use('registerCommand');
+    const def = (typeof definition === 'object' && definition !== null ? definition : {}) as {
+      description?: string;
+      getArgumentCompletions?: unknown;
+      handler?: (args: string, ctx: unknown) => Promise<void> | void;
+    };
+    const normalized = String(name).replace(/^\//, '').toLowerCase();
+    if (normalized !== String(name)) {
+      report(`command.${String(name)}.name`, `DSH 要求小写、不带前导斜杠 ⇒ 已规范化为 "${normalized}"`);
+    }
+    if (def.getArgumentCompletions) {
+      report(
+        `command.${normalized}.getArgumentCompletions`,
+        'DSH 的 CommandInputDescriptor 只有 hint/attachments ⇒ 命令参数补全无对应',
+      );
+    }
+    if (!def.description) {
+      report(`command.${normalized}.description`, 'pi 侧 description 可选、DSH 必填 ⇒ 用命令名兜底');
+    }
     if (!canCommand || !ctx.commands) return;
-    disposers.push(ctx.commands.register(name, definition));
+    const runtime = ctx.commands;
+    const dshDefinition: DshCommandDefinition = {
+      name: normalized,
+      description: def.description ?? normalized,
+      handler: async (invocation: DshCommandInvocation): Promise<DshCommandResult> => {
+        const handlerContext = withSessionContext(basePiContext, { session: invocation.agent?.session });
+        try {
+          await def.handler?.(invocation.rawInput ?? '', handlerContext);
+          return { kind: 'success' };
+        } catch (error) {
+          const text = error instanceof Error ? error.message : String(error);
+          return { kind: 'error', text: `命令 ${normalized} 执行失败：${text}` };
+        }
+      },
+    };
+    disposers.push(runtime.register(dshDefinition));
   };
   const registerShortcut = (): void => {
     ledger.use('registerShortcut');

@@ -15,6 +15,8 @@
  *   A8 负向：未登记映射的事件直接抛错（不允许"注册了但永不触发"）
  *   A9 **全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）经外观层注册；
  *      需要 pi 包别名（ui-adapter/session-adapter 运行时 import pi 的包）⇒ 别名不可用时记 SKIP
+ *   A10 pi 形状命令 → **真实命令服务**（`@deepseek-ai/dsh-commands`）：注册形状/名称规范化/
+ *      `rawInput` 透传/会话身份注入/抛错映射成 `{kind:'error'}`，并用 `commands.find()` 反查命中
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -200,6 +202,79 @@ async function main(): Promise<void> {
     a9 = { id: 'A9', ok: 'skip', detail: `pi 包别名不可用：${(error as Error).message.slice(0, 80)}` };
   }
   checks.push(a9);
+
+  // ── A10：pi 形状命令 → 真实命令服务（命令契约 2026-10-16 补读）────────────────
+  let a10: Check = { id: 'A10', ok: 'skip', detail: '命令服务不可用（@deepseek-ai/dsh-commands 未安装？）' };
+  try {
+    const commandsModule = (await import('@deepseek-ai/dsh-commands')) as unknown as {
+      default?: unknown;
+      CommandRuntime?: unknown;
+    };
+    const runtimePlugin = (commandsModule.default ?? commandsModule.CommandRuntime) as never;
+    const cmdCtx = new Context();
+    cmdCtx.plugin(SystemPrompt);
+    cmdCtx.plugin(ToolRuntime);
+    cmdCtx.plugin(runtimePlugin);
+    await tick();
+
+    const captured: Array<{ name: string; description: string; handler: (invocation: unknown) => Promise<unknown> }> = [];
+    const commandRegistry = cmdCtx.commands as unknown as {
+      register: (definition: unknown) => () => void;
+      find: (agent: unknown, name: string) => unknown;
+    };
+    const originalRegister = commandRegistry.register.bind(cmdCtx.commands);
+    commandRegistry.register = (definition: unknown) => {
+      captured.push(definition as never);
+      return originalRegister(definition);
+    };
+
+    const cmdFacade = createDshExtensionApi(cmdCtx as unknown as DshContext, {
+      cwd: '/spike',
+      onUnsupported: () => undefined,
+    });
+    let seenArgs: string | undefined;
+    let seenSession: string | undefined;
+    cmdFacade.api.registerCommand('Spike-Cmd' as never, {
+      description: 'spike 命令',
+      handler: async (args: string, ctx: unknown) => {
+        seenArgs = args;
+        seenSession = (ctx as { sessionManager?: { getSessionId?: () => string | undefined } })?.sessionManager?.getSessionId?.();
+      },
+    } as never);
+    cmdFacade.api.registerCommand('boom' as never, {
+      description: '抛错命令',
+      handler: async () => {
+        throw new Error('故意失败');
+      },
+    } as never);
+
+    const definition = captured[0];
+    const result = (await definition?.handler({
+      rawInput: ' arg1',
+      agent: { session: { id: 's-9', header: { id: 's-9', cwd: '/w' } } },
+    })) as { kind?: string } | undefined;
+    const found = commandRegistry.find({}, 'spike-cmd');
+    const errorResult = (await captured[1]?.handler({ rawInput: '' })) as { kind?: string; text?: string } | undefined;
+
+    const ok =
+      definition?.name === 'spike-cmd' &&
+      definition?.description === 'spike 命令' &&
+      result?.kind === 'success' &&
+      seenArgs === ' arg1' &&
+      seenSession === 's-9' &&
+      Boolean(found) &&
+      errorResult?.kind === 'error' &&
+      String(errorResult?.text ?? '').includes('故意失败');
+    a10 = {
+      id: 'A10',
+      ok,
+      detail: `注册名=${definition?.name}｜find() 命中=${Boolean(found)}｜rawInput 透传=${JSON.stringify(seenArgs)}｜会话身份=${seenSession}｜结果=${result?.kind}｜抛错映射=${errorResult?.kind}`,
+    };
+    cmdFacade.dispose();
+  } catch (error) {
+    a10 = { id: 'A10', ok: 'skip', detail: `命令服务不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a10);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

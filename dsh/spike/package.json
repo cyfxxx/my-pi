@@ -2,9 +2,10 @@
   "name": "my-pi-dsh-spike",
   "private": true,
   "type": "module",
-  "description": "DSH 换基座 spike：用**真实的** @deepseek-ai 包验证 custom/adapters/dsh 的映射（见 docs/design/DSH-MIGRATION-PLAN.md P3/P4）",
+  "description": "DSH \u6362\u57fa\u5ea7 spike\uff1a\u7528**\u771f\u5b9e\u7684** @deepseek-ai \u5305\u9a8c\u8bc1 custom/adapters/dsh \u7684\u6620\u5c04\uff08\u89c1 docs/design/DSH-MIGRATION-PLAN.md P3/P4\uff09",
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-commands": "0.2.0-rc.2",
     "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2"
   }
