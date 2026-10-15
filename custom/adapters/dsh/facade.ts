@@ -238,13 +238,33 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       return;
     }
     // session-event：只能订阅追加流，再按 event.type 派发（**提交后**，观察型）
-    ledger.declare(`on(${event})`, 'degraded', `→ session/event 里 type=${target}（追加流：提交后观察、**不可否决**）`);
+    ledger.declare(
+      `on(${event})`,
+      'degraded',
+      `→ session/event 里 type=${target}（追加流：提交后观察、**不可否决**）${mapping.degradedNote ? `；${mapping.degradedNote}` : ''}`,
+    );
     ledger.use(`on(${event})`);
     disposers.push(
       ctx.on('session/event', (...args: readonly unknown[]) => {
-        const envelope = args[0] as { type?: unknown } | undefined;
-        if (envelope?.type === target) return listener(...args);
-        return undefined;
+        // ★ 2026-10-17 修：`session/event` 的真实签名是 `(session, event)`（scoped）
+        // —— 第一参是 **Session**，事件在第二参。此前按 args[0] 取 type 永远拿不到，
+        //   于是所有走 session-event 的 pi 事件**从未被触发**（spike A13 当场暴露）。
+        const envelope = args.find(
+          (a): a is { type: string } =>
+            typeof a === 'object' && a !== null && typeof (a as { type?: unknown }).type === 'string',
+        );
+        if (!envelope) return undefined;
+        if (envelope.type !== target) return undefined;
+        // 交给 pi 处理器时：
+        //   ① `type` 换成 **pi 的事件名**（处理器按 pi 语义读事件）；
+        //   ② 把 DSH 日志事件的 `data` **摊平到顶层** —— 实测日志事件是 `{type, seq, time, data}`
+        //      （例：`turn/start` 的回合号在 `data.turn`），而 pi 处理器习惯读顶层字段（`event.turn`）。
+        //   ③ 保留原始 `data` 与 `seq/time`，不丢信息。
+        // ✗ 仍有字段名差异：`turn/end` 的 data 是 `{turn, reason}`，没有 pi 的 `message`；
+        //   `message_update` 的 pi 字段是 `assistantMessageEvent` ⇒ 这类要**字段翻译或改处理器**。
+        const raw = envelope as { data?: unknown } & Record<string, unknown>;
+        const data = typeof raw.data === 'object' && raw.data !== null ? (raw.data as Record<string, unknown>) : {};
+        return listener({ ...raw, ...data, type: event }, undefined);
       }),
     );
   };

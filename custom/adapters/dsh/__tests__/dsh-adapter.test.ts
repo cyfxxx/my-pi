@@ -359,6 +359,44 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
   });
 });
 
+describe('会话事件桥（session/event 的真实签名与负载）', () => {
+  it('`(session, event)` 两参形态能被识别；按 event.type 过滤；type 换成 pi 名；data 摊平到顶层', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const hit: unknown[] = [];
+    facade.api.on('turn_start' as never, ((event: unknown) => {
+      hit.push(event);
+      return undefined;
+    }) as never);
+
+    const listener = fake.listeners.get('session/event')?.[0];
+    expect(listener).toBeDefined();
+    // 真实签名：(session, event)；事件是日志事件 {type, seq, time, data}
+    const session = { id: 's-1', header: { id: 's-1' } };
+    await listener?.(session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 7 } });
+    expect(hit).toHaveLength(1);
+    const seen = hit[0] as { type?: string; turn?: number; data?: { turn?: number } };
+    expect(seen.type).toBe('turn_start'); // pi 事件名
+    expect(seen.turn).toBe(7);            // data 已摊平
+    expect(seen.data?.turn).toBe(7);      // 原始 data 保留
+
+    // 不同 type 不串台
+    await listener?.(session, { type: 'turn/end', seq: 1, time: 2, data: { turn: 7, reason: 'completed' } });
+    expect(hit).toHaveLength(1);
+  });
+
+  it('不是本事件的 type / 没有 type 的负载 ⇒ 不调处理器', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const handler = vi.fn();
+    facade.api.on('turn_start' as never, handler as never);
+    const listener = fake.listeners.get('session/event')?.[0];
+    await listener?.({ id: 's' }, { type: 'step/start', data: {} });
+    await listener?.({ id: 's' });
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
 describe('工具清单与会话名（2026-10-17 新增落点）', () => {
   it('getActiveTools/getAllTools 落到 ctx.tools.schemas()（状态 degraded，不再报 unsupported）', () => {
     const fake = makeFakeDsh();

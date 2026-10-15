@@ -63,10 +63,10 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 12 条检查（A1–A12）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 13 条检查（A1–A13）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）。
-实测结果：**12 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）。
+实测结果：**13 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
 **7 直接 / 11 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
@@ -185,3 +185,15 @@ pi 的 `input` 处理器返回 `{action:'continue'|'transform'|'handled'}`，DSH
   DSH 的 `agent/request` 只能换**调用配置**，而 `llm/stream` 收到的 loop 请求**深度冻结** —— 契约原话
   listeners "read it, never rewrite it"（可重建性不变量，`dsh-llm/lib/types/index.d.ts:33-44`）
   ⇒ 暖前缀"重放已记录 payload"在 DSH 上**没有对应** ✗。
+
+### 会话事件桥：真实签名是 `(session, event)`（2026-10-17 修）
+
+★ 修前这里有个**静默真 bug**：`session/event` 的签名是 `(session, event)`（scoped），事件在**第二参**，
+而外观层按 `args[0].type` 过滤 ⇒ **所有走 `session-event` 的 pi 事件从未被触发**（多类事件、不报错）。
+现在：在参数里找带字符串 `type` 的那个；把日志事件的 `data` **摊平到顶层**
+（实测日志事件是 `{type,seq,time,data}`，pi 处理器习惯读 `event.turn`）；`type` 换成 **pi 的事件名**；
+原始 `data`/`seq`/`time` 保留。spike **A13** 用真实 `Session.append()` 验证（各触发 1 次、type 不串台）。
+
+✗ 仍有**字段名差异**（不是触发问题）：`turn/end` 的 data 只有 `{turn,reason}`（pi 读 `event.message`）、
+`message_update` 的 pi 字段是 `assistantMessageEvent` 而 DSH 是**有序帧** ⇒ 这类要字段翻译或改处理器，
+已在映射表逐条标注。

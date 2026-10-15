@@ -21,6 +21,8 @@
  *      `session_start` → `ctx.sessions.create()` 真的发出 `session/created`，处理器拿到**会话身份**
  *   A12 **动态上下文的落点**（`ctx.systemPrompt.context()`）：注册一段运行时上下文，
  *      在真实装配结果里可见（`assembly.contexts` + `joinContextSections(renderContextSections())`）
+ *   A13 **会话事件桥（session/event + type 过滤）真跑**：真实 `Session.append()` 发日志事件，
+ *      按 `event.type` 派发到对应的 pi 处理器，且**不同 type 不会串台**
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -374,6 +376,64 @@ async function main(): Promise<void> {
     a12 = { id: 'A12', ok: 'skip', detail: `提示词服务不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a12);
+
+  // ── A13：会话事件桥（session/event + type 过滤）─────────────────────────────
+  let a13: Check = { id: 'A13', ok: 'skip', detail: '会话服务不可用' };
+  try {
+    const sessionModule = (await import('@deepseek-ai/dsh-session')) as unknown as {
+      SessionStore?: unknown;
+      Session?: { create: (id: string) => { id: string; append: (type: string, data: unknown) => unknown } };
+    };
+    if (!sessionModule.SessionStore || !sessionModule.Session) throw new Error('dsh-session 未导出 SessionStore/Session');
+    const evCtx = new Context();
+    evCtx.plugin(SystemPrompt);
+    evCtx.plugin(ToolRuntime);
+    evCtx.plugin(sessionModule.SessionStore as never);
+    await tick();
+
+    const evFacade = createDshExtensionApi(evCtx as unknown as DshContext, { onUnsupported: () => undefined });
+    const turnStarts: number[] = [];
+    const turnEnds: number[] = [];
+    const turnOf = (event: unknown): number | undefined => {
+      const e = event as { turn?: unknown; data?: { turn?: unknown } } | undefined;
+      const t = e?.turn ?? e?.data?.turn;
+      return typeof t === 'number' ? t : undefined;
+    };
+    evFacade.api.on('turn_start' as never, ((event: unknown) => {
+      const turn = turnOf(event);
+      if (typeof turn === 'number') turnStarts.push(turn);
+      return undefined;
+    }) as never);
+    evFacade.api.on('turn_end' as never, ((event: unknown) => {
+      const turn = turnOf(event);
+      if (typeof turn === 'number') turnEnds.push(turn);
+      return undefined;
+    }) as never);
+
+    const store = (evCtx as unknown as {
+      sessions: { enter: (s: unknown) => () => void; announce: (s: unknown) => void };
+    }).sessions;
+    const session = sessionModule.Session.create('spike-events');
+    const detach = store.enter(session);
+    store.announce(session);
+    await tick(80);
+    // 真实日志事件：turn/start 与 turn/end 各一条（都是 log-only，不需要 SurfaceIntent）
+    session.append('turn/start', { turn: 7 });
+    session.append('turn/end', { turn: 7, reason: 'completed' });
+    await tick(120);
+    detach();
+
+    const ok = turnStarts.length === 1 && turnStarts[0] === 7 && turnEnds.length === 1 && turnEnds[0] === 7;
+    a13 = {
+      id: 'A13',
+      ok,
+      detail: `append(turn/start) ⇒ turn_start 处理器 ${turnStarts.length} 次（turn=${turnStarts[0] ?? 'n/a'}）；append(turn/end) ⇒ turn_end ${turnEnds.length} 次（turn=${turnEnds[0] ?? 'n/a'}）——两个 type 未串台`,
+    };
+    evFacade.dispose();
+  } catch (error) {
+    a13 = { id: 'A13', ok: 'skip', detail: `会话事件桥不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a13);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

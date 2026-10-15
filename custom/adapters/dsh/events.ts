@@ -114,6 +114,7 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     dsh: ['turn/end', 'agent/turn-stopping'],
     via: 'session-event',
     note: '3 处；需要"让回合继续"时 DSH 的 turn-stopping 比 pi 更强（可 steer）',
+    degradedNote: '负载字段名不同：DSH 日志事件是 `{type,seq,time,data}`（桥接层已把 `data` 摊平到顶层），但 `turn/end` 的 data 只有 `{turn,reason}`，**没有** pi 的 `message` ⇒ 读 `event.message` 的处理器会拿到 undefined，需要字段翻译或改处理器',
   },
   {
     pi: 'session_compact',
@@ -170,6 +171,8 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     tier: 'direct',
     dsh: ['agent/assistant-stream'],
     via: 'cordis',
+    status: 'degraded',
+    degradedNote: '负载字段名不同：pi 是 `{assistantMessageEvent:{type,delta}}`，DSH 的 agent/assistant-stream 是**有序帧**（`{type:start|chunk|...}`）⇒ 读 pi 字段的处理器会拿到 undefined，需要字段翻译或改处理器',
     note: '1 处；助手流式增量（DSH 是有序帧 + 结束帧）',
   },
   {
@@ -190,6 +193,8 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     pi: 'message_end',
     tier: 'direct',
     dsh: ['assistant/message'],
+    status: 'degraded',
+    degradedNote: '负载字段名不同：pi 读 `event.message`，DSH 的日志事件把内容放在 `data`（桥接层已摊平 `data`，但名字不一定叫 message）⇒ 需要按 DSH 字段名核对后再定',
     via: 'session-event',
     note: '1 处；"一条助手消息定稿"是日志类型，走 session/event；也可用 agent/assistant-stream 的结束帧',
   },
