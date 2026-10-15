@@ -31,6 +31,7 @@ dsh/
 bash scripts/dsh-build.sh            # 打包 + 产物冒烟（纯 node 加载 dist，断言 54 工具 / 0 失败）
 bash scripts/dsh-spike.sh            # 源码级 spike（A1–A11，真实 @deepseek-ai 包 + pi shim）
 bash scripts/dsh-smoke-profile.sh    # 真实 launcher 的 profile 组合干跑（隔离 DSH_HOME，--dump-config）
+bash scripts/dsh-package.sh          # **正式发布形态**：npm pack → 安装到独立目录 → 从 node_modules 加载
 bash scripts/dsh-baseline.sh --check # 工具声明面漂移守门（P6 第一块；漂移 ⇒ exit 1）
 ```
 
@@ -95,3 +96,17 @@ pi 的 `APPEND_SYSTEM.md` 在 DSH 上**没有等价约定** —— 它只有 `Sy
 - 迁移执行计划与进度：[`docs/design/DSH-MIGRATION-PLAN.md`](../docs/design/DSH-MIGRATION-PLAN.md)
 - 可行性评估（含 2026-10-10 spike 原始输出）：[`docs/design/BASE-SWITCH-DSH.md`](../docs/design/BASE-SWITCH-DSH.md)
 - 钩子逐类映射（18→19 条）：[`docs/design/DSH-HOOK-MAPPING.md`](../docs/design/DSH-HOOK-MAPPING.md)
+
+## 正式发布形态：打包 → 安装 → 从 node_modules 加载（已验通）
+
+`bash scripts/dsh-package.sh` 做四件事（每步都有自检）：
+
+1. 构建产物（`dist/my-pi-plugin.mjs`）→ `npm pack` 出 tgz；
+   **tgz 自检**：必须含 `dist/` 产物、不得夹带源码/测试（`files` 白名单）；
+2. `npm install <tgz>` 到 `/tmp/my-pi-plugin-install`（依赖一并装好）；
+3. **部署侧别名**：`node_modules/@earendil-works/{pi-tui,pi-coding-agent}` → 本仓 `pi-shims/*`
+   ★ **这一步是真实部署必须做的**（等价于 profile 的 pnpm overrides）。缺它会在**加载期**报
+   `ERR_MODULE_NOT_FOUND: Cannot find package '@earendil-works/pi-tui'` —— 本脚本首次运行时就撞上了这条；
+4. 纯 node 从**已安装位置**加载并 apply ⇒ 实测 **54 个工具 / 0 个特性失败 / `getAllTools()` 一致** ✓。
+
+✗ profile 级 overrides 的写法（`pnpm.overrides` 指向 shim 包）尚未在真实 profile 里跑过（Host 级）。
