@@ -3990,3 +3990,26 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   内容含三层身份判定、宿主↔容器互通命令表、zt 桥与 ZT 内置智能体 vs my-pi 分工、包管理/换源、保活（signal 9 按 Android 版本处置）、定时任务、平板交互与互传、
   proot 实测坑、容器里跑 Node/Python/AI、安全边界、未核实清单 + 经验沉淀段；已登记 packs/INDEX.md 与 packs/README.md。
 - 未核实（✗）：ZT 许可细节、本机安装版本号、zt↔19951 协议、ZT 内置工具语义未实测、termux-change-repo 各镜像、X11/VNC、phantom killer adb 命令未在本平板实测。
+
+### packs 全量整理：补回 1 个被静默吞掉的上游文件 + 结构约定升格为守门（2026-10-15）
+
+- 用户："查看 packs 目录，做一下整理和优化"。先做全量只读体检（体积/追踪面/147 个 SKILL.md 的 frontmatter/许可/空目录/跨包重复/索引登记/引用可达性），
+  再按"沉默出错优先"处理，共 4 类问题。
+- **① 静默丢失（最严重）**：`git ls-files packs/reverse-skill`（599）与上游 `cab634bd` 快照集合做差 ⇒ 上游有、本仓没有 **2 个已跟踪文件**，
+  两者 `git add -A` 时都静默跳过、`git status` 看不见（上一轮"599/599 一致"比的是**解包所得**、不是**入库所得** ✗✓）：
+  - `docs/plans/2026-09-21-pwntools-kali-discovery.md` 被**父仓根** `.gitignore:34 plans/` 吞（通用规则会递归进 vendored 目录）⇒ **`git add -f` 补回**（本包该有的设计文档）。
+  - `reports/2026-05-26_new-hahacc-ctf-pentest-report.md` 被**包自带** `.gitignore:70 reports/` 吞 ⇒ ★ **有意不发布**：它是针对**真实第三方域名**（`new.hahacc.com`）的渗透报告、含可复现 PoC，
+    而上游那条规则的注释正是"报告（防未脱敏泄漏）"，本仓又是公开仓库、约定里"数据默认不出本机"⇒ **冲突取更严的一方**：文件从工作区删除、不 `git add -f`（要看得从上游 tarball 取，仅本地）。
+  - 最终追踪数 **600** = 上游 599 − 1（有意排除） + 本侧 2（`EXPERIENCE.md` / `rea.md`）；R5 守门会拦住将来同步又把 `reports/` 解包出来的情况。
+- **② 计数失真**：`packs/README.md` 写"经验沉淀已落地 13 个"，实测 **17 个**（pdf-toolkit 补齐 + termux 新增 + 本轮 books/skill-integration 补齐 2 个）⇒ 已改并写进守门。
+- **③ 缺段补齐**：`packs/books/`、`packs/skill-integration/` 补"使用后经验沉淀"段（后者顺带写死"vendored 整树必须核对文件数"的纪律）。
+- **④ 新增守门 `scripts/check-packs-structure.mjs`（R1–R7）** 接进 `check-conventions.sh` **H 段**（不动 golden 步数）：包根须有 SKILL.md（或在细节层/vendored 入口别名白名单）、
+  每个 SKILL.md 的 frontmatter 须有 name+description 且 description 不带日期、包根须有沉淀段或 EXPERIENCE.md、包名须登记进 INDEX+README、
+  **packs 下不得有未跟踪或"未跟踪且被忽略"的文件**（兜住 ① 那一类）、`drafts/` 命名口径、README 计数须等于实测（兜住 ②）。
+  证据：守门全绿（17 包 / 147 个 SKILL.md / 沉淀落点 17 / 无未跟踪）；**4 条反证探针**各自失败并点名（R5 往 reports/ 放文件、R7 改错计数、R2 删 description、R3 改掉 books 段标题），
+  复原后三份文件 sha256 与探针前**逐字节相同** ✓。
+- **⑤ 顺带修掉的计数漂移（同一类问题，非 packs 目录）**：`scripts/README.md` 的 golden 行漏了第 21 步会话切换场景且写"`--smoke`＝第 21 步"（实际 22）；
+  `docs/design/VISION.md` 还写"20 步"；`docs/FAQ.md` 同上；`docs/operations/PI-1.2-SWITCH.md` 只提示 19/20 步默认跳过 ⇒ 四处已按实测（21 步 / 第 22 步冒烟 / 19-21 默认跳过、其中 19/20 才是留出集）改正。
+- 体检结论（无问题项，如实记）：147 个 SKILL.md 的 frontmatter 全部合规（`name`/`description` 齐、description 无日期）；无空目录；跨包无重复文件；INDEX/README 双向登记齐全；
+  pack 内引用的 `scripts/*.py` 都是包内相对路径且确实存在；许可声明齐全（cangjie-skill/reverse-skill 带 LICENSE 文件，其余在正文声明来源与许可）。
+- 边界：只读体检 + 文件比对与文档改动，**未执行 reverse-skill 任何脚本**（其 `AGENTS.md` 明示"读≠授权执行"）；未碰 `vendor/**`、`patches/**`、`custom/**`；未提交他人改动（`portable/agent/settings.json`）。

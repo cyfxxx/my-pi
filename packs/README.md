@@ -39,7 +39,7 @@ packs/
 4. **跨包复用**：有跨包通用价值的工具坑（网络通道、依赖安装、API 变化）同时 `memory_store`（带环境标签）
 5. **技能缺陷**：流程本身暴露的问题（命令失效/字段过时/章节不合理）直接改 SKILL.md 对应章节，不只写经验文件
 
-各包 SKILL.md 末尾应有"使用后经验沉淀"引导段（**已落地 13 个**：10 个包根 SKILL.md + `media-toolkit` 三个子技能；`gamedev` 是范本之一；`pdf-toolkit` 已于 2026-10-15 补齐）；存量包下次使用时先补段再执行。
+各包 SKILL.md 末尾应有"使用后经验沉淀"引导段（**已落地 17 个**：14 个包根 SKILL.md + `media-toolkit` 三个子技能；`gamedev` 是范本之一；`pdf-toolkit` 于 2026-10-15 补齐，`books`/`skill-integration` 同日补齐；`reverse-skill` 无包根 SKILL.md，以包根 `EXPERIENCE.md` 代段；`net-mirror`/`security-baseline` 是细节层，无 SKILL.md 故不适用）。**该计数由 `scripts/check-packs-structure.mjs` 守门**（改这段时同步改计数，否则守门会点名）。
 
 ## 更新与整合原则（整合优先，禁止直接覆盖）
 
@@ -52,6 +52,7 @@ packs/
 2. **整合相似技能**：新技能与已有包/技能重叠 → 合并进现有包（例：colab-cli 并入 colab-bridge），双方经验条目都保留并去重；不另立新包
 3. **收编外部技能**：优先提炼通用能力 + 专用能力分类 + 繁重能力记录（见 pdf-toolkit 三层结构），不整树复制；来源与授权记录在包 README
 4. 更新后立即把本次整合经验追加到 EXPERIENCE.md（本条也适用）
+5. **vendored 整树（如 reverse-skill）入库后必须与上游做文件集比对**：`git add`/`git add -A` 会被 `.gitignore` **静默跳过**上游**已跟踪**的文件——会咬人的有两层规则：本仓根级通用规则（如 `plans/`）与 vendored 包自带的 `.gitignore`（如 `reports/`）。实例：2026-10-15 同步上游 `cab634bd` 时 `docs/plans/2026-09-21-*.md`（本仓根规则误伤）与 `reports/2026-05-26_*.md`（包自带规则）就这样既没入库也没报错，靠逐文件比对才发现。纪律：`git ls-files <包>` 与上游快照的差集里**每一项都要有书面理由**——① 「本仓该有」的用 `git add -f` 补回；② **上游 `.gitignore` 声明"不入库"的内容（如 `reports/` 的报告：防未脱敏泄漏）本仓同样不发布**，冲突时取更严的一方，解包后删除、**不要** `git add -f`。`scripts/check-packs-structure.mjs` 的 R5 会在 packs 下出现"未跟踪且被忽略"的文件时失败，兜住这一类（含将来同步又把它解包出来的情况）
 
 ### 外部技能引入完整流程（2026-08-27 吸收 drafts/external-skill-pack-integration + skill-pack-adoption）
 
@@ -87,7 +88,7 @@ packs/
 | `colab-bridge/` | Colab（免费 GPU）远程执行：自研桥 `bin/colab_exec`（备胎）+ 官方 google-colab-cli 方案（首选，`references/colab-cli.md`） |
 | `gamedev/` | 游戏开发技能组（skills/{design,godot,web,workflow}） |
 | `reverse-skill/` | 逆向/CTF 技能包（含 burp-mcp 等） |
-| `dg-piagent/` | pi-agent SDK 开发助手（教程同步维护，API 基线 v0.83.0，含 sdk_doc/场景 references） |
+| `dg-piagent/` | pi-agent SDK 开发助手（教程同步维护，**API 基线 v0.83.0**；本机 vendored pi 已是 **1.2.0**（`vendor/PINNED_COMMIT`=`6374c2baf…`）⇒ 基线落后两个大版本，`sdk_doc/` 与场景 references **待按 1.2 复核** ✗，涉及本机 SDK 时以 `vendor/pi/packages/*/dist/**/*.d.ts` 实测为准） |
 | `novel-writing/` | 长篇网文工程化写作系统：六大协议（大纲/规划目录/草案/正文/体检/存档）+ 一致性/叙事/输出条例 + 文风溯源/去AI指纹 + 50章分批/事实锁/状态回证/伏笔追踪/双重审查。整合 tianming-skill 等 3 个开源仓库并优化（CC BY-NC-SA 4.0，来源见 SKILL.md「来源与许可」） |
 | `embedded-dev/` | 嵌入式/MCU 开发 AI 技能入口：构建/烧录/调试/串口/协议领域路由 + 开源工具链命令速查 + 执行闭环（证据驱动）。整合 embeddedskills(MIT) 与 embed-ai-tool(无LICENSE仅引用) 的通用能力；专用工具（llm-pid-tuner/garycli/on-MCU agent 等）记录在 references/specialized-tools.md |
 | `pcb-design/` | PCB/硬件设计 AI 技能入口：KiCad 工具链路由 + 设计审查契约（最小清单/证据分级）+ ERC/DRC/Gerber/SPICE/EMC 命令速查。提炼 kicad-happy(MIT)/skidl-skills(MIT)/hardware-agency-agents(MIT)；MCP server 与 ML 布局记录在 references/specialized-tools.md |

@@ -306,6 +306,21 @@ else
   bad "缺少 scripts/check-packs-links.mjs（packs 链接守门）"
 fi
 
+# ── H. packs 结构（README 里已成文的约定 ⇒ 变成断言；见脚本文件头"为什么需要它"）──
+# 起因（2026-10-15 全量体检）：① README 的经验沉淀计数写着 13、实测 17（数字会被人当基线照抄）；
+# ② reverse-skill 同步上游时，git add 被 .gitignore 静默吞掉两个**上游已跟踪**的文件（不报错、git status 也看不见）。
+# 两次都属"沉默出错"，所以 R1–R7 里既有结构断言，也有"packs 下不得有未跟踪文件"这条兜底。
+if [ -f scripts/check-packs-structure.mjs ]; then
+  if packs_s_out=$("$NODE_BIN" scripts/check-packs-structure.mjs 2>&1); then
+    ok "${packs_s_out#✓ }"
+  else
+    bad "packs 结构不符约定（跑 node scripts/check-packs-structure.mjs 看明细）"
+    printf '%s\n' "$packs_s_out" | head -10 | sed 's/^/      /'
+  fi
+else
+  bad "缺少 scripts/check-packs-structure.mjs（packs 结构守门）"
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "🎉 约定守门全部通过"

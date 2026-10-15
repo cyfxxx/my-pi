@@ -6059,3 +6059,27 @@ xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效�
   `termux-change-repo` 各镜像可用性；X11/VNC 实际效果；phantom killer 的 adb 命令（公开文档，未在本平板实测）。
 
 **边界**：本轮未碰 `vendor/**`、`patches/**`（只删了 `patches-next/**` 这个已冗余的暂存目录）、`custom/**`；未提交他人改动（`portable/agent/settings.json` 仍留在工作区）。
+
+### [2026-10-15] packs 结构约定升格为守门（R1–R7）；被吞的上游文件按"本仓该有 / 上游声明不发布"分流处置
+
+**起因（两类"沉默出错"，都无任何信号）**：① `packs/README.md` 写"经验沉淀已落地 13 个"，实测 **17 个**；② 把 `git ls-files packs/reverse-skill`
+与上游 `cab634bd` 快照做集合差，发现上游**已跟踪**的 `reports/2026-05-26_*.md`、`docs/plans/2026-09-21-*.md` 在本仓**根本没入库**——
+`git add` 被本包自带 `.gitignore`（`reports/`）与**父仓根**通用规则（`plans/`）先后跳过，既不报错也不出现在 `git status` 里。
+
+**决策 1：新建 `scripts/check-packs-structure.mjs`（R1–R7）并接进 `check-conventions.sh` H 段**（不动 golden 步数）。规则 = 包根须有 SKILL.md（或在
+`DETAIL_LAYERS` 细节层 / `ROOT_ENTRY_ALIAS` vendored 入口白名单里）、每个 SKILL.md 的 frontmatter 须有 `name`+`description` 且 description 不带日期、
+包根须有"使用后经验沉淀"段或 `EXPERIENCE.md`、包名须登记进 `INDEX.md`+`README.md`、**packs 下不得有未跟踪或"未跟踪且被忽略"的文件**、
+`drafts/` 命名口径、README 计数须等于实测。**理由**：这些约定早已成文却无人执行，成文的数字会被人当基线照抄，静默丢失则完全不可见。
+
+**决策 2：被吞的文件分两类处置，不改 vendored 包自带的 `.gitignore`，也不把根级通用规则改成锚定式**。
+- `docs/plans/2026-09-21-*.md`：被**父仓根** `plans/` 规则误伤，是**本包该有**的设计文档 ⇒ **`git add -f` 补回**。
+- `reports/2026-05-26_*.md`：上游虽跟踪，但上游那条规则的注释明写"报告（**防未脱敏泄漏**）"，且该报告是**针对真实第三方域名、含可复现 PoC 的渗透报告**；
+  本仓是公开仓库、约定里"数据默认不出本机" ⇒ **冲突取更严的一方：本仓不发布**，文件从工作区删除、不 `git add -f`（需要时从上游 tarball 取，仅本地看）。
+- 不改编 vendored `.gitignore` 与根级规则的理由：上游文件改了会污染快照、下次同步又多一处三方合并；把根级 `plans/` 改成 `/plans/` 会连带暴露其它目录的运行时产物，风险大于收益。
+- 要钉的不变量改为"**差集里每一项都要有书面理由**（补回 / 有意排除）"，用 `git add -f` + R5 守门表达，且每条都能复跑核验
+  （`git ls-files packs/reverse-skill | wc -l` = **600** = 上游 599 − 1 有意排除 + 本侧 2；`git ls-files --others --ignored --exclude-standard packs` 为空）。
+
+**证据**：守门绿（17 包 / 147 个 SKILL.md / 沉淀落点 17 / 无未跟踪）；**4 条反证探针**分别让 R5/R7/R2/R3 失败并点名，复原后三份被探针改动过的文件 sha256 与探针前一致 ✓；
+`check-conventions` 全绿（含新 H 段、脚本数 66、golden 步数 21）、`check-doc-links` 171 md 一致。
+
+**边界**：全部为只读体检 + 文档/守门改动；**未执行 reverse-skill 的任何脚本**（其 `AGENTS.md`：读 ≠ 授权执行）；未碰 `vendor/**`、`patches/**`、`custom/**`。

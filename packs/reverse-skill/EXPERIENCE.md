@@ -45,3 +45,27 @@
     benchmark 覆盖每条路由 / expect 全部存在 / INDEX 存在 / RULES(.md,_zh) 含 case-init+scope+auth 硬门 / master-route.ps1 无硬编码路由表 ⇒ **全过** ✓
 - **未跑（✗ 如实）**：`verify-routing-coherence.ps1`、`test-routing.ps1`、`smoke.ps1`、`extract-summaries.ps1`（本机无 pwsh）；
   `INDEX.md` 未用生成器重跑（直接取上游版本；模块数=45 与上游 README 一致 ✓）。
+
+## 2026-10-15 补记：入库时被 `.gitignore` **静默吞掉**的上游文件（1 个补回 / 1 个有意排除）
+
+- 环境: 与上一条同机（proot-ubuntu aarch64）；**本次未执行本包任何脚本**（只做文件比对与 `git add`）
+- 场景/经验:
+  - 全量体检时把本仓 `git ls-files packs/reverse-skill` 与上游快照（`cab634bd` 的 codeload 解包目录）**做集合差**，
+    发现上游有、本仓没有的文件 **2 个**，两者在上游都**已跟踪**（能从 GitHub tarball 解出来即为证），
+    却在本仓 `git add -A` 时被**静默跳过**：`docs/plans/2026-09-21-pwntools-kali-discovery.md`（11,741 B）命中
+    **父仓根 `.gitignore:34 plans/`**（通用规则会递归进 vendored 目录）；`reports/2026-05-26_new-hahacc-ctf-pentest-report.md`（3,656 B）
+    命中**本包自带的 `.gitignore:70 reports/`**。
+  - **后果形态**：不报错、`git status` 也看不见（"未跟踪且被忽略"）⇒ 只有"逐文件比对上游"这种主动手段能发现。
+    这也是上一节"599/599 一致"与本节看似矛盾的原因：那次比对的是**解包所得**，不是**入库所得** ✗✓。
+  - **处置（两者不同，别一刀切）**：
+    - `docs/plans/…` ⇒ **`git add -f` 补回**（它是与 pwntools 发现流程相关的设计文档，本包该有；被吞纯粹是父仓通用规则的误伤）。
+    - `reports/…` ⇒ **有意不发布**：它是**针对真实第三方域名 `new.hahacc.com` 的渗透报告（含可复现 PoC）**，而上游 `.gitignore`
+      自己的注释就是"报告（防未脱敏泄漏）"；本仓是公开仓库，且本仓约定里"数据默认不出本机"。**冲突时取更严的一方** ⇒
+      该文件从工作区删除、**不** `git add -f`（需要时从上游 tarball 重新取，仅本地查看）。
+    - 最终追踪数 **600** = 上游 599 − 1（有意排除 `reports/`） + 本侧 2（`EXPERIENCE.md`、`skills/reverse-engineering/references/rea.md`）。
+      包入口在 `skills/SKILL.md`（`packs/INDEX.md` 已注明；结构守门 `scripts/check-packs-structure.mjs` 的 `ROOT_ENTRY_ALIAS` 也钉住了这条）。
+  - 纪律（已写进 `packs/README.md` 更新与整合原则第 5 条）：**每次 vendored 同步后必须比对文件集**，差集里每一项都要有书面理由
+    （补回 / 有意排除），不能"没报错就算同步完了"；`scripts/check-packs-structure.mjs` 的 R5 会在 packs 下出现
+    "未跟踪且被忽略"的文件时直接让守门失败（把这一类从"沉默"变成"响铃"，包括将来同步又把 `reports/` 解包出来的情况）。
+  - 可复跑的自查命令：`git ls-files packs/reverse-skill | wc -l`（应 =600）；`git ls-files --others --ignored --exclude-standard packs`（应为空）；
+    重新解包上游后 `git status --ignored` 若再次出现 `reports/`，按上文删除即可（**不要** `git add -f`）。

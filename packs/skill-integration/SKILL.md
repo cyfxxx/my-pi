@@ -56,3 +56,12 @@ description: 外部技能包（GitHub zip 等）引入与整合进仓库内 pack
 
 - 更新 `packs/README.md` 索引与技能 frontmatter（name/description，不带时间戳，1-2 句）。
 - 记录整合说明：来源、纳入/未纳入项及原因；有长期价值的结论 memory_store 入库。
+
+## 八、使用后经验沉淀
+
+任务结束后按 [packs/README.md](../README.md) 的"经验沉淀机制"收尾：把本次选源/许可核对/安全审查/验收冒烟/三层归置暴露的偏差
+（许可冲突、脚本危险操作、命令面漂移、上游覆盖风险、整合后索引漏登记）追加到包根 `EXPERIENCE.md`
+（格式：`## YYYY-MM-DD <模式> / - 环境: … / - 场景·经验: …`，**环境必须标注**）；
+同一模式的坑累计 ≥3 条时合并进上文对应条目，通用工具坑（网络通道、依赖安装、API 变化）同时 `memory_store`（带环境标签）。
+**这条对"外部仓库整树 vendored"尤其重要**：`git add` 会被 `.gitignore`（本仓根级通用规则 + vendored 包自带的 `.gitignore`）静默吞掉
+上游**已跟踪**的文件——收尾必须核对文件数并在提交后 `git status --ignored` 复查（实例见 `packs/reverse-skill/EXPERIENCE.md`）。

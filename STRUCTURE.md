@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 65 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
+├── scripts/             # 66 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -99,7 +99,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 
 ### `scripts/`
 （另有 `docs/CHANGES.jsonl` 改动台账：由 pre-push 追加、由约定守门校验格式）
-共 65 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 66 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
@@ -111,6 +111,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `check-features.sh`：功能完整性（12 功能目录 + 生成式注册面基线 + 适配器 API + 钩子事件 + 配置/脚本/补丁）
 - `gen-registrations.mjs`：从代码生成/校验注册面基线（`registration-baseline.json`；`--update` 刷新）——替代原先手写清单，防漂移
 - `check-packs-links.mjs`：**packs 内部 Markdown 相对链接守门**（既有 `check-doc-links.mjs` 有意排除 `packs/`；本脚本按 vendored 布局判定，口径与上游 `verify-doc-links.py` 一致：只查相对链接、跳过围栏代码、命中集合 = git 跟踪文件∪目录；反证探针：注入一条断链 ⇒ exit 1 并点名 `md:行 -> 目标`）
+- `check-packs-structure.mjs`：**packs 结构守门**（2026-10-15 新增，七条规则 R1–R7：包根须有 SKILL.md 或登记为细节层/vendored 入口别名、每个 SKILL.md 的 frontmatter 须有 name+description 且 description 不带日期、包根须有"使用后经验沉淀"段或 EXPERIENCE.md、包名须登记进 `packs/INDEX.md`+`README.md`、**packs 下不得有未跟踪/未跟踪且被忽略的文件**（兜住"git add 被 .gitignore 静默吞掉上游已跟踪文件"这类静默丢失）、`drafts/` 命名口径、README 里"已落地 N 个"计数须等于实测）。起因：同年全量体检抓到 README 计数 13 vs 实测 17，以及 reverse-skill 同步时静默丢了 `reports/…` 与 `docs/plans/…` 两个上游已跟踪文件）
 - `check-dead-exports.mjs`：死导出守门（抓"写了没接线"，如曾经的 `pruneThinkingBudget`），白名单见 `dead-exports-allowlist.txt`
 - `check-patches-behavior.mjs`：补丁"行为存在性"守门（断言补丁关键符号/自标记仍在 vendor 源码，防上游同步语义漂移）
 - `check-upstream.sh`：上游同步前体检（只读）——目标版本/区间提交数/各包 churn/新增包、changelog 新增版本段与破坏性关键词、每个补丁的目标文件是否被上游改过、adapters 依赖的 API 面是否变动；结论=已最新/可同步/需先改补丁（`PI_CHECK_NO_FETCH=1` 离线）；同步流程与「不想要的变更怎么办」见 [docs/operations/UPSTREAM-UPDATE.md](docs/operations/UPSTREAM-UPDATE.md)

@@ -77,10 +77,11 @@ bash scripts/sync-upstream.sh
 node_modules/.bin/tsc --noEmit -p custom/
 node_modules/.bin/vitest run
 bash scripts/golden-tasks.sh --fast
-PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh     # ★ 两个 pty 场景必须显式开启
+PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh     # ★ 三个 pty 场景必须显式开启
 ```
-★ **注意**：第 19/20 步（模式切换 / 两实例隔离）**默认跳过** ✗，不加 `PI_GOLDEN_SCENARIO=1` **也不会跑**；
-本项目日志还提示它们是**"留出集：开发期间不应查看结果，只在验收时跑"** ⇒ **跑完后其盲测新鲜度会被消耗**，请知悉后再决定是否查看。
+★ **注意**：第 19/20/21 步（模式切换 / 两实例隔离 / 会话切换）**默认跳过** ✗，不加 `PI_GOLDEN_SCENARIO=1` **也不会跑**；
+本项目日志还提示第 19/20 步是**"留出集：开发期间不应查看结果，只在验收时跑"** ⇒ **跑完后其盲测新鲜度会被消耗**，请知悉后再决定是否查看
+（第 21 步是 2026-10-14 那次会话切换改动的开发期检查，不属于留出集）。
 
 ## 8. 回滚（已验证路径 ✓）
 
