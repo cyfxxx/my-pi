@@ -67,7 +67,7 @@ spike 的 11 条检查（A1–A11）覆盖：真实服务启动、工具注册�
 **pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）。
 实测结果：**11 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
-**10 直接 / 8 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
+**9 直接 / 9 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
 
 ### pi 包别名（A9 的前提，也是 P5 的机制验证）
@@ -156,3 +156,17 @@ DSH 的 `agent/status` 在 `running` 与 `idle` **两个方向**都发，而 pi 
 因此 `session_start` / `session_shutdown` 的**首选落点改为会话级**
 （`session/created` / `session/disposed`；agent 级与 `workspace/session-stop` 作为各自时机的补充），
 并由 spike **A11** 在真实服务上验证：两个处理器各触发 1 次、都拿到会话身份 ✓。
+
+### `input`：handled ⇒ reject；transform 暂不实现（2026-10-17）
+
+pi 的 `input` 处理器返回 `{action:'continue'|'transform'|'handled'}`，DSH 的 `agent/pre-step`
+是 waterfall、判定为 `{kind:'reject'} | {kind:'enter', messages}`。当前实现：
+
+| pi | DSH | 状态 |
+|---|---|---|
+| `{action:'handled'}` | `{kind:'reject'}` | ✓ 已实现（**并上报**"reject 后消息是否回到收件箱未核实"）|
+| `{action:'continue'}` / `undefined` | `next()`（不干预）| ✓ |
+| `{action:'transform'}` | — | ✗ **不实现**：要替换 `UserMessage` 的**不可变 content** 并保持稳定 `id`，需真 agent 验证不变量 ⇒ 按不干预处理并**显式上报**（不静默改行为）|
+
+另：DSH 的 pre-step 负载**没有** `streamingBehavior`（steer/followUp）⇒ 该字段置空并上报；
+`inputTextFromPayload` 取最后一条含文本块的 user 消息文本供处理器读 `event.text`。

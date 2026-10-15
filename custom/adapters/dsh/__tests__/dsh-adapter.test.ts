@@ -12,7 +12,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PI_TO_DSH_EVENTS, assertEventsMapped, mappingSummary, resolveDshEvent } from '../events';
 import { createDshExtensionApi } from '../facade';
-import { dedupeByTurn, deriveSessionInfo, idleOnly, makeDshListener, mapToolCallDecision, mapToolResultDecision, withSessionContext } from '../hooks';
+import {
+  dedupeByTurn,
+  deriveSessionInfo,
+  idleOnly,
+  inputTextFromPayload,
+  makeDshListener,
+  mapToolCallDecision,
+  mapToolResultDecision,
+  withSessionContext,
+} from '../hooks';
 import { toDshToolPayload } from '../tool';
 import type { DshCommandDefinition, DshContext, DshDefineToolOptions, DshEventListener } from '../types';
 
@@ -462,6 +471,75 @@ describe('每步 → 每回合一次（before_agent_start 的语义适配）', (
     const entry = facade.surfaceReport().find((e) => e.member === 'on(before_agent_start)');
     expect(entry?.status).toBe('degraded');
     expect(entry?.detail).toContain('每步');
+  });
+});
+
+describe('input：pi 的 decision → agent/pre-step 的 PreStepDecision', () => {
+  const payloadWithText = (text: string) => ({
+    messages: [
+      { role: 'user', content: [{ type: 'text', text: '早期消息' }] },
+      { role: 'user', content: [{ type: 'text', text }, { type: 'text', text: '（附图）' }] },
+    ],
+  });
+
+  it('inputTextFromPayload：取**最后一条**含文本块的 user 消息（多块换行拼接）', () => {
+    expect(inputTextFromPayload(payloadWithText('你好'))).toBe('你好\n（附图）');
+    expect(inputTextFromPayload({ messages: [] })).toBe('');
+    expect(inputTextFromPayload({})).toBe('');
+    expect(inputTextFromPayload(undefined)).toBe('');
+  });
+
+  it('{action:"handled"} ⇒ {kind:"reject"}，且不调 next()（并上报 reject 语义未核实）', async () => {
+    const reports: string[] = [];
+    const next = vi.fn().mockResolvedValue(undefined);
+    const handler = vi.fn(() => ({ action: 'handled' }));
+    const listener = makeDshListener('input', handler, { report: (m) => reports.push(m) });
+    const out = await listener(payloadWithText('命令'), next);
+    expect(out).toEqual({ kind: 'reject' });
+    expect(next).not.toHaveBeenCalled();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(reports).toContain('hook.input.handled');
+  });
+
+  it('undefined / {action:"continue"} ⇒ 调 next()（不干预）', async () => {
+    const next = vi.fn().mockResolvedValue(undefined);
+    const listener = makeDshListener('input', () => undefined, { report: () => undefined });
+    await listener(payloadWithText('普通输入'), next);
+    expect(next).toHaveBeenCalledTimes(1);
+    const next2 = vi.fn().mockResolvedValue(undefined);
+    const listener2 = makeDshListener('input', () => ({ action: 'continue' }), { report: () => undefined });
+    await listener2(payloadWithText('x'), next2);
+    expect(next2).toHaveBeenCalledTimes(1);
+  });
+
+  it('{action:"transform"} 暂不实现 ⇒ **按不干预处理**并显式上报（不静默改行为）', async () => {
+    const reports: string[] = [];
+    const next = vi.fn().mockResolvedValue(undefined);
+    const listener = makeDshListener('input', () => ({ action: 'transform', text: '改写后' }), {
+      report: (m) => reports.push(m),
+    });
+    await listener(payloadWithText('原样'), next);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(reports).toContain('hook.input.transform');
+  });
+
+  it('处理器能从事件里读到文本；streamingBehavior 缺失会被上报', async () => {
+    const reports: string[] = [];
+    let seenText: string | undefined;
+    let seenBehavior: string | undefined;
+    const listener = makeDshListener(
+      'input',
+      (event) => {
+        const e = event as { text?: string; streamingBehavior?: string };
+        seenText = e.text;
+        seenBehavior = e.streamingBehavior;
+      },
+      { report: (m) => reports.push(m) },
+    );
+    await listener(payloadWithText('读我'), vi.fn().mockResolvedValue(undefined));
+    expect(seenText).toBe('读我\n（附图）');
+    expect(seenBehavior).toBeUndefined();
+    expect(reports).toContain('hook.input.streamingBehavior');
   });
 });
 

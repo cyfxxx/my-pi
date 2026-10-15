@@ -270,6 +270,39 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
       return next ? next() : undefined;
     }
 
+    if (piEvent === 'input') {
+      // pi 的 input 处理器返回 {action:'continue'|'transform'|'handled'}；
+      // DSH 的 agent/pre-step 是 waterfall，判定是 {kind:'reject'} | {kind:'enter',messages}
+      const text = inputTextFromPayload(first);
+      const event = { type: 'input', text, source: 'user' } as {
+        type: string;
+        text: string;
+        source: string;
+        streamingBehavior?: string;
+      };
+      // DSH 的 pre-step 负载里没有"steer / followUp"这一维 ⇒ 置空并**上报**（否则 pi 处理器会以为不是 steer）
+      report('hook.input.streamingBehavior', 'DSH 的 agent/pre-step 负载不含 streamingBehavior（steer/followUp）⇒ 该字段为空，依赖它的处理器会走非 steer 分支');
+      const decision = (await handler(event, piContext)) as { action?: unknown } | undefined;
+      const action = decision?.action;
+      if (action === 'handled') {
+        // pi：输入已被处理，不要送给模型 ⇒ DSH：否决这一步
+        // ✗ 语义差异（未核实）：DSH 的 reject 之后消息是否回到收件箱未知；若否，行为是"输入被吞掉"而非"被处理"
+        report('hook.input.handled', 'pi 的 handled ⇒ DSH 的 {kind:"reject"}（已实现）；但 reject 后消息是否回到收件箱**未核实**（需真 agent）');
+        return { kind: 'reject' };
+      }
+      if (action === 'transform') {
+        report(
+          'hook.input.transform',
+          'pi 的 transform 要替换进入 step 的消息内容（DSH 的 UserMessage 有稳定 id 与不可变 content）⇒ 需真 agent 上下文验证后再实现；本次按不干预处理',
+        );
+        return next ? next() : undefined;
+      }
+      if (action !== undefined && action !== 'continue') {
+        report(`hook.${piEvent}.decision`, `未知 action=${String(action)} ⇒ 按不干预处理`);
+      }
+      return next ? next() : undefined;
+    }
+
     // 其余事件：先按观察者语义调用处理器，然后**必须**按 waterfall/emit 语义收尾
     const decision = await handler(first, piContext);
     if (decision !== undefined && decision !== null) {
@@ -303,6 +336,29 @@ export function withSessionContext(base: unknown, payload: unknown): unknown {
       ...(info.cwd ? { getSessionCwd: (): string | undefined => info.cwd } : {}),
     },
   };
+}
+
+/**
+ * 从 `agent/pre-step` 的负载里取"这次要进入模型的用户文本"。
+ *
+ * pi 的 `input` 处理器读 `event.text`；DSH 的对应负载是 `{messages: UserMessage[]}`
+ * （消息刚从收件箱里取出来）⇒ 取**最后一条**含文本块的 user 消息的文本（多块用换行拼接）。
+ * 取不到就返回空串（不编造）。
+ */
+export function inputTextFromPayload(payload: unknown): string {
+  const messages = (typeof payload === 'object' && payload !== null ? (payload as { messages?: unknown }).messages : undefined);
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const content = (typeof messages[i] === 'object' && messages[i] !== null ? (messages[i] as { content?: unknown }).content : undefined);
+    if (!Array.isArray(content)) continue;
+    const texts: string[] = [];
+    for (const block of content) {
+      const b = typeof block === 'object' && block !== null ? (block as { type?: unknown; text?: unknown }) : undefined;
+      if (b?.type === 'text' && typeof b.text === 'string') texts.push(b.text);
+    }
+    if (texts.length > 0) return texts.join('\n');
+  }
+  return '';
 }
 
 /** 映射表的落点类型（供 facade 判断是否需要包 session/event 信封） */

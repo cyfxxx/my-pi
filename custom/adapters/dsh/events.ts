@@ -90,6 +90,8 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     tier: 'semantic',
     dsh: ['agent/pre-step', 'agent/inbox/inserted'],
     via: 'cordis',
+    status: 'degraded',
+    degradedNote: '已实现：pi 的 {action:"handled"} ⇒ DSH {kind:"reject"}（并上报"reject 后消息是否回收件箱未核实"）；{action:"continue"}/undefined ⇒ next()。未实现：{action:"transform"} 需要替换 UserMessage 的不可变 content（且有稳定 id）⇒ 按不干预处理并上报（不静默改行为）。另外 DSH 的 pre-step 负载没有 streamingBehavior（steer/followUp）⇒ 该字段为空并上报',
     note: '4 处；改写对象从"用户输入"变成"进入 step 的消息数组"（`PreStepDecision`：`{kind:reject}` 或 `{kind:enter,messages}` ⇒ **整组替换**；`agent/inbox/inserted` 只能观察）。契约出处 `dsh-agent/lib/types/runtime-types.d.ts:92-99`；✗ 运行时未验（需 agent+LLM）',
   },
   {
