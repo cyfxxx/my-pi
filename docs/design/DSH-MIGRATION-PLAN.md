@@ -150,7 +150,11 @@ pi 侧的 11 个补丁是"底座替换"的账；换到 DSH 后**没有"能不能
 1. `@deepseek-ai/dsh-commands` 的命令契约**未读** ⇒ `registerCommand`（14 处）能否干净映射待验；
 2. 快捷键在**内核无对应**（属客户端层）⇒ 4 处可能需要"不迁移"或改用 DSH 客户端方案；
 3. 事件 `@mode` 注解的**实际驱动方**未逐个回源确认（映射表按注解口径）；
-4. `session/event` 观察是"提交后"⇒ 需要决策的钩子（如 `input` 改写）只能用**步级瀑布**（`agent/pre-step`）；
+4. ~~`session/event` 观察是"提交后"⇒ 需要决策的钩子（如 `input` 改写）只能用**步级瀑布**（`agent/pre-step`）~~
+   **契约级已确证（2026-10-15）**：`agent/pre-step` 是 waterfall，判定形状
+   `PreStepDecision = {kind:'reject'} | {kind:'enter', messages: UserMessage[], startsRequestSeries?: true}`
+   （`dsh-agent/lib/types/runtime-types.d.ts:92-99`，事件签名 `:304`）⇒ pi 的 `input` **可以**翻译为
+   "替换进入该 step 的消息数组"；✗ 仍未做**运行时**验证（需要 agent + LLM，属 Host 级，见 P5②）；
 5. 完整 profile / Host 级运行**未做**（内存与"别打扰 GUI"两条约束）⇒ P4 的端到端目前是**契约级**；
 6. DSH 是 `0.2.0-rc.2`（RC）⇒ 接口可能变动；本轮把用到的形状**固化成本地最小类型声明**（`custom/adapters/dsh/types.ts`），
    从而"RC 变了"只需改一处，而不是散落到 223 个文件。

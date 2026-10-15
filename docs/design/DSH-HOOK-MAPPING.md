@@ -110,7 +110,7 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 | `agent/created` | serial | `dsh-agent/lib/types/runtime-types.d.ts:227` | agent 进入后、创建落定前的逐个初始化；**抛错会让创建失败** |
 | `agent/disposed` | emit | 同上 `:240` | agent 离开注册表（驱动静默、作用域注销之后） |
 | `agent/status` | emit | 同上 `:252` | 状态在 `idle` ⇄ `running`；`idle` 指没有驱动在排队或在跑 |
-| `agent/pre-step` | waterfall | 同上 `:304` | **可否决该 step、或替换进入它的 messages** |
+| `agent/pre-step` | waterfall | 同上 `:304`（判定类型 `:92-99`） | **可否决该 step、或替换进入它的 messages**；判定形状实测读到：`{kind:'reject'}` 或 `{kind:'enter', messages: UserMessage[], startsRequestSeries?: true}` ⇒ 改写是**整组替换**（不是就地改文本），与 pi 的 `input` 语义可按此翻译 |
 | `agent/request` | waterfall | 同上 `:327` | 替换冻结的调用配置（可在系统提示词前改） |
 | `agent/request-error` | waterfall | 同上 `:348` | 一次模型请求失败后决定 retry 或终止 |
 | `agent/assistant-stream` | emit | 同上 `:366` | 助手流式分片（有序帧） |
