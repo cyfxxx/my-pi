@@ -67,7 +67,7 @@ spike 的 10 条检查（A1–A10）覆盖：真实服务启动、工具注册�
 **pi 形状命令 → 真实命令服务**（A10）。
 实测结果：**10 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
-**12 直接 / 6 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
+**10 直接 / 8 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
 
 ### pi 包别名（A9 的前提，也是 P5 的机制验证）
@@ -137,3 +137,10 @@ pi 的 `before_agent_start` 是**每回合一次**；DSH 的对应点 `agent/pre
 （waterfall 的 next 漏调会打挂调用链，这是本项目实测过的坑）。
 负载没有回合号时**不去重**：宁可多跑一次，也不静默少跑。
 该事件在 `surfaceReport()` 里是 `degraded`：提示词装配类处理器若要每步都跑，应改挂 `system-prompt/assemble`。
+
+### `agent_settled` / `agent_end`：只在 `idle` 方向触发（2026-10-16）
+
+DSH 的 `agent/status` 在 `running` 与 `idle` **两个方向**都发，而 pi 的 `agent_settled`/`agent_end`
+只在"静置"时该跑 ⇒ 裸挂会让处理器在每个回合**开始时**也跑一遍（症状：重复记账/重复清理，且不报错）。
+桥接层的 `payloadFilter` 按 `status === 'idle'` 放行；**读不到 `status` 时失败开放**
+（宁可多跑一次，也不因为"认不出形状"而静默少跑一次清理）。被过滤时 `next()` **仍然照调**。

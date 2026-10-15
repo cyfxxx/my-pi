@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PI_TO_DSH_EVENTS, assertEventsMapped, mappingSummary, resolveDshEvent } from '../events';
 import { createDshExtensionApi } from '../facade';
-import { dedupeByTurn, deriveSessionInfo, makeDshListener, mapToolCallDecision, mapToolResultDecision, withSessionContext } from '../hooks';
+import { dedupeByTurn, deriveSessionInfo, idleOnly, makeDshListener, mapToolCallDecision, mapToolResultDecision, withSessionContext } from '../hooks';
 import { toDshToolPayload } from '../tool';
 import type { DshCommandDefinition, DshContext, DshDefineToolOptions, DshEventListener } from '../types';
 
@@ -446,6 +446,43 @@ describe('每步 → 每回合一次（before_agent_start 的语义适配）', (
     const entry = facade.surfaceReport().find((e) => e.member === 'on(before_agent_start)');
     expect(entry?.status).toBe('degraded');
     expect(entry?.detail).toContain('每步');
+  });
+});
+
+describe('agent_settled / agent_end：只在 idle 方向触发', () => {
+  it('idleOnly：idle 放行、running 拦住、**形状不认识时失败开放**', () => {
+    expect(idleOnly({ status: 'idle' })).toBe(true);
+    expect(idleOnly({ status: 'running' })).toBe(false);
+    expect(idleOnly({})).toBe(true);            // 没有 status ⇒ 放行（宁可多跑）
+    expect(idleOnly({ status: 42 })).toBe(true); // 形状不对 ⇒ 放行
+    expect(idleOnly(undefined)).toBe(true);
+  });
+
+  it('被过滤时**不调处理器但 next() 照调**', async () => {
+    const handler = vi.fn(() => undefined);
+    const next = vi.fn().mockResolvedValue(undefined);
+    const listener = makeDshListener('agent_settled', handler, { report: () => undefined, payloadFilter: idleOnly });
+    await listener({ status: 'running' }, next);
+    expect(handler).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+    await listener({ status: 'idle' }, next);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(2);
+  });
+
+  it('经外观层：agent_settled 订到 agent/status、过滤 running，且状态为 degraded', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const handler = vi.fn(() => undefined);
+    facade.api.on('agent_settled' as never, handler as never);
+    const listener = fake.listeners.get('agent/status')?.[0];
+    expect(listener).toBeDefined();
+    await listener?.({ status: 'running' });
+    await listener?.({ status: 'idle' });
+    expect(handler).toHaveBeenCalledTimes(1);
+    const entry = facade.surfaceReport().find((e) => e.member === 'on(agent_settled)');
+    expect(entry?.status).toBe('degraded');
+    expect(entry?.detail).toContain('两个方向');
   });
 });
 

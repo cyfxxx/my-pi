@@ -28,7 +28,7 @@
 
 import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil-works/pi-coding-agent';
 import { assertEventsMapped, resolveDshEvent } from './events';
-import { dedupeByTurn, makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
+import { dedupeByTurn, idleOnly, makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
 import { toDshToolPayload, type UnsupportedReporter } from './tool';
 import type {
   DshCommandDefinition,
@@ -201,6 +201,8 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       // pi 的 before_agent_start 是"每回合一次"、DSH 的 agent/pre-step 是"每步一次" ⇒ 按回合去重
       // （只跳过处理器，next() 照调；语义差异已在 surfaceReport 里标为 degraded）
       ...(event === 'before_agent_start' ? { dedupeKey: dedupeByTurn } : {}),
+      // agent/status 在 running/idle 两个方向都发；pi 的 settled/end 只在静置时该跑（失败开放）
+      ...(event === 'agent_settled' || event === 'agent_end' ? { payloadFilter: idleOnly } : {}),
     });
     if (via === 'cordis') {
       const degraded = mapping.status === 'degraded';

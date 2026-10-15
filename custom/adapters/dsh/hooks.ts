@@ -83,6 +83,26 @@ export interface HookBridgeContext {
    * 返回 `undefined` 表示"这次不去重"（例如负载里没有回合号）。
    */
   readonly dedupeKey?: (payload: unknown) => string | undefined;
+  /**
+   * 负载过滤器（可选）：返回 `false` 时**跳过 pi 处理器**，但 `next()` 仍然照调。
+   *
+   * 用途：DSH 的一个事件可能覆盖 pi 的两个语义。例如 `agent/status` 在 `running` 与 `idle`
+   * **两个方向**都发，而 pi 的 `agent_settled`/`agent_end` 只在"静置"时该跑 ⇒ 必须按
+   * `payload.status === 'idle'` 过滤，否则处理器会在每回合开始时也跑一遍。
+   */
+  readonly payloadFilter?: (payload: unknown) => boolean;
+}
+
+/**
+ * 只在 `agent/status` 翻到 `idle` 时放行（供 `agent_settled` / `agent_end` 使用）。
+ *
+ * **失败开放**：负载里读不到 `status`（形状不是预期的）时返回 `true` —— 宁可多跑一次，
+ * 也不要因为"认不出形状"而静默少跑一次清理（这正是本项目最忌讳的失效形态）。
+ */
+export function idleOnly(payload: unknown): boolean {
+  const status = (typeof payload === 'object' && payload !== null ? (payload as { status?: unknown }).status : undefined);
+  if (typeof status !== 'string') return true;
+  return status === 'idle';
 }
 
 /** 从 `agent/pre-step` 的负载里取回合号（`{agent, messages, turn, step, signal}`） */
@@ -199,6 +219,9 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
 
     // 本次负载对应的 pi 上下文（会话事件里带会话身份；其它事件回落到默认）
     const piContext = bridge.piContextFor ? bridge.piContextFor(first) : bridge.piContext;
+
+    // 负载过滤：不匹配时**只跳过 pi 处理器**，`next()` 仍然必须调
+    if (bridge.payloadFilter && !bridge.payloadFilter(first)) return next ? next() : undefined;
 
     // "每步"→"每回合一次"的去重：**只跳过 pi 处理器**，`next()` 仍然必须调（见 dedupeKey 说明）
     if (bridge.dedupeKey) {

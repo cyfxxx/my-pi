@@ -82,6 +82,8 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     dsh: ['agent/status'],
     via: 'cordis',
     note: '4 处；DSH 把 settled 表达为状态翻到 idle（无驱动在排队/在跑）',
+    status: 'degraded',
+    degradedNote: 'agent/status 在 running/idle **两个方向**都发 ⇒ 桥接层按 status==="idle" 过滤（读不到 status 时**失败开放**，宁可多跑不静默少跑）',
   },
   {
     pi: 'input',
@@ -121,9 +123,11 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
   {
     pi: 'agent_end',
     tier: 'semantic',
-    dsh: ['agent/turn-stopping', 'agent/status'],
+    dsh: ['agent/status', 'agent/turn-stopping'],
     via: 'cordis',
     note: '2 处；pi 是"整段 agent 结束"，DSH 这一层是回合级 ⇒ 处理器要从"结束一次"改成"每回合判条件"',
+    status: 'degraded',
+    degradedNote: '主落点取 agent/status 的 **idle** 转变（桥接层按 status==="idle" 过滤、读不到就失败开放）；若要"每回合判条件"应改挂 agent/turn-stopping（serial，可 steer）',
   },
   {
     pi: 'thinking_level_select',
