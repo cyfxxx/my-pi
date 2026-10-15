@@ -99,7 +99,7 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | **P3 真实 spike** | `dsh/spike/**` + `scripts/dsh-spike.sh` | 脚本跑通真实 `@deepseek-ai/*`：注册的工具**被真实注册表调用**、事件**真触发**、拦截**真生效** | ✓ **8/8 通过**（真实包 `0.2.0-rc.2` + cordis 4.0.4） |
 | **P4 一个特性端到端** | 真实特性 `custom/features/web-search` 经 `tool-adapter` → 外观层 → DSH 注册表 | spike 里 `web_search` **真实执行并返回 36 条结果** | ✓（选它的原因：唯一不 import pi 运行时包的特性） |
 | **P5 引导与配置** | ① pi 包 **shim**（`custom/adapters/dsh/pi-shims/`，35 条单测含漂移守门）② **插件产物 + profile 接线**（`dsh/plugin`、`dsh/profile`、`scripts/dsh-build.sh`、`scripts/dsh-smoke-profile.sh`） | ①✓ 零 pi 依赖下 A9 仍 54 工具 / 0 失败；②✓ **真实 launcher 已接受插件进 profile**（隔离 DSH_HOME 的 `--dump-config` 干跑：基线条目 96 → 出现 `id: my-pi`）；**Host 级启动仍待做** ✗ | **①②完成 / Host 待做** |
-| **P6 守门重建（D 块）** | ① 工具声明面基线 ② **注入面基线**（`dsh/baseline/system-prompt.json`）③ 场景测试 ④ 补丁检查 | ①✓ 54 工具 / **25,761 B**（反证：篡改工具字节 ⇒ 点名 `web_search 999→270`）；②✓ **注入面接线 + 基线**：`APPEND_SYSTEM.md` 注册为 DSH 提示段（order=2500，实测是渲染结果**结尾**），基线哈希 `renderPrompt(assemble())`（反证：改源文件 ⇒ exit 1，点名渲染 sha / 源文件 / 段内容三条漂移；复原 ⇒ exit 0）；③④ 待做 ✗ | **①②完成 / ③④ 待做** |
+| **P6 守门重建（D 块）** | ① 工具声明面基线 ② **注入面基线**（`dsh/baseline/system-prompt.json`）③ 场景测试 ④ **补丁账处置表**（§4.2） | ①✓ 54 工具 / **25,761 B**（反证：篡改工具字节 ⇒ 点名 `web_search 999→270`）；②✓ **注入面接线 + 基线**：`APPEND_SYSTEM.md` 注册为 DSH 提示段（order=2500，实测是渲染结果**结尾**），基线哈希 `renderPrompt(assemble())`（反证：改源文件 ⇒ exit 1，点名渲染 sha / 源文件 / 段内容三条漂移；复原 ⇒ exit 0）；④✓ **补丁账收敛为 0 个需移植**（§4.2：001/002 不需要、003–009 属客户端插件、010 已核对 DSH 无 `/share` `/bug`、011 无对应实现但留下 deferred 工具发现机制的待查 ✗）；③待做 ✗ | **①②④完成 / ③待做** |
 
 > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗；
 > 先做 P3/P4 的**契约级真实运行**（真包、真注册表、真事件），把"能不能搬"钉死，再决定 Host 级验证的时机。
@@ -117,6 +117,31 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | 会话切换/两实例隔离/模式切换场景（`scripts/test-scenario-*.mjs`） | 真跑 pi + supervisor | DSH 侧 Host/Session 语义不同 ⇒ **重写**（`agent/created`、`session/disposed`） |
 | 补丁可应用性（`check-patches-behavior.mjs`） | 11 个 pi 补丁 | 补丁目标是 pi 的 TUI ⇒ 多数**不迁移**，改为"DSH 侧不需要"的书面结论 |
 | 便携运行时（`PORTABLE-LINUX.md`） | 与底座无关 | **可直接复用**（Node/CPython/服务都进仓库 ✓） |
+
+### 4.1 已重建（本轮）
+
+| 基线 | 产物 | 生成 / 守门命令 | 反证（证明守门真的会咬） |
+|---|---|---|---|
+| 工具声明面 | `dsh/baseline/tool-surface.json`（54 工具 / 25,761 B） | `bash scripts/dsh-baseline.sh --tools [--update]` | 篡改基线里 `web_search` 字节数 ⇒ `--check` exit 1 并点名 `合计字节 25762 → 25761`、`web_search 999→270` |
+| 注入面 | `dsh/baseline/system-prompt.json`（1324 B / 4 段） | `bash scripts/dsh-baseline.sh --prompt [--update]` | 改一行 `portable/agent/APPEND_SYSTEM.md` ⇒ exit 1 并点名"渲染 sha / 源文件 / 段内容"三条；`git checkout` 复原 ⇒ exit 0 |
+
+### 4.2 补丁账 → DSH 处置（P6 ④，2026-10-15）
+
+pi 侧的 11 个补丁是"底座替换"的账；换到 DSH 后**没有"能不能 apply"的问题**（我们不 patch DSH），
+真正的问题是**每一条能力在新底座上还需不需要**。逐条结论（依据都写出来）：
+
+| 补丁 | 作用 | DSH 侧处置 | 依据 |
+|---|---|---|---|
+| 001 branding | `package.json` 品牌 | **不需要** | 不 vendor pi；品牌落在 DSH 插件名 `my-pi`（`dsh/plugin/entry.ts` 导出 `name='my-pi'`） |
+| 002 local-pi-mods | vendor/pi 源码与文档改动 | **不需要（对 DSH 运行时）** | DSH 路径不加载 `vendor/pi`；该目录留给 **pi 底座**（main 分支 + `tsconfig` 类型映射）继续用 |
+| 003 tab-completion | pi TUI 编辑器补全 | **不迁移** ✗ | 表现层属于客户端；DSH 的 TUI/Web 是它自己的组件，要等价能力得写 **DSH 客户端插件** |
+| 004–009 footer（6 条） | pi TUI footer（速度/成本/缓存/重排/badge） | **不迁移** ✗ | 同上；我们的适配层刻意只做 `output.render` + 降级上报，不碰表现层 |
+| 010 disable `/share` `/bug` | 私人助手不外发会话 | **无需对应补丁（已核对）** | `grep -rlE "'(share|bug)'" @deepseek-ai/*/lib/types/*.d.ts` = **0 命中** ⇒ DSH 未注册这两个命令。✗ 未穷尽：未扫运行时 bundle，也未扫"本项目 profile 未安装"的插件；若将来启用相关插件需复核 |
+| 011 tool-search CJK 分词 | pi 的 `tool_search` 对中文 query 检索不到 deferred 工具（分词只认 `a-z0-9`，CJK 全丢） | **无对象可移植** | 已安装的 `@deepseek-ai/*` 里没有 `tool_search` 实现（类型声明里 `grep tool_search` 仅命中 `dsh-llm-pi-ai` 的 catalog）；`dsh-tools` 只有 `deferLoading?: true` 声明（`schema.d.ts:194-195`）。⚠️ **未解问题** ✗：DSH 上"deferred 工具如何被模型发现"尚未查清 —— 若它用的是某个检索器，必须复核其 CJK 行为（这正是 011 的教训） |
+
+**结论**：补丁账在 DSH 上**收敛为 0 个需要移植的补丁**，但留下两个显式待办 ✗：
+(1) 表现层等价能力（003–009）若要保留，属于 DSH 客户端插件范畴，不在本次迁移范围；
+(2) `010`/`011` 的结论建立在**类型声明 + 已安装包**的检索面上，未覆盖运行时 bundle 与未安装插件。
 
 ---
 
