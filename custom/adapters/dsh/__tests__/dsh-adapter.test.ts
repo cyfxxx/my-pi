@@ -296,6 +296,15 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
     expect(info).toEqual({ sessionId: 's2', cwd: '/work/y' });
   });
 
+  it('**原始 Session 对象**（session/created 的负载就是 Session 本身）也能读出身份', () => {
+    // 实测形态：dsh-session 的 session/created 把 Session 直接作为负载传出
+    // （`{id, header:{version,id,createdAt,cwd?,isSeeded}}`），不是 `{session}` 包裹
+    const info = deriveSessionInfo({ id: 'raw-1', header: { id: 'raw-1', cwd: '/work/raw' } });
+    expect(info).toEqual({ sessionId: 'raw-1', cwd: '/work/raw' });
+    // 只有 header、没有顶层 id 时同样成立（Session 的 id 就是从 header 派生的）
+    expect(deriveSessionInfo({ header: { id: 'raw-2' } })).toEqual({ sessionId: 'raw-2' });
+  });
+
   it('读不出身份时**原样返回**基准上下文（不编造）', () => {
     const base = { hasUI: false, cwd: '/base' };
     expect(withSessionContext(base, { type: 'turn/end' })).toBe(base);
@@ -324,10 +333,17 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
       return undefined;
     }) as never);
 
-    const listener = fake.listeners.get('agent/created')?.[0];
+    // 2026-10-17：session_start 的首选落点已改为**会话级** session/created
+    const listener = fake.listeners.get('session/created')?.[0];
     expect(listener).toBeDefined();
-    await listener?.({ agent: { session: { id: 'sess-7', header: { id: 'sess-7', cwd: '/work/w' } } } });
+    // 会话级负载就是 Session 本身（首参）
+    await listener?.({ id: 'sess-7', header: { id: 'sess-7', cwd: '/work/w' } });
     expect(seen).toEqual(['sess-7']);
+    // agent 级形状（`{agent:{session}}`）同样能读出身份（备用落点）
+    const viaAgent = withSessionContext({ hasUI: false }, { agent: { session: { id: 'sess-8', header: { id: 'sess-8' } } } }) as {
+      sessionManager?: { getSessionId?: () => string | undefined };
+    };
+    expect(viaAgent.sessionManager?.getSessionId?.()).toBe('sess-8');
   });
 });
 

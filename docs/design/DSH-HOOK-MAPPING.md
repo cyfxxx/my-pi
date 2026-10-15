@@ -156,8 +156,8 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 
 | # | my-pi 事件 | 档 | DSH 对应 | 一行理由 |
 |---|---|---|---|---|
-| 1 | `session_start` | **②** | `agent/created`（serial, `dsh-agent:227`）；旁证 `session/created`（emit, `dsh-session:42`） | 粒度从「会话」变成「agent」，且 resume 语义要重查；`agent/created` 还能否决创建，需确认原处理器不做假设 |
-| 2 | `session_shutdown` | **②** | `agent/disposed`（emit, `:240`）、`session/disposed`（emit, `:52`）、`workspace/session-stop`（parallel, `dsh-workspace:110`） | pi 是"会话被替换时"的一次性清理通知；DSH 拆成 agent 级/存储级/归档级三种时机，顺序与"能否 veto"都不同 |
+| 1 | `session_start` | **②** | ★ **2026-10-17 首选会话级**：`session/created`（emit, `dsh-session:42`；由 `SessionStore.announce()` 发出，**负载是 Session 对象本身**）；备选 `agent/created`（serial, `dsh-agent:227`） | pi 的"会话开始"与 DSH 的"会话创建公告"同层 ✓ **运行时已验证**（spike A11：`Session.create → enter → announce` ⇒ 处理器触发 1 次、拿到会话身份）；✗ 处理器内部的资源启停语义仍需逐条对齐 |
+| 2 | `session_shutdown` | **②** | ★ **2026-10-17 首选会话级**：`session/disposed`（emit, `:52`；由 `enter()` 的 detach disposer 发出，**负载是 Session 对象本身**）；补充 `agent/disposed`（emit, `:240`）、`workspace/session-stop`（parallel, `dsh-workspace:110`） | pi 是"会话被替换时"的一次性清理；DSH 拆成存储级/agent 级/归档级三种时机 ✓ **运行时已验证**（spike A11：调用 detach disposer ⇒ 处理器触发 1 次、身份一致）；✗ 三种时机各该做什么清理仍需按功能定义 |
 | 3 | `before_agent_start` | **②** | `agent/pre-step`（waterfall, `:304`）、`system-prompt/assemble`（waterfall, `dsh-system-prompt:27`） | pi 是"agent 启动前一次"；DSH 对应点是**每步**（`pre-step`）或**提示词装配**，需改成幂等/每步语义 |
 | 4 | `turn_start` | **①** | `turn/start`（SessionEventMap, `dsh-agent/types.d.ts:86`） | 能力都是"观察回合开始"；接入方式要从直接订阅改为订阅 `session/event` 再按 `event.type` 派发 |
 | 5 | `turn_end` | **①** | `turn/end`（同上）；更强的是 `agent/turn-stopping`（serial, `:387`） | 观察点存在；若需要"能否让回合继续"，DSH 的 `turn-stopping` 比 pi 更强（可 steer 继续），按需选一个 |

@@ -62,10 +62,10 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 10 条检查（A1–A10）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 11 条检查（A1–A11）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）。
-实测结果：**10 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）。
+实测结果：**11 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
 **10 直接 / 8 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
@@ -144,3 +144,15 @@ DSH 的 `agent/status` 在 `running` 与 `idle` **两个方向**都发，而 pi 
 只在"静置"时该跑 ⇒ 裸挂会让处理器在每个回合**开始时**也跑一遍（症状：重复记账/重复清理，且不报错）。
 桥接层的 `payloadFilter` 按 `status === 'idle'` 放行；**读不到 `status` 时失败开放**
 （宁可多跑一次，也不因为"认不出形状"而静默少跑一次清理）。被过滤时 `next()` **仍然照调**。
+
+### 会话生命周期（2026-10-17 运行时已验证）
+
+`dsh-session` 的 `SessionStore` 可以挂在最小 harness 上（服务名 **`ctx.sessions`**）：
+`Session.create(id)` → `store.enter(s)`（拿到 detach disposer）→ `store.announce(s)` 发 **`session/created`**；
+调用 disposer 发 **`session/disposed`**。两者的负载都是 **Session 对象本身**
+（`{id, header:{version,id,createdAt,cwd?,isSeeded}}`），不是 `{session}` 包裹 ——
+`deriveSessionInfo` 的第三种形状（`{header}`）正好覆盖它。
+
+因此 `session_start` / `session_shutdown` 的**首选落点改为会话级**
+（`session/created` / `session/disposed`；agent 级与 `workspace/session-stop` 作为各自时机的补充），
+并由 spike **A11** 在真实服务上验证：两个处理器各触发 1 次、都拿到会话身份 ✓。

@@ -17,6 +17,8 @@
  *      需要 pi 包别名（ui-adapter/session-adapter 运行时 import pi 的包）⇒ 别名不可用时记 SKIP
  *   A10 pi 形状命令 → **真实命令服务**（`@deepseek-ai/dsh-commands`）：注册形状/名称规范化/
  *      `rawInput` 透传/会话身份注入/抛错映射成 `{kind:'error'}`，并用 `commands.find()` 反查命中
+ *   A11 **会话生命周期真跑**（`@deepseek-ai/dsh-session`）：挂载 `SessionStore` → 经外观层订阅
+ *      `session_start` → `ctx.sessions.create()` 真的发出 `session/created`，处理器拿到**会话身份**
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -275,6 +277,65 @@ async function main(): Promise<void> {
     a10 = { id: 'A10', ok: 'skip', detail: `命令服务不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a10);
+
+  // ── A11：会话生命周期真跑（created 与 disposed 都由真实 SessionStore 发出）────
+  let a11: Check = { id: 'A11', ok: 'skip', detail: '会话服务不可用（@deepseek-ai/dsh-session 未安装？）' };
+  try {
+    const sessionModule = (await import('@deepseek-ai/dsh-session')) as unknown as {
+      SessionStore?: unknown;
+      Session?: { create: (id: string) => { id: string } };
+    };
+    if (!sessionModule.SessionStore || !sessionModule.Session) throw new Error('dsh-session 未导出 SessionStore/Session');
+    const sessionCtx = new Context();
+    sessionCtx.plugin(SystemPrompt);
+    sessionCtx.plugin(ToolRuntime);
+    sessionCtx.plugin(sessionModule.SessionStore as never);
+    await tick();
+
+    const sessionFacade = createDshExtensionApi(sessionCtx as unknown as DshContext, {
+      cwd: '/spike',
+      onUnsupported: () => undefined,
+    });
+    const started: Array<string | undefined> = [];
+    const stopped: Array<string | undefined> = [];
+    const readId = (ctx: unknown): string | undefined =>
+      (ctx as { sessionManager?: { getSessionId?: () => string | undefined } })?.sessionManager?.getSessionId?.();
+    sessionFacade.api.on('session_start' as never, ((_e: unknown, ctx: unknown) => {
+      started.push(readId(ctx));
+      return undefined;
+    }) as never);
+    sessionFacade.api.on('session_shutdown' as never, ((_e: unknown, ctx: unknown) => {
+      stopped.push(readId(ctx));
+      return undefined;
+    }) as never);
+
+    const store = (sessionCtx as unknown as {
+      sessions: { enter: (s: unknown) => () => void; announce: (s: unknown) => void };
+    }).sessions;
+    if (!store || typeof store.enter !== 'function') throw new Error('ctx.sessions 不可用');
+
+    // 真实生命周期：Session.create → enter（拿到 detach disposer）→ announce（发 session/created）
+    //               → 调 disposer（发 session/disposed）
+    const session = sessionModule.Session.create('spike-session');
+    const detach = store.enter(session);
+    store.announce(session);
+    await tick(120);
+    detach();
+    await tick(120);
+
+    const ok =
+      started.length === 1 && started[0] === 'spike-session' &&
+      stopped.length === 1 && stopped[0] === 'spike-session';
+    a11 = {
+      id: 'A11',
+      ok,
+      detail: `session/created 触发 session_start ${started.length} 次（身份=${started[0] ?? 'n/a'}）；session/disposed 触发 session_shutdown ${stopped.length} 次（身份=${stopped[0] ?? 'n/a'}）`,
+    };
+    sessionFacade.dispose();
+  } catch (error) {
+    a11 = { id: 'A11', ok: 'skip', detail: `会话服务不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a11);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

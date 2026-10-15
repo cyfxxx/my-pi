@@ -49,16 +49,16 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
   {
     pi: 'session_start',
     tier: 'semantic',
-    dsh: ['agent/created', 'session/created'],
+    dsh: ['session/created', 'agent/created'],
     via: 'cordis',
-    note: '9 处调用点；粒度从"会话"变"agent"，且 agent/created 是否决点（抛错即创建失败），resume 语义要重查',
+    note: '9 处调用点；★ 2026-10-17 调整：**首选会话级** `session/created`（DSH 的会话创建公告，负载是 **Session 对象本身**——实测 `ctx.sessions.create()` 即触发；语义与 pi 的"会话开始"同层），agent 级 `agent/created` 作为备选（粒度是 agent，且抛错即创建失败，语义更重）',
   },
   {
     pi: 'session_shutdown',
     tier: 'semantic',
-    dsh: ['agent/disposed', 'session/disposed', 'workspace/session-stop'],
+    dsh: ['session/disposed', 'agent/disposed', 'workspace/session-stop'],
     via: 'cordis',
-    note: '6 处；pi 是"会话被替换时"一次清理，DSH 拆成 agent/存储/归档三种时机，顺序与能否 veto 都不同',
+    note: '6 处；★ 2026-10-17 调整：**首选会话级** `session/disposed`（会话离开存储，含回滚），`agent/disposed`（agent 级）与 `workspace/session-stop`（因归档停止运行中工作）作为各自时机的补充；pi 的"会话被替换时一次清理"在 DSH 上要按这三种时机分别想清楚',
   },
   {
     pi: 'before_agent_start',
