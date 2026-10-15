@@ -88,10 +88,10 @@ describe('events 映射表', () => {
     }
   });
 
-  it('档位分布：①11 / ②8 / ③0（②比 HOOK-MAPPING §3.1 多 1：session_before_switch）', () => {
+  it('档位分布：①9 / ②10 / ③0（2026-10-17 把 context 与 before_provider_request 从 ① 降到 ②：语义面不同）', () => {
     const s = mappingSummary();
-    expect(s.direct).toHaveLength(11);
-    expect(s.semantic).toHaveLength(8);
+    expect(s.direct).toHaveLength(9);
+    expect(s.semantic).toHaveLength(10);
     expect(s.none).toHaveLength(0);
   });
 

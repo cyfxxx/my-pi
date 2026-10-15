@@ -572,7 +572,7 @@
 - `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 1. 第一步：my-pi 的钩子归类（实测，非估算） · grep 命令（可复跑）： · 数字: 55 个 / 53 个 / 2 个 / 18 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 2. 第二步：DSH 实际声明的事件（附行号） · DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不在 my-pi 的 `node_modules`**）。 · 数字: 105 个 / 41 个 / 59 个 / 2 条 · 证据: 1e7f6d9597241db0
-- `docs/design/DSH-HOOK-MAPPING.md` · 3. 第三步：逐类映射（18 个 my-pi 事件） · ### 3.1 三档汇总 · 数字: 1 次 / 23 个 / 29 个 / 0 个
+- `docs/design/DSH-HOOK-MAPPING.md` · 3. 第三步：逐类映射（18 个 my-pi 事件） · ### 3.1 三档汇总 · 数字: 1 次 / 22 个 / 31 个 / 0 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 4. 未核实项（必读，明确列出） · 1. **自动化任务（autopilot）的 21 个调用点是本清单里最难的一块**：它注册 `session_start`/`session_shutdown`/`turn_*`/`tool_*`/`input`/`agent_settl · 数字: 21 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 5. 复跑命令（供核对） · # my-pi 侧 · 数字: 53 个 / 105 个 / 59 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 6. 复核轮（2026-10-11）：验证或推翻"压缩前干预缺失" · **结论：原结论被推翻。** DSH **有**压缩前介入能力，只是形态与 pi 不同（pi 是"每次压缩前的回调闸门"，DSH 是"**可替换的压缩引擎服务**"＋失败路径瀑布）。 · 数字: 289 个 / 5 个 / 4 个 / 1 个 · 证据: 1e7f6d9597241db0

@@ -19,12 +19,14 @@
  *      `rawInput` 透传/会话身份注入/抛错映射成 `{kind:'error'}`，并用 `commands.find()` 反查命中
  *   A11 **会话生命周期真跑**（`@deepseek-ai/dsh-session`）：挂载 `SessionStore` → 经外观层订阅
  *      `session_start` → `ctx.sessions.create()` 真的发出 `session/created`，处理器拿到**会话身份**
+ *   A12 **动态上下文的落点**（`ctx.systemPrompt.context()`）：注册一段运行时上下文，
+ *      在真实装配结果里可见（`assembly.contexts` + `joinContextSections(renderContextSections())`）
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
 
 import { Context } from '@deepseek-ai/cordis';
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
+import SystemPrompt, { joinContextSections, renderContextSections } from '@deepseek-ai/dsh-system-prompt';
 import ToolRuntime from '@deepseek-ai/dsh-tools';
 
 import { createDshExtensionApi } from '../../custom/adapters/dsh/facade';
@@ -340,6 +342,38 @@ async function main(): Promise<void> {
     a11 = { id: 'A11', ok: 'skip', detail: `会话服务不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a11);
+
+  // ── A12：动态上下文的落点（prompt-side 注入在真实装配里可见）───────────────
+  let a12: Check = { id: 'A12', ok: 'skip', detail: '提示词服务不可用' };
+  try {
+    const pc = new Context();
+    pc.plugin(SystemPrompt);
+    pc.plugin(ToolRuntime);
+    await tick();
+    const sp = pc.systemPrompt as unknown as {
+      context: (c: { name: string; order: number; text: string | (() => string) }) => () => void;
+      getContextOrder?: (name: string) => number;
+      assemble: () => Promise<{ contexts: ReadonlyArray<{ name: string; text: string }> }>;
+    };
+    const probe = 'my-pi 动态上下文探针（A12）';
+    const order = typeof sp.getContextOrder === 'function' ? sp.getContextOrder('SANDBOX_POLICY') : 110;
+    const dispose = sp.context({ name: 'my-pi:probe-context', order, text: probe });
+    const assembly = await sp.assemble();
+    const inContexts = assembly.contexts.some((c) => c.text.includes(probe));
+    const snapshot = joinContextSections(renderContextSections(assembly as never));
+    const inSnapshot = snapshot.includes(probe);
+    dispose();
+    const afterDispose = await sp.assemble();
+    const goneAfterDispose = !afterDispose.contexts.some((c) => c.text.includes(probe));
+    a12 = {
+      id: 'A12',
+      ok: inContexts && inSnapshot && goneAfterDispose,
+      detail: `context() 注入在 assembly.contexts 可见=${inContexts}、在上下文快照里可见=${inSnapshot}、dispose 后消失=${goneAfterDispose}（order=${order}）`,
+    };
+  } catch (error) {
+    a12 = { id: 'A12', ok: 'skip', detail: `提示词服务不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a12);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

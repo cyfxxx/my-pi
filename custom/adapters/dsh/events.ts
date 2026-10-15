@@ -142,10 +142,12 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
   },
   {
     pi: 'context',
-    tier: 'direct',
+    tier: 'semantic',
     dsh: ['system-prompt/assemble'],
     via: 'cordis',
-    note: '1 处；两者都允许权威改写装配结果，是最干净的一处对应',
+    note: '1 处；原先判为"最干净的一处对应"，2026-10-17 更正为②（语义面不同，见 degradedNote）',
+    status: 'degraded',
+    degradedNote: '★ 2026-10-17 更正（原判 ① 是**语义面搞错**）：pi 的 context 事件拿到的是**消息转录**并且可以**替换它**（`ContextEventResult {messages?}`，vendor/pi/.../types.ts:1443-1445），而 DSH 的 system-prompt/assemble 拿到的是**提示词分段/工具/变量**、不是转录 ⇒ 改造点根本不是换事件名。我们那 1 处做的是"旧摘要去重 + 工具输出分层擦除"：前者属压缩引擎（替换 CompactionEngine / 子类化 summarize），后者属 **ctx.toolResultPruner**（服务级、压缩前必跑）；若只是想"补一段上下文"，DSH 的正解是 **ctx.systemPrompt.context()**（实测见 spike A12）⇒ 需重设计',
   },
   {
     pi: 'session_before_compact',
@@ -156,10 +158,12 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
   },
   {
     pi: 'before_provider_request',
-    tier: 'direct',
+    tier: 'semantic',
     dsh: ['agent/request', 'llm/stream'],
     via: 'cordis',
-    note: '1 处；都能在请求发出前替换调用配置，DSH 另有流级瀑布可短路',
+    note: '1 处；原先判为"请求前替换调用配置"等价，2026-10-17 更正为②（能力面不同，见 degradedNote）',
+    status: 'degraded',
+    degradedNote: '★ 2026-10-17 更正（原判 ① 高估了能力面）：pi 这条能**替换整个请求负载**（我们的暖前缀处理器返回 `{messages, tools}` 的新 payload）；DSH 的 `agent/request` 只能替换**调用配置**（provider/model/reasoningEffort/temperature/maxTokens/stop），而 `llm/stream` 虽是"每次流式调用外的瀑布（可短路）"，但**loop 构造的请求是深度冻结的**，契约原话 "listeners **read it, never rewrite it**"（可重建性不变量，dsh-llm/lib/types/index.d.ts:33-44）⇒ 暖前缀"重放已记录 payload"这条路在 DSH 上**没有对应**，需重设计或放弃',
   },
   {
     pi: 'message_update',

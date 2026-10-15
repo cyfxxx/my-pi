@@ -63,12 +63,12 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 11 条检查（A1–A11）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 12 条检查（A1–A12）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）。
-实测结果：**11 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）。
+实测结果：**12 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
-**9 直接 / 9 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
+**7 直接 / 11 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
 
 ### pi 包别名（A9 的前提，也是 P5 的机制验证）
@@ -171,3 +171,17 @@ pi 的 `input` 处理器返回 `{action:'continue'|'transform'|'handled'}`，DSH
 
 另：DSH 的 pre-step 负载**没有** `streamingBehavior`（steer/followUp）⇒ 该字段置空并上报；
 `inputTextFromPayload` 取最后一条含文本块的 user 消息文本供处理器读 `event.text`。
+
+### `context` / `before_provider_request`：两条 ① 评级被降档（2026-10-17）
+
+细读契约后发现两处"最干净的对应"其实是**语义面不同**，已在映射表降为 ② 并标 `degraded`：
+
+- **`context`**：pi 拿到的是**消息转录**且可**替换它**（`ContextEventResult {messages?}`，`types.ts:1443-1445`）；
+  DSH 的 `system-prompt/assemble` 拿到的是**提示词分段/工具/变量**。转录改写只有**服务级**去处：
+  `ctx.toolResultPruner`（压缩前必跑，适合"工具输出分层擦除"）与替换 `CompactionEngine`（适合"摘要去重"）；
+  纯"补一段上下文"用 **`ctx.systemPrompt.context()`**（spike **A12** 实测：注入在 `assembly.contexts`
+  与上下文快照里都可见，dispose 后消失）。
+- **`before_provider_request`**：pi 这条能**替换整个请求负载**（我们的暖前缀处理器就返回 `{messages, tools}` 新 payload）；
+  DSH 的 `agent/request` 只能换**调用配置**，而 `llm/stream` 收到的 loop 请求**深度冻结** —— 契约原话
+  listeners "read it, never rewrite it"（可重建性不变量，`dsh-llm/lib/types/index.d.ts:33-44`）
+  ⇒ 暖前缀"重放已记录 payload"在 DSH 上**没有对应** ✗。

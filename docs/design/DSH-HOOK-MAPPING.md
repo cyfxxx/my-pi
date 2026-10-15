@@ -170,8 +170,8 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 | 12 | `session_compact` | **①** | `compaction/end`（SessionEventMap） | "压缩完成"有直接对应类型；接入同样走 `session/event` |
 | 13 | `session_before_compact` | **②**（**理由已更正**；原判"无等价闸门"**被推翻**） | ★ **2026-10-16 关键区分（观察 vs 干预）**：`compaction/start` 确实是**会话日志事件**（声明于 `dsh-compaction` 的 `SessionEventMap`，`types.d.ts:21`；同族 `:35/73/88`），经 `session/event` 追加派发 ⇒ **观察型用法够用**（我们唯一那处=压缩前落快照+记账：`compaction/start` 到达时 summary 与替换用的 `user/message` 都还没落 ✓，已把映射从`via:'service'` 改为 `via:'session-event'`）；但它是**提交后**的，**不能否决压缩** ⇒ **干预型**用法仍需服务替换/瀑布（见右列分析）✗ | ~~只找到 `compaction/summary-error` 与 `compaction/start`~~；实为 **服务级**：`CompactionEngine`（`dsh-compaction/lib/types/index.d.ts:102`，注册为 `ctx.compaction` @ `:67-70`）＋ **`compaction/summary-error` 瀑布**（`@mode waterfall` @ `:83`，可在失败后**持久改写被选中的输入** @ `:72-77`）＋ 配置化策略（`dsh-compaction-basic/lib/types/config.d.ts:22`、`:29`、`:42`） | 能力**存在**但**形态不同**：pi 是"**每次压缩前**的回调（可取消/可自定义，`vendor/pi/.../types.ts:763`）"；DSH 是"**换一个压缩引擎实现**"（契约原文"Implementations own trigger policy, retention, and summarization" @ `dsh-compaction:94-95`；首方实现 `BasicCompactionEngine extends CompactionEngine` @ `dsh-compaction-basic/lib/types/index.d.ts:24`）＋失败路径瀑布（首方用法 `dsh-compaction-image-offload/lib/index.js:146`）。⇒ 仍需改语义（要换介入形态），但**不是缺口** |
 | 14 | `thinking_level_select` | **②** | ~~`model/selection`（SessionEventMap）~~ ★ **2026-10-16 更正**：**应用点**是 `agent/request`（waterfall，替换冻结调用配置；配置里有 `reasoningEffort?: ReasoningEffortId`，`dsh-llm/lib/types/call-config.d.ts:19`，模块注释原话 "request waterfalls replace them"）；**触发点**在 DSH 仍**无**等价物 | 两者形态不同：pi 是"**选中档位时**触发 + 处理器改档"；DSH 没有选中事件，但有**每请求**的配置替换点 ⇒ 正确移植方式是**把"缓存安全夹档"逻辑搬到请求点**（每请求幂等），级别→档位的纯映射已实现（`custom/adapters/dsh/thinking-level.ts`，只降不升）；✗ 真正改配置需模型路由（`LlmModelReasoningInfo.efforts`）故运行时未验 |
-| 15 | `context` | **①** | `system-prompt/assemble`（waterfall, `dsh-system-prompt:27`） | 两者都允许**权威地改写**上下文/提示词装配结果，是最干净的一处对应 |
-| 16 | `before_provider_request` | **①** | `agent/request`（waterfall, `dsh-agent:327`）；需要包流时用 `llm/stream`（waterfall, `dsh-llm:45`） | 都能在请求发出前替换调用配置；DSH 另有更强的流级瀑布可短路 |
+| 15 | `context` | **②**（★ 2026-10-17 由 ① 降档：**语义面搞错了**） | `system-prompt/assemble`（waterfall, `dsh-system-prompt:27`）＋ `ctx.systemPrompt.context()`（动态上下文，实测见 spike A12）；转录改写只有服务级去处：`ctx.toolResultPruner`（压缩前必跑）/ 替换 `CompactionEngine` | pi 的 `context` 拿到的是**消息转录**且可**替换它**（`ContextEventResult {messages?}`，`types.ts:1443-1445`）；DSH 的 assemble 拿到的是**提示词分段/工具/变量**、**不是转录** ⇒ 不是换事件名的事。我们那处（旧摘要去重 + 工具输出分层擦除）在 DSH 上是**两个服务级点**，需重设计 ✗ |
+| 16 | `before_provider_request` | **②**（★ 2026-10-17 由 ① 降档：能力面被高估） | `agent/request`（waterfall, `dsh-agent:327`，只能替换**调用配置**）；`llm/stream`（waterfall, `dsh-llm:45`）**不能改写 loop 构造的请求** | pi 这条可**替换整个请求负载**（我们的暖前缀处理器返回 `{messages, tools}`）；DSH 契约写明 loop 请求**深度冻结**、listeners "**read it, never rewrite it**"（`dsh-llm/lib/types/index.d.ts:33-44`，可重建性不变量）⇒ 暖前缀"重放已记录 payload"在 DSH 上**没有对应** ✗ |
 | 17 | `message_update` | **①** | `agent/assistant-stream`（emit, `:366`） | 两者都是助手流式增量；DSH 明确是"有序帧 + 结束帧"的形态 |
 | 18 | `message_end` | **①** | `assistant/message`（SessionEventMap）；或 `agent/assistant-stream` 的终结帧 | "一条助手消息定稿"有对应（日志类型），接入走 `session/event` |
 
@@ -179,13 +179,13 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 
 | 档 | 数量 | 事件 |
 |---|---|---|
-| **① 可映射** | **11** | `turn_start`、`turn_end`、`agent_settled`、`tool_call`、`tool_result`、`tool_execution_start`、`session_compact`、`context`、`before_provider_request`、`message_update`、`message_end` |
-| **② 需改语义** | **7** | `session_start`、`session_shutdown`、`before_agent_start`、`agent_end`、`input`、`session_before_compact`、`thinking_level_select` |
+| **① 可映射** | **9**（2026-10-17 由 11 降） | `turn_start`、`turn_end`、`agent_settled`、`tool_call`、`tool_result`、`tool_execution_start`、`session_compact`、`message_update`、`message_end` |
+| **② 需改语义** | **10**（2026-10-17 由 7 升） | `session_start`、`session_shutdown`、`before_agent_start`、`agent_end`、`input`、`session_before_compact`、`thinking_level_select`、**`context`**、**`before_provider_request`**（含 2026-10-16 新增的 `session_before_switch`，共 10 行） |
 | **③ 无对应** | **0** | — |
 
-按**调用点数**加权（更能反映改造量）：① 覆盖 3+3+4+3+3+1+2+1+1+1+1 = **23 个调用点**；
-② 覆盖 9+6+6+2+4+1+1 = **29 个调用点**；③ 0 个。
-⇒ **超过一半的调用点（29/53）落在"需改语义"那一档**，且集中在**会话生命周期**与**输入/压缩干预**这两族。
+按**调用点数**加权（更能反映改造量，逐条取自 §1.1 的计数）：
+① 覆盖 4+3+4+3+3+1+2+1+1 = **22 个调用点**；② 覆盖 9+6+6+2+4+1+1+1+1 = **31 个调用点**；③ 0 个。
+⇒ **接近六成的调用点（31/53）落在"需改语义"那一档**，且集中在**会话生命周期**与**输入/压缩干预**这两族。
 （**复核后计数不变**：第 13 行的档位仍是 ②，只是理由从"缺口"改成"形态不同"，见第 6.3 节；
 **复核二后仍是 ②**，但理由进一步精确为「三处等价落脚点 + 唯一缺「单独取消压缩」」，见第 8.5 节。）
 
