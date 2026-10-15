@@ -11,6 +11,8 @@
 
 ```
 dsh/
+  baseline/
+    tool-surface.json # ★ DSH 侧**工具声明面基线**（54 工具 / 25,761 B；由 --update 生成）
   plugin/
     entry.ts         # 产品入口：把 custom/bootstrap.ts 的全量特性固定进来（机制在 custom/adapters/dsh/plugin.ts）
     package.json     # 产物包元信息 + 依赖声明（typebox/ws/tinyglobby + 可选 playwright/@xterm）
@@ -29,7 +31,27 @@ dsh/
 bash scripts/dsh-build.sh            # 打包 + 产物冒烟（纯 node 加载 dist，断言 54 工具 / 0 失败）
 bash scripts/dsh-spike.sh            # 源码级 spike（A1–A9，真实 @deepseek-ai 包 + pi shim）
 bash scripts/dsh-smoke-profile.sh    # 真实 launcher 的 profile 组合干跑（隔离 DSH_HOME，--dump-config）
+bash scripts/dsh-baseline.sh --check # 工具声明面漂移守门（P6 第一块；漂移 ⇒ exit 1）
 ```
+
+## P6 第一块：工具声明面基线（已重建）
+
+换底座后**旧的字节账不能继承**（声明格式不同）⇒ 重新量并留守门：
+
+| 口径 | 值 |
+|---|---|
+| 单个声明 | `{ name, description, parameters: parameterSchemaSpecToJsonSchema(spec), deferLoading? }` 的 UTF-8 字节 |
+| 合计 | **54 工具 / 25,761 B（25.2 KB）**，sha256 存于基线 |
+| 最大 5 | `subagent=1860B`、`goal=1442B`、`schedule_task=1426B`、`memory_search=1040B`、`todo=1003B` |
+
+```bash
+bash scripts/dsh-baseline.sh            # 测量并打印
+bash scripts/dsh-baseline.sh --check    # 漂移 ⇒ exit 1（实测：篡改 web_search 999→270 会被点名）
+bash scripts/dsh-baseline.sh --update   # 更新基线（需人工确认后提交；纪律：不擅自抬预算）
+```
+
+✗ 与 pi 侧 `TOOL-BUDGET-DECISION.md` 的 **24,785 B 不是同一口径**（那是 system prompt + 声明的整段前缀），
+所以只各自守各自漂移，**不做减法**。
 
 ## profile 接线的实测结论（**踩过再写下来**）
 
