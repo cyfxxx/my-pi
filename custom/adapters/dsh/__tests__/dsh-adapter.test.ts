@@ -342,8 +342,11 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
       return undefined;
     }) as never);
 
-    // 2026-10-17：session_start 的首选落点已改为**会话级** session/created
-    const listener = fake.listeners.get('session/created')?.[0];
+    // 2026-10-17：session_start 的首选落点已改为**会话级** session/created。
+    // ★ 注意外观层自己也会订阅 session/created（用于跟踪当前会话对象）⇒ 取**最后一个**才是处理器。
+    const sessionCreated = fake.listeners.get('session/created') ?? [];
+    expect(sessionCreated.length).toBeGreaterThanOrEqual(2);
+    const listener = sessionCreated[sessionCreated.length - 1];
     expect(listener).toBeDefined();
     // 会话级负载就是 Session 本身（首参）
     await listener?.({ id: 'sess-7', header: { id: 'sess-7', cwd: '/work/w' } });
@@ -353,6 +356,53 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
       sessionManager?: { getSessionId?: () => string | undefined };
     };
     expect(viaAgent.sessionManager?.getSessionId?.()).toBe('sess-8');
+  });
+});
+
+describe('工具清单与会话名（2026-10-17 新增落点）', () => {
+  it('getActiveTools/getAllTools 落到 ctx.tools.schemas()（状态 degraded，不再报 unsupported）', () => {
+    const fake = makeFakeDsh();
+    (fake.ctx.tools as { schemas?: () => Array<{ name: string }> }).schemas = () => [
+      { name: 'web_search' },
+      { name: 'fetch_url' },
+      { name: 'subagent' },
+    ];
+    const facade = createDshExtensionApi(fake.ctx);
+    expect(facade.api.getActiveTools()).toEqual(['web_search', 'fetch_url', 'subagent']);
+    expect(facade.api.getAllTools()).toEqual(['web_search', 'fetch_url', 'subagent']);
+    expect(facade.surfaceReport().find((e) => e.member === 'getAllTools')?.status).toBe('degraded');
+  });
+
+  it('schemas() 缺失 ⇒ 上报且返回空（不假装有清单）', () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m) => reports.push(m) });
+    expect(facade.api.getAllTools()).toEqual([]);
+    expect(reports).toContain('getAllTools');
+  });
+
+  it('setSessionName：rename(跟踪到的会话, 标题)；没有 sessionTitle 服务时上报', () => {
+    const fake = makeFakeDsh();
+    const renamed: Array<{ session: unknown; title: string }> = [];
+    const renamedCtx = fake.ctx as unknown as Record<string, unknown>;
+    renamedCtx.sessionTitle = { get: () => undefined, rename: (session: unknown, title: string) => renamed.push({ session, title }) };
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m) => reports.push(m) });
+
+    // 外观层订阅了 session/created ⇒ 先喂一个会话（最后一个监听器是处理器，基础设施在地一个）
+    const created = fake.listeners.get('session/created') ?? [];
+    const session = { id: 's-1', header: { id: 's-1' } };
+    created[0]?.({ ...session, session });
+    created[0]?.(session);
+
+    facade.api.setSessionName('新标题');
+    expect(renamed).toEqual([{ session, title: '新标题' }]);
+
+    // 没有 sessionTitle 服务：显式上报（不静默丢弃）
+    const bareReports: string[] = [];
+    const bare = createDshExtensionApi(makeFakeDsh().ctx, { onUnsupported: (m, d) => bareReports.push(`${m} :: ${d}`) });
+    bare.api.setSessionName('x');
+    expect(bareReports.some((m) => m.includes('sessionTitle'))).toBe(true);
   });
 });
 

@@ -139,24 +139,46 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   ledger.declare('registerCommand', canCommand ? 'degraded' : 'unsupported', canCommand ? 'DSH 命令服务契约未读（dsh-commands），载荷为尽力映射' : 'ctx.commands 缺失（命令服务未加载）');
   const canRestrict = typeof (ctx.tools as { restrict?: unknown } | undefined)?.restrict === 'function';
   ledger.declare('setActiveTools', canRestrict ? 'degraded' : 'unsupported', canRestrict ? '映射到 ctx.tools.restrict（DSH 的限制是"求交"，与 pi 的"设置激活集"不完全等价）' : undefined);
+  ledger.declare(
+    'getActiveTools',
+    typeof (ctx.tools as { schemas?: unknown } | undefined)?.schemas === 'function' ? 'degraded' : 'unsupported',
+    '落到 ToolRuntime.schemas()（DSH 没有"全部 vs 激活"两个清单）',
+  );
+  ledger.declare(
+    'getAllTools',
+    typeof (ctx.tools as { schemas?: unknown } | undefined)?.schemas === 'function' ? 'degraded' : 'unsupported',
+    '与 getActiveTools 同源（DSH 没有未受限的完整清单 API）',
+  );
+  ledger.declare(
+    'setSessionName',
+    typeof (ctx.sessionTitle as { rename?: unknown } | undefined)?.rename === 'function' ? 'degraded' : 'unsupported',
+    '映射到 ctx.sessionTitle.rename(当前会话, 标题)（@deepseek-ai/dsh-session-title）；会话对象来自 session/created 跟踪',
+  );
   for (const member of [
     'registerShortcut',
     'registerMessageRenderer',
     'registerFlag',
     'getFlag',
-    'getActiveTools',
-    'getAllTools',
     'getThinkingLevel',
     'setThinkingLevel',
     'sendMessage',
     'sendUserMessage',
     'appendEntry',
-    'setSessionName',
   ]) {
     ledger.declare(member, 'unsupported', '内核侧无等价服务；需要时由具体 DSH 客户端 bundle 提供（不得静默当作已支持）');
   }
 
   // ── 工具 ───────────────────────────────────────────────────────────────────
+  /**
+   * 当前会话对象（由 `session/created` 自动跟踪）。
+   *
+   * 为什么需要：pi 的 `setSessionName(title)` **只给标题**，而 DSH 的
+   * `SessionTitleService.rename(session, title)` 需要 **Session 对象**
+   * （`dsh-session-title/lib/types/index.d.ts`）⇒ 不跟踪就无从下手。
+   * ★ 这条订阅是**基础设施**，不对外声明成 pi 面成员。
+   */
+  let currentSession: unknown;
+
   /** pi 处理器第二个参数（ExtensionContext）的 DSH 侧替身：能给的给，给不了的不编造 */
   const basePiContext: unknown = options.piContext ?? { hasUI: options.hasUI, cwd: options.cwd };
 
@@ -227,6 +249,17 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     );
   };
 
+  // 基础设施订阅：跟踪最近创建/公告的会话（供 setSessionName 等需要 Session 对象的映射使用）
+  if (canOn && ctx.on) {
+    disposers.push(
+      ctx.on('session/created', (...args: readonly unknown[]) => {
+        const first = args[0];
+        if (typeof first === 'object' && first !== null) currentSession = first;
+        return undefined;
+      }),
+    );
+  }
+
   // ── 命令 / 快捷键 / 渲染器 / 标志 ──────────────────────────────────────────
   /**
    * pi 形状命令 → DSH `CommandDefinition`（契约 `dsh-commands/lib/types/index.d.ts:38-56`）。
@@ -294,9 +327,30 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     ledger.use('getFlag');
     return flags.get(name);
   };
+  /**
+   * 当前**可见**的工具名（DSH `ToolRuntime.schemas(scope?)`，`dsh-tools/lib/types/index.d.ts:225`）。
+   *
+   * 说明：DSH 没有"全部注册项 vs 当前激活项"两个清单（只有 `schemas()` 这一个可见面），
+   * 所以 `getActiveTools` 与 `getAllTools` 都落到它上面，并在报告里写明这是**降级**（不是等价）。
+   */
+  const toolNamesFromSchemas = (member: string): string[] => {
+    const schemas = (ctx.tools as { schemas?: (scope?: unknown) => readonly { name?: unknown }[] } | undefined)?.schemas;
+    if (typeof schemas !== 'function') {
+      report(member, 'ctx.tools.schemas() 不可用 ⇒ 无法枚举工具名');
+      return [];
+    }
+    try {
+      return schemas.call(ctx.tools).map((sch) => String(sch?.name ?? '')).filter((n) => n.length > 0);
+    } catch (error) {
+      report(member, `ctx.tools.schemas() 调用失败：${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
+  };
+
   const getActiveTools = (): string[] => {
     ledger.use('getActiveTools');
-    return [];
+    ledger.declare('getActiveTools', 'degraded', 'DSH 只有 ToolRuntime.schemas() 一个可见面（没有"全部 vs 激活"两清单）⇒ 返回当前可见工具名');
+    return toolNamesFromSchemas('getActiveTools');
   };
   const setActiveTools = (names: string[]): void => {
     ledger.use('setActiveTools');
@@ -306,7 +360,8 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   };
   const getAllTools = (): string[] => {
     ledger.use('getAllTools');
-    return [];
+    ledger.declare('getAllTools', 'degraded', 'DSH 没有"未受限的完整清单"API ⇒ 与 getActiveTools 同源（ToolRuntime.schemas()）');
+    return toolNamesFromSchemas('getAllTools');
   };
   const getThinkingLevel = (): string | undefined => {
     ledger.use('getThinkingLevel');
@@ -324,8 +379,37 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   const appendEntry = (): void => {
     ledger.use('appendEntry');
   };
-  const setSessionName = (): void => {
+  /**
+   * `setSessionName(title)` → `ctx.sessionTitle.rename(session, title)`。
+   *
+   * 前置：① `ctx.sessionTitle` 服务已加载（`@deepseek-ai/dsh-session-title`）；
+   * ② 能拿到**当前会话对象** —— 优先用 `session/created` 跟踪到的那个，
+   * 否则在"当前只有一个会话"时用它（多会话时**不猜**，直接上报）。
+   * 拿不到就显式上报（不静默丢弃）。
+   */
+  const setSessionName = (title: string): void => {
     ledger.use('setSessionName');
+    const titles = ctx.sessionTitle as { rename?: (session: unknown, title: string) => unknown } | undefined;
+    if (typeof titles?.rename !== 'function') {
+      report('setSessionName', 'ctx.sessionTitle 服务未加载（@deepseek-ai/dsh-session-title）⇒ 无法设置会话名');
+      return;
+    }
+    let session = currentSession;
+    if (!session) {
+      const sessions = ctx.sessions as { list?: () => readonly unknown[] } | undefined;
+      const list = typeof sessions?.list === 'function' ? sessions.list() : undefined;
+      if (Array.isArray(list) && list.length === 1) session = list[0];
+    }
+    if (!session) {
+      report('setSessionName', '拿不到当前会话对象（pi 只给标题、DSH 需要 Session）⇒ 未设置；多会话时不做猜测');
+      return;
+    }
+    try {
+      titles.rename(session, String(title));
+      ledger.declare('setSessionName', 'degraded', '映射到 ctx.sessionTitle.rename(当前会话, 标题)；会话对象来自 session/created 跟踪');
+    } catch (error) {
+      report('setSessionName', `ctx.sessionTitle.rename 抛错：${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const api = {

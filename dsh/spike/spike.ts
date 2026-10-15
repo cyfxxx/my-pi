@@ -193,10 +193,14 @@ async function main(): Promise<void> {
       const unsupported = eventEntries.filter((e) => e.status === 'unsupported').length;
       const compact = eventEntries.find((e) => e.member === 'on(session_before_compact)');
       const compactOk = compact?.status === 'degraded';
+      // 工具清单：ToolRuntime.schemas() 映射（2026-10-17 新增）——全量注册后应能看到全部工具名
+      const listed = bootFacade.api.getAllTools();
+      const active = bootFacade.api.getActiveTools();
+      const listOk = listed.length === names.length && listed.includes('web_search') && active.length === listed.length;
       a9 = {
         id: 'A9',
-        ok: failures.length === 0 && names.length > 20 && unsupported === 0 && compactOk,
-        detail: `全量 bootstrap：注册工具 ${names.length} 个；失败特性 ${failures.length} 个；钩子桥接 ${supported} 直接 / ${degraded} 降级 / ${unsupported} 无等价；session_before_compact=${compact?.status ?? '未注册'}${failures.length ? ' ⇒ ' + failures.join(' | ') : ''}`,
+        ok: failures.length === 0 && names.length > 20 && unsupported === 0 && compactOk && listOk,
+        detail: `全量 bootstrap：注册工具 ${names.length} 个；失败特性 ${failures.length} 个；钩子桥接 ${supported} 直接 / ${degraded} 降级 / ${unsupported} 无等价；session_before_compact=${compact?.status ?? '未注册'}；getAllTools() 列出 ${listed.length} 个（getActiveTools ${active.length} 个）${failures.length ? ' ⇒ ' + failures.join(' | ') : ''}`,
       };
       bootFacade.dispose();
     }

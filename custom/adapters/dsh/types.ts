@@ -101,6 +101,10 @@ export interface DshContext {
   on?(event: string, listener: DshEventListener): DshDisposer;
   /** 命令服务（`@deepseek-ai/dsh-commands`；契约见 `DshCommandRuntime`） */
   readonly commands?: DshCommandRuntime;
+  /** 会话存储（`@deepseek-ai/dsh-session`；没有它就没有会话身份可用） */
+  readonly sessions?: DshSessions;
+  /** 会话标题服务（`@deepseek-ai/dsh-session-title`；`setSessionName` 的落点） */
+  readonly sessionTitle?: DshSessionTitle;
   /** 会话事件信封（用于 `session/event` 派发：`event.type` 是日志事件类型） */
   readonly [service: string]: unknown;
 }
@@ -146,6 +150,27 @@ export interface DshCommandInvocation {
 export type DshCommandResult =
   | { readonly kind: 'success'; readonly text?: string }
   | { readonly kind: 'error'; readonly text: string };
+
+/**
+ * 会话存储服务（`@deepseek-ai/dsh-session` 的 `SessionStore`，服务名 **`sessions`**）。
+ *
+ * 出处：`dsh-session/lib/types/index.d.ts:27-29`（`interface Context { sessions: SessionStore }`）与
+ * `:334` 起的类声明。★ 会话对象**没有磁盘文件路径**（`SessionHeader` 只有 id/createdAt/cwd）——
+ * 这是 pi 的 `getSessionFile()` 在 DSH 上没有对应物的原因。
+ */
+export interface DshSessions {
+  create?(id?: unknown, options?: unknown): unknown;
+  get?(id: unknown): unknown;
+  list?(): readonly unknown[];
+  enter?(session: unknown): DshDisposer;
+  announce?(session: unknown): void;
+}
+
+/** 会话标题服务（`@deepseek-ai/dsh-session-title`，服务名 `sessionTitle`） */
+export interface DshSessionTitle {
+  get(session: unknown): unknown;
+  rename(session: unknown, title: string): unknown;
+}
 
 /**
  * 系统提示词服务（`@deepseek-ai/dsh-system-prompt` 的 `SystemPrompt extends Service`）。

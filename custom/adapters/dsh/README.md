@@ -45,10 +45,11 @@ features/**  ──registerTool(pi, internalDef)──▶  custom/adapters/tool-
 
 | pi 面 | DSH 侧 | 处置 |
 |---|---|---|
-| `sendMessage` / `sendUserMessage` / `appendEntry` / `setSessionName` | 内核无等价服务 | 上报 unsupported（客户端 bundle 可能需要） |
+| `sendMessage` / `sendUserMessage` / `appendEntry` | 内核无"往会话里塞消息"的等价 API | 上报 unsupported（客户端 bundle 可能需要） |
+| `setSessionName` | ★ 有落点：`ctx.sessionTitle.rename(session, title)`（`dsh-session-title`） | **已映射**（degraded）：会话对象由 `session/created` 跟踪；服务缺失/拿不到会话对象时**显式上报**（多会话不猜） |
 | `registerShortcut` / `registerMessageRenderer` / `registerFlag` | 内核无 | 上报 |
 | `getThinkingLevel` / `setThinkingLevel` | **没有同名 API**，但请求配置里有 `reasoningEffort` | API 上报 unsupported；**档位本身可表达**：`agent/request` 替换冻结配置 + `thinking-level.ts` 的纯映射（见下）|
-| `getActiveTools` / `getAllTools` | 无公开列举 API | 上报；`setActiveTools` 降级映射到 `ctx.tools.restrict` |
+| `getActiveTools` / `getAllTools` | ★ 有落点：`ToolRuntime.schemas()`（`dsh-tools:225`） | **已映射**（degraded）：DSH 只有"可见面"一个清单（没有全部 vs 激活两个）⇒ 两者同源；`setActiveTools` 仍降级映射到 `ctx.tools.restrict` |
 | `session_before_compact` | **会话日志事件** `compaction/start`（可观察、**不可否决**） | 走 `session/event` + `type` 过滤（状态 `degraded`）；要"取消压缩"须替换 `CompactionEngine` 服务 ✗ |
 | 会话身份（`ctx.sessionManager.getSessionFile()`） | 会话是**存储模型**：`SessionHeader` 只有 `id`/`createdAt`/`cwd`，无文件路径 | `deriveSessionInfo`/`withSessionContext` 合成 `getSessionId()`/`getSessionCwd()`；**不伪造文件路径**；`mode` 用 `session-key.ts` 统一取键（见下） |
 | `tool_call` 里**就地改参数**、`terminate` | DSH 明确排除参数改写 | 检测到即上报（`hooks.ts`） |
