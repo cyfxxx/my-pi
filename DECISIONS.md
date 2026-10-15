@@ -6083,3 +6083,42 @@ xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效�
 `check-conventions` 全绿（含新 H 段、脚本数 66、golden 步数 21）、`check-doc-links` 171 md 一致。
 
 **边界**：全部为只读体检 + 文档/守门改动；**未执行 reverse-skill 的任何脚本**（其 `AGENTS.md`：读 ≠ 授权执行）；未碰 `vendor/**`、`patches/**`、`custom/**`。
+
+### [2026-10-15] Linux 完全便携化：运行时进仓库（`runtime/<平台>/`）、解析收敛一处、通用 Python 包用 `--target` 而非 venv
+
+**背景**：用户在 Windows 上已实现"插到任何机器都能跑"（`<repo>\runtime` 放 PortableGit + Node）。Linux 侧当时只是"能在本机跑"：
+Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sherpa 的 venv 与模型在 `/opt/pi-*`、piper 模型写死 `/opt/pi-tts/models`、npm 缓存写 `~/.npm`。
+这些**都不报错**，只在换机器/换路径时集中爆出来。用户要求"所有项目相关内容全部集中在一起，不分散不依赖系统环境"，并点名"网络搜索这类要建虚拟 python 环境的也要能跟着项目移动"。
+
+**决策 1：布局 `runtime/<os>-<arch>/`，旧扁平 `runtime/node` 只读兼容。**
+理由：同一块盘可能同时用于 Windows 与 Linux 便携（`win-x64` 与 `linux-arm64` 各自一套运行时），扁平布局无法表达；同时必须让既有 Windows 实装继续可用 ⇒ 解析顺序里保留旧扁平与"历史同级 `../runtime`"两条回退。
+
+**决策 2：解析收敛到 `scripts/lib-portable.sh` 一处。**
+此前 `run-my-pi.ps1` / `pi-supervisor.sh` / `lib-vendor.sh` 各写一份，已漂移过一次（`mode_resolve` 拿到 node、裸 `node` 调不到 ⇒ 启动行模式为空，见 BUILD-PORTABILITY §4.3）。
+`lib-vendor.sh` 改为 source 它并保留原函数名（`build.sh`/`doctor.sh`/`check-*.sh` 等调用方无需改动）。
+
+**决策 3：通用 Python 包用 `pip install --target` + `PYTHONPATH`，**不建 venv**；重依赖服务仍用 venv 但加启动自愈。**
+理由：venv 的 `pyvenv.cfg`/`bin/python*`/console script shebang 都绑定绝对路径，仓库一搬就失效；`--target` 装出的站点目录是纯数据。
+配套两条硬纪律：① 一律 `python -m <模块>`，不调用 venv 的 bin 脚本；② 需要 venv 的重依赖（faster-whisper/sherpa）在启动前跑 `pi_py_repair_venv`（重写 `pyvenv.cfg` 的 home + 把 `bin/python*` 改成相对链接）。
+
+**决策 4：缓存**强制**仓内**（`npm_config_cache`/`PIP_CACHE_DIR`/`PYTHONPYCACHEPREFIX` 只认 `PI_*` 显式覆盖）。
+理由：从 npm 脚本/CI 启动时环境里本来就有 `npm_config_cache=~/.npm`，"尊重已设置的值"等于把缓存写回用户目录 ⇒ 便携性静默失效（实测踩到）。
+
+**决策 5：制品下载**强制 sha256 校验**，镜像/代理只影响速度不影响正确性。**
+清单写死在 `scripts/portable-artifacts.txt`（版本 + 镜像 + sha256）；直连慢/断时按序尝试阿里云、gh-proxy 等；校验不符即丢弃换通道。
+纪律写明"sha256 必须用 `sha256sum` 生成后粘入"——本次手抄一次写错被当场拦下。
+
+**决策 6：守门 `check-portability.sh`（P1–P5）进 `check-conventions.sh` I 段 + 真实搬移测试 `test-portability-move.sh`（按需、不进 pre-commit）。**
+理由：便携性违约是"沉默"的，必须变成断言；而"真搬走还能跑"只能端到端证明，成本 5–10 分钟，不适合每次提交跑。
+搬移测试的判据全部落在**功能事实**上（新路径的 node、站点包导入、SearXNG 真实搜出结果），不靠"看起来对"。
+
+**决策 7：不把 bash/git 打进仓库（Linux 侧）。**
+理由：二者在所有 Linux 发行版与 Termux/proot 环境里都存在，且 Windows 侧已有 PortableGit 提供 bash；
+把它们也搬进仓库会显著增大体积与维护面，收益低。**如实记入文档**"仍需系统提供"，不假装零依赖。
+（`curl`/`tar` 只在引导期需要；`rg`/`fd` 这类**可选 CLI 已改为复制进仓库**，因为它们的 shim 里会出现仓外绝对路径。）
+
+**加固（因一次真实事故）**：本机 PRoot/FUSE"覆盖更短符号链接目标不截断"，且 `cp -al` 会**改到源**——一次尝试把源仓库 runtime 下 545 个链接写成 `xxx0001`，导致 `python3` 悬空并**静默回退到系统解释器**。
+处置：从已校验缓存重解包修复；新增 `portable-runtime.sh repair` 自愈、`verify` 全量链接自证、守门 P5 有界快扫；搬移测试改用 tar 并写明禁用 `cp -al`；记入 CODING-TRAPS 第 9 条（第 8 条同源：FUSE 下 `Dirent` 类型不可信，遍历必须 `statSync` 兜底）。
+
+**证据**：`check-conventions`/`check-portability` 全绿；`portable-runtime.sh verify` 全绿；`test-portability-move.sh` **7/7**（含 SearXNG 在新路径搜出 35 条结果）；`tsc -p custom/` rc=0；`vitest run` 109 文件 / 1166 用例通过。
+**未核实（✗）**：仅本机 `linux-arm64` 实跑；voice 重依赖未端到端；systemd 单元未用 `systemd-analyze` 校验。

@@ -45,8 +45,15 @@ npm_args=()
 # ── 1. Node 版本检查（my-pi 与全部 vendor 包的 engines 均为 >= 22.19.0）──
 # 注意：必须比到 minor。只看主版本会让 22.14.0 通过，随后在构建中途因
 # "node scripts/*.ts" 缺少内置类型剥离而失败（详见 lib-vendor.sh 的说明）。
-if ! command -v node >/dev/null 2>&1; then
-  echo "✗ 未找到 node。请安装 Node.js >= ${PI_NODE_MIN}（https://nodejs.org 或 nvm install ${PI_NODE_MIN_MAJOR}.${PI_NODE_MIN_MINOR}）" >&2
+#
+# 便携化（2026-10-15）：先 `pi_portable_env` —— 把**仓内** Node（`<repo>/runtime/<平台>/node`）
+# 与 npm/pip 缓存前置/指向仓库。这样"机器上没装 node"也能构建（`portable-runtime.sh node`
+# 装好即可），且 `npm ci` 不会把缓存写进 `~/.npm`。解析口径见 scripts/lib-portable.sh。
+pi_portable_env
+NODE_BIN_BUILD="$(pi_resolve_node 2>/dev/null || true)"
+if [ -z "$NODE_BIN_BUILD" ]; then
+  echo "✗ 未找到满足要求的 node（>= ${PI_NODE_MIN}）" >&2
+  node_version_hint
   exit 1
 fi
 if ! node_version_ok; then
@@ -54,7 +61,7 @@ if ! node_version_ok; then
   node_version_hint
   exit 1
 fi
-echo "✓ Node.js $(node -v) / npm $(npm -v 2>/dev/null || echo '?')"
+echo "✓ Node.js $(node -v)（$NODE_BIN_BUILD）/ npm $(npm -v 2>/dev/null || echo '?')"
 
 # ── 1b. 依赖安装前的文件系统能力预检（符号链接）──
 # npm workspaces 需要符号链接；exFAT/FAT32 不支持，会先抛出难以定位的

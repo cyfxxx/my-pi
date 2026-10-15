@@ -4,8 +4,9 @@
 
 ## systemd
 
-- `systemd/pi-searxng.service`：把原生安装的 SearXNG（`scripts/setup-external.sh web` 装到 `/opt/searxng`）
-  托管为 systemd 服务，开机自启、崩溃自动重启。
+- `systemd/pi-searxng.service`：把**仓内便携**的 SearXNG（`bash scripts/portable-runtime.sh searxng`
+  装到 `<repo>/runtime/<os>-<arch>/ext/searxng`）托管为 systemd 服务，开机自启、崩溃自动重启。
+  ★ 用前先把 unit 里的 `MY_PI_REPO=` 改成你的实际仓库路径（便携布局下路径由仓库位置推导）。
 
 ```bash
 sudo cp deploy/systemd/pi-searxng.service /etc/systemd/system/
@@ -14,9 +15,9 @@ sudo systemctl enable --now pi-searxng
 systemctl status pi-searxng        # journalctl -u pi-searxng 看日志
 ```
 
-自定义安装路径时用 drop-in 覆盖（见 unit 内注释），或在 `ExecStart` 前设 `SEARXNG_HOME`。
+自定义仓库路径时用 drop-in 覆盖 `MY_PI_REPO`（见 unit 内注释）；**不必**再改 `SEARXNG_HOME`/`PYTHONPATH`，它们都由它推导。
 
-> 注意：容器/PRoot/Termux 环境通常无 systemd，直接用 `scripts/setup-external.sh web`
+> 注意：容器/PRoot/Termux 环境通常无 systemd，直接用 `bash scripts/setup-external.sh searxng`
 > 启动（内部以 `setsid … &` 后台运行）即可。
 
 ## tmux

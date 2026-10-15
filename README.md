@@ -104,6 +104,11 @@ my-pi/
 > fresh checkout 时 `vendor/pi/` 不存在（已 gitignore）。新设备只需一条命令：
 > `bash scripts/build.sh` —— 自动安装根依赖、从上游 clone、checkout `vendor/PINNED_COMMIT`、
 > 幂等应用 `patches/` 并构建。之后 `./my-pi.sh` 即可启动。
+>
+> **要"插到别的 Linux 机器/别的路径也能跑"**（完全便携：Node、Python、SearXNG 与全部依赖都在仓内）：
+> `bash scripts/portable-runtime.sh all`，再 `bash scripts/portable-runtime.sh verify` 自证；
+> 搬运证明用 `bash scripts/test-portability-move.sh`。见
+> [docs/operations/PORTABLE-LINUX.md](docs/operations/PORTABLE-LINUX.md)。
 
 ```bash
 # 1. 新设备一键重建（安装根依赖 + 引导 vendor + 构建）

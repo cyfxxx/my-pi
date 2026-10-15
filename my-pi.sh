@@ -6,6 +6,15 @@ set -e
 
 MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# ── 便携运行时（单一事实来源）──────────────────────────────────────────────
+# `lib-portable.sh` 负责：平台判定、把仓内 Node/Python 前置进 PATH、把 npm/pip 缓存与
+# pycache 指到仓库内。**不装也能跑**（退回系统 node/python3），但"完全便携"要靠
+# `bash scripts/portable-runtime.sh all` 把运行时装进 `<repo>/runtime/<平台>/`。
+# shellcheck source=scripts/lib-portable.sh
+ROOT="$MY_PI_ROOT"
+. "$MY_PI_ROOT/scripts/lib-portable.sh"
+pi_portable_env
+
 # 导出环境变量
 # pi 只识别 PI_CODING_AGENT_DIR；技能（config/skills）与会话（config/sessions）都在其下。
 # PI_MEMORY_DIR 由 custom/core/config.ts 解析（记忆/工具归档等数据落点）。

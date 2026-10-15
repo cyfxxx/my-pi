@@ -9,7 +9,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PI_HOME="${PI_HOME:-$(cd "$SCRIPT_DIR/../../../.." && pwd)}"
 AGENT_DIR="${MY_PI_AGENT_DIR:-$PI_HOME/portable/agent}"
 LOG_DIR="${PI_VOICE_LOG_DIR:-$PI_HOME/portable/memory/logs/voice}/whisper"
-VENV="${PI_WHISPER_VENV:-/opt/pi-whisper/venv}"
+# 便携化（2026-10-15）：venv 与模型默认放**仓内** <repo>/runtime/<平台>/ext/whisper/，
+# 随项目移动；此前默认 /opt/pi-whisper/...（仓外），换机器/换路径即失效。
+PI_ROOT="$PI_HOME"
+. "$PI_HOME/scripts/lib-portable.sh"
+VENV="${PI_WHISPER_VENV:-$(pi_ext_dir whisper)/venv}"
+export PI_WHISPER_MODELS="${PI_WHISPER_MODELS:-$(pi_ext_dir whisper)/models}"
+mkdir -p "$PI_WHISPER_MODELS" 2>/dev/null || true
+# venv 里若还残留旧仓库路径（整盘搬移后），此处**幂等自愈**：pyvenv.cfg 与 bin/python* 重指
+pi_py_repair_venv "$VENV" 2>/dev/null || true
 SERVER="$SCRIPT_DIR/whisper-server.py"
 PORT="${PI_WHISPER_PORT:-18766}"
 LOG="$LOG_DIR/server.log"
@@ -68,12 +76,16 @@ start() {
     stop
   fi
   if [ ! -x "$VENV/bin/python" ]; then
-    echo "错误: 未找到 $VENV/bin/python，请先: python3 -m venv $VENV && $VENV/bin/pip install faster-whisper opencc-python-reimplemented" >&2
+    echo "错误: 未找到 $VENV/bin/python（仓内 venv 未建）" >&2
+    echo "  修复（均在仓库内，随项目移动）：" >&2
+    echo "    bash scripts/portable-runtime.sh python          # 装仓内便携 CPython" >&2
+    echo "    \"$(pi_resolve_python 2>/dev/null || echo python3)\" -m venv \"$VENV\"" >&2
+    echo "    \"$VENV/bin/python\" -m pip install faster-whisper opencc-python-reimplemented" >&2
     return 1
   fi
   # opencc 缺失时中文转写会输出繁体（服务端设计为缺失时跳过转换），警告但不阻塞启动
   if ! "$VENV/bin/python" -c 'import opencc' >/dev/null 2>&1; then
-    echo "警告: opencc 未安装，中文转写将保持繁体。修复: $VENV/bin/pip install opencc-python-reimplemented"
+    echo "警告: opencc 未安装，中文转写将保持繁体。修复: \"$VENV/bin/python\" -m pip install opencc-python-reimplemented"
   fi
   local token model device
   token="$(read_token)"
@@ -84,6 +96,8 @@ start() {
   [ -n "$token" ] && envs+=(PI_WHISPER_TOKEN="$token")
   [ -n "$model" ] && envs+=(PI_WHISPER_MODEL="$model")
   [ -n "$device" ] && envs+=(PI_WHISPER_DEVICE="$device")
+  # 模型缓存目录显式传给服务端（服务端默认也会落到仓内，这里保证与 shell 侧同一目录）
+  envs+=(PI_WHISPER_MODELS="$PI_WHISPER_MODELS")
   # ctranslate2 CUDA 依赖（nvidia-cublas/cudnn pip 包）不在系统库路径，需显式加入
   # 审计 MEDIUM 修复（2026-08-25）：python 小版本用通配探测（对齐 rebuild.sh），
   # 硬编码 3.12 在其他版本 venv 下静默丢 LD_LIBRARY_PATH → GPU 静默降级 CPU

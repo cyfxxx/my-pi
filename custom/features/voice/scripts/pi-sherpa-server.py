@@ -8,7 +8,7 @@
 
 环境变量：
   PI_SHERPA_PORT          端口（默认 18768）
-  PI_SHERPA_MODELS_DIR    模型根目录（默认 /opt/pi-sherpa/models）
+  PI_SHERPA_MODELS_DIR    模型根目录（默认 <仓库>/runtime/<平台>/ext/sherpa/models）
   PI_SHERPA_MODEL_DIR     SenseVoice 模型子目录（默认 sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17）
   PI_SHERPA_MODEL_FILE    模型文件（默认 model.int8.onnx）
   PI_SHERPA_LANGUAGE      识别语言（默认 zh；空 = 自动检测）
@@ -22,6 +22,7 @@
 """
 
 import io
+import glob
 import json
 import math
 import os
@@ -33,7 +34,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 PORT = int(os.environ.get("PI_SHERPA_PORT", "18768"))
-MODELS_DIR = os.environ.get("PI_SHERPA_MODELS_DIR", "/opt/pi-sherpa/models")
+def _repo_ext_default(*parts):
+    """模型目录默认值：仓内 <repo>/runtime/<平台>/ext/<服务>/<...>（随项目移动）。
+
+    便携化（2026-10-15）：原默认 /opt/<服务>/models 在仓外，项目一搬就丢。
+    这里不重复实现平台映射，而是 glob `runtime/*/ext/<服务>/...` 取第一个存在的候选，
+    找不到时仍返回仓内路径（便于报错里看到"应当放哪"）。
+    """
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))))
+    matches = sorted(glob.glob(os.path.join(root, "runtime", "*", "ext", *parts)))
+    if matches:
+        return matches[0]
+    return os.path.join(root, "runtime", "<平台>", "ext", *parts)
+
+MODELS_DIR = os.environ.get("PI_SHERPA_MODELS_DIR") or _repo_ext_default("sherpa", "models")
 MODEL_DIRNAME = os.environ.get(
     "PI_SHERPA_MODEL_DIR", "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
 )

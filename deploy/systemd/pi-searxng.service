@@ -1,5 +1,5 @@
 [Unit]
-Description=my-pi SearXNG metasearch engine (native venv)
+Description=my-pi SearXNG metasearch engine (repo-local portable runtime)
 Documentation=https://github.com/cyfxxx/my-pi
 # 等待网络就绪（WSL 重启时网卡初始化晚，避免 bind 失败）
 After=network-online.target
@@ -7,16 +7,31 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# 原生安装目录；用 scripts/setup-external.sh web 安装后即 /opt/searxng。
-# 如需自定义：sudo mkdir -p /etc/systemd/system/pi-searxng.service.d
-#             printf '[Service]\nEnvironment=SEARXNG_HOME=/your/path\n' > override.conf
-Environment=SEARXNG_HOME=/opt/searxng
-Environment=SEARXNG_SETTINGS_PATH=/opt/searxng/settings.yml
+# ── 便携化布局（2026-10-15 起）───────────────────────────────────────────────
+# SearXNG 的源码 / Python 依赖 / settings.yml / HOME / 日志全部在**仓库内**：
+#   <repo>/runtime/<os>-<arch>/ext/searxng/
+# 仓库位置 systemd 不知道 ⇒ 这里显式给一个仓库根 MY_PI_REPO（改成你的实际路径），
+# 其余路径用 systemd 的 ${VAR} 展开从它推导。也可用 drop-in 覆盖：
+#   sudo mkdir -p /etc/systemd/system/pi-searxng.service.d
+#   printf '[Service]\nEnvironment=MY_PI_REPO=/your/my-pi\n' | sudo tee /etc/systemd/system/pi-searxng.service.d/override.conf
+#
+# 建议先手动验证（与 unit 同路径同参数）：
+#   bash scripts/portable-runtime.sh searxng
+#   bash scripts/setup-external.sh searxng && bash scripts/setup-external.sh status
+Environment=MY_PI_REPO=/path/to/my-pi
+# 平台目录要与本机一致（uname -s -m ⇒ linux-arm64 / linux-x64 / …；见 scripts/lib-portable.sh 的 pi_platform）
+Environment=SEARXNG_PY=${MY_PI_REPO}/runtime/linux-arm64/py/bin/python3
+Environment=SEARXNG_HOME=${MY_PI_REPO}/runtime/linux-arm64/ext/searxng
+Environment=SEARXNG_SETTINGS_PATH=${SEARXNG_HOME}/settings.yml
 Environment=SEARXNG_DEBUG=0
-Environment=PYTHONPATH=/opt/searxng
-WorkingDirectory=/opt/searxng
-# 与 scripts/setup-external.sh web 一致（wsgi、127.0.0.1:8889、2 worker）
-ExecStart=/opt/searxng/venv/bin/uvicorn searx.webapp:app --interface wsgi --host 127.0.0.1 --port 8889 --workers 2
+Environment=PYTHONPATH=${SEARXNG_HOME}/src:${SEARXNG_HOME}/site
+# 服务私有 HOME/XDG/TMP：保证它不往用户目录写缓存/状态（与 scripts/lib-portable.sh 的 pi_service_env 同口径）
+Environment=HOME=${SEARXNG_HOME}/home
+Environment=XDG_CACHE_HOME=${SEARXNG_HOME}/home/.cache
+Environment=TMPDIR=${SEARXNG_HOME}/tmp
+WorkingDirectory=${SEARXNG_HOME}/src
+# ★ 用 `python -m granian` 而不是 console script：venv/site 的 bin 脚本 shebang 里是绝对路径，仓库一搬就失效
+ExecStart=/bin/sh -c 'exec "${SEARXNG_PY}" -m granian --interface wsgi --host 127.0.0.1 --port 8889 searx.webapp:app'
 Restart=always
 RestartSec=3
 StandardOutput=journal

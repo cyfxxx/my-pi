@@ -8,13 +8,14 @@
 环境变量：
   PI_WHISPER_MODEL   模型名（默认 base，可用 tiny/base/small/medium/large-v3）
   PI_WHISPER_PORT    端口（默认 18766）
-  PI_WHISPER_MODELS  模型缓存目录（默认 /opt/pi-whisper/models）
+  PI_WHISPER_MODELS  模型缓存目录（默认 <仓库>/runtime/<平台>/ext/whisper/models）
   PI_WHISPER_TOKEN   共享访问令牌；设置后 /health、/transcribe 均要求
                      Authorization: Bearer <token>，否则 401
 
 国内网络：HuggingFace 需走 hf-mirror.com 且禁用 Xet 后端（已在代码内固化）。
 """
 
+import glob
 import json
 import os
 import sys
@@ -28,7 +29,21 @@ os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 MODEL = os.environ.get("PI_WHISPER_MODEL") or "base"
 PORT = int(os.environ.get("PI_WHISPER_PORT", "18766"))
-MODELS_DIR = os.environ.get("PI_WHISPER_MODELS", "/opt/pi-whisper/models")
+def _repo_ext_default(*parts):
+    """模型目录默认值：仓内 <repo>/runtime/<平台>/ext/<服务>/<...>（随项目移动）。
+
+    便携化（2026-10-15）：原默认 /opt/<服务>/models 在仓外，项目一搬就丢。
+    这里不重复实现平台映射，而是 glob `runtime/*/ext/<服务>/...` 取第一个存在的候选，
+    找不到时仍返回仓内路径（便于报错里看到"应当放哪"）。
+    """
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))))
+    matches = sorted(glob.glob(os.path.join(root, "runtime", "*", "ext", *parts)))
+    if matches:
+        return matches[0]
+    return os.path.join(root, "runtime", "<平台>", "ext", *parts)
+
+MODELS_DIR = os.environ.get("PI_WHISPER_MODELS") or _repo_ext_default("whisper", "models")
 LANGUAGE = os.environ.get("PI_WHISPER_LANGUAGE") or None  # 服务级默认语言；None = 自动检测
 # 推理设备：cpu / cuda / auto（auto = nvidia-smi 可用则 cuda，否则 cpu）
 DEVICE = (os.environ.get("PI_WHISPER_DEVICE") or "auto").lower()

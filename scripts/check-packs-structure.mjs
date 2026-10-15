@@ -77,11 +77,20 @@ const git = (args) =>
 
 const posix = (p) => p.replaceAll('\\', '/');
 
+/** 路径类型判定：**不用 Dirent.isFile()/isDirectory()**。
+ *
+ * 为什么（2026-10-15 实测陷阱）：在 Termux/PRoot 的 FUSE 视图下，`readdir` 不返回
+ * `d_type`（DT_UNKNOWN），于是 Node 的 `Dirent.isFile()/isDirectory()` **全为 false** ——
+ * 同一个函数上一分钟还能列出 147 个 SKILL.md，下一分钟就列 0 个（目录项缓存状态不同）。
+ * 本守门当时靠 R7 计数不符**报错**才被发现（不是静默放过），但遍历逻辑必须自证可靠。
+ * 结论：一律 `statSync` 兜底，不信任 readdir 给的类型。 */
+const isDir = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
+
 /** packs/ 下的包目录（磁盘为准；drafts 单列） */
 function packDirs() {
-  const dirs = readdirSync(join(ROOT, 'packs'), { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
+  const dirs = readdirSync(join(ROOT, 'packs'))
+    .filter((name) => isDir(join(ROOT, 'packs', name)))
     .sort();
   return dirs.filter((d) => d !== 'drafts');
 }
@@ -90,12 +99,12 @@ function packDirs() {
 function allSkillFiles() {
   const out = [];
   const walk = (rel) => {
-    for (const e of readdirSync(join(ROOT, rel), { withFileTypes: true })) {
-      const r = `${rel}/${e.name}`;
-      if (e.isDirectory()) {
-        if (e.name === 'node_modules' || e.name === '__pycache__' || e.name === '.git') continue;
+    for (const name of readdirSync(join(ROOT, rel))) {
+      const r = `${rel}/${name}`;
+      if (isDir(join(ROOT, r))) {
+        if (name === 'node_modules' || name === '__pycache__' || name === '.git') continue;
         walk(r);
-      } else if (e.isFile() && e.name === 'SKILL.md') out.push(posix(r));
+      } else if (name === 'SKILL.md' && isFile(join(ROOT, r))) out.push(posix(r));
     }
   };
   walk('packs');

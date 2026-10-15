@@ -36,6 +36,37 @@ export function getPortableRoot(): string {
 }
 
 /**
+ * 便携运行时的**平台标识**：与 `scripts/lib-portable.sh` 的 `pi_platform()` 同口径。
+ *
+ * 为什么必须两侧一致：shell 侧把 Node / CPython / 外部服务装进
+ * `<repo>/runtime/<平台>/`（见 scripts/portable-runtime.sh），TS 侧也要能找到同一目录
+ * （如 piper 的 TTS 模型）。口径一旦分叉，症状是"明明装了却找不到"——静默回退到 espeak。
+ */
+export function portablePlatform(): string {
+  const os =
+    process.platform === 'win32' ? 'win'
+    : process.platform === 'darwin' ? 'darwin'
+    : process.platform === 'linux' ? 'linux'
+    : process.platform;
+  const arch =
+    process.arch === 'x64' ? 'x64'
+    : process.arch === 'arm64' ? 'arm64'
+    : process.arch === 'arm' ? 'armv7l'
+    : process.arch;
+  return `${os}-${arch}`;
+}
+
+/** 便携运行时根：`<repo>/runtime/<平台>`（随项目移动；gitignored，见 .gitignore 的 runtime/） */
+export function getRuntimeRoot(platform: string = portablePlatform()): string {
+  return join(getProjectRoot(), 'runtime', platform);
+}
+
+/** 便携外部服务目录：`<repo>/runtime/<平台>/ext/<name>`（SearXNG / whisper / sherpa / tts…） */
+export function getExtDir(name: string): string {
+  return join(getRuntimeRoot(), 'ext', name);
+}
+
+/**
  * pi 的运行时根目录（agentDir）。
  * 按 pi 的约定，配置、技能、会话与第三方扩展都在此目录下。
  *

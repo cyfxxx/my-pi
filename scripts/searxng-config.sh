@@ -17,7 +17,12 @@
 #   SEARXNG_PORT    监听端口（默认 8889）
 set -e
 
-DIR="${SEARXNG_HOME:-/opt/searxng}"
+# 便携化（2026-10-15）：默认写到**仓内** <repo>/runtime/<平台>/ext/searxng/settings.yml
+# （此前是 /opt/searxng，仓外 ⇒ 换机器/换路径就丢配置）；SEARXNG_HOME 仍可覆盖旧布局。
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib-portable.sh
+. "$ROOT/scripts/lib-portable.sh"
+DIR="${SEARXNG_HOME:-$(pi_ext_dir searxng)}"
 PORT="${SEARXNG_PORT:-8889}"
 CONFIG="$DIR/settings.yml"
 

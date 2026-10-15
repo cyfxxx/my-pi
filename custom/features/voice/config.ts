@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getAgentDir, getMemoryDir, getProjectRoot } from '../../core/config';
+import { getAgentDir, getExtDir, getMemoryDir, getProjectRoot } from '../../core/config';
 
 export type PlatformKind = 'auto' | 'termux' | 'linux' | 'windows';
 export type TtsEngine = 'auto' | 'piper' | 'espeak';
@@ -82,7 +82,10 @@ export const DEFAULTS: VoiceConfig = {
   linuxMicDevice: '',
   linuxTtsSink: '',
   ttsEngine: 'auto',
-  linuxPiperModel: '/opt/pi-tts/models/zh_CN-huayan-medium.onnx',
+  // 便携化（2026-10-15）：默认指向**仓内** <repo>/runtime/<平台>/ext/tts/models，
+  // 随项目移动；此前写死 /opt/pi-tts/...（仓外），换机器/换路径就找不到模型。
+  // 仍可用 PI_VOICE_PIPER_MODEL 或 pi-voice.json 覆盖。
+  linuxPiperModel: join(getExtDir('tts'), 'models', 'zh_CN-huayan-medium.onnx'),
   linuxTtsVoice: 'cmn',
   linuxTtsRate: 170,
   tmpDir: defaultTmpDir(),

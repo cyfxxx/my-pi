@@ -8,98 +8,18 @@
 #     从而 sync-upstream 的 merge/rebase 能自然工作。
 #   * 不产生副作用时可安全重复调用。
 
-# ── Node 版本下限 ──────────────────────────────────────────────────────────
-# my-pi 与全部 vendor/pi 包（13 个）的 engines 均为 >=22.19.0；上游 README 亦明言
-# "Pi requires Node.js 22.19 or newer"。
-#
-# 为什么必须比到 minor 而不能只看主版本（真实事故）：
-#   上游构建脚本直接用 Node 内置类型剥离运行 TypeScript，例如
-#     packages/ai: "check:model-data": "node scripts/check-model-data.ts"
-#     packages/ai: "generate-models": "node scripts/generate-models.ts --strict"
-#   该能力在 Node 22.18+ 才默认开启。Node 22.14.0（主版本同为 22）会通过旧的主版本
-#   检查，然后在构建中途以 ERR_UNKNOWN_FILE_EXTENSION 崩溃，报错位置离根因很远。
-PI_NODE_MIN_MAJOR=22
-PI_NODE_MIN_MINOR=19
-PI_NODE_MIN_PATCH=0
-PI_NODE_MIN="${PI_NODE_MIN_MAJOR}.${PI_NODE_MIN_MINOR}.${PI_NODE_MIN_PATCH}"
-
-# 校验一个语义化版本是否 >= 下限。用法：_pi_version_ok <major> <minor> <patch>
-_pi_version_ok() {
-  local maj="${1:-0}" min="${2:-0}" pat="${3:-0}"
-  [ "$maj" -gt "$PI_NODE_MIN_MAJOR" ] && return 0
-  [ "$maj" -lt "$PI_NODE_MIN_MAJOR" ] && return 1
-  [ "$min" -gt "$PI_NODE_MIN_MINOR" ] && return 0
-  [ "$min" -lt "$PI_NODE_MIN_MINOR" ] && return 1
-  [ "$pat" -ge "$PI_NODE_MIN_PATCH" ] && return 0
-  return 1
-}
-
-# 校验当前 PATH 上的 node 是否满足下限。
-# 用法：node_version_ok  → 0=满足（或未安装 node 以外的情形），1=过旧
-# 仅做版本判定；"未安装 node" 由调用方单独处理，避免两处口径不一致。
-node_version_ok() {
-  command -v node >/dev/null 2>&1 || return 0
-  local raw maj min pat
-  raw="$(node -v 2>/dev/null)" || return 1
-  raw="${raw#v}"
-  maj="${raw%%.*}"
-  min="$(printf '%s' "$raw" | cut -d. -f2)"
-  pat="$(printf '%s' "$raw" | cut -d. -f3)"
-  # 预发布版本（如 22.19.0-rc.1）的 patch 段会带后缀，剥掉非数字尾部
-  pat="$(printf '%s' "${pat:-0}" | sed 's/[^0-9].*$//')"
-  case "${maj}" in ''|*[!0-9]*) return 1 ;; esac
-  case "${min}" in ''|*[!0-9]*) min=0 ;; esac
-  case "${pat}" in ''|*[!0-9]*) pat=0 ;; esac
-  _pi_version_ok "$maj" "$min" "$pat"
-}
-
-# 校验某个 node 可执行文件存在且版本达标。用法：_pi_node_ok <路径或命令名>
-_pi_node_ok() {
-  [ -x "$1" ] || command -v "$1" >/dev/null 2>&1 || return 1
-  local v maj min pat
-  v="$("$1" -v 2>/dev/null)" || return 1
-  v="${v#v}"
-  maj="${v%%.*}"; v="${v#*.}"; min="${v%%.*}"; pat="${v#*.}"; pat="${pat%%-*}"
-  case "${maj}" in ""|*[!0-9]*) return 1 ;; esac
-  case "${min}" in ""|*[!0-9]*) min=0 ;; esac
-  case "${pat}" in ""|*[!0-9]*) pat=0 ;; esac
-  _pi_version_ok "$maj" "$min" "$pat"
-}
-
-# 解析出一个**可用的** node，打印其路径；找不到时返回 1 且不打印。
-#
-# 为什么要这个（真实事故，两次同源）：
-#   * 构建期只比主版本 → 22.14.0 被放行、构建中途崩（bug-027）
-#   * **运行期/守门期直接写裸 `node`** → PATH 上没有 node 时命令退出码 127，
-#     调用方若把"任何非 0"当成"内容有问题"，就会把「工具缺失」误报成「内容漂移」
-#     （bug-030 的同型：把 129「读不了」误报成「有改动」）。
-# 故此处统一口径：**先解析出满足下限的可执行文件**，调用方一律用它，不再裸调 node。
-#
-# 优先级：MY_PI_NODE（显式指定，便携启动器用）→ 便携布局 → PATH。
-# 便携布局优先找**仓库内** `<repo>/runtime/node/`（项目自包含、随项目移动），
-# 再退到与仓库同级的 `<repo>/../runtime/node/`（历史布局：工具分区 /runtime/node）。
-pi_resolve_node() {
-  local c
-  if [ -n "${MY_PI_NODE:-}" ] && _pi_node_ok "$MY_PI_NODE"; then
-    printf '%s' "$MY_PI_NODE"; return 0
-  fi
-  local root="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-  for c in     "$root/../runtime/node/node" "$root/../runtime/node/node.exe"     "$root/runtime/node/node" "$root/runtime/node/node.exe"; do
-    if _pi_node_ok "$c"; then printf '%s' "$c"; return 0; fi
-  done
-  if _pi_node_ok node; then printf '%s' node; return 0; fi
-  return 1
-}
-
-# 打印 Node 版本不达标的升级指引（build.sh / doctor.sh 共用，保持口径一致）
-node_version_hint() {
-  echo "  当前：$(node -v 2>/dev/null || echo '未找到 node')；要求：Node.js >= ${PI_NODE_MIN}" >&2
-  echo "  说明：上游构建脚本用 Node 内置类型剥离直接运行 .ts（如 node scripts/check-model-data.ts），" >&2
-  echo "        该能力在 22.18+ 才默认开启；仅主版本为 22 并不够，构建中途会以" >&2
-  echo "        ERR_UNKNOWN_FILE_EXTENSION 失败。" >&2
-  echo "  修复：nvm install ${PI_NODE_MIN_MAJOR}.${PI_NODE_MIN_MINOR} && nvm use ${PI_NODE_MIN_MAJOR}.${PI_NODE_MIN_MINOR}" >&2
-  echo "        或从 https://nodejs.org 安装 Node.js ${PI_NODE_MIN} 及以上" >&2
-}
+# ── Node / Python / 便携运行时：单一事实来源已移到 lib-portable.sh ────────────
+# 本文件此前自带一套 `_pi_version_ok` / `node_version_ok` / `_pi_node_ok` /
+# `pi_resolve_node` / `node_version_hint`，而 `pi-supervisor.sh` 与 Windows 启动器
+# `run-my-pi.ps1` 各有一份等价拷贝 —— 三份口径漂移过一次（BUILD-PORTABILITY.md §4.3：
+# `mode_resolve` 拿到 node、裸 `node` 却调不到，启动行模式为空）。
+# 2026-10-15 起统一由 `scripts/lib-portable.sh` 提供：
+#   * 版本下限与判据（PI_NODE_MIN*、_pi_version_ok、node_version_ok、_pi_node_ok、node_version_hint）
+#   * 解析顺序（MY_PI_NODE → `<repo>/runtime/<平台>/node/…` → 旧扁平 runtime/node → 同级历史布局 → PATH）
+#   * 平台判定、运行时目录、Python 解析、便携环境导出（PATH/npm 缓存/pip 缓存/pycache）
+# 既有调用方（build.sh / doctor.sh / check-*.sh / golden-tasks.sh）无须改动：source 本文件即可。
+# shellcheck source=scripts/lib-portable.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib-portable.sh"
 
 # ── 依赖安装的文件系统能力预检 ──────────────────────────────────────────────
 # npm 的 workspaces（根 package.json 声明 custom，vendor/pi 声明 packages/*）会把

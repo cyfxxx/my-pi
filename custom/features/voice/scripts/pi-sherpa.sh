@@ -9,7 +9,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PI_HOME="${PI_HOME:-$(cd "$SCRIPT_DIR/../../../.." && pwd)}"
 AGENT_DIR="${MY_PI_AGENT_DIR:-$PI_HOME/portable/agent}"
 LOG_DIR="${PI_VOICE_LOG_DIR:-$PI_HOME/portable/memory/logs/voice}/sherpa"
-VENV="${PI_SHERPA_VENV:-/opt/pi-sherpa/venv}"
+# 便携化（2026-10-15）：venv 与模型默认放**仓内** <repo>/runtime/<平台>/ext/sherpa/
+PI_ROOT="$PI_HOME"
+. "$PI_HOME/scripts/lib-portable.sh"
+VENV="${PI_SHERPA_VENV:-$(pi_ext_dir sherpa)/venv}"
+export PI_SHERPA_MODELS_DIR="${PI_SHERPA_MODELS_DIR:-$(pi_ext_dir sherpa)/models}"
+mkdir -p "$PI_SHERPA_MODELS_DIR" 2>/dev/null || true
+pi_py_repair_venv "$VENV" 2>/dev/null || true
 SERVER="$SCRIPT_DIR/pi-sherpa-server.py"
 PORT="${PI_SHERPA_PORT:-18768}"
 LOG="$LOG_DIR/server.log"
@@ -54,11 +60,15 @@ start() {
     stop
   fi
   if [ ! -x "$VENV/bin/python" ]; then
-    echo "错误: 未找到 $VENV/bin/python，请先: python3 -m venv $VENV && $VENV/bin/pip install sherpa-onnx numpy" >&2
+    echo "错误: 未找到 $VENV/bin/python（仓内 venv 未建）" >&2
+    echo "  修复（均在仓库内，随项目移动）：" >&2
+    echo "    bash scripts/portable-runtime.sh python          # 装仓内便携 CPython" >&2
+    echo "    \"$(pi_resolve_python 2>/dev/null || echo python3)\" -m venv \"$VENV\"" >&2
+    echo "    \"$VENV/bin/python\" -m pip install sherpa-onnx numpy" >&2
     return 1
   fi
   if ! "$VENV/bin/python" -c 'import sherpa_onnx' >/dev/null 2>&1; then
-    echo "错误: $VENV 中未安装 sherpa-onnx，请执行: $VENV/bin/pip install sherpa-onnx numpy" >&2
+    echo "错误: $VENV 中未安装 sherpa-onnx，请执行: \"$VENV/bin/python\" -m pip install sherpa-onnx numpy" >&2
     return 1
   fi
   local token lang

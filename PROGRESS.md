@@ -4013,3 +4013,33 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - 体检结论（无问题项，如实记）：147 个 SKILL.md 的 frontmatter 全部合规（`name`/`description` 齐、description 无日期）；无空目录；跨包无重复文件；INDEX/README 双向登记齐全；
   pack 内引用的 `scripts/*.py` 都是包内相对路径且确实存在；许可声明齐全（cangjie-skill/reverse-skill 带 LICENSE 文件，其余在正文声明来源与许可）。
 - 边界：只读体检 + 文件比对与文档改动，**未执行 reverse-skill 任何脚本**（其 `AGENTS.md` 明示"读≠授权执行"）；未碰 `vendor/**`、`patches/**`、`custom/**`；未提交他人改动（`portable/agent/settings.json`）。
+
+### Linux 完全便携化：运行时装进仓库、随项目移动（2026-10-15）
+
+- 用户："之前在 windows 上实现了完全便携化……现在继续优化便携化能力，实现在 Linux 环境中的完全便携化，所有项目相关内容全部集中在一起，不分散不依赖系统环境。
+  类似网络搜索功能需要创建虚拟 python 环境的也要实现便携化，能跟随项目直接移动。"（期间用户离开，授权常规决策自主决定）
+- **体检（只读，先测后动）**：库外依赖 = Node 来自 `/root/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sherpa venv 与模型在 `/opt/pi-*`、
+  piper 模型写死 `/opt/pi-tts/models`（TS 默认值）、npm 缓存写 `~/.npm`；仓库 tracked 内容零符号链接、`/root/my-pi` 只出现在测试夹具里（生产代码干净）。
+- **布局**（`runtime/` 整目录 gitignore，随盘移动）：`runtime/<os>-<arch>/{node,py,bin,ext/<服务>,npm-cache,pip-cache,pycache}`；旧扁平 `runtime/node` 保留兼容（Windows 现状）。
+- **解析收敛**：新增 `scripts/lib-portable.sh` 为**唯一**事实来源（平台判定、运行时目录、`pi_resolve_node`（MY_PI_NODE → 仓内 → 旧扁平 → 历史同级 → PATH，且必须 ≥22.19）、
+  `pi_resolve_python`、`pi_portable_env`（PATH + **强制**把 npm/pip 缓存与 pycache 指到仓内）、`pi_service_env`（服务私有 HOME/XDG/TMP）、`pi_py_repair_venv`（venv 自愈））；
+  `lib-vendor.sh`/`pi-supervisor.sh`/`my-pi.sh`/`build.sh`/`doctor.sh` 全部改用它（此前三份拷贝漂移过，见 BUILD-PORTABILITY §4.3）。
+- **引导**：新增 `scripts/portable-runtime.sh`（`status|node|python|deps [profile…]|searxng|repair|env|verify|all`）+ 清单 `scripts/portable-artifacts.txt`（版本/镜像/**sha256**）。
+  实测：Node 28.83 MB（阿里云 12 秒，sha256 ✓）；CPython 3.12.15（python-build-standalone，直连时通时断 ⇒ 加 gh-proxy 兜底）；SearXNG 源码 6.5 MB（codeload commit 内容地址，两次下载逐字节相同）。
+  ★ 教训：手抄 sha256 一次写成 `…2b7b…`（正确 `…2d7b…`）被校验当场拦下 ⇒ 清单里明确"必须 `sha256sum` 生成后粘入"。
+- **Python 便携化**：通用包用 `pip install --target <repo>/…/ext/py/site-packages` + `PYTHONPATH`（**不建 venv** ⇒ 天然可搬迁；纪律：一律 `python -m <模块>`，不调用 shebang 带绝对路径的 console script）；
+  pdf/media/game 三个 profile 实测装入 29 个顶层条目。SearXNG 单独落 `ext/searxng/{src,site,settings.yml,home,log,run,tmp}`，用 `python -m granian` 启动，**真实搜索出结果**（22/30/35 条，多次实测）。
+- **语音**：`pi-whisper.sh`/`pi-sherpa.sh` 的 venv/模型默认改到仓内 `ext/{whisper,sherpa}/`，启动前 `pi_py_repair_venv` 自愈；`whisper-server.py`/`pi-sherpa-server.py` 的模型目录默认改仓内（glob 探测，免平台映射重复）；
+  `custom/core/config.ts` 新增 `portablePlatform()/getRuntimeRoot()/getExtDir()`，`voice/config.ts` 的 piper 模型改指仓内（TS 与 shell 同口径）。
+- **其他落点**：`setup-external.sh fd-rg` 改为把 rg/fd **复制**进 `runtime/<平台>/bin`（旧写法是 `exec /usr/bin/rg` 的仓外绝对路径 shim）；`deploy/systemd/pi-searxng.service` 按便携布局改写（`MY_PI_REPO` 推导其余路径 + `python -m granian`）。
+- **守门**：新增 `scripts/check-portability.sh`（P1 生产代码无仓外绝对路径默认落点／P2 `runtime/` 被忽略且零入库／P3 解析与三个缓存必须在仓内／P4 制品 sha256 格式／P5 符号链接无 `0001` 污染），接进 `check-conventions.sh` **I 段** ⇒ 随 golden（含 `--fast`）跑。
+- **搬移测试（最强证据）**：新增 `scripts/test-portability-move.sh`——整树复制到 `/tmp`，用**最小环境**（`env -i PATH=<git>:/usr/bin:/bin`，不提供 node/python）验证 **7/7 全过**：
+  `my-pi.sh --version` 用新路径的 node、不含旧路径、便携 python+站点包可导入、`verify` 全绿、**SearXNG 在新路径搜出 35 条结果**；第 7 步只报惰性元数据（console script/.pyc/日志里的旧串）。
+- ★ **踩到并修复的环境陷阱（值得单列）**：本机 PRoot/FUSE 层"覆盖更短的符号链接目标不截断"，且 `cp -al`（硬链接复制）**会改到源**——
+  一次搬移测试的尝试把源仓库 `runtime/` 下 **545 个符号链接**写成 `xxx0001`（并删掉 `py/bin/python3`），症状是"python3 悬空 ⇒ 静默回退到系统 python"。
+  处置：删残留 DEST（2.0 GB 硬链接）→ 从已校验缓存**重解包** node/python/SearXNG 源码 → 修复 `node_modules/my-pi-custom` 链接（`rm -f` + `ln -s`）→ 全量复扫 **0 个污染**。
+  加固：`portable-runtime.sh repair`（自愈）+ `verify` 的全量链接自证 + 守门 P5（有界快扫）；搬移测试改用 tar（注释写明 `cp -al` 为何禁用）；记入 `docs/design/CODING-TRAPS.md` 第 9 条。
+  连带发现并记入同文档第 8 条：`readdir` 的 `Dirent` 类型在 PRoot/FUSE 下不可信（`isFile()/isDirectory()` 全 false ⇒ 同一守门上一分钟数到 147 个 SKILL.md、下一分钟 0 个），packs 结构守门已改 `statSync` 兜底。
+- **验证**：`check-conventions` 全绿（含新 I 段与 H 段）、`check-portability` 全绿、`portable-runtime.sh verify` 全绿、`test-portability-move.sh` 7/7、`tsc -p custom/` rc=0、`vitest run` **109 文件 / 1166 用例通过**、`check-doc-links` 一致、`doctor.sh` 报告 Node/Python/缓存在仓内。
+- **未核实（✗ 如实）**：只在本机 `linux-arm64` 实跑（清单里 linux-x64/win-x64 的 Node 与 linux-x64 的 CPython 未在对应平台验证）；voice（faster-whisper/sherpa）未端到端跑（依赖重）；`deploy/systemd` 单元未用 `systemd-analyze` 校验（PRoot 无 systemd）；
+  git/bash/curl/tar 仍由系统提供（Windows 侧已有 PortableGit/bash，Linux 侧未打进仓库）。

@@ -43,6 +43,11 @@ grep -qi microsoft /proc/version && echo WSL2
 
 识别结果决定三件事：本机该用哪套每环境独立配置（§4）、哪些终端/输入差异需要处理（§5）、以及记录经验时是否需要标注环境（§2）。
 
+> **便携运行时（2026-10-15 新增）**：Node / CPython / 各服务的 venv 与站点包 / npm·pip 缓存
+> 一律落在 `<repo>/runtime/<os>-<arch>/`（整目录 gitignored，**随盘移动**，不属于"每环境独立数据"，
+> 也不随 git 同步）。装与自证：`bash scripts/portable-runtime.sh all && bash scripts/portable-runtime.sh verify`；
+> 细节见 [PORTABLE-LINUX.md](PORTABLE-LINUX.md)。
+
 ## 二、运行时数据布局
 
 所有运行时数据都在仓库内的 `portable/` 下，通过启动脚本 `my-pi.sh`（或 `scripts/dev.sh`）、以及浏览器接入通道 `scripts/web-terminal.sh`（`npm run web`，在 pty 里拉起同一个 `my-pi.sh`）把 `PI_CODING_AGENT_DIR` 指向 `portable/agent`；技能由 pi 从 `agentDir/skills`（即 `portable/agent/skills/`）自动发现。

@@ -5,7 +5,7 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（240 条）
+## 决策台账（241 条）
 
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
@@ -247,8 +247,9 @@
 - `DECISIONS.md` · [2026-10-15] packs/reverse-skill 同步到上游 main（`cab634bd`）：44 路由 / 181 用例，保住本地定制 · **背景**：上一轮审计判定"落后上游约一个月"并留给用户 go/no-go；用户回"继续" ⇒ 按已披露的计划执行（用户已知：抓取、逐文件校验、三方合并、跑 pack 自带 Linux 测试与仓库守门）。 · 数字: 168 B / 880 条 / 42 个 / 56 个 · 证据: fe2e2def5 / edd62689f
 - `DECISIONS.md` · [2026-10-15] 三件收尾：删冗余 `patches-next/`、加 packs 链接守门、新建 termux 技能 · **① `patches-next/` 已删（已切换完成后它就是冗余）**：`patches-next/1.2/002-local-pi-mods.patch` 与 `010-disable-share-bug.patch` · 数字: 681 个 / 1236 条 / 94MB / 83MB · 证据: bc3e4ba11 / 4294967295
 - `DECISIONS.md` · [2026-10-15] packs 结构约定升格为守门（R1–R7）；被吞的上游文件按"本仓该有 / 上游声明不发布"分流处置 · **起因（两类"沉默出错"，都无任何信号）**：① `packs/README.md` 写"经验沉淀已落地 13 个"，实测 **17 个**；② 把 `git ls-files packs/reverse-skill` · 数字: 13 个 / 17 个 / 147 个 / 4 条 · 证据: cab634bd
+- `DECISIONS.md` · [2026-10-15] Linux 完全便携化：运行时进仓库（`runtime/<平台>/`）、解析收敛一处、通用 Python 包用 `--target` 而非 venv · **背景**：用户在 Windows 上已实现"插到任何机器都能跑"（`<repo>\runtime` 放 PortableGit + Node）。Linux 侧当时只是"能在本机跑"： · 数字: 10 分钟 / 545 个 / 9 条 / 8 条
 
-## 进度记录（238 条）
+## 进度记录（239 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -488,6 +489,7 @@
 - `PROGRESS.md` · packs/reverse-skill 同步到上游 main（cab634bd）：44 路由 / 181 用例（2026-10-15） · - 用户回"继续" ⇒ 按已披露计划执行（抓取→逐文件校验→三方合并→跑 pack 自带测试与仓库守门）。 · 数字: 168 B / 880 条 / 42 个 / 3 个 · 证据: fe2e2def5 / edd62689f
 - `PROGRESS.md` · 三件收尾：删 patches-next + packs 链接守门 + termux 技能（2026-10-15） · - ① patches-next/ 已删：002/010 与 patches/ 里换入后的两份 sha256 **逐字节相同** ⇒ 冗余；runbook 改写成"已执行"（状态横幅 + 等价性说明 + · 数字: 1236 条
 - `PROGRESS.md` · packs 全量整理：补回 1 个被静默吞掉的上游文件 + 结构约定升格为守门（2026-10-15） · - 用户："查看 packs 目录，做一下整理和优化"。先做全量只读体检（体积/追踪面/147 个 SKILL.md 的 frontmatter/许可/空目录/跨包重复/索引登记/引用可达性）， · 数字: 147 个 / 2 个 / 13 个 / 17 个 · 证据: cab634bd
+- `PROGRESS.md` · Linux 完全便携化：运行时装进仓库、随项目移动（2026-10-15） · - 用户："之前在 windows 上实现了完全便携化……现在继续优化便携化能力，实现在 Linux 环境中的完全便携化，所有项目相关内容全部集中在一起，不分散不依赖系统环境。 · 数字: 28.83 MB / 12 秒 / 6.5 MB / 29 个
 
 ## 缺陷回放（38 条）
 
@@ -530,7 +532,7 @@
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 - `docs/BUG-REPLAYS.md` · #38 **创建/切换会话打断在跑的那一轮**：TUI 里 `/new`（新建会话）或 `/resume`（会话选择器）会把当前会话**正在跑的那一轮直接中止** —— 用户视角是「我刚让它做的事被打断、结果丢了」。**根因在 pi 内部* · 切换前 pane 有工作指示器；切换后**旧会话文件末条是 `stopReason=aborted` / 空 content 的 assistant 记录**；同一轮本该落盘的回复**永远不再出现**在旧会话文件里；PID 不变（不是重启） · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
 
-## 设计文档（198 条）
+## 设计文档（200 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -557,6 +559,8 @@
 - `docs/design/CODING-TRAPS.md` · 5. 新引入一种"我写的文件格式"⇒ 必须同时引入一条校验它的守门 · - **症状**：一份**非法 JSON** 一路提交进仓库（文档链接只查 md、约定守门只查计数、死导出只查 TS ⇒ **没人看 `.json` 语法**）。
 - `docs/design/CODING-TRAPS.md` · 6. 改语义前，先读断言本身表达的契约——测试可能是 bug 的保护壳 · - **症状**：一个 bug 长期存活，因为**既有测试把错误行为写成了期望**（实例：`it('shutdown 回收空闲与在租的全部 worker')`
 - `docs/design/CODING-TRAPS.md` · 7. 真 pty 场景里，用"切片里没有某段文本"做断言 ⇒ 被 TUI 全屏重绘污染成**假失败** · - **症状**：断言"发 `/new` 之后 pane 里还没有 `New session started`"失败，而行为其实完全正确； · 数字: 2 次 / 3 分钟
+- `docs/design/CODING-TRAPS.md` · 8. `readdir` 给的 `Dirent` 类型在 PRoot/FUSE 下**不可信** ⇒ 遍历结果会"时好时坏" · - **症状**：同一个 `check-packs-structure.mjs`，前一分钟报 `147 个 SKILL.md`，下一分钟报 · 数字: 147 个 / 0 个
+- `docs/design/CODING-TRAPS.md` · 9. PRoot/FUSE 下"覆盖更短的符号链接目标"不截断 ⇒ 留下 `0001` 尾巴；`cp -al` 还会**改到源** · - **症状 A（静默）**：`python3 -V` 仍能跑，但用的是**另一个解释器**（系统/Termux 的）， · 数字: 545 个 · 证据: bash scripts/portable-runtime.sh repair
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条

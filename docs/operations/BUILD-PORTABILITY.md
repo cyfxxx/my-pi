@@ -441,6 +441,30 @@ env MY_PI_NODE= PATH="/d/App_X/Node:/usr/bin:/mingw64/bin" bash -c './my-pi.sh -
 
 ---
 
+### 4.5 Linux 完全便携（2026-10-15 实装）
+
+§4.3 解决的是 Windows 侧"盘上带工具链"；Linux 侧当时仍只是"能在本机跑"——
+Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sherpa 的 venv 在
+`/opt/*`、npm 缓存写 `~/.npm`。这些**都不会报错**，只在换机器/换路径时集中爆出来。
+
+现在两侧统一到同一套解析与同一套布局（`scripts/lib-portable.sh` 是**唯一**解析点）：
+
+| 关注点 | Windows（既有） | Linux（本次） |
+|---|---|---|
+| 工具链位置 | `<repo>\runtime\node`、`<repo>\runtime\PortableGit` | `<repo>/runtime/<os>-<arch>/{node,py}`、`ext/<服务>` |
+| 解析函数 | `run-my-pi.ps1` 的 `Find-Runtime`（含盘符遍历回退） | `pi_resolve_node`/`pi_resolve_python`（含旧扁平布局与历史同级布局回退） |
+| 版本门禁 | 解析后必须通过 `>= 22.19.0` 校验 | 同一函数、同一常量 |
+| 服务 | VeraCrypt（唯一必须留明文分区的例外） | SearXNG / whisper / sherpa 全部落仓内；VeraCrypt 同前 |
+| 守门 | 无（靠启动器实现） | `check-portability.sh`（P1–P5）+ `test-portability-move.sh`（真实搬移） |
+
+**§4.3 那张"三个解析点必须一致"的表已经过时**：2026-10-15 起
+`run-my-pi.ps1` 只负责"找运行时"，Linux 侧的 `pi-supervisor.sh` 与 `lib-vendor.sh`
+都改为调用 `scripts/lib-portable.sh`（保留原函数名，调用方无需改动）。
+
+细节、命令、实测数据、边界与未核实项见 **[`PORTABLE-LINUX.md`](PORTABLE-LINUX.md)**。
+
+---
+
 ## 5. 预防：为什么这三条被写成守门而不是文档提醒
 
 my-pi 的既定纪律是"反复有效的软引导必须硬化"（VISION §3.1），"数据完整性不依赖模型自觉"

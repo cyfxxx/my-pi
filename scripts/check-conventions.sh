@@ -321,6 +321,21 @@ else
   bad "缺少 scripts/check-packs-structure.mjs（packs 结构守门）"
 fi
 
+# ── I. 便携性（"项目相关内容都在仓库内、随项目移动"）──
+# 起因（2026-10-15 实测）：Linux 侧此前"能跑但不可搬"——Node 在 ~/.local/share/pi-node、
+# SearXNG 在 /opt/searxng、whisper/sherpa 的 venv 在 /opt/*、npm 缓存写 ~/.npm。
+# 这些**都不会报错**，只在换机器/换路径时集中爆出来。判据与"为什么"见脚本文件头。
+if [ -f scripts/check-portability.sh ]; then
+  if port_out="$(bash scripts/check-portability.sh 2>&1)"; then
+    ok "$(printf '%s' "$port_out" | grep -E '^🎉' | sed 's/^🎉 //')"
+  else
+    bad "便携性守门未通过（跑 bash scripts/check-portability.sh 看明细）"
+    printf '%s\n' "$port_out" | grep -E '❌' | head -6 | sed 's/^/      /'
+  fi
+else
+  bad "缺少 scripts/check-portability.sh（便携性守门）"
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "🎉 约定守门全部通过"

@@ -39,15 +39,25 @@ echo "=== my-pi doctor（$ROOT）==="
 
 # ── 1. Node ──
 echo "[1] 运行时"
+# 便携化（2026-10-15）：体检要能回答"项目是不是自包含"——node/python 是否在仓内、
+# 缓存有没有漏到用户目录。判据与 scripts/check-portability.sh 同源（都走 lib-portable.sh）。
+pi_portable_env
 if command -v node >/dev/null 2>&1; then
   if node_version_ok; then
-    ok "Node $(node -v)"
+    ok "Node $(node -v)（$(pi_resolve_node 2>/dev/null || echo '?')）"
   else
     bad "Node $(node -v) 低于要求（需要 >= ${PI_NODE_MIN}）；上游构建脚本需内置类型剥离运行 .ts"
   fi
 else
-  bad "未找到 node（安装 Node >= ${PI_NODE_MIN}）"
+  bad "未找到 node（装进仓库：bash scripts/portable-runtime.sh node）"
 fi
+if [ -x "$(pi_runtime_root)/py/bin/python3" ]; then
+  ok "便携 Python $( "$(pi_runtime_root)/py/bin/python3" -V 2>&1 | awk '{print $2}' )（$(pi_runtime_root)/py）"
+else
+  warn "无仓内便携 Python（bash scripts/portable-runtime.sh python）—— 依赖系统 python3 的能力（PDF/media/voice）会跟着系统走"
+fi
+case "${npm_config_cache:-}" in "$ROOT"/*) ok "npm 缓存在仓内" ;; *) warn "npm 缓存不在仓内：${npm_config_cache:-未设置}" ;; esac
+case "${PIP_CACHE_DIR:-}" in "$ROOT"/*) ok "pip 缓存在仓内" ;; *) warn "pip 缓存不在仓内：${PIP_CACHE_DIR:-未设置}" ;; esac
 
 # ── 2. 根工作区依赖 ──
 echo "[2] 依赖"

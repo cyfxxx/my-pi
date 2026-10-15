@@ -82,47 +82,22 @@ export PI_TELEMETRY=0
 # 报错点离根因极远，故此处显式解析并校验，且导出给所有子进程继承。
 . "$ROOT/scripts/lib-vendor.sh"
 
-_pi_node_ok() {  # $1 = node 可执行文件；版本达标返回 0
-  [ -x "$1" ] || command -v "$1" >/dev/null 2>&1 || return 1
-  local v maj min pat
-  v="$("$1" -v 2>/dev/null)" || return 1
-  v="${v#v}"
-  maj="${v%%.*}"; v="${v#*.}"; min="${v%%.*}"; pat="${v#*.}"; pat="${pat%%-*}"
-  case "${maj}" in ""|*[!0-9]*) return 1 ;; esac
-  case "${min}" in ""|*[!0-9]*) min=0 ;; esac
-  case "${pat}" in ""|*[!0-9]*) pat=0 ;; esac
-  _pi_version_ok "$maj" "$min" "$pat"
-}
-
-NODE_BIN=""
-if [ -n "${MY_PI_NODE:-}" ] && _pi_node_ok "$MY_PI_NODE"; then
-  NODE_BIN="$MY_PI_NODE"
-fi
-if [ -z "$NODE_BIN" ]; then
-  # 便携布局：ROOT 下的 runtime/node/，或与仓库同级（同盘）的 runtime/node/
-  # 顺序上把 `<repo>/runtime`（项目自包含的主布局）放在前面。
-  for c in "$ROOT/runtime/node/node" "$ROOT/runtime/node/node.exe" \
-           "$ROOT/../runtime/node/node" "$ROOT/../runtime/node/node.exe"; do
-    if _pi_node_ok "$c"; then NODE_BIN="$c"; break; fi
-  done
-fi
-if [ -z "$NODE_BIN" ] && command -v node >/dev/null 2>&1 && _pi_node_ok node; then
-  NODE_BIN=node
-fi
-# 把解析到的 node 目录放到 PATH 最前 —— **对所有分支统一做**，不能只在 MY_PI_NODE 分支做。
-# 为什么必须统一（2026-10-13 实测缺陷）：`mode_resolve` 用**裸 `node -e`** 解析 modes.json。
-# 原先只有 MY_PI_NODE 分支会把它加进 PATH，于是"靠便携布局自动发现 node"时，
-# 监督器本身拿到了 node，但 PATH 里的裸 `node` 调不到 → `mode_resolve` 返回空 →
-# 启动行显示「模式 」（空）而不是「模式 full」。实测精简 PATH 下稳定复现 5/5，
-# 完整 PATH（或显式 MY_PI_NODE）下正常 —— 差别就在这一行 PATH。
-if [ -n "$NODE_BIN" ] && [ "$NODE_BIN" != "node" ]; then
-  PATH="$(cd "$(dirname "$NODE_BIN")" && pwd):$PATH"; export PATH
-fi
+# ── Node 解析：**收敛到 scripts/lib-portable.sh**（2026-10-15）──
+# 此前这里有一份与 lib-vendor.sh 重复的 `_pi_node_ok` + 解析循环，而 Windows 启动器又有
+# 第三份；BUILD-PORTABILITY.md §4.3 已记录过"解析点不一致"造成的真实缺陷
+# （`mode_resolve` 拿到 node、裸 `node` 却调不到 ⇒ 启动行模式为空）。
+# 现在统一走 `pi_resolve_node`：MY_PI_NODE → `<repo>/runtime/<平台>/node/{bin/,}node[.exe]`
+# → 旧扁平 `<repo>/runtime/node/` → 同级历史布局 → PATH。
+#
+# `pi_portable_env` 还顺手把仓内 node/python/bin 前置进 PATH、把 npm/pip 缓存与 pycache
+# 指到仓库内（否则写 ~/.npm、~/.cache，等于把项目状态散到用户目录）。
+pi_portable_env
+NODE_BIN="$(pi_resolve_node 2>/dev/null || true)"
 if [ -z "$NODE_BIN" ]; then
   echo "❌ 未找到满足要求的 Node.js（需要 >= ${PI_NODE_MIN}）" >&2
   node_version_hint
   echo "  提示：可用 MY_PI_NODE=<node 绝对路径> 显式指定；" >&2
-  echo "        或把便携 Node 放到 <仓库>/runtime/node/（仓库内便携布局会自动采用）。" >&2
+  echo "        或装进仓库自带运行时：bash scripts/portable-runtime.sh node" >&2
   exit 1
 fi
 export NODE_BIN

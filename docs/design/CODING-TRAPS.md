@@ -55,6 +55,39 @@
   自查：`bash -c 'grep -n "slice(mark)" scripts/test-scenario-*.mjs'`，逐条问"这条是正向还是反向？
   重绘会让它假绿还是假红？"
 
+## 8. `readdir` 给的 `Dirent` 类型在 PRoot/FUSE 下**不可信** ⇒ 遍历结果会"时好时坏"
+
+- **症状**：同一个 `check-packs-structure.mjs`，前一分钟报 `147 个 SKILL.md`，下一分钟报
+  `0 个 SKILL.md`（`packs` 目录数仍是 17）。期间没有任何文件被改动。
+- **原因**：`fs.readdirSync(dir, { withFileTypes: true })` 的类型来自 `readdir` 的 `d_type`；
+  在 Termux/PRoot 的 FUSE 视图下它可能是 `DT_UNKNOWN`，于是 `Dirent.isFile()` /
+  `isDirectory()` **一律返回 false**。实测同一进程里 `packs/` 一层能给类型、
+  `packs/books/` 一层全是 false（取决于目录项缓存状态）⇒ **行为不可预测**。
+- **为什么没有静默放过**：该守门的 R7 拿"README 声明的经验沉淀数"与实测数比对，0 ≠ 17 直接报错
+  （"计数必须等于实测"这条意外成了探针）。否则就是"守门全绿、其实什么都没查"。
+- **判据**：遍历目录一律 `statSync` 兜底，不信任 `Dirent`：
+  `const isDir = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };`
+  自查：`bash -c 'grep -rn "withFileTypes" scripts/*.mjs custom 2>/dev/null'`，
+  逐处问"这里依赖 d_type 吗？FUSE 下会不会全 false？"
+
+## 9. PRoot/FUSE 下"覆盖更短的符号链接目标"不截断 ⇒ 留下 `0001` 尾巴；`cp -al` 还会**改到源**
+
+- **症状 A（静默）**：`python3 -V` 仍能跑，但用的是**另一个解释器**（系统/Termux 的），
+  报错却来自别处：`ImportError: dlopen failed: ... /libpython3.14.so is not accessible`。
+  根因是仓内 `runtime/<平台>/py/bin/python3` 已变成**悬空链接**（目标 `python3.120001`），
+  `[ -x … ]` 判定失败 ⇒ 解析器静默回退到 PATH 上的 python。
+- **症状 B（更坏）**：`cp -al`（硬链接复制）在本机**会修改源仓库**——一次尝试把源仓库
+  `runtime/` 下 **545 个符号链接**写成 `xxx0001`，还删掉了 `py/bin/python3`。
+- **原因**：把链接目标写成 `target2` 时，若底层目录项原先存的是更长字符串且 FS 不截断，
+  就会残留尾部（实测 `target1` → `ln -sfn target2` → `readlink` 得 `target20001`）；
+  `cp -l` 为符号链接建硬链接在部分路径上**成功**，于是源与目标共享同一目录项。
+- **判据**：
+  - 创建/覆盖符号链接一律 **先 `rm -f` 再 `ln -s`**（本仓 `pi_py_repair_venv` 已如此）；
+  - **不要用 `cp -al`** 复制含符号链接的树（用 `tar -cf - | tar -xf -`）；
+  - 自查：`bash -c 'find runtime -type l -printf "%p -> %l\n" | grep -c "0001$"'` 应为 0；
+    被污染时 `bash scripts/portable-runtime.sh repair` 从已校验的缓存归档重解包（自愈），
+    守门 `check-portability.sh` 的 P5 与 `portable-runtime.sh verify` 都会拦。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
