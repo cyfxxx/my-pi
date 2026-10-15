@@ -133,9 +133,9 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
   {
     pi: 'session_before_compact',
     tier: 'semantic',
-    dsh: ['compaction'],
-    via: 'service',
-    note: '1 处；无等价事件：pi 是"每次压缩前可取消/可自定义的回调"，DSH 是替换 CompactionEngine 服务（或失败路径瀑布 compaction/summary-error）⇒ 外观层显式判为需服务替换',
+    dsh: ['compaction/start'],
+    via: 'session-event',
+    note: '1 处；★ 2026-10-16 更正：DSH 的压缩生命周期是**会话日志事件** compaction/start|summary|end|prune（声明于 dsh-compaction 的 SessionEventMap，types.d.ts:21/35/73/88），经 `session/event` 追加派发 ⇒ 只能"开始后"观察、**不能否决**。我们这处只需要"压缩前落快照 + 记账"：`compaction/start` 到达时 summary 与替换用的 user/message 都还没落，够用 ✓；若将来要"取消压缩"，DSH 侧得替换 CompactionEngine 服务（不是订阅事件）✗',
   },
   {
     pi: 'before_provider_request',

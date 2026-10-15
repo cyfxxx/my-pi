@@ -184,10 +184,14 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     //   （实测 `{isError:true, error:{message:"Cannot read properties of undefined (reading 'kind')"}}`）
     const listener = makeDshListener(event, handler as PiHookHandler, { report, piContext: options.piContext });
     if (via === 'cordis') {
+      ledger.declare(`on(${event})`, 'supported', `→ ${target}（cordis 事件）`);
+      ledger.use(`on(${event})`);
       disposers.push(ctx.on(target, listener));
       return;
     }
     // session-event：只能订阅追加流，再按 event.type 派发（**提交后**，观察型）
+    ledger.declare(`on(${event})`, 'degraded', `→ session/event 里 type=${target}（追加流：提交后观察、**不可否决**）`);
+    ledger.use(`on(${event})`);
     disposers.push(
       ctx.on('session/event', (...args: readonly unknown[]) => {
         const envelope = args[0] as { type?: unknown } | undefined;

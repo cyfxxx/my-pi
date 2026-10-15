@@ -83,7 +83,10 @@ describe('events 映射表', () => {
   it('查表能拿到落点类型（cordis / session-event / service）', () => {
     expect(resolveDshEvent('tool_call')?.dsh[0]).toBe('tools/pre-execute');
     expect(resolveDshEvent('turn_start')?.via).toBe('session-event');
-    expect(resolveDshEvent('session_before_compact')?.via).toBe('service');
+    // 2026-10-16 更正：压缩生命周期是会话日志事件 ⇒ 走 session/event（不再判为服务替换）。
+    // 表里现在**没有** via:'service' 的条目；facade 仍保留该分支以备将来（防御性，不是当前路径）。
+    expect(resolveDshEvent('session_before_compact')?.via).toBe('session-event');
+    expect(PI_TO_DSH_EVENTS.some((m) => m.via === 'service')).toBe(false);
     expect(resolveDshEvent('nonexistent')).toBeUndefined();
   });
 });
@@ -314,14 +317,27 @@ describe('facade 外观层', () => {
     expect(() => facade.api.on('before_tool_call' as never, (() => undefined) as never)).toThrow(/before_tool_call/);
   });
 
-  it('服务替换类事件（session_before_compact）上报 unsupported 且不订阅', () => {
+  it('压缩生命周期事件走 session/event 且按 compaction/start 派发（2026-10-16 更正）', () => {
     const fake = makeFakeDsh();
-    const reports: string[] = [];
-    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m) => reports.push(m) });
-    facade.api.on('session_before_compact' as never, (() => undefined) as never);
-    expect(reports.some((m) => m.includes('session_before_compact'))).toBe(true);
+    const facade = createDshExtensionApi(fake.ctx);
+    const handler = vi.fn();
+    facade.api.on('session_before_compact' as never, handler as never);
+    // 订阅的是会话事件流，不是某个 cordis 事件
+    expect(fake.listeners.get('session/event')).toHaveLength(1);
     expect(fake.listeners.get('compaction')).toBeUndefined();
-    expect(facade.surfaceReport().find((e) => e.member === 'on(session_before_compact)')?.status).toBe('unsupported');
+
+    const listener = fake.listeners.get('session/event')?.[0];
+    // 只转发压缩开始；其它会话事件（及 turn/end 之类）不应触发我们的处理器
+    listener?.({ type: 'compaction/start', compactionId: 'c1', turn: 3 });
+    expect(handler).toHaveBeenCalledTimes(1);
+    listener?.({ type: 'compaction/summary' });
+    listener?.({ type: 'turn/end' });
+    expect(handler).toHaveBeenCalledTimes(1);
+    // 状态是 **degraded** 而不是 supported：会话事件是"提交后观察"，丢失了 pi 的"可否决"语义
+    // （我们这处只需要观察+快照 ⇒ 够用，但要在报告里如实体现降级）
+    const entry = facade.surfaceReport().find((e) => e.member === 'on(session_before_compact)');
+    expect(entry?.status).toBe('degraded');
+    expect(entry?.detail).toContain('不可否决');
   });
 
   it('未支持的 pi 成员被调用时上报，且返回安全值', () => {

@@ -182,10 +182,17 @@ async function main(): Promise<void> {
       const bootstrapModule = await import('../../custom/bootstrap');
       bootstrapModule.default(bootFacade.api);
       console.error = originalError;
+      // 事件桥接台账：确认"哪些 pi 钩子真的接上了"，并守住"压缩事件不再被判为服务替换"这条更正
+      const eventEntries = bootFacade.surfaceReport().filter((e) => e.member.startsWith('on('));
+      const supported = eventEntries.filter((e) => e.status === 'supported').length;
+      const degraded = eventEntries.filter((e) => e.status === 'degraded').length;
+      const unsupported = eventEntries.filter((e) => e.status === 'unsupported').length;
+      const compact = eventEntries.find((e) => e.member === 'on(session_before_compact)');
+      const compactOk = compact?.status === 'degraded';
       a9 = {
         id: 'A9',
-        ok: failures.length === 0 && names.length > 20,
-        detail: `全量 bootstrap：注册工具 ${names.length} 个；失败特性 ${failures.length} 个${failures.length ? ' ⇒ ' + failures.join(' | ') : ''}`,
+        ok: failures.length === 0 && names.length > 20 && unsupported === 0 && compactOk,
+        detail: `全量 bootstrap：注册工具 ${names.length} 个；失败特性 ${failures.length} 个；钩子桥接 ${supported} 直接 / ${degraded} 降级 / ${unsupported} 无等价；session_before_compact=${compact?.status ?? '未注册'}${failures.length ? ' ⇒ ' + failures.join(' | ') : ''}`,
       };
       bootFacade.dispose();
     }
