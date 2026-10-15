@@ -71,6 +71,14 @@ portable/memory/stats/*
 data/logs/
 data/plans/
 
+# 仓库内 .pi/（pi-tools 旧布局的运行时状态；my-pi 已改用 portable/agent）
+# 该规则最初由 036ae7c58（2026-09-20，「add .pi/searxng/ and runtime data to .gitignore」）加入，
+# 随后在 agentDir 改名那次 .gitignore 重写中丢失。补回的原因是可指认的事故：
+# 2026-09-19 误提交 .pi/searxng/venv（pack 内 48.4 MB，占整个 clone 的 35%），次日删除，
+# 但已进入 HEAD 祖先，永久无法用 gc 回收。当前 .pi/ 下没有任何入库文件。
+.pi/
+# 若将来确需跟踪其中个别文件，用「!.pi/<file>」白名单，或 git add -f。
+
 # 根目录 memory/（仅限仓库根，勿影响 portable/memory/）
 /memory/
 
