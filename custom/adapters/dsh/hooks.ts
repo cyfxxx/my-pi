@@ -74,6 +74,21 @@ export interface HookBridgeContext {
    * 不派生的话，那些处理器在 DSH 上拿不到"这是哪个会话"——这正是 pi→DSH 最容易静默出错的地方。
    */
   readonly piContextFor?: (payload: unknown) => unknown;
+  /**
+   * 把"每步"事件适配成"每回合一次"用的去重键（可选）。
+   *
+   * 背景：pi 的 `before_agent_start` 是**每回合一次**，DSH 的对应点 `agent/pre-step` 是**每步一次**
+   * （一回合里可能有多次模型请求）⇒ 不去重会让"回合开始才该跑一次"的逻辑跑多次。
+   * ★ 只对 **pi 处理器**去重：waterfall 的 `next()` **每次都要调**，否则会打挂调用链。
+   * 返回 `undefined` 表示"这次不去重"（例如负载里没有回合号）。
+   */
+  readonly dedupeKey?: (payload: unknown) => string | undefined;
+}
+
+/** 从 `agent/pre-step` 的负载里取回合号（`{agent, messages, turn, step, signal}`） */
+export function dedupeByTurn(payload: unknown): string | undefined {
+  const turn = (typeof payload === 'object' && payload !== null ? (payload as { turn?: unknown }).turn : undefined);
+  return typeof turn === 'number' || typeof turn === 'string' ? `turn:${String(turn)}` : undefined;
 }
 
 /**
@@ -175,6 +190,7 @@ export function mapToolResultDecision(decision: unknown): PostToolDecision | und
  * DSH-HOOK-MAPPING.md §4#5）。
  */
 export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge: HookBridgeContext): DshEventListener {
+  let lastDedupeKey: string | undefined;
   return async (...args: readonly unknown[]): Promise<unknown> => {
     const report = bridge.report;
     const last = args.length > 0 ? args[args.length - 1] : undefined;
@@ -183,6 +199,15 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
 
     // 本次负载对应的 pi 上下文（会话事件里带会话身份；其它事件回落到默认）
     const piContext = bridge.piContextFor ? bridge.piContextFor(first) : bridge.piContext;
+
+    // "每步"→"每回合一次"的去重：**只跳过 pi 处理器**，`next()` 仍然必须调（见 dedupeKey 说明）
+    if (bridge.dedupeKey) {
+      const key = bridge.dedupeKey(first);
+      if (key !== undefined) {
+        if (key === lastDedupeKey) return next ? next() : undefined;
+        lastDedupeKey = key;
+      }
+    }
 
     if (piEvent === 'tool_call') {
       const event = toPiToolCallEvent(first);

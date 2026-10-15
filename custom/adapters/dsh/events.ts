@@ -64,6 +64,8 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     pi: 'before_agent_start',
     tier: 'semantic',
     dsh: ['agent/pre-step', 'system-prompt/assemble'],
+    status: 'degraded',
+    degradedNote: 'pi 是**每回合一次**、DSH 的 agent/pre-step 是**每步一次**（一回合可多次请求）⇒ 桥接层按 `turn` 去重（只跳过处理器，next() 每次照调）以保持"回合开始跑一次"的语义；提示词装配类处理器若要每步都跑应改挂 system-prompt/assemble',
     via: 'cordis',
     note: '6 处；pi 是"启动前一次"，DSH 对应点是每步（pre-step）或提示词装配 ⇒ 处理器必须改成幂等/每步语义',
   },

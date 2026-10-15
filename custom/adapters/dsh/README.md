@@ -67,7 +67,7 @@ spike 的 10 条检查（A1–A10）覆盖：真实服务启动、工具注册�
 **pi 形状命令 → 真实命令服务**（A10）。
 实测结果：**10 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
-**13 直接 / 5 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
+**12 直接 / 6 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
 
 ### pi 包别名（A9 的前提，也是 P5 的机制验证）
@@ -128,3 +128,12 @@ pi 的 `thinking_level_select` 是"**选中档位时**"触发、处理器做**�
 `thinking-level.ts`：`mapThinkingLevelToEffort(level, efforts)` 做精确/别名匹配，
 **只降不升**（升档会让整段前缀缓存失效），认不出序或只有更高档位时**失败并给原因**（不猜）。
 ✗ 真正改配置需要模型路由（`LlmModelReasoningInfo.efforts`）⇒ 运行时未验；映射表把该事件显式标为 `degraded`。
+
+### `before_agent_start`：每步 → 每回合一次（2026-10-16）
+
+pi 的 `before_agent_start` 是**每回合一次**；DSH 的对应点 `agent/pre-step` 是**每步一次**
+（一回合里可能有多次模型请求，负载形如 `{agent, messages, turn, step, signal}`）。
+桥接层用 `dedupeKey` 按 `turn` 去重 —— **只跳过 pi 处理器，`next()` 每次都照调**
+（waterfall 的 next 漏调会打挂调用链，这是本项目实测过的坑）。
+负载没有回合号时**不去重**：宁可多跑一次，也不静默少跑。
+该事件在 `surfaceReport()` 里是 `degraded`：提示词装配类处理器若要每步都跑，应改挂 `system-prompt/assemble`。

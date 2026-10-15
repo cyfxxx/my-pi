@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PI_TO_DSH_EVENTS, assertEventsMapped, mappingSummary, resolveDshEvent } from '../events';
 import { createDshExtensionApi } from '../facade';
-import { deriveSessionInfo, makeDshListener, mapToolCallDecision, mapToolResultDecision, withSessionContext } from '../hooks';
+import { dedupeByTurn, deriveSessionInfo, makeDshListener, mapToolCallDecision, mapToolResultDecision, withSessionContext } from '../hooks';
 import { toDshToolPayload } from '../tool';
 import type { DshCommandDefinition, DshContext, DshDefineToolOptions, DshEventListener } from '../types';
 
@@ -399,6 +399,53 @@ describe('命令映射（pi 形状 → DSH CommandDefinition）', () => {
     facade.api.registerCommand('mode', piCommand() as never);
     expect(reports).toContain('registerCommand');
     expect(facade.surfaceReport().find((e) => e.member === 'registerCommand')?.status).toBe('unsupported');
+  });
+});
+
+describe('每步 → 每回合一次（before_agent_start 的语义适配）', () => {
+  it('同一 turn 只调一次处理器，但 **next() 每次都调**（waterfall 不能被打断）', async () => {
+    const handler = vi.fn(() => undefined);
+    const next = vi.fn().mockResolvedValue(undefined);
+    const listener = makeDshListener('before_agent_start', handler, { report: () => undefined, dedupeKey: dedupeByTurn });
+
+    await listener({ turn: 7, step: 1 });
+    await listener({ turn: 7, step: 2 });
+    await listener({ turn: 7, step: 3 });
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled(); // 无 next 入参（emit 形态）时不应报错
+
+    await listener({ turn: 7, step: 4 }, next);
+    expect(handler).toHaveBeenCalledTimes(1); // 仍同回合
+    expect(next).toHaveBeenCalledTimes(1);     // 但 next 必须调
+
+    await listener({ turn: 8, step: 1 }, next);
+    expect(handler).toHaveBeenCalledTimes(2); // 新回合 ⇒ 再跑一次
+    expect(next).toHaveBeenCalledTimes(2);
+  });
+
+  it('负载没有回合号时**不去重**（宁可多跑，不静默少跑）', async () => {
+    const handler = vi.fn(() => undefined);
+    const listener = makeDshListener('before_agent_start', handler, { report: () => undefined, dedupeKey: dedupeByTurn });
+    await listener({ step: 1 });
+    await listener({ step: 2 });
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(dedupeByTurn({ step: 1 })).toBeUndefined();
+    expect(dedupeByTurn({ turn: 0 })).toBe('turn:0');
+  });
+
+  it('经外观层：before_agent_start 走 agent/pre-step 且按 turn 去重（状态为 degraded）', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const handler = vi.fn(() => undefined);
+    facade.api.on('before_agent_start' as never, handler as never);
+    const listener = fake.listeners.get('agent/pre-step')?.[0];
+    expect(listener).toBeDefined();
+    await listener?.({ turn: 1, step: 1 });
+    await listener?.({ turn: 1, step: 2 });
+    expect(handler).toHaveBeenCalledTimes(1);
+    const entry = facade.surfaceReport().find((e) => e.member === 'on(before_agent_start)');
+    expect(entry?.status).toBe('degraded');
+    expect(entry?.detail).toContain('每步');
   });
 });
 
