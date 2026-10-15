@@ -24,11 +24,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * 解析项目根目录
- * 从 custom/core/config.ts 向上两级
+ * 解析项目根目录。
+ *
+ * 优先级：`MY_PI_ROOT` → `PI_ROOT` → **从本文件位置上溯两级**（`custom/core/` → 仓库根）。
+ *
+ * 为什么必须支持环境变量（2026-10-15 换 DSH 底座时实测到的坑）：
+ * 打包（esbuild）会把本文件内联进产物，`import.meta.url` 于是指向**产物位置**而不是
+ * `custom/core/`；DSH 的插件产物在 `dsh/plugin/dist/`，上溯两级得到的是 `dsh/` ——
+ * 于是 features 把 `portable/agent/modes.json` 写到了 `dsh/portable/agent/`（实测产生的脏目录）。
+ * ⇒ 部署侧（DSH 插件入口 / 启动脚本）必须显式给出根目录；本文件的回退只适用于"从源码位置加载"。
  */
 export function getProjectRoot(): string {
-  return resolve(__dirname, '..', '..');
+  const envRoot = process.env.MY_PI_ROOT ?? process.env.PI_ROOT;
+  return envRoot ? resolve(envRoot) : resolve(__dirname, '..', '..');
 }
 
 export function getPortableRoot(): string {

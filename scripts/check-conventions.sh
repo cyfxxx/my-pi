@@ -185,8 +185,21 @@ fi
 # 约定：资产文件名一律 `<两位序号>-<内容>.<ext>`，人设与 assets/README.md 都用反引号点它。
 MODE_ASSETS_DIR="portable/agent/modes/assets"
 MODE_ASSETS_MAX_BYTES=$((8 * 1024 * 1024))
+# ★ 这里**不能用 `find -type f`**（2026-10-15 实测陷阱）：
+#   本机 PRoot/FUSE 会**间歇性**把普通文件报成 `l`（符号链接）——同一路径 `find -printf '%y'`
+#   上一秒 `l`、下一秒 `f`；于是 `-type f` 可能命中 **0 个**，守门就报"0 个文件，0KB"（虚假失败），
+#   而任何用 `-type f` 做"有没有漏"的脚本则会**虚假通过**（更危险）。
+#   稳健口径：`find -print0` 列条目，再用 `[ -f ]`（stat）判类型。
+mode_asset_files() {
+  find "$MODE_ASSETS_DIR" -print0 2>/dev/null | while IFS= read -r -d '' p; do
+    [ -f "$p" ] || continue
+    case "$p" in */README.md) continue ;; esac
+    printf '%s\n' "$p"
+  done
+}
 if [ -d "$MODE_ASSETS_DIR" ]; then
-  ASSET_FILES="$(find "$MODE_ASSETS_DIR" -type f ! -name 'README.md' -printf '%f\n' 2>/dev/null | sort)"
+  ASSET_PATHS="$(mode_asset_files)"
+  ASSET_FILES="$(printf '%s\n' "$ASSET_PATHS" | while IFS= read -r p; do [ -n "$p" ] && basename "$p"; done | sort)"
   # 2026-10-12 修：原模式的否定字符类里放了全角标点（（）,，）。在 C.UTF-8 locale 下
   # grep 把 UTF-8 按**字节**处理，那个类会把整个中文件名吞掉 —— 实测 8 个资产只认出 3 个，
   # 甚至匹配不了本行自己的文件名，于是 5 个真实存在的引用被误判成"孤儿资产"。
@@ -195,14 +208,14 @@ if [ -d "$MODE_ASSETS_DIR" ]; then
   MISSING_REFS=""
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
-    [ -n "$(find "$MODE_ASSETS_DIR" -name "$ref" -print -quit 2>/dev/null)" ] || MISSING_REFS="$MISSING_REFS
+    printf '%s\n' "$ASSET_FILES" | grep -qxF "$ref" || MISSING_REFS="$MISSING_REFS
        $ref"
   done <<< "$ASSET_REFS"
   ORPHANS="$(printf '%s\n' "$ASSET_FILES" | while IFS= read -r f; do
     [ -n "$f" ] || continue
     printf '%s\n' "$ASSET_REFS" | grep -qxF "$f" || echo "       $f"
   done)"
-  ASSET_BYTES="$(find "$MODE_ASSETS_DIR" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END{print s+0}')"
+  ASSET_BYTES="$(printf '%s\n' "$ASSET_PATHS" | while IFS= read -r p; do [ -n "$p" ] && stat -c %s "$p" 2>/dev/null; done | awk '{s+=$1} END{print s+0}')"
   if [ -n "$MISSING_REFS" ]; then
     bad "人设/清单点名了不存在的资产文件（悬空引用）：$MISSING_REFS"
   elif [ -n "$ORPHANS" ]; then

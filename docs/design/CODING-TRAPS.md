@@ -88,6 +88,26 @@
     被污染时 `bash scripts/portable-runtime.sh repair` 从已校验的缓存归档重解包（自愈），
     守门 `check-portability.sh` 的 P5 与 `portable-runtime.sh verify` 都会拦。
 
+## 10. `find -type f` 在本机 PRoot/FUSE 下会**间歇性漏掉普通文件**（比 #8 更毒：它会污染守门结论）
+
+- **症状 A（守门虚假失败）**：`check-conventions.sh` 的"模式资产引用成对"突然报
+  `0 个文件，0KB`，而同一目录 `ls` 明明有 9 个文件（8 图 + README）。
+- **症状 B（同一路径类型会变）**：`find <png> -printf '%y\n'` 上一分钟输出 `l`（符号链接）、
+  下一分钟输出 `f`（普通文件）；`stat` / `test -f` / `readlink` 始终说它是普通文件。
+- **根因**：与第 8 条同族——PRoot/FUSE 的目录项类型/`lstat` 结果不可靠。
+  `find -type f` 依赖该结果 ⇒ **命中数会随机变成 0**。
+- **影响面（为什么列成陷阱而不是"本机怪现象"）**：
+  - 断言"**必须有几个**"的守门 ⇒ **虚假失败**（本次实例：模式资产 8 个被判成 0 个）；
+  - 断言"**不该有别的**"的检查 ⇒ **虚假通过**（更危险！例如引导包白名单、敏感文件扫描）。
+  本次实测到两处真实代码依赖它：`scripts/check-conventions.sh`（E 段资产）与
+  `scripts/bootstrap-key.sh`（引导包成员白名单，漏报方向虽安全但会造成假失败）。
+- **判据（改法）**：枚举一律 `find <dir> -print0`，类型判定交给 `[ -f ]`（stat）：
+  ```
+  find "$dir" -print0 | while IFS= read -r -d '' p; do [ -f "$p" ] || continue; …; done
+  ```
+  体积用 `stat -c %s` 累加，不要 `find -printf '%s'`。
+  自查：`bash -c 'grep -rn "find .*-type f" scripts .githooks'`（应无命中，或每处都能说明为何不受影响）。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

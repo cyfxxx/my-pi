@@ -42,6 +42,21 @@ STAGE=""
 cleanup_stage() { [ -n "$STAGE" ] && rm -rf "$STAGE"; }
 trap cleanup_stage EXIT
 
+# 列出目录下的**普通文件**（排序、空格分隔、带尾空格；可排除一个名字）
+#
+# 为什么不用 `find -type f`：本机 PRoot/FUSE 会**间歇性**把普通文件报成 `l`（符号链接），
+# `find -type f` 于是可能命中 0 个 —— 对"白名单断言"这类安全判定，漏报即便方向安全（拒绝），
+# 也会造成假失败；对"有没有漏东西"的检查则会**虚假通过**（更危险）。见 CODING-TRAPS 第 10 条。
+stage_members() {
+  local dir="$1" exclude="${2:-}" name
+  ( cd "$dir" && find . -print0 2>/dev/null | while IFS= read -r -d '' p; do
+      [ -f "$p" ] || continue
+      name="${p#./}"
+      [ -n "$exclude" ] && [ "$name" = "$exclude" ] && continue
+      printf '%s\n' "$name"
+    done | sort | tr '\n' ' ' )
+}
+
 die() { echo "❌ $*" >&2; exit 1; }
 ok() { echo "✓ $*"; }
 warn() { echo "⚠ $*" >&2; }
@@ -109,7 +124,9 @@ my-pi age 引导包（方案 A）
 口令来源与轮换步骤见 sync/README.md「引导包」一节。
 EOF
   # 白名单断言：stage 里只能有这两个成员
-  local members; members="$(cd "$stage" && find . -type f | sed 's|^\./||' | sort | tr '\n' ' ')"
+  # ★ 用 stat 口径而不是 `find -type f`：本机 PRoot/FUSE 会间歇性把普通文件报成 `l`，
+  #   于是 `-type f` 可能命中 0 个 —— 这里虽然"漏报会失败关闭"（拒绝），但会造成假失败。
+  local members; members="$(stage_members "$stage")"
   [ "$members" = "$MEMBER_KEY $MEMBER_README " ] || die "引导包成员不在白名单内：$members"
 
   mkdir -p "$(dirname "$BUNDLE")"
@@ -158,7 +175,7 @@ decrypt_to_stage() {
     age -d -o "$stage/memory.tar" "$BUNDLE" || die "解密失败（口令错误？）"
   fi
   tar -xzf "$stage/memory.tar" -C "$stage" || die "解包失败（不是预期 tar？）"
-  local members; members="$(cd "$stage" && find . -type f ! -name memory.tar | sed 's|^\./||' | sort | tr '\n' ' ')"
+  local members; members="$(stage_members "$stage" memory.tar)"
   case "$members" in
     "$MEMBER_KEY $MEMBER_README "|"$MEMBER_README $MEMBER_KEY ") : ;;
     *) die "引导包含非白名单成员：$members（拒绝继续——仓库里的引导包被替换过？）" ;;

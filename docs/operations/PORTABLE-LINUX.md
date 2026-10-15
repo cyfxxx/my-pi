@@ -226,8 +226,13 @@ bash scripts/portable-runtime.sh all               # node + python + 默认依�
   但**改完必须保持 sha256 校验**。
 - **`site-packages/bin/*` 与 `.pyc` 里的旧路径**是惰性元数据（不参与导入/执行），本仓不依赖它们；
   要彻底净化可删 `site-packages/bin`（本仓一律 `python -m`）。
-- **PRoot/FUSE 的 `readdir` 不返回 `d_type`**：目录遍历必须 `statSync` 兜底，否则会出现
-  "同一守门上一分钟 147 个、下一分钟 0 个"（见 [`../design/CODING-TRAPS.md`](../design/CODING-TRAPS.md) 第 8 条）。
+- **PRoot/FUSE 的目录项类型不可靠**（两条实测，见 [`../design/CODING-TRAPS.md`](../design/CODING-TRAPS.md) 第 8、10 条）：
+  ① `readdir` 的 `d_type` 可能是 `DT_UNKNOWN` ⇒ Node/`Dirent.isFile()` 全 false
+  （"同一守门上一分钟 147 个、下一分钟 0 个"）；
+  ② **`find -type f` 会间歇性漏掉普通文件**（同一路径 `find -printf '%y'` 在 `l`/`f` 之间跳变，
+  而 `stat`/`[ -f ]` 始终正确）⇒ 已把 `check-conventions.sh` 的资产扫描与
+  `bootstrap-key.sh` 的白名单断言改成 `find -print0` + `[ -f ]` 口径。
+  这两条都会让"检查"给出错误结论（虚假红或**虚假绿**），所以不是本机怪现象而是必须绕开的约束。
 
 ---
 

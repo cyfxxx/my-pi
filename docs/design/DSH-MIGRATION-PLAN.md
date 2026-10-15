@@ -55,6 +55,8 @@ adapters/**（唯一接触底座的地方）
 | 14 | schema 表达能力有限：无法精确映射的参数**不能丢** | `Union([String, Number])` 之类在我们的参数 DSL 里不该出现，但真实工具里存在 | ✓ 处置：降级为 `{type:'json'}` + 上报（丢参数会改签名 = 模型看不到入参，比类型放宽更危险）|
 | 15 | 全量 bootstrap 在 DSH harness 下**可加载**（需把 pi 包 specifier 别名到 vendor/pi） | A9：**54 个工具、0 个特性失败** | ✓ 但"DSH-only 部署里没有 vendor/pi"仍是缺口 ✗ ⇒ 见 #16 |
 | 16 | **`pi-shims/` 让"零 pi 依赖"也成立** | 两个 specifier 别名到本仓 shim 后：`import('@earendil-works/pi-tui')` 只导出 7 个符号、`pi-coding-agent` 只导出 2 个（实测）⇒ A9 仍 **54 工具 / 0 失败** | ✓✓ 别名机制可用 shim 承载；漂移由单测守着 |
+| 17 | **打包产物**可行且足够小：只含本仓代码（712 KB），外部包全部 external | `scripts/dsh-build.sh` + `dsh/spike/smoke-built.mjs`（纯 node，无 tsx）⇒ 54 工具 / 0 失败 | ✓ 交付物形态确定 |
+| 18 | **真实 launcher 的 profile 组合**：`id:` 形式是"覆盖已有条目"，**插入新插件要用 `insert:`** | 隔离 DSH_HOME 干跑：`- id: my-pi` ⇒ `patch: entry "my-pi" not found`；`- insert: [{id: my-pi, name: …}]` ⇒ 组合树出现 `file:///…/my-pi-plugin.mjs` | ✓✓ P5② 的落地方式确定；Host 启动仍未做 ✗ |
 
 ---
 
@@ -94,7 +96,7 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | **P2 外观层** | `custom/adapters/dsh/facade.ts` | 单测：注册工具、`on` 桥接、waterfall 纪律、unsupported 显式上报 | ✓ |
 | **P3 真实 spike** | `dsh/spike/**` + `scripts/dsh-spike.sh` | 脚本跑通真实 `@deepseek-ai/*`：注册的工具**被真实注册表调用**、事件**真触发**、拦截**真生效** | ✓ **8/8 通过**（真实包 `0.2.0-rc.2` + cordis 4.0.4） |
 | **P4 一个特性端到端** | 真实特性 `custom/features/web-search` 经 `tool-adapter` → 外观层 → DSH 注册表 | spike 里 `web_search` **真实执行并返回 36 条结果** | ✓（选它的原因：唯一不 import pi 运行时包的特性） |
-| **P5 引导与配置** | ① pi 包 **shim**（已实现 `custom/adapters/dsh/pi-shims/`，35 条单测含漂移守门）② DSH profile/plugin 落点与 `dsh plugin` 用法 | ①✓ 零 pi 依赖下 A9 仍 54 工具 / 0 失败；②**profile + Host 级运行仍待做** ✗ | **①完成 / ②待做** |
+| **P5 引导与配置** | ① pi 包 **shim**（`custom/adapters/dsh/pi-shims/`，35 条单测含漂移守门）② **插件产物 + profile 接线**（`dsh/plugin`、`dsh/profile`、`scripts/dsh-build.sh`、`scripts/dsh-smoke-profile.sh`） | ①✓ 零 pi 依赖下 A9 仍 54 工具 / 0 失败；②✓ **真实 launcher 已接受插件进 profile**（隔离 DSH_HOME 的 `--dump-config` 干跑：基线条目 96 → 出现 `id: my-pi`）；**Host 级启动仍待做** ✗ | **①②完成 / Host 待做** |
 | **P6 守门重建（D 块）** | 注入面基线 / 工具面预算 / 场景测试 / 补丁检查的 DSH 版 | 每项都有"新基线 + 生成命令 + 反证" | **待做** ✗ |
 
 > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗；

@@ -1,0 +1,24 @@
+# my-pi 的 DSH profile 覆盖层（patch overlay）—— 把本仓插件插进一个 DSH profile
+#
+# ## 已验证的用法（隔离 DSH_HOME，只组合配置、**不启动**）
+#
+#   bash scripts/dsh-build.sh                       # 先产出 dsh/plugin/dist/my-pi-plugin.mjs
+#   export DSH_HOME=/tmp/my-pi-dsh-home             # 用隔离的 home，别碰正在跑的 profile
+#   dsh --profile mypi --from-default-profile headless --dump-config         # 从内置模板建 profile
+#   dsh --profile mypi --patch <repo>/dsh/profile/my-pi.patch.yml --dump-config | grep -A3 my-pi
+#
+# 实测（2026-10-15，dsh 0.2.0-rc.2 / cordis 4.0.4）：
+#   - id 形式的补丁会报 `entry "my-pi" not found`（那是**覆盖已有条目**的语义）；
+#   - **插入新插件要用 `insert:`**，如下；`--dump-config` 会把它打印成
+#     `name: file:///…/my-pi-plugin.mjs` ⇒ 真实 launcher 已接受该插件进 profile ✓。
+#
+# ## 说明
+#
+#   * DSH 的 patch 是**有序数组**：`name` 是插件模块 specifier，**相对路径以 patch 文件所在目录为锚点**。
+#   * 产物只含本仓代码；第三方依赖见 dsh/plugin/package.json（仓库在本机时由本仓 node_modules 解析；
+#     正式部署应把 `my-pi-dsh-plugin` 作为 profile 依赖安装）。
+#   * ✗ 尚未做：Host 级真正启动（需要凭据/内存；且不得打扰正在运行的 dsh web）。
+- insert:
+    - id: my-pi
+      name: "../plugin/dist/my-pi-plugin.mjs"
+      config: {}

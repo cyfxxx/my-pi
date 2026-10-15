@@ -532,7 +532,7 @@
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 - `docs/BUG-REPLAYS.md` · #38 **创建/切换会话打断在跑的那一轮**：TUI 里 `/new`（新建会话）或 `/resume`（会话选择器）会把当前会话**正在跑的那一轮直接中止** —— 用户视角是「我刚让它做的事被打断、结果丢了」。**根因在 pi 内部* · 切换前 pane 有工作指示器；切换后**旧会话文件末条是 `stopReason=aborted` / 空 content 的 assistant 记录**；同一轮本该落盘的回复**永远不再出现**在旧会话文件里；PID 不变（不是重启） · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
 
-## 设计文档（206 条）
+## 设计文档（207 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -561,6 +561,7 @@
 - `docs/design/CODING-TRAPS.md` · 7. 真 pty 场景里，用"切片里没有某段文本"做断言 ⇒ 被 TUI 全屏重绘污染成**假失败** · - **症状**：断言"发 `/new` 之后 pane 里还没有 `New session started`"失败，而行为其实完全正确； · 数字: 2 次 / 3 分钟
 - `docs/design/CODING-TRAPS.md` · 8. `readdir` 给的 `Dirent` 类型在 PRoot/FUSE 下**不可信** ⇒ 遍历结果会"时好时坏" · - **症状**：同一个 `check-packs-structure.mjs`，前一分钟报 `147 个 SKILL.md`，下一分钟报 · 数字: 147 个 / 0 个
 - `docs/design/CODING-TRAPS.md` · 9. PRoot/FUSE 下"覆盖更短的符号链接目标"不截断 ⇒ 留下 `0001` 尾巴；`cp -al` 还会**改到源** · - **症状 A（静默）**：`python3 -V` 仍能跑，但用的是**另一个解释器**（系统/Termux 的）， · 数字: 545 个 · 证据: bash scripts/portable-runtime.sh repair
+- `docs/design/CODING-TRAPS.md` · 10. `find -type f` 在本机 PRoot/FUSE 下会**间歇性漏掉普通文件**（比 #8 更毒：它会污染守门结论） · - **症状 A（守门虚假失败）**：`check-conventions.sh` 的"模式资产引用成对"突然报 · 数字: 0 个 / 0KB / 9 个 / 8 条
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
