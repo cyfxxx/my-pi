@@ -33,7 +33,7 @@ if [ -z "$NODE_BIN" ]; then
   exit 1
 fi
 
-echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对 / F 隐私边界） ==="
+echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对 / F 隐私边界 / … / I 便携性 / J DSH 侧基线） ==="
 
 # ── A. 运行时/每环境状态不入库 ──
 # 判定：入库的 JSON 里出现这些键即失败（应改写入 gitignored 的 *-state.json）。
@@ -347,6 +347,27 @@ if [ -f scripts/check-portability.sh ]; then
   fi
 else
   bad "缺少 scripts/check-portability.sh（便携性守门）"
+fi
+
+# ── J. DSH 侧基线（分支 feat/base-switch-dsh 的产物；依赖/产物在才跑，否则跳过）──
+# ★ 纪律：**没有守门的地方，错误不会被发现，只会被传播**。工具声明面与注入面的基线
+#   在 `dsh/baseline/*.json`，这里做**条件守门**：装了 spike 依赖并构建了产物就比对，
+#   否则明确打印"跳过"（而不是静默算通过）。
+if [ -d dsh/spike/node_modules/@deepseek-ai/dsh-tools ] && [ -f dsh/plugin/dist/my-pi-plugin.mjs ]; then
+  dsh_fail=0
+  if ! node dsh/spike/measure-surface.mjs --check >/tmp/dsh-baseline-tools.out 2>&1; then
+    dsh_fail=1
+    bad "DSH 工具声明面相对基线漂移（明细见 /tmp/dsh-baseline-tools.out；确认有意后跑 node dsh/spike/measure-surface.mjs --update）"
+  fi
+  if ! node dsh/spike/measure-prompt.mjs --check >/tmp/dsh-baseline-prompt.out 2>&1; then
+    dsh_fail=1
+    bad "DSH 注入面相对基线漂移（明细见 /tmp/dsh-baseline-prompt.out；确认有意后跑 node dsh/spike/measure-prompt.mjs --update）"
+  fi
+  if [ "$dsh_fail" -eq 0 ]; then
+    ok "DSH 侧基线一致（工具声明面 + 注入面；dsh/baseline/*.json）"
+  fi
+else
+  note "DSH 侧基线跳过（缺 dsh/spike/node_modules 或 dsh/plugin/dist 产物；跑 bash scripts/dsh-build.sh 与 scripts/dsh-spike.sh 后自动生效）"
 fi
 
 echo ""
