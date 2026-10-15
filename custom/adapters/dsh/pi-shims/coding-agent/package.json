@@ -1,0 +1,7 @@
+{
+  "name": "my-pi-dsh-shim-pi-coding-agent",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "description": "把 @earendil-works/pi-coding-agent 这个 specifier 别名到本包：只提供 custom/adapters 运行时用到的 getMarkdownTheme 与 SessionManager"
+}

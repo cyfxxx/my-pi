@@ -1,0 +1,7 @@
+{
+  "name": "my-pi-dsh-shim-pi-tui",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "description": "把 @earendil-works/pi-tui 这个 specifier 别名到本包：DSH 上没有终端 TUI，组件成为惰性对象并上报降级"
+}

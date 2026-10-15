@@ -47,29 +47,40 @@ else
   echo "✓ 依赖已就绪（跳过安装）"
 fi
 
-# ── pi 包别名（P5 机制的现场验证与演示）──────────────────────────────────────
-# 全量 bootstrap 会经 ui-adapter/session-adapter **运行时** import pi 的包
-# （`@earendil-works/pi-tui` 的 TUI 组件、`pi-coding-agent` 的 SessionManager）。
-# pi 自己是靠 `vendor/pi/node_modules/@earendil-works/*` 解析的；DSH 部署里没有这些包，
-# 所以要么提供等价实现、要么把这两个 specifier 别名到本仓的 shim/别名目录。
-# 本脚本用**软链到 vendor/pi 的包**做演示（gitignored 的 custom/node_modules 下），
-# 让 A9 能在本机跑通；真正的部署做法见 docs/design/DSH-MIGRATION-PLAN.md 的 P5。
-# ★ 必须放在**仓库根**的 node_modules：Node 的裸包解析是从**导入方文件**所在目录向上找，
-#   spike 在 dsh/spike/、适配器在 custom/adapters/，只有根 node_modules 对两者都可见。
+# ── pi 包别名：默认用**本仓 shim**（证明"没有 pi 包也能加载全部特性"）──────────
+# 背景：`ui-adapter.ts` / `session-adapter.ts` 会**运行时** import `@earendil-works/pi-tui`
+# 与 `pi-coding-agent`。pi 靠 `vendor/pi/node_modules/@earendil-works/*` 解析；DSH 部署里没有 pi，
+# 所以必须把这两个 specifier 别名到等价实现。本仓库的做法是 `custom/adapters/dsh/pi-shims/`
+# （惰性 TUI 组件 + 会话枚举降级，均**显式上报**）。
+#
+# PI_SPIKE_PI_ALIAS=shim    （默认）别名到本仓 shim ⇒ A9 证明**零 pi 运行时依赖**也能全量加载
+# PI_SPIKE_PI_ALIAS=vendor  别名到 vendor/pi 真包 ⇒ 作为对照（行为更完整，但那是 pi 的代码）
+ALIAS_MODE="${PI_SPIKE_PI_ALIAS:-shim}"
 ALIAS_DIR="$ROOT/node_modules/@earendil-works"
 mkdir -p "$ALIAS_DIR"
+for spec in pi-tui pi-coding-agent pi-ai pi-agent-core; do rm -f "$ALIAS_DIR/$spec"; done
 linked=0
-for pair in "pi-tui:tui" "pi-coding-agent:coding-agent" "pi-ai:ai" "pi-agent-core:agent"; do
-  spec="${pair%%:*}"; dir="${pair##*:}"
-  target="$ROOT/vendor/pi/packages/$dir"
-  [ -d "$target" ] || continue
-  [ -e "$ALIAS_DIR/$spec" ] && continue
-  ln -sfn "$target" "$ALIAS_DIR/$spec" 2>/dev/null && linked=$((linked + 1))
-done
-if [ -e "$ALIAS_DIR/pi-tui" ] && [ -e "$ALIAS_DIR/pi-coding-agent" ]; then
-  echo "✓ pi 包别名就绪（node_modules/@earendil-works，新增 $linked 个）⇒ A9 全量 bootstrap 可跑"
+if [ "$ALIAS_MODE" = "vendor" ]; then
+  for pair in "pi-tui:tui" "pi-coding-agent:coding-agent" "pi-ai:ai" "pi-agent-core:agent"; do
+    spec="${pair%%:*}"; dir="${pair##*:}"
+    target="$ROOT/vendor/pi/packages/$dir"
+    [ -d "$target" ] || continue
+    ln -sfn "$target" "$ALIAS_DIR/$spec" 2>/dev/null && linked=$((linked + 1))
+  done
+  echo "→ pi 包别名：**vendor/pi 真包**（对照模式，新增 $linked 个）"
 else
-  echo "⚠ pi 包别名不可用 ⇒ A9 会记 SKIP（DSH-only 部署需要 P5 的 shim/别名）"
+  for pair in "pi-tui:pi-shims/tui" "pi-coding-agent:pi-shims/coding-agent"; do
+    spec="${pair%%:*}"; dir="${pair##*:}"
+    target="$ROOT/custom/adapters/dsh/$dir"
+    [ -d "$target" ] || continue
+    ln -sfn "$target" "$ALIAS_DIR/$spec" 2>/dev/null && linked=$((linked + 1))
+  done
+  echo "→ pi 包别名：**本仓 shim**（$linked 个；A9 将证明零 pi 运行时依赖也能全量加载）"
+fi
+if [ -e "$ALIAS_DIR/pi-tui" ] && [ -e "$ALIAS_DIR/pi-coding-agent" ]; then
+  echo "✓ 别名就绪（$ALIAS_DIR）"
+else
+  echo "⚠ 别名不可用 ⇒ A9 会记 SKIP"
 fi
 
 echo "→ 运行 spike（tsx）…"

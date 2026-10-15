@@ -53,7 +53,8 @@ adapters/**（唯一接触底座的地方）
 | 12 | `tools/pre-execute` 的**参数改写被明确排除**（"arguments are already logged and presented"） | `dsh-tools/lib/types/index.d.ts` 的 `PreToolDecision` 注释 | ✗ pi 的"就地改 `event.input`"迁移后失效 ⇒ 桥接层检测并上报 |
 | 13 | **映射表会漂移**：`session_before_switch`（2026-10-14 会话切换守卫新增）不在 2026-10-10 的 18 个普查里 | 真实 bootstrap 时适配层**当场抛错**并点名该事件 | ✓ 守门按设计生效（"宁可报错，不注册永不触发的钩子"）⇒ 已补为第 19 条（档位 ②，DSH 侧只能改到发起方那层）|
 | 14 | schema 表达能力有限：无法精确映射的参数**不能丢** | `Union([String, Number])` 之类在我们的参数 DSL 里不该出现，但真实工具里存在 | ✓ 处置：降级为 `{type:'json'}` + 上报（丢参数会改签名 = 模型看不到入参，比类型放宽更危险）|
-| 15 | 全量 bootstrap 在 DSH harness 下**可加载**（需把 pi 包 specifier 别名到 vendor/pi） | A9：**54 个工具、0 个特性失败** | ✓ 但"DSH-only 部署里没有 vendor/pi"仍是缺口 ✗ ⇒ P5 要么带 shim，要么保持别名 |
+| 15 | 全量 bootstrap 在 DSH harness 下**可加载**（需把 pi 包 specifier 别名到 vendor/pi） | A9：**54 个工具、0 个特性失败** | ✓ 但"DSH-only 部署里没有 vendor/pi"仍是缺口 ✗ ⇒ 见 #16 |
+| 16 | **`pi-shims/` 让"零 pi 依赖"也成立** | 两个 specifier 别名到本仓 shim 后：`import('@earendil-works/pi-tui')` 只导出 7 个符号、`pi-coding-agent` 只导出 2 个（实测）⇒ A9 仍 **54 工具 / 0 失败** | ✓✓ 别名机制可用 shim 承载；漂移由单测守着 |
 
 ---
 
@@ -93,7 +94,7 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | **P2 外观层** | `custom/adapters/dsh/facade.ts` | 单测：注册工具、`on` 桥接、waterfall 纪律、unsupported 显式上报 | ✓ |
 | **P3 真实 spike** | `dsh/spike/**` + `scripts/dsh-spike.sh` | 脚本跑通真实 `@deepseek-ai/*`：注册的工具**被真实注册表调用**、事件**真触发**、拦截**真生效** | ✓ **8/8 通过**（真实包 `0.2.0-rc.2` + cordis 4.0.4） |
 | **P4 一个特性端到端** | 真实特性 `custom/features/web-search` 经 `tool-adapter` → 外观层 → DSH 注册表 | spike 里 `web_search` **真实执行并返回 36 条结果** | ✓（选它的原因：唯一不 import pi 运行时包的特性） |
-| **P5 引导与配置** | ① pi 包 specifier 的**别名/shim 机制**② DSH profile/plugin 落点与 `dsh plugin` 用法 | spike A9 已验证别名机制（全量 bootstrap 54 工具 / 0 失败 ✓）；**profile + Host 级运行仍待做** ✗ | **进行中** |
+| **P5 引导与配置** | ① pi 包 **shim**（已实现 `custom/adapters/dsh/pi-shims/`，35 条单测含漂移守门）② DSH profile/plugin 落点与 `dsh plugin` 用法 | ①✓ 零 pi 依赖下 A9 仍 54 工具 / 0 失败；②**profile + Host 级运行仍待做** ✗ | **①完成 / ②待做** |
 | **P6 守门重建（D 块）** | 注入面基线 / 工具面预算 / 场景测试 / 补丁检查的 DSH 版 | 每项都有"新基线 + 生成命令 + 反证" | **待做** ✗ |
 
 > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗；

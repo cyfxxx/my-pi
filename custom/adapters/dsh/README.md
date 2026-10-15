@@ -14,7 +14,8 @@
 | `hooks.ts` | pi 处理器 → DSH waterfall 监听器 | **必须调 `next()`**；`{block:true}` → `{kind:'deny'}`；无等价物显式上报 |
 | `facade.ts` | DSH `Context` → pi 形状 API（18 个成员） | `surfaceReport()` 如实列出 `supported/degraded/unsupported` |
 | `plugin.ts` | cordis 插件入口 `apply(ctx, config)` | 特性列表**由调用方传入**（见下） |
-| `__tests__/` | 27 条纯逻辑单测 | 不需要装 DSH 包即可跑 |
+| `pi-shims/` | **pi 包 specifier 的等价实现**（让 DSH 侧零 pi 依赖也能加载） | 见 [pi-shims/README.md](pi-shims/README.md) |
+| `__tests__/` | 35 条纯逻辑单测 | 不需要装 DSH 包即可跑 |
 
 ## 运行期调用链（实测走过的路径）
 
@@ -51,7 +52,7 @@ features/**  ──registerTool(pi, internalDef)──▶  custom/adapters/tool-
 | `session_before_compact` | **服务替换**（`ctx.compaction`）而非事件 | 上报 unsupported，交由使用方替换服务 |
 | `tool_call` 里**就地改参数**、`terminate` | DSH 明确排除参数改写 | 检测到即上报（`hooks.ts`） |
 | pi 的 TUI 渲染（`renderCall`/`renderResult`、pi-tui 组件） | 无 | 上报；DSH 表现层走 `output.render`/`presentationMeta` |
-| `ui-adapter.ts` / `session-adapter.ts` 的 **pi 运行时 import** | DSH 部署里没有 pi 包 | **尚未解决** ✗：它们静态 import `@earendil-works/pi-tui` 与 `SessionManager` ⇒ 目前只能加载不依赖它们的功能（如 `web-search`）。下一步要么注入 UI 原语，要么在 DSH profile 里提供这些包名的 shim（见计划 P5） |
+| `ui-adapter.ts` / `session-adapter.ts` 的 **pi 运行时 import** | DSH 部署里没有 pi 包 | **已用 `pi-shims/` 解决** ✓：把两个 specifier 别名到本仓 shim（惰性 TUI 组件 + 会话枚举降级，均显式上报）。漂移由 `__tests__/pi-shims.test.ts` 守着（新增 pi 运行期符号而忘补 shim ⇒ 测试红）|
 
 ## 怎么跑（可复跑证据）
 
@@ -62,7 +63,8 @@ bash scripts/dsh-spike.sh --no-install
 
 spike 的 9 条检查（A1–A9）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）。
-实测结果：**9 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 35–36 条结果；A9 注册 **54 个工具、0 个特性失败**）。
+实测结果：**9 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 34–36 条结果；
+A9 在**别名到本仓 shim**（即零 pi 依赖）的情况下注册 **54 个工具、0 个特性失败**）。
 
 ### pi 包别名（A9 的前提，也是 P5 的机制验证）
 
