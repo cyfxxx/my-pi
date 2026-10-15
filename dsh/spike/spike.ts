@@ -13,6 +13,8 @@
  *   A6 一个**真实特性**（`custom/features/web-search`，唯一不依赖 pi 运行时包的特性）经外观层注册
  *   A7 该特性的工具能被真实执行（走本机 SearXNG；后端不在时记 SKIP）
  *   A8 负向：未登记映射的事件直接抛错（不允许"注册了但永不触发"）
+ *   A9 **全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）经外观层注册；
+ *      需要 pi 包别名（ui-adapter/session-adapter 运行时 import pi 的包）⇒ 别名不可用时记 SKIP
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -152,6 +154,45 @@ async function main(): Promise<void> {
     threw = error instanceof Error ? error.message : String(error);
   }
   record('A8', threw.includes('before_tool_call'), `抛错信息：${threw.slice(0, 120)}`);
+
+  // ── A9：全量 bootstrap（真实 12 个特性）；需要 pi 包别名 ────────────────────
+  let a9: Check = { id: 'A9', ok: 'skip', detail: 'pi 包别名不可用（DSH-only 部署需 P5 的 shim/别名）' };
+  try {
+    const resolvePiTui = await import('@earendil-works/pi-tui');
+    if (resolvePiTui) {
+      const bootCtx = new Context();
+      bootCtx.plugin(SystemPrompt);
+      bootCtx.plugin(ToolRuntime);
+      await tick();
+      const bootFacade = createDshExtensionApi(bootCtx as unknown as DshContext, { onUnsupported: () => undefined, hasUI: false });
+      const names: string[] = [];
+      const registry = bootCtx.tools as unknown as { register: (d: { name: string }) => unknown };
+      const original = registry.register.bind(bootCtx.tools);
+      registry.register = (def: { name: string }) => {
+        names.push(def.name);
+        return original(def as never);
+      };
+      const failures: string[] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => {
+        const text = args.map(String).join(' ');
+        if (text.includes('注册功能失败')) failures.push(text.slice(0, 120));
+        originalError(...args);
+      };
+      const bootstrapModule = await import('../../custom/bootstrap');
+      bootstrapModule.default(bootFacade.api);
+      console.error = originalError;
+      a9 = {
+        id: 'A9',
+        ok: failures.length === 0 && names.length > 20,
+        detail: `全量 bootstrap：注册工具 ${names.length} 个；失败特性 ${failures.length} 个${failures.length ? ' ⇒ ' + failures.join(' | ') : ''}`,
+      };
+      bootFacade.dispose();
+    }
+  } catch (error) {
+    a9 = { id: 'A9', ok: 'skip', detail: `pi 包别名不可用：${(error as Error).message.slice(0, 80)}` };
+  }
+  checks.push(a9);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

@@ -14,7 +14,7 @@
 | `hooks.ts` | pi 处理器 → DSH waterfall 监听器 | **必须调 `next()`**；`{block:true}` → `{kind:'deny'}`；无等价物显式上报 |
 | `facade.ts` | DSH `Context` → pi 形状 API（18 个成员） | `surfaceReport()` 如实列出 `supported/degraded/unsupported` |
 | `plugin.ts` | cordis 插件入口 `apply(ctx, config)` | 特性列表**由调用方传入**（见下） |
-| `__tests__/` | 26 条纯逻辑单测 | 不需要装 DSH 包即可跑 |
+| `__tests__/` | 27 条纯逻辑单测 | 不需要装 DSH 包即可跑 |
 
 ## 运行期调用链（实测走过的路径）
 
@@ -60,9 +60,17 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 8 条检查（A1–A8）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
-**拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）。
-实测结果：**8 通过 / 0 失败**（其中 A7 是真实 `web_search` 打出 36 条结果）。
+spike 的 9 条检查（A1–A9）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+**拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）。
+实测结果：**9 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 35–36 条结果；A9 注册 **54 个工具、0 个特性失败**）。
+
+### pi 包别名（A9 的前提，也是 P5 的机制验证）
+
+`ui-adapter.ts` / `session-adapter.ts` **运行时** import `@earendil-works/pi-tui` 与 `pi-coding-agent`；
+DSH-only 部署里没有这些包 ⇒ 必须把它们**别名**到等价实现（shim）或保留 vendor/pi。
+`scripts/dsh-spike.sh` 现场演示了这件事：把这两个（以及 `pi-ai`/`pi-agent-core`）specifier 软链到
+`node_modules/@earendil-works/*` → `vendor/pi/packages/*`，A9 即可全量加载。
+**缺口 ✗**：真正的 DSH 部署不能依赖 vendor/pi；shim（惰性 TUI 组件 + 会话枚举降级）尚未实现。
 
 ## 相关
 

@@ -47,6 +47,31 @@ else
   echo "✓ 依赖已就绪（跳过安装）"
 fi
 
+# ── pi 包别名（P5 机制的现场验证与演示）──────────────────────────────────────
+# 全量 bootstrap 会经 ui-adapter/session-adapter **运行时** import pi 的包
+# （`@earendil-works/pi-tui` 的 TUI 组件、`pi-coding-agent` 的 SessionManager）。
+# pi 自己是靠 `vendor/pi/node_modules/@earendil-works/*` 解析的；DSH 部署里没有这些包，
+# 所以要么提供等价实现、要么把这两个 specifier 别名到本仓的 shim/别名目录。
+# 本脚本用**软链到 vendor/pi 的包**做演示（gitignored 的 custom/node_modules 下），
+# 让 A9 能在本机跑通；真正的部署做法见 docs/design/DSH-MIGRATION-PLAN.md 的 P5。
+# ★ 必须放在**仓库根**的 node_modules：Node 的裸包解析是从**导入方文件**所在目录向上找，
+#   spike 在 dsh/spike/、适配器在 custom/adapters/，只有根 node_modules 对两者都可见。
+ALIAS_DIR="$ROOT/node_modules/@earendil-works"
+mkdir -p "$ALIAS_DIR"
+linked=0
+for pair in "pi-tui:tui" "pi-coding-agent:coding-agent" "pi-ai:ai" "pi-agent-core:agent"; do
+  spec="${pair%%:*}"; dir="${pair##*:}"
+  target="$ROOT/vendor/pi/packages/$dir"
+  [ -d "$target" ] || continue
+  [ -e "$ALIAS_DIR/$spec" ] && continue
+  ln -sfn "$target" "$ALIAS_DIR/$spec" 2>/dev/null && linked=$((linked + 1))
+done
+if [ -e "$ALIAS_DIR/pi-tui" ] && [ -e "$ALIAS_DIR/pi-coding-agent" ]; then
+  echo "✓ pi 包别名就绪（node_modules/@earendil-works，新增 $linked 个）⇒ A9 全量 bootstrap 可跑"
+else
+  echo "⚠ pi 包别名不可用 ⇒ A9 会记 SKIP（DSH-only 部署需要 P5 的 shim/别名）"
+fi
+
 echo "→ 运行 spike（tsx）…"
 if bash scripts/run-ts.sh dsh/spike/spike.ts; then
   echo "🎉 DSH spike 通过"

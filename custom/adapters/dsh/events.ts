@@ -159,6 +159,13 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     note: '1 处；阶段相同（分发前），DSH 版本是环绕瀑布、能力是超集（超时/重试/指标）',
   },
   {
+    pi: 'session_before_switch',
+    tier: 'semantic',
+    dsh: ['session/disposed', 'agent/disposed', 'workspace/session-stop'],
+    via: 'cordis',
+    note: '1 处（mode 的会话切换守卫，2026-10-14 新增）；★ pi 这条是**可否决的"切换前"闸门**（{cancel:true} 即可拦下），DSH 的会话生命周期事件都在**之后**（disposed 系）⇒ DSH 上要保留"切换中延后"的语义，得改到发起方（Host/客户端）那一层，agent 侧无处可拦',
+  },
+  {
     pi: 'message_end',
     tier: 'direct',
     dsh: ['assistant/message'],

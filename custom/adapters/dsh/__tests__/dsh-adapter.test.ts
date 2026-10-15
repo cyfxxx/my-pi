@@ -57,19 +57,21 @@ function makeFakeDsh(options: { withTools?: boolean } = {}): FakeDsh {
 // ── ① 映射表 ────────────────────────────────────────────────────────────────
 
 describe('events 映射表', () => {
-  it('18 个 pi 事件、名字唯一、都有落点与理由', () => {
-    expect(PI_TO_DSH_EVENTS).toHaveLength(18);
-    expect(new Set(PI_TO_DSH_EVENTS.map((m) => m.pi)).size).toBe(18);
+  it('19 个 pi 事件、名字唯一、都有落点与理由', () => {
+    // 19 = DSH-HOOK-MAPPING.md 的 18 个（2026-10-10 静态普查）+ session_before_switch
+    //      （2026-10-14 会话切换守卫新增；漏登记时适配层会**当场抛错**——这条就是被它抓出来的）
+    expect(PI_TO_DSH_EVENTS).toHaveLength(19);
+    expect(new Set(PI_TO_DSH_EVENTS.map((m) => m.pi)).size).toBe(19);
     for (const m of PI_TO_DSH_EVENTS) {
       expect(m.dsh.length, `${m.pi} 缺落点`).toBeGreaterThan(0);
       expect(m.note.length, `${m.pi} 缺理由`).toBeGreaterThan(0);
     }
   });
 
-  it('档位分布与 DSH-HOOK-MAPPING.md §3.1 一致（①11 / ②7 / ③0）', () => {
+  it('档位分布：①11 / ②8 / ③0（②比 HOOK-MAPPING §3.1 多 1：session_before_switch）', () => {
     const s = mappingSummary();
     expect(s.direct).toHaveLength(11);
-    expect(s.semantic).toHaveLength(7);
+    expect(s.semantic).toHaveLength(8);
     expect(s.none).toHaveLength(0);
   });
 
@@ -179,6 +181,22 @@ describe('tool 载荷合成（pi 形状 → DSH）', () => {
     const reports: string[] = [];
     toDshToolPayload(samplePiTool() as never, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
     expect(reports.some((r) => r.includes('note') && r.includes('string|null'))).toBe(true);
+  });
+
+  it('无法精确映射的参数**降级为 json**而不是丢掉（保住工具签名）+ 上报路径带工具名', () => {
+    const reports: string[] = [];
+    const payload = toDshToolPayload(
+      samplePiTool({
+        parameters: {
+          type: 'object',
+          required: [],
+          properties: { weird: { anyOf: [{ type: 'string' }, { type: 'number' }] } },
+        },
+      }) as never,
+      { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) },
+    );
+    expect(payload.parameters.weird).toEqual({ type: 'json' });
+    expect(reports.some((r) => r.startsWith('tool.sample_tool.parameters.weird'))).toBe(true);
   });
 
   it('pi 的 TUI 渲染回调在 DSH 无对应 ⇒ 上报而不是丢弃', () => {

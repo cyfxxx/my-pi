@@ -132,15 +132,25 @@ export function jsonSchemaNodeToDsh(node: unknown, report: UnsupportedReporter, 
 }
 
 /** pi 工具的参数根 schema（TypeBox 对象）→ DSH 参数表 */
-export function toDshParametersFromJsonSchema(root: unknown, report: UnsupportedReporter = defaultReporter): DshParameterSchema {
+export function toDshParametersFromJsonSchema(
+  root: unknown,
+  report: UnsupportedReporter = defaultReporter,
+  toolName = '',
+): DshParameterSchema {
   const n = asNode(root);
   const properties = asNode(n?.properties) ?? {};
   const required = new Set(asStringArray(n?.required) ?? []);
+  const prefix = toolName ? `tool.${toolName}.parameters` : 'tool.parameters';
   const out: Record<string, DshParameterProperty> = {};
   for (const [name, child] of Object.entries(properties)) {
-    const mapped = jsonSchemaNodeToDsh(child, report, `tool.parameters.${name}`);
-    if (!mapped) continue;
-    out[name] = required.has(name) ? { ...mapped, required: true } : mapped;
+    // ★ 无法精确表达时**降级为 `{type:'json'}` 并上报**，而不是把参数丢掉：
+    //   丢参数会改变工具的签名（模型看到的入参少了），比"类型放宽"更危险。
+    const mapped = jsonSchemaNodeToDsh(child, report, `${prefix}.${name}`);
+    if (!mapped) {
+      report(`${prefix}.${name}`, '该参数类型无法精确映射到 DSH ⇒ 已降级为任意 JSON（保持参数存在、不改变签名）');
+    }
+    const value = mapped ?? { type: 'json' };
+    out[name] = required.has(name) ? { ...value, required: true } : value;
   }
   return out;
 }
@@ -207,7 +217,7 @@ export function toDshToolPayload(piDef: PiToolDefinition, options: ToDshToolOpti
   const payload: DshDefineToolOptions = {
     name: definition.name,
     description: definition.description ?? definition.name,
-    parameters: toDshParametersFromJsonSchema(definition.parameters, report),
+    parameters: toDshParametersFromJsonSchema(definition.parameters, report, definition.name),
     output: {
       schema: { type: 'string' },
       render: (_args: unknown, value: unknown): DshContentBlock[] => [

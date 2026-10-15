@@ -578,7 +578,7 @@
 - `docs/design/DSH-HOOK-MAPPING.md` · 8. 复核二：追 `CompactionEngine` 的调用者（补齐第 4 节第 2 条的残留缺口） · **结论：缺口②已被回答 —— 存在「每次压缩前必然触发」的服务级点** ✓； · 数字: 1 条
 - `docs/design/DSH-HOOK-MAPPING.md` · 7.4 复核三：`schedule` 是否依赖交互客户端（**已核实 ✓**） · **问题**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：无头会话只做种子对账、不启调度器 ✗） · 数字: 289 个 / 3011 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
-- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒
+- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒 / 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 2. 迁移面（本仓实测口径） · ### 2.1 四个原语与 DSH 的对应（登记表） · 数字: 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗； · 数字: 18 个 / 100% / 36 条 / 2.5 GB · 证据: npx vitest run custom/adapters/dsh
 - `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个
