@@ -32,6 +32,13 @@ export interface DshEventMapping {
   readonly via: DshEventVia;
   /** 一行理由（含粒度差异与风险） */
   readonly note: string;
+  /**
+   * 落点存在但**语义不等价**时显式声明为 `degraded`（否则外观层会按 `via` 报成 supported，
+   * 那是**过度声称**：例如 pi 的"选中档位时触发" vs DSH 的"每请求触发"）。
+   */
+  readonly status?: 'supported' | 'degraded';
+  /** `status: 'degraded'` 时的具体理由（缺省用 note） */
+  readonly degradedNote?: string;
 }
 
 /**
@@ -119,9 +126,11 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
   {
     pi: 'thinking_level_select',
     tier: 'semantic',
-    dsh: ['model/selection'],
-    via: 'session-event',
-    note: '1 处；DSH 没有 thinking-level 事件，只能拿到模型选择 ⇒ 需确认处理器是否真依赖级别语义',
+    dsh: ['agent/request'],
+    via: 'cordis',
+    status: 'degraded',
+    degradedNote: '触发点无等价物：DSH 的 agent/request 是**每请求**，pi 的 thinking_level_select 是**选中档位时** ⇒ 处理器语义要搬到请求点（级别→档位的纯映射见 thinking-level.ts，运行时未验）',
+    note: '1 处；★ 2026-10-16 更正：**触发点**在 DSH 没有等价物（无"档位选中"事件），但**应用点**有：请求的冻结配置含 `reasoningEffort?: ReasoningEffortId`（dsh-llm/lib/types/call-config.d.ts:19，模块注释明说 "request waterfalls replace them"）⇒ `agent/request`（waterfall，替换冻结调用配置）就是落点。正确移植形态是把 context 的"缓存安全夹档"逻辑**搬到请求点**（每请求幂等），级别→档位的纯映射见 thinking-level.ts。✗ 真正改配置需要模型路由（efforts 来自 LlmModelReasoningInfo）⇒ 运行时未验',
   },
   {
     pi: 'context',

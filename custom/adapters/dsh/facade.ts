@@ -200,7 +200,12 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       piContextFor: (payload: unknown) => withSessionContext(basePiContext, payload),
     });
     if (via === 'cordis') {
-      ledger.declare(`on(${event})`, 'supported', `→ ${target}（cordis 事件）`);
+      const degraded = mapping.status === 'degraded';
+      ledger.declare(
+        `on(${event})`,
+        degraded ? 'degraded' : 'supported',
+        `→ ${target}（cordis 事件）${degraded ? `；${mapping.degradedNote ?? mapping.note}` : ''}`,
+      );
       ledger.use(`on(${event})`);
       disposers.push(ctx.on(target, listener));
       return;

@@ -47,7 +47,7 @@ features/**  ──registerTool(pi, internalDef)──▶  custom/adapters/tool-
 |---|---|---|
 | `sendMessage` / `sendUserMessage` / `appendEntry` / `setSessionName` | 内核无等价服务 | 上报 unsupported（客户端 bundle 可能需要） |
 | `registerShortcut` / `registerMessageRenderer` / `registerFlag` | 内核无 | 上报 |
-| `getThinkingLevel` / `setThinkingLevel` | 无 thinking-level 概念 | 上报（DSH 的思考级别是适配器配置） |
+| `getThinkingLevel` / `setThinkingLevel` | **没有同名 API**，但请求配置里有 `reasoningEffort` | API 上报 unsupported；**档位本身可表达**：`agent/request` 替换冻结配置 + `thinking-level.ts` 的纯映射（见下）|
 | `getActiveTools` / `getAllTools` | 无公开列举 API | 上报；`setActiveTools` 降级映射到 `ctx.tools.restrict` |
 | `session_before_compact` | **会话日志事件** `compaction/start`（可观察、**不可否决**） | 走 `session/event` + `type` 过滤（状态 `degraded`）；要"取消压缩"须替换 `CompactionEngine` 服务 ✗ |
 | 会话身份（`ctx.sessionManager.getSessionFile()`） | 会话是**存储模型**：`SessionHeader` 只有 `id`/`createdAt`/`cwd`，无文件路径 | `deriveSessionInfo`/`withSessionContext` 合成 `getSessionId()`/`getSessionCwd()`；**不伪造文件路径**；`mode` 用 `session-key.ts` 统一取键（见下） |
@@ -117,3 +117,14 @@ DSH 的 `SessionHeader` 只有 `id`/`createdAt`/`cwd`，**没有会话文件路�
 
 ⇒ "源码里 61 处 `registerTool`" 是**静态 grep 的伪差**：其中 2 处是 `tool-adapter.ts` 的定义与调用点、
 2 处是 `dsh/tool.ts` 的注释。**运行时以本表为准（59 定义 / 54 生效）**。
+
+### thinking 档位 → `reasoningEffort`（2026-10-16）
+
+pi 的 `thinking_level_select` 是"**选中档位时**"触发、处理器做**缓存安全夹档**；DSH **没有**这个事件 ✗，
+但**应用点**存在：请求的冻结配置含 `reasoningEffort?: ReasoningEffortId`
+（`dsh-llm/lib/types/call-config.d.ts:19`，模块注释 "request waterfalls replace them"）⇒ `agent/request`（waterfall）可替换它。
+
+⇒ 正确移植形态是把夹档逻辑**搬到请求点**（每请求幂等）。本目录已提供可单测的纯映射
+`thinking-level.ts`：`mapThinkingLevelToEffort(level, efforts)` 做精确/别名匹配，
+**只降不升**（升档会让整段前缀缓存失效），认不出序或只有更高档位时**失败并给原因**（不猜）。
+✗ 真正改配置需要模型路由（`LlmModelReasoningInfo.efforts`）⇒ 运行时未验；映射表把该事件显式标为 `degraded`。
