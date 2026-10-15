@@ -95,3 +95,25 @@ DSH 的 `SessionHeader` 只有 `id`/`createdAt`/`cwd`，**没有会话文件路�
 - **绝不伪造 `getSessionFile()`**（伪造会让上层把键当路径用，例如写进重启请求的 `targetSession`）；
 - `custom/features/mode/session-key.ts` 统一"会话稳定键"：有路径用路径，否则 `dsh-session:<id>`，
   并给出 `isSessionPath()` 供"必须真路径"的场景（重启请求）判断。
+
+### 工具面按特性对账（2026-10-16 实测）
+
+在真实 harness 上**逐特性**注册并计数（`dsh/spike/` 的一次性探针脚本，结论入 `DSH-MIGRATION-PLAN.md` 实测 #18-f）：
+
+| 特性 | DSH 侧工具数 | 工具名 |
+|---|---|---|
+| web-search | 2 | `web_search` `fetch_url` |
+| context | 3 | `edit_and_run` `session_title` `thinking_level` |
+| memory | 8 | `memory_store/search/stats/forget` + `ctx_note/list/snap/exec` |
+| plan-mode | 4 | `ask_user` `plan_enter` `plan_exit` `todo` |
+| subagent | 1 | `subagent` |
+| tmux | 6 | `tmux_run/status/read/send/stop/wait` |
+| browser | 18 | `browser_navigate/screenshot/click/type/scroll/extract/evaluate/…` |
+| autopilot | 12 | `admin_*` 8 + `goal` `schedule_task` `autopilot_policy` `autopilot_status` |
+| link（默认关闭） | 2 | `link_send` `link_status` |
+| voice（默认关闭） | 3 | `voice_record` `voice_speak` `voice_transcribe` |
+| mode / intervention | 0 | 只注册钩子与命令 |
+| **合计** | **59** | `full` 模式实际注册 **54**（`voice`+`link` 属 `DEFAULT_OFF_FEATURES`，见 `mode/logic.ts:404`）|
+
+⇒ "源码里 61 处 `registerTool`" 是**静态 grep 的伪差**：其中 2 处是 `tool-adapter.ts` 的定义与调用点、
+2 处是 `dsh/tool.ts` 的注释。**运行时以本表为准（59 定义 / 54 生效）**。
