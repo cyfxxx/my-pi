@@ -491,7 +491,7 @@
 - `PROGRESS.md` · packs 全量整理：补回 1 个被静默吞掉的上游文件 + 结构约定升格为守门（2026-10-15） · - 用户："查看 packs 目录，做一下整理和优化"。先做全量只读体检（体积/追踪面/147 个 SKILL.md 的 frontmatter/许可/空目录/跨包重复/索引登记/引用可达性）， · 数字: 147 个 / 2 个 / 13 个 / 17 个 · 证据: cab634bd
 - `PROGRESS.md` · Linux 完全便携化：运行时装进仓库、随项目移动（2026-10-15） · - 用户："之前在 windows 上实现了完全便携化……现在继续优化便携化能力，实现在 Linux 环境中的完全便携化，所有项目相关内容全部集中在一起，不分散不依赖系统环境。 · 数字: 28.83 MB / 12 秒 / 6.5 MB / 29 个
 
-## 缺陷回放（38 条）
+## 缺陷回放（39 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -531,6 +531,7 @@
 - `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 - `docs/BUG-REPLAYS.md` · #38 **创建/切换会话打断在跑的那一轮**：TUI 里 `/new`（新建会话）或 `/resume`（会话选择器）会把当前会话**正在跑的那一轮直接中止** —— 用户视角是「我刚让它做的事被打断、结果丢了」。**根因在 pi 内部* · 切换前 pane 有工作指示器；切换后**旧会话文件末条是 `stopReason=aborted` / 空 content 的 assistant 记录**；同一轮本该落盘的回复**永远不再出现**在旧会话文件里；PID 不变（不是重启） · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
+- `docs/BUG-REPLAYS.md` · #39 **守门脚本的开关组合会把它变成"只测量"（虚假绿）**：`scripts/dsh-baseline.sh` 最初把参数写成三选一的位置参数（`--check` / `--update` / `--tools`／`--prompt` · 未改任何文件时 `--prompt --check` 与 `--prompt` 输出**完全一样**且都 exit 0；改一行源文件后 `--prompt --check` 仍 exit 0（应 1） · 证据: bash scripts/dsh-baseline.sh --prompt
 
 ## 设计文档（207 条）
 

@@ -6,22 +6,38 @@
 #
 # 用法：
 #   bash scripts/dsh-baseline.sh            # 测量并打印（不改文件）
-#   bash scripts/dsh-baseline.sh --check    # 与基线比对（漂移 ⇒ exit 1）
+#   bash scripts/dsh-baseline.sh --check    # 与基线比对（任一漂移 ⇒ exit 1）
 #   bash scripts/dsh-baseline.sh --update   # 更新基线（**需人工确认**后提交）
+#   bash scripts/dsh-baseline.sh --tools    # 只量工具声明面
+#   bash scripts/dsh-baseline.sh --prompt   # 只量注入面（system prompt）
 #
-# 口径与不可比说明见 dsh/spike/measure-surface.mjs 文件头。
+# 两块基线：
+#   ① 工具声明面 dsh/baseline/tool-surface.json（口径见 dsh/spike/measure-surface.mjs 文件头）
+#   ② 注入面     dsh/baseline/system-prompt.json（口径见 dsh/spike/measure-prompt.mjs 文件头）
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 2
 
-MODE="${1:-measure}"
-case "$MODE" in
-  measure) ARGS=() ;;
-  --check|check) ARGS=(--check) ;;
-  --update|update) ARGS=(--update) ;;
-  *) echo "用法: $0 [--check|--update]" >&2; exit 2 ;;
-esac
+# 参数解析：**可组合**（`--prompt --check`、`--tools --update`……）。
+# ★ 曾经写成一个位置参数的三选一 switch —— 于是 `--prompt` 会把 `--check` 丢掉，
+#   命令"看起来在守门"实际只是测量（**虚假绿**）。探针（改源文件后 check）当场发现了它。
+ARGS=()
+ONLY=""
+for arg in "$@"; do
+  case "$arg" in
+    --check|check) ARGS+=(--check) ;;
+    --update|update) ARGS+=(--update) ;;
+    --tools) ONLY=tools ;;
+    --prompt) ONLY=prompt ;;
+    ""|measure) : ;;
+    *) echo "用法: $0 [--check|--update] [--tools|--prompt]" >&2; exit 2 ;;
+  esac
+done
+if [ "${#ARGS[@]}" -gt 1 ]; then
+  echo "❌ --check 与 --update 不能同时给" >&2
+  exit 2
+fi
 
 ARTIFACT="$ROOT/dsh/plugin/dist/my-pi-plugin.mjs"
 if [ ! -f "$ARTIFACT" ]; then
@@ -34,4 +50,19 @@ if [ ! -d "$ROOT/dsh/spike/node_modules/@deepseek-ai/dsh-tools" ]; then
   exit 2
 fi
 
-node "$ROOT/dsh/spike/measure-surface.mjs" "${ARGS[@]}"
+run_one() { # $1 = 标签，$2 = 脚本
+  echo "── $1 ──"
+  node "$ROOT/dsh/spike/$2" "${ARGS[@]}"
+  local rc=$?
+  [ "$rc" -ne 0 ] && FAILED=1
+  return 0
+}
+
+FAILED=0
+[ -n "$ONLY" ] && [ "$ONLY" != "tools" ] || run_one "工具声明面" measure-surface.mjs
+[ -n "$ONLY" ] && [ "$ONLY" != "prompt" ] || run_one "注入面（system prompt）" measure-prompt.mjs
+
+if [ "$FAILED" = "1" ]; then
+  echo "❌ 基线守门失败（见上面的漂移明细）" >&2
+  exit 1
+fi

@@ -16,3 +16,11 @@ export { makeDshListener, mapToolCallDecision, mapToolResultDecision, toPiToolCa
 export { jsonSchemaNodeToDsh, toDshParametersFromJsonSchema, toDshToolPayload, type ToDshToolOptions, type UnsupportedReporter } from './tool';
 export { apply, inject, name, type MyPiDshConfig } from './plugin';
 export type { DshContext, DshDefineToolOptions, DshDisposer, DshToolRegistry, DshValueSchema } from './types';
+export {
+  FALLBACK_ORDER,
+  MY_PI_APPEND_SECTION,
+  registerMyPiSystemPrompt,
+  resolveAppendOrder,
+  type RegisterSystemPromptOptions,
+  type SystemPromptReporter,
+} from './system-prompt';

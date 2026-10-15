@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import bootstrap from '../../custom/bootstrap';
 import { apply as applyFacade, inject, name } from '../../custom/adapters/dsh/plugin';
+import { registerMyPiSystemPrompt } from '../../custom/adapters/dsh/system-prompt';
 import type { DshContext } from '../../custom/adapters/dsh/types';
 import type { DshFacade } from '../../custom/adapters/dsh/facade';
 
@@ -57,7 +58,7 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
   if (!process.env.MY_PI_ROOT) process.env.MY_PI_ROOT = root;
   if (!process.env.PI_CODING_AGENT_DIR) process.env.PI_CODING_AGENT_DIR = resolve(root, 'portable/agent');
   if (!process.env.PI_MEMORY_DIR) process.env.PI_MEMORY_DIR = resolve(root, 'portable/memory');
-  return applyFacade(ctx, {
+  const facade = applyFacade(ctx, {
     ...(config.facade ?? {}),
     features: [
       (api) => {
@@ -65,6 +66,15 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
       },
     ],
   });
+  // 静态 system 注入（pi 的 APPEND_SYSTEM.md 语义）——不接这一步，那段指令在 DSH 上根本不会出现，
+  // 而且**不会报错**；disposer 交给 facade 统一回收。
+  facade.disposers.push(
+    registerMyPiSystemPrompt(ctx, {
+      root,
+      report: (member, detail) => console.warn(`[my-pi-dsh] ${member}：${detail}`),
+    }),
+  );
+  return facade;
 }
 
 export default apply;

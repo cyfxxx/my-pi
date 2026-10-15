@@ -1,0 +1,42 @@
+{
+  "generatedBy": "dsh/spike/measure-prompt.mjs --update",
+  "note": "DSH 侧注入面基线：renderPrompt(assemble()) 的哈希（最小 harness 口径；与 pi 侧整段前缀口径不同）",
+  "harness": "SystemPrompt + ToolRuntime + my-pi 插件产物",
+  "source": {
+    "file": "portable/agent/APPEND_SYSTEM.md",
+    "exists": true,
+    "sha256": "2feecdb20a2f56a317993aac27c59df6f4e7714e6c99f6ba7418a18a372dfdb8"
+  },
+  "mySection": {
+    "present": true,
+    "name": "my-pi:append-system",
+    "bytes": 1274,
+    "isSuffix": true,
+    "charsAfter": 0
+  },
+  "sectionCount": 4,
+  "renderedBytes": 1324,
+  "renderedSha256": "a3a7c5fa8605970e98fdb54b13c6c63cb96e2cd61b4a19ec2f4391e6ab76ea3e",
+  "sections": [
+    {
+      "name": "harness:identity",
+      "bytes": 48,
+      "sha256": "1dd6363fa551837a"
+    },
+    {
+      "name": "deployment:persona-prefix",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c14"
+    },
+    {
+      "name": "my-pi:append-system",
+      "bytes": 1274,
+      "sha256": "2feecdb20a2f56a3"
+    },
+    {
+      "name": "deployment:persona-suffix",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c14"
+    }
+  ]
+}

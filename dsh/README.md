@@ -45,13 +45,28 @@ bash scripts/dsh-baseline.sh --check # 工具声明面漂移守门（P6 第一�
 | 最大 5 | `subagent=1860B`、`goal=1442B`、`schedule_task=1426B`、`memory_search=1040B`、`todo=1003B` |
 
 ```bash
-bash scripts/dsh-baseline.sh            # 测量并打印
-bash scripts/dsh-baseline.sh --check    # 漂移 ⇒ exit 1（实测：篡改 web_search 999→270 会被点名）
-bash scripts/dsh-baseline.sh --update   # 更新基线（需人工确认后提交；纪律：不擅自抬预算）
+bash scripts/dsh-baseline.sh                  # 两块都测量并打印
+bash scripts/dsh-baseline.sh --check          # 任一漂移 ⇒ exit 1（开关可组合：--prompt --check / --tools --update）
+bash scripts/dsh-baseline.sh --update         # 更新基线（需人工确认后提交；纪律：不擅自抬预算）
 ```
 
 ✗ 与 pi 侧 `TOOL-BUDGET-DECISION.md` 的 **24,785 B 不是同一口径**（那是 system prompt + 声明的整段前缀），
 所以只各自守各自漂移，**不做减法**。
+
+## P6 第二块：注入面接线 + 基线（已重建）
+
+pi 的 `APPEND_SYSTEM.md` 在 DSH 上**没有等价约定** —— 它只有 `SystemPrompt.section()` 服务。
+不接线的话，那段指令在 DSH 上根本不会进提示词，**而且不会报错**（静默失效）。
+
+- `custom/adapters/dsh/system-prompt.ts`：把 `portable/agent/APPEND_SYSTEM.md` 注册为
+  `my-pi:append-system`（`order` = 已知工具段最大值 2400 + 100 = **2500**；`interpolate:false`
+  保留 `{{...}}` 字面量）；服务缺失或文件不存在都**上报**，不静默。
+- `dsh/plugin/entry.ts`：`apply()` 里接线，disposer 交给 facade 统一回收。
+- 基线 `dsh/baseline/system-prompt.json`：哈希 `renderPrompt(await ctx.systemPrompt.assemble())`
+  （最小 harness 口径：1324 B / 4 段），并记录"我们的段就是渲染结果的**结尾**"——用
+  `isSuffix` **直接判**，不靠 order 推断（组装结果里的 section 不带 order）。
+- 反证：改一行 `APPEND_SYSTEM.md` ⇒ `--prompt --check` exit 1 并点名三条漂移（渲染 sha、源文件、
+  段内容）；`git checkout` 复原 ⇒ exit 0。另有"开关组合"的坑记在 `docs/BUG-REPLAYS.md` 第 39 条。
 
 ## profile 接线的实测结论（**踩过再写下来**）
 

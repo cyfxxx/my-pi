@@ -106,6 +106,40 @@ export interface DshContext {
 }
 
 /**
+ * 系统提示词服务（`@deepseek-ai/dsh-system-prompt` 的 `SystemPrompt extends Service`）。
+ *
+ * 出处：`dsh-system-prompt/lib/types/index.d.ts:165-230`（2026-10-15 读）。
+ * 只声明本仓用到的四个方法；**不 import** 该包（同 `DshContext` 的理由：本地快照，RC 变动只改一处）。
+ */
+export interface DshSystemPromptService {
+  /**
+   * 注册一个有序的静态提示段（返回 disposer）。
+   * - `name` 必须唯一（重名会抛）；
+   * - `order` 升序拼接，同序按名字的 code-unit 顺序；
+   * - `interpolate: false` 保留 `{{...}}` 字面量（我们自己的文案不该被 harness 变量插值）。
+   */
+  section(section: DshPromptSection): DshDisposer;
+  /** 解析 harness 中心分配的段位置（如 `'TOOL_GOAL'`），用于"排在工具段之后"这类诉求 */
+  getSectionOrder?(name: string): number;
+  /** 组装当前提示词（我们用它做**注入面基线**：哈希模型真正看到的文本） */
+  assemble?(context?: unknown): Promise<DshPromptAssembly>;
+}
+
+/** 一个提示段（`PromptSection` 的最小快照） */
+export interface DshPromptSection {
+  readonly name: string;
+  readonly order: number;
+  readonly text: string | ((context: unknown) => string);
+  readonly interpolate?: boolean;
+  readonly complete?: boolean;
+}
+
+/** 组装结果（`PromptAssembly` 的最小快照：只取我们要哈希的部分） */
+export interface DshPromptAssembly {
+  readonly sections: ReadonlyArray<{ readonly name: string; readonly order: number; readonly text: string }>;
+}
+
+/**
  * 事件订阅的落点类型：
  *   - `cordis`：可 `ctx.on(名字, fn)` 直接订阅（含 waterfall）
  *   - `session-event`：只能订阅 `session/event` 后按 `event.type` 派发（**提交后**，不可拦截）
