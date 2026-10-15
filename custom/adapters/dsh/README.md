@@ -49,7 +49,8 @@ features/**  ──registerTool(pi, internalDef)──▶  custom/adapters/tool-
 | `registerShortcut` / `registerMessageRenderer` / `registerFlag` | 内核无 | 上报 |
 | `getThinkingLevel` / `setThinkingLevel` | 无 thinking-level 概念 | 上报（DSH 的思考级别是适配器配置） |
 | `getActiveTools` / `getAllTools` | 无公开列举 API | 上报；`setActiveTools` 降级映射到 `ctx.tools.restrict` |
-| `session_before_compact` | **服务替换**（`ctx.compaction`）而非事件 | 上报 unsupported，交由使用方替换服务 |
+| `session_before_compact` | **会话日志事件** `compaction/start`（可观察、**不可否决**） | 走 `session/event` + `type` 过滤（状态 `degraded`）；要"取消压缩"须替换 `CompactionEngine` 服务 ✗ |
+| 会话身份（`ctx.sessionManager.getSessionFile()`） | 会话是**存储模型**：`SessionHeader` 只有 `id`/`createdAt`/`cwd`，无文件路径 | `deriveSessionInfo`/`withSessionContext` 合成 `getSessionId()`/`getSessionCwd()`；**不伪造文件路径**；`mode` 用 `session-key.ts` 统一取键（见下） |
 | `tool_call` 里**就地改参数**、`terminate` | DSH 明确排除参数改写 | 检测到即上报（`hooks.ts`） |
 | pi 的 TUI 渲染（`renderCall`/`renderResult`、pi-tui 组件） | 无 | 上报；DSH 表现层走 `output.render`/`presentationMeta` |
 | `ui-adapter.ts` / `session-adapter.ts` 的 **pi 运行时 import** | DSH 部署里没有 pi 包 | **已用 `pi-shims/` 解决** ✓：把两个 specifier 别名到本仓 shim（惰性 TUI 组件 + 会话枚举降级，均显式上报）。漂移由 `__tests__/pi-shims.test.ts` 守着（新增 pi 运行期符号而忘补 shim ⇒ 测试红）|
@@ -80,3 +81,14 @@ DSH-only 部署里没有这些包 ⇒ 必须把它们**别名**到等价实现�
 - 可行性评估（含 spike 原始输出）：[`docs/design/BASE-SWITCH-DSH.md`](../../../docs/design/BASE-SWITCH-DSH.md)
 - 钩子逐类映射：[`docs/design/DSH-HOOK-MAPPING.md`](../../../docs/design/DSH-HOOK-MAPPING.md)
 - 底座无关的分层约定：[`../README.md`](../README.md)
+
+### 会话身份（2026-10-16）
+
+DSH 的 `SessionHeader` 只有 `id`/`createdAt`/`cwd`，**没有会话文件路径**，而 pi 的处理器习惯
+`ctx.sessionManager.getSessionFile()`。适配层的处置：
+
+- `hooks.ts` 的 `deriveSessionInfo`/`withSessionContext` 从 `session/created`（`{session}`）、
+  `agent/created`（`{agent.session}`）与日志信封（`{header}`）读身份，合成 `getSessionId()`/`getSessionCwd()`；
+- **绝不伪造 `getSessionFile()`**（伪造会让上层把键当路径用，例如写进重启请求的 `targetSession`）；
+- `custom/features/mode/session-key.ts` 统一"会话稳定键"：有路径用路径，否则 `dsh-session:<id>`，
+  并给出 `isSessionPath()` 供"必须真路径"的场景（重启请求）判断。

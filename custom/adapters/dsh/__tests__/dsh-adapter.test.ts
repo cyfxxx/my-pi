@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PI_TO_DSH_EVENTS, assertEventsMapped, mappingSummary, resolveDshEvent } from '../events';
 import { createDshExtensionApi } from '../facade';
-import { makeDshListener, mapToolCallDecision, mapToolResultDecision } from '../hooks';
+import { deriveSessionInfo, makeDshListener, mapToolCallDecision, mapToolResultDecision, withSessionContext } from '../hooks';
 import { toDshToolPayload } from '../tool';
 import type { DshContext, DshDefineToolOptions, DshEventListener } from '../types';
 
@@ -273,6 +273,52 @@ describe('hooks 桥接', () => {
 });
 
 // ── ④ 外观层 ────────────────────────────────────────────────────────────────
+
+describe('会话身份派生（DSH 没有会话文件路径）', () => {
+  it('从 session/created 的负载读出 id 与 cwd', () => {
+    const info = deriveSessionInfo({ session: { id: 's1', header: { id: 's1', cwd: '/work/x' } } });
+    expect(info).toEqual({ sessionId: 's1', cwd: '/work/x' });
+  });
+
+  it('从 agent/created 的负载读出 id（agent.session）', () => {
+    const info = deriveSessionInfo({ agent: { session: { id: 's2', header: { id: 's2', cwd: '/work/y' } } } });
+    expect(info).toEqual({ sessionId: 's2', cwd: '/work/y' });
+  });
+
+  it('读不出身份时**原样返回**基准上下文（不编造）', () => {
+    const base = { hasUI: false, cwd: '/base' };
+    expect(withSessionContext(base, { type: 'turn/end' })).toBe(base);
+  });
+
+  it('合入身份时给 getSessionId/getSessionCwd，但**不给** getSessionFile（不伪造路径）', () => {
+    const base = { hasUI: true, cwd: '/base', sessionManager: { getSessionFile: () => undefined } };
+    const merged = withSessionContext(base, { session: { id: 's9', header: { cwd: '/work/z' } } }) as {
+      cwd?: string;
+      sessionManager?: Record<string, () => string | undefined>;
+    };
+    expect(merged.cwd).toBe('/work/z');
+    expect(merged.sessionManager?.getSessionId?.()).toBe('s9');
+    expect(merged.sessionManager?.getSessionCwd?.()).toBe('/work/z');
+    // 关键：不新增 getSessionFile 的"可用"返回值（上面那个仍返回 undefined）
+    expect(merged.sessionManager?.getSessionFile?.()).toBeUndefined();
+  });
+
+  it('经外观层：session/created 的处理器能从第二个参数拿到会话 id', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx, { cwd: '/base' });
+    const seen: Array<string | undefined> = [];
+    facade.api.on('session_start' as never, ((_event: unknown, ctx: unknown) => {
+      const sm = (ctx as { sessionManager?: { getSessionId?: () => string | undefined } }).sessionManager;
+      seen.push(sm?.getSessionId?.());
+      return undefined;
+    }) as never);
+
+    const listener = fake.listeners.get('agent/created')?.[0];
+    expect(listener).toBeDefined();
+    await listener?.({ agent: { session: { id: 'sess-7', header: { id: 'sess-7', cwd: '/work/w' } } } });
+    expect(seen).toEqual(['sess-7']);
+  });
+});
 
 describe('facade 外观层', () => {
   it('registerTool 落到 ctx.tools.register，disposer 可回收', () => {

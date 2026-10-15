@@ -65,6 +65,42 @@ export interface HookBridgeContext {
   readonly report: ReportFn;
   /** pi 形状的事件上下文字段（DSH 侧能拿到的部分；拿不到的留给使用方显式降级） */
   readonly piContext?: unknown;
+  /**
+   * 按**本次负载**派生 pi 上下文（可选）。
+   *
+   * 为什么需要：会话生命周期事件的负载里带着**本会话的身份**（DSH 的 `session/created` 给
+   * `{session}`、`agent/created` 给 `{agent}`，而 `agent.session` 是 `Session`），
+   * 而 pi 的处理器习惯从第二个参数（ExtensionContext）读会话身份。
+   * 不派生的话，那些处理器在 DSH 上拿不到"这是哪个会话"——这正是 pi→DSH 最容易静默出错的地方。
+   */
+  readonly piContextFor?: (payload: unknown) => unknown;
+}
+
+/**
+ * 从事件负载里提取 DSH 的会话身份（**只读已有字段，不编造**）。
+ *
+ * 支持的形状（都来自真实契约）：
+ *   - `{ session: { id, header: { id, cwd } } }`   ← `session/created`（`dsh-session/lib/types/index.d.ts:42`）
+ *   - `{ agent: { session: … } }`                   ← `agent/created`（`dsh-agent/lib/types/runtime-types.d.ts:143` 有 `readonly session`）
+ *   - `{ header: … }`                               ← 会话日志信封
+ *
+ * ✗ 注意：DSH 的会话是**存储模型**，`SessionHeader` 只有 `id`/`createdAt`/`cwd`，
+ *   **没有磁盘文件路径**（`dsh-session/lib/types/types.d.ts` 的 `SessionHeader`）。
+ *   所以这里**绝不**伪造 `getSessionFile()`；调用方要用稳定键就用 `getSessionId()`。
+ */
+export function deriveSessionInfo(payload: unknown): { sessionId?: string; cwd?: string } {
+  const asRecord = (v: unknown): Record<string, unknown> | undefined =>
+    typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : undefined;
+  const root = asRecord(payload);
+  const session =
+    asRecord(root?.session) ?? asRecord(asRecord(root?.agent)?.session) ?? undefined;
+  const header = asRecord(session?.header) ?? asRecord(root?.header) ?? undefined;
+  const id = session?.id ?? header?.id;
+  const cwd = header?.cwd ?? session?.cwd;
+  return {
+    ...(typeof id === 'string' && id.length > 0 ? { sessionId: id } : {}),
+    ...(typeof cwd === 'string' && cwd.length > 0 ? { cwd } : {}),
+  };
 }
 
 /** 从 DSH 的执行对象里取字段（不假设它一定有，缺就缺） */
@@ -145,10 +181,13 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
     const next = typeof last === 'function' ? (last as () => Promise<unknown>) : undefined;
     const first = args.length > 0 ? args[0] : undefined;
 
+    // 本次负载对应的 pi 上下文（会话事件里带会话身份；其它事件回落到默认）
+    const piContext = bridge.piContextFor ? bridge.piContextFor(first) : bridge.piContext;
+
     if (piEvent === 'tool_call') {
       const event = toPiToolCallEvent(first);
       const before = snapshotArgs((event as { input?: unknown }).input);
-      const decision = await handler(event, bridge.piContext);
+      const decision = await handler(event, piContext);
       // ① 想改参数？DSH 在 pre-execute 阶段明确不支持（参数已记录/已呈现）⇒ 检测到就上报
       const after = snapshotArgs((event as { input?: unknown }).input);
       if (before !== after) {
@@ -170,7 +209,7 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
 
     if (piEvent === 'tool_result') {
       const event = toPiToolResultEvent(first, args.length > 1 ? args[1] : undefined);
-      const decision = await handler(event, bridge.piContext);
+      const decision = await handler(event, piContext);
       const d = decision as PiToolResultResult | undefined;
       if (d && d.details !== undefined) {
         report('hook.tool_result.details', 'DSH 的 tools/post-execute 决策没有 details 字段');
@@ -184,11 +223,37 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
     }
 
     // 其余事件：先按观察者语义调用处理器，然后**必须**按 waterfall/emit 语义收尾
-    const decision = await handler(first, bridge.piContext);
+    const decision = await handler(first, piContext);
     if (decision !== undefined && decision !== null) {
       report(`hook.${piEvent}.decision`, '该事件的返回值在本层还没有翻译规则（可能是拦截语义）⇒ 本次按"不干预"处理');
     }
     return next ? next() : undefined;
+  };
+}
+
+/**
+ * 把会话身份合进 pi 上下文（**只增不减、不编造**）。
+ *
+ * 行为：负载里能读出会话身份时，返回一个带 `sessionManager.getSessionId()`/`getSessionCwd()`
+ * 的新对象（保留原有字段）；读不出就**原样返回**，绝不给假值。
+ * ✗ 刻意**不**提供 `getSessionFile()`：DSH 的会话是存储模型，没有磁盘文件路径；
+ *   伪造一个路径会让上层把它当真实文件用（例如写进重启请求的 `targetSession`）。
+ */
+export function withSessionContext(base: unknown, payload: unknown): unknown {
+  const info = deriveSessionInfo(payload);
+  if (!info.sessionId && !info.cwd) return base;
+  const asRecord = (v: unknown): Record<string, unknown> =>
+    typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+  const b = asRecord(base);
+  const sm = asRecord(b.sessionManager);
+  return {
+    ...b,
+    ...(info.cwd ? { cwd: info.cwd } : {}),
+    sessionManager: {
+      ...sm,
+      ...(info.sessionId ? { getSessionId: (): string | undefined => info.sessionId } : {}),
+      ...(info.cwd ? { getSessionCwd: (): string | undefined => info.cwd } : {}),
+    },
   };
 }
 

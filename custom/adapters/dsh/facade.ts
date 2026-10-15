@@ -28,7 +28,7 @@
 
 import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil-works/pi-coding-agent';
 import { assertEventsMapped, resolveDshEvent } from './events';
-import { makeDshListener, type PiHookHandler } from './hooks';
+import { makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
 import { toDshToolPayload, type UnsupportedReporter } from './tool';
 import type { DshContext, DshDisposer, DshEventListener, DshEventVia } from './types';
 
@@ -149,6 +149,9 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   }
 
   // ── 工具 ───────────────────────────────────────────────────────────────────
+  /** pi 处理器第二个参数（ExtensionContext）的 DSH 侧替身：能给的给，给不了的不编造 */
+  const basePiContext: unknown = options.piContext ?? { hasUI: options.hasUI, cwd: options.cwd };
+
   const registerTool = (definition: PiToolDefinition): void => {
     ledger.use('registerTool');
     if (!canRegisterTool || !ctx.tools) return;
@@ -182,7 +185,12 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     const via: DshEventVia = mapping.via;
     // ★ 必须经桥接层：DSH 的 waterfall 事件把"返回值"当决策，裸挂 pi 处理器会把工具调用打挂
     //   （实测 `{isError:true, error:{message:"Cannot read properties of undefined (reading 'kind')"}}`）
-    const listener = makeDshListener(event, handler as PiHookHandler, { report, piContext: options.piContext });
+    const listener = makeDshListener(event, handler as PiHookHandler, {
+      report,
+      piContext: basePiContext,
+      // 会话生命周期事件的负载里带会话身份 ⇒ 按负载派生（不编造文件路径，见 withSessionContext）
+      piContextFor: (payload: unknown) => withSessionContext(basePiContext, payload),
+    });
     if (via === 'cordis') {
       ledger.declare(`on(${event})`, 'supported', `→ ${target}（cordis 事件）`);
       ledger.use(`on(${event})`);
