@@ -22,6 +22,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 便携运行时（2026-10-15）：把仓内 age/age-keygen 与缓存前置进来，使记忆同步不再依赖系统安装。
+# ★ 只搬工具，不搬私钥：私钥默认仍在仓外 `~/.config/my-pi/age.key`（刻意边界）。
+# shellcheck source=scripts/lib-portable.sh
+. "$ROOT/scripts/lib-portable.sh"
+pi_portable_env
 SYNC_DIR="${MY_PI_SYNC_DIR:-$ROOT/sync}"
 MANIFEST="$SYNC_DIR/manifest.txt"
 BUNDLE="$SYNC_DIR/memory.tar.age"

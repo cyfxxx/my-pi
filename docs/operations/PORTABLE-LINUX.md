@@ -204,6 +204,7 @@ bash scripts/portable-runtime.sh all               # node + python + 默认依�
 | `bash` | 需要系统提供 | 同上：Windows 用 PortableGit 的 bash，Linux 用系统 bash（所有发行版都有） |
 | `curl` + `tar`（+ `xz`/`unzip`） | 需要系统提供 | 只在**引导**时用（下载并解包运行时）；装好之后运行期不需要 |
 | `rg` / `fd` | **已进仓库**（可选但推荐） | `bash scripts/setup-external.sh fd-rg` 会把找到的二进制**复制**进 `runtime/<平台>/bin/` 并写 `portable/agent/bin/` shim（旧写法是 `exec /usr/bin/rg` 这种仓外绝对路径 shim，换机器即失效）；`pi_portable_env` 会把该目录前置进 PATH |
+| `age` / `age-keygen` | **已进仓库**（可选但推荐） | `bash scripts/setup-external.sh age` 复制进 `runtime/<平台>/bin`，`scripts/sync-memory.sh`（记忆加密同步）因此不再依赖系统 age。★ **私钥不随之移动**：默认仍在 `~/.config/my-pi/age.key`（仓外），这是刻意的安全边界 |
 | ffmpeg / tesseract / ImageMagick / chromium | 按需 | 属于各 pack 的能力（media/pdf/browser），缺失时对应技能降级；同样可放进 `runtime/<平台>/bin` |
 | Docker/Podman | 可选 | 只在"用容器起 SearXNG"这条回退路径上用；仓内原生 SearXNG 不需要它 |
 

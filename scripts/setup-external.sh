@@ -12,7 +12,8 @@
 #   bash scripts/setup-external.sh                  # 打印各项状态
 #   bash scripts/setup-external.sh searxng          # 启动仓内 SearXNG（8889）
 #   bash scripts/setup-external.sh searxng-stop     # 停止（按 pidfile，不用 pkill）
-#   bash scripts/setup-external.sh fd-rg            # 把系统 fd/rg 链接进 portable/agent/bin
+#   bash scripts/setup-external.sh fd-rg            # 把 rg/fd **复制**进 runtime/<平台>/bin（随项目移动）
+#   bash scripts/setup-external.sh age              # 同上：把 age/age-keygen 复制进仓库（私钥仍留仓外）
 #   bash scripts/setup-external.sh tmux             # 安装 tmux（按平台）
 #   bash scripts/setup-external.sh whisper          # 打印 whisper 服务安装指引（仓内路径）
 #   bash scripts/setup-external.sh all              # fd-rg + tmux（不自动起服务）
@@ -75,6 +76,19 @@ setup_tmux() {
   elif command -v brew >/dev/null 2>&1; then brew install tmux && ok "tmux 已安装（brew）" || warn "brew install tmux 失败"
   elif command -v apt-get >/dev/null 2>&1; then sudo apt-get update -qq && sudo apt-get install -y tmux && ok "tmux 已安装（apt）" || warn "apt install tmux 失败"
   else warn "未知包管理器，请手动安装 tmux"; fi
+}
+
+# ── age（记忆加密同步要用的加密工具，`scripts/sync-memory.sh`）──────────────
+# 复制进仓库的理由与 rg/fd 相同：sync-memory 是"项目功能"，不该因为新机器没装 age 就不可用。
+# ★ **私钥不随之移动**：`sync-memory.sh init` 默认把私钥放在 `~/.config/my-pi/age.key`（仓外），
+#   这是刻意的安全边界（私钥绝不能进仓库/随同步包走）；本函数只搬**可执行文件**。
+setup_age() {
+  local a k
+  a="$(command -v age 2>/dev/null || true)"
+  k="$(command -v age-keygen 2>/dev/null || true)"
+  [ -n "$a" ] && write_portable_cli age "$a" || warn "未找到 age（apt install age / pkg install age）"
+  [ -n "$k" ] && write_portable_cli age-keygen "$k" || true
+  info "私钥仍在仓外（默认 ~/.config/my-pi/age.key）——这是刻意的，别搬进仓库"
 }
 
 # ── SearXNG（web_search 的本地后端）──────────────────────────────────────────
@@ -183,6 +197,9 @@ status() {
   if [ -x "$(pi_bin_dir)/rg" ]; then ok "rg 已复制进仓库：$(pi_bin_dir)/rg（随项目移动）"
   elif [ -x "$BIN_DIR/rg" ]; then warn "rg 只有仓外 shim（换机器会失效）：bash scripts/setup-external.sh fd-rg"
   else warn "rg 未就绪（bash scripts/setup-external.sh fd-rg）"; fi
+  if [ -x "$(pi_bin_dir)/age" ]; then ok "age 已复制进仓库：$(pi_bin_dir)/age（私钥仍应在仓外）"
+  elif have age; then warn "age 只有系统版本（bash scripts/setup-external.sh age 可复制进仓库）"
+  else warn "age 未就绪（记忆加密同步需要；bash scripts/setup-external.sh age）"; fi
   have ffmpeg && ok "ffmpeg: $(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}')" || warn "ffmpeg 未安装（语音转码需要）"
   have chromium-browser || have chromium || have google-chrome && ok "chromium 可用" || warn "chromium 未安装（browser_* 需要）"
   have espeak || have espeak-ng && ok "espeak 可用（TTS fallback）" || warn "espeak 未安装"
@@ -215,11 +232,12 @@ setup_web() {
 
 case "${1:-status}" in
   fd-rg) setup_fd_rg ;;
+  age) setup_age ;;
   tmux) setup_tmux ;;
   web|searxng) setup_web ;;
   searxng-stop|web-stop) stop_searxng ;;
   whisper) setup_whisper ;;
-  all) setup_fd_rg; setup_tmux ;;
+  all) setup_fd_rg; setup_age; setup_tmux ;;
   status|"") status ;;
-  *) echo "用法: $0 {status|fd-rg|tmux|web|searxng|searxng-stop|whisper|all}" >&1; exit 1 ;;
+  *) echo "用法: $0 {status|fd-rg|age|tmux|web|searxng|searxng-stop|whisper|all}" >&1; exit 1 ;;
 esac
