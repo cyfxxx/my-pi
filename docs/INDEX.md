@@ -5,7 +5,7 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（237 条）
+## 决策台账（238 条）
 
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
@@ -244,8 +244,9 @@
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 - `DECISIONS.md` · [2026-10-14] 会话切换守卫：`/new`、`/resume` 不再打断在跑的那一轮（在 pi 的事件层等，不改上游语义） · **背景**（用户实测）：TUI 里"创建新会话或切换会话会导致正在运行的会话中断"。两问定范围后确认：
 - `DECISIONS.md` · [2026-10-15] REA 接进 packs 逆向技能（挂 `R0`，不新增路由）+ packs 审计修问题 · **背景**：用户要求把 GitHub `morluto/rea`（"Reverse Engineer Anything"）整合进 packs 的逆向技能，并体检 packs、非重大影响的问题自行处理。 · 数字: 3 条 / 13 个 / 4 个 / 232 个 · 证据: d201760ff / 6374c2baf
+- `DECISIONS.md` · [2026-10-15] packs/reverse-skill 同步到上游 main（`cab634bd`）：44 路由 / 181 用例，保住本地定制 · **背景**：上一轮审计判定"落后上游约一个月"并留给用户 go/no-go；用户回"继续" ⇒ 按已披露的计划执行（用户已知：抓取、逐文件校验、三方合并、跑 pack 自带 Linux 测试与仓库守门）。 · 数字: 168 B / 880 条 / 42 个 / 56 个 · 证据: fe2e2def5 / edd62689f
 
-## 进度记录（235 条）
+## 进度记录（236 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -482,6 +483,7 @@
 - `PROGRESS.md` · ★ 上游 pi 1.2 同步已执行（2026-10-11） · - 结果：vendor/pi HEAD db03484e2 → c3bc10e24 local: 011-tool-search-cjk；LAST_SYNC_POINT 28dcce2b → 6374c2baf； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf（第一位置参数=目标；UPSTREAM_URL
 - `PROGRESS.md` · 修"创建/切换会话打断在跑的那一轮"：会话切换守卫（2026-10-14） · - **需求（用户实测）**：TUI 里"创建新会话或切换会话会导致正在运行的会话中断"。定位用两个问题定死范围： · 数字: 5 条 · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
 - `PROGRESS.md` · REA（morluto/rea）接进 packs 逆向技能 + packs 审计修问题（2026-10-15） · - **需求**：用户要求把 GitHub 的 `morluto/rea` 整合进 packs 的逆向技能，并体检 packs 各技能、非重大影响的问题自行处理。 · 数字: 496 KB / 290 KB / 3 条 / 168 条 · 证据: 3b79af28 / edd62689f
+- `PROGRESS.md` · packs/reverse-skill 同步到上游 main（cab634bd）：44 路由 / 181 用例（2026-10-15） · - 用户回"继续" ⇒ 按已披露计划执行（抓取→逐文件校验→三方合并→跑 pack 自带测试与仓库守门）。 · 数字: 168 B / 880 条 / 42 个 / 3 个 · 证据: fe2e2def5 / edd62689f
 
 ## 缺陷回放（38 条）
 

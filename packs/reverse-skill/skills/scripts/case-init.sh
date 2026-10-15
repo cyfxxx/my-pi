@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
     *)
       if [[ -z "$HINT" && "$1" != -* ]]; then HINT="$1"; shift
-      else echo "Unknown arg: $1" >&2; exit 2; fi
+      else echo "Unknown arg: \"$1\"" >&2; exit 2; fi
       ;;
   esac
 done
@@ -92,7 +92,8 @@ case "$PRESET" in
     EVIDENCE_OF_AUTH="${EVIDENCE_OF_AUTH:-preset:own-system/lab}"
     ;;
   *)
-    echo "WARN: unknown preset '$PRESET' (allowed: offline-sample|ctf-public|own-system)" >&2
+    echo "ERROR: invalid --preset '$PRESET' (allowed: offline-sample|ctf-public|own-system)" >&2
+    exit 2
     ;;
 esac
 
@@ -302,6 +303,8 @@ cat > "$CASE_ROOT/timeline.md" <<EOF
 - result_summary: $timeline_summary
 - artifacts: [scope.md, workitems.md]
 - evidence_ids: []
+- decision_delta: [case_initialized]
+- carry_forward_refs: [scope.md]
 - next: $timeline_next
 EOF
 

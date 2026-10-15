@@ -89,6 +89,7 @@ python3 skills/case-review/scripts/review_case.py work/<case> --verify-hashes --
 | **R9** | 恶意样本 / YARA / 沙箱 | `malware-analysis/` |
 | **R21** | 协议 / Protobuf / PCAP 协议 | `protocol-reverse/` |
 | **R22** | Ghidra / 开源反编译 | `ghidra-reverse/` |
+| **R45** | Binary Ninja / Binja / HLIL / MLIL / Binary Ninja MCP | `binary-ninja-reverse/` |
 | **R6** | IDA / 反编译 / 反汇编深挖 | `ida-reverse/` |
 | **R7** | radare2 / r2 | `radare2/` |
 | **R8** | 固件 / binwalk / IoT / EMBA | `firmware-pentest/` |
@@ -102,6 +103,7 @@ python3 skills/case-review/scripts/review_case.py work/<case> --verify-hashes --
 | **R23** | 云 / 容器 / K8s | `cloud-k8s/` |
 | **R35** | 数据库安全 | `database-security/` |
 | **R25** | 取证 / 内存转储 / 时间线 | `digital-forensics/` |
+| **R44** | OSINT / 威胁情报 / 公开 X IOC 补充 | `threat-intelligence/` |
 | **R36** | 邮件 / 钓鱼分析 | `email-security/` |
 | **R29** | Wi-Fi / 无线渗透 | `wifi-wireless/` |
 | **R38** | RF / SDR 研究 | `radio-sdr/` |

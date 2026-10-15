@@ -64,6 +64,16 @@ else {
     if ($scope -match 'ready_for_act:\s*true') { Ok 'scope ready_for_act true' } else { Bad 'scope ready_for_act not true' }
 }
 
+# 2b) transition handoff is delta-by-reference: scope holds full state; timeline does not duplicate unchanged target context
+$timelinePath = Join-Path $caseRoot 'timeline.md'
+if (-not (Test-Path $timelinePath)) { Bad "timeline.md missing at $timelinePath" }
+else {
+    $timelineText = Get-Content $timelinePath -Raw -Encoding UTF8
+    if ($timelineText -match '(?m)^- decision_delta:\s*\[case_initialized\]\s*$') { Ok 'timeline decision_delta initialized' } else { Bad 'timeline decision_delta missing' }
+    if ($timelineText -match '(?m)^- carry_forward_refs:\s*\[scope\.md\]\s*$') { Ok 'timeline carries authoritative scope by reference' } else { Bad 'timeline carry_forward_refs missing' }
+    if ($timelineText -notmatch [regex]::Escape('https://app.example.invalid/')) { Ok 'timeline does not duplicate unchanged target context' } else { Bad 'timeline duplicated target context from scope' }
+}
+
 # 3) bare case-init still pending defaults
 $bareName = 'p0-bare-' + (Get-Date -Format 'HHmmss')
 & $HostExe -NoProfile -ExecutionPolicy Bypass -File $ci -CaseName $bareName -PackageRoot $PackageRoot 2>&1 | Out-Null
@@ -356,7 +366,26 @@ if ($invalidNetworkProcess.ExitCode -ne 0 -and -not (Test-Path -LiteralPath $inv
     Bad 'case-init accepted unsupported network profile or wrote a partial case'
 }
 
-# 14b) CaseName must remain a single safe directory name under work/.
+# 14b) Unknown presets must fail before writing a partial case.
+$invalidPresetName = 'p0-invalid-preset-' + (Get-Date -Format 'HHmmss')
+$invalidPresetProcess = Start-Process -FilePath $HostExe -ArgumentList @(
+    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ci,
+    '-Hint', 'invalid preset regression',
+    '-CaseName', $invalidPresetName,
+    '-PackageRoot', $PackageRoot,
+    '-Preset', 'definitely-not-valid'
+) -Wait -PassThru -WindowStyle Hidden
+$invalidPresetRoot = Join-Path $PackageRoot ("work\{0}" -f $invalidPresetName)
+if ($invalidPresetProcess.ExitCode -ne 0 -and -not (Test-Path -LiteralPath $invalidPresetRoot)) {
+    Ok 'case-init rejects unknown preset before writing case'
+} else {
+    Bad 'case-init accepted unknown preset or wrote a partial case'
+    if (Test-Path -LiteralPath $invalidPresetRoot) {
+        Remove-Item -LiteralPath $invalidPresetRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# 14c) CaseName must remain a single safe directory name under work/.
 $invalidCaseNames = @('..\case-escape', '../case-escape', 'case/name', 'case:name', '.. ', 'case.')
 $workRoot = Join-Path $PackageRoot 'work'
 foreach ($invalidCaseName in $invalidCaseNames) {

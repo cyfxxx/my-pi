@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 param(
     [string]$ScratchDir = ''
 )
@@ -28,7 +28,7 @@ foreach ($name in @('ConvertTo-TomlLiteral', 'Remove-CodexMcpServerBlocks', 'Set
     if ($null -eq $functionAst) {
         throw "Function not found: $name"
     }
-    Invoke-Expression $functionAst.Extent.Text
+    . ([scriptblock]::Create($functionAst.Extent.Text))
 }
 
 function Assert-True {

@@ -6001,3 +6001,26 @@ xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效�
 - **建议但未做**：packs 的内部链接**没有守门**（`check-doc-links.mjs` 明确排除 `packs/`；本次自扫 232 个 md 的相对链接 0 断）⇒ 可加一个 `scripts/check-packs-links.mjs` 进 golden（属新增门禁，等用户点头）。
 
 **未核实（✗）**：REA 未安装/未跑（命令清单来自上游 docs 原文，非 `--help` 实测）；172 个工具逐个名未核；Termux/PRoot 宿主可用性未实测；上游 `reverse-skill` HEAD 的精确用例数存疑。
+### [2026-10-15] packs/reverse-skill 同步到上游 main（`cab634bd`）：44 路由 / 181 用例，保住本地定制
+
+**背景**：上一轮审计判定"落后上游约一个月"并留给用户 go/no-go；用户回"继续" ⇒ 按已披露的计划执行（用户已知：抓取、逐文件校验、三方合并、跑 pack 自带 Linux 测试与仓库守门）。
+
+**通道与完整性（这是本次最有复用价值的部分）**：
+- 本机 `raw.githubusercontent.com` / `cdn.jsdelivr.net` **全 000（reset）**，`api.github.com` **通**，且 `codeload.github.com` 与 `api.github.com/.../tarball/main` **都通**（3,762,168 B）⇒ **一次 tarball 拿全仓**，不必逐文件打 API（未认证配额仅 60/h）。
+- ★ `gitclone.com` 对本仓给的是**陈旧快照**（HEAD `fe2e2def5`，2026-06-12，无 `VERSION`）⇒ **不能当上游**（本仓 net-mirror 技能记的"gitclone 可用"对**这个**仓库不成立——又一次"通道要按目标仓库实测"）。
+- 校验：`git/trees/main?recursive=1` 取 path+blob sha（880 条 / 599 blob）→ 解包后逐文件 `git hash-object --path=…` ⇒ **599/599 一致** ✓。
+  坑：tarball 按 `.gitattributes` 转换行尾（`.ps1`/`.bat` 变 CRLF）⇒ 直接比对会**假不一致 42 个**，归一化后全对 ✓。
+
+**合并（保住本地定制的正解 = 三方合并，不是覆盖）**：base=`edd62689f^`（vendored 快照）、ours=HEAD、theirs=上游 ⇒ 56 个纯上游变更直接取上游、
+26 个新增直接加、9 个三方合并；冲突仅 3 个文件（README.md / README_zh.md 的数字行；benchmark 因上游把 JSON 重排成 2 空格而整文件冲突）⇒
+数字取**实测值**（44 路由 / 181 用例 / 45 模块），benchmark = 上游 178 + 我的 3 条 REA = **181**。**新增能力**：R44 threat-intelligence、R45 binary-ninja-reverse、
+`plugins/`（Codex 适配）、`SECURITY.md`、`reports/`、`docs/*`、并**继承上游两个新守门**（`verify-doc-links.py`、`verify-repository-security.py`）。
+★ 上游 `AGENTS.md` 这次也变了：**激活与同意边界**（"读文件 ≠ 授权执行"、跑仓内脚本前须显式同意、客户端全局配置 opt-in）——**随同步一起进来了**，这是安全性的实质提升。
+
+**验证**：`test-routing.sh` **181/181 PASS**；`test-bootstrap-manifest.sh` passed；上游两个新守门在**独立副本**里跑（它们假定 cwd=仓库根，vendored 场景会误读父仓）⇒
+`verify-doc-links.py` OK（全部内部链接可解析）、`verify-repository-security.py` OK（tracked=600 / exec=74 / binary_like=1 / agent_entries=4 / symlinks=0）；
+**等价 coherence 复刻**（镜像 pwsh 门禁机械判据）全过：44 路由 / priority 1:1 / MASTER-ROUTING 顺序一致 / benchmark 覆盖每条路由 / INDEX 存在 / RULES 双语含 case-init+scope+auth 硬门 / master-route.ps1 无硬编码表；
+仓库侧 `check-conventions` 全绿（含**换行守门**：新入 .ps1 是 `i/lf w/crlf` ✓）、`check-doc-links` 172 md 一致、`golden --fast` 全绿。
+
+**未跑（✗）**：`verify-routing-coherence.ps1` / `test-routing.ps1` / `smoke.ps1` / `extract-summaries.ps1`（本机无 pwsh）——用上面的等价复刻替代，**不等价的部分（文档级语义检查）如实未验**；
+`INDEX.md` 直接取上游版本未用生成器重跑（模块数 45 与上游 README 一致）。

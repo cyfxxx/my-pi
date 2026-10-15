@@ -155,6 +155,20 @@ function Get-ReverseToolCatalog {
             )
         }
         [pscustomobject]@{
+            Name = 'binaryninja'
+            Skill = 'binary-ninja-reverse'
+            Purpose = 'Binary Ninja 商业逆向平台（GUI/Python API）'
+            FixedVersion = 'manual-license'
+            VersionArgs = @('--version')
+            Fallbacks = @(
+                [pscustomobject]@{ Type = 'command'; Value = 'binaryninja' },
+                [pscustomobject]@{ Type = 'command'; Value = 'binaryninja-headless' },
+                [pscustomobject]@{ Type = 'path'; Value = 'C:\Program Files\Vector35\BinaryNinja\binaryninja.exe' },
+                [pscustomobject]@{ Type = 'path'; Value = (Join-ReverseOptionalPath -Path $localAppData -ChildPath 'Vector35\BinaryNinja\binaryninja.exe') },
+                [pscustomobject]@{ Type = 'path'; Value = (Join-Path $userProfile 'Tools\BinaryNinja\binaryninja.exe') }
+            )
+        }
+        [pscustomobject]@{
             Name = 'frida'
             Skill = 'apk-reverse'
             Purpose = 'Frida 动态注入'
@@ -370,6 +384,13 @@ function Get-ReverseToolCatalog {
             Skill = 'pentest-tools'
             Purpose = '通过 npx 启动 Reqable 桌面客户端 MCP（需 MCP 注册与 Reqable；npx 本身不代表该能力已安装）'
             FixedVersion = 'reqable-mcp-server@1.0.1'
+            VersionArgs = @()
+            Fallbacks = @()
+        }
+        [pscustomobject]@{
+            Name = 'xquik-mcp'
+            Skill = 'threat-intelligence'
+            Purpose = '公开 X/Twitter 威胁情报采集的远程 MCP（需客户端登记与 OAuth）'
             VersionArgs = @()
             Fallbacks = @()
         }
@@ -907,6 +928,9 @@ function Get-ReverseCapabilityState {
     $ready = $toolReady
     if ($definition.PSObject.Properties['mcpNames']) {
         switch ($verificationMode) {
+            'registration-only' {
+                $ready = $registered
+            }
             'service-and-registration' {
                 $ready = $registered -and $serviceOnline
             }

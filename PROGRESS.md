@@ -3959,3 +3959,19 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
 - **平台边界（如实）**：声明支持 Linux x64/arm64 + macOS x64/arm64，Windows 仅 experimental P0；**Termux/PRoot 0 命中**（Termux 只出现在它把 Termux 当浏览器采集目标的 CI 工作流里）⇒ 本机要用先 `npx -y rea-agents@6.5.0 doctor --json` 实测。商用工具（IDA/Hopper/JEB）上游明确要求自行获授权。
 - **REA 侧验证（可复跑）**：`bash skills/scripts/test-routing.sh` ⇒ **171/171 PASS**（新增 3 条 REA 用例；168 条无回归）；`bash skills/scripts/test-bootstrap-manifest.sh` ⇒ passed；`bash skills/scripts/master-route.sh --hint "用 rea 逆向这个 electron 应用"` ⇒ PRIMARY `skills/reverse-engineering/SKILL.md`（confidence high，生成物 `work/` 已清）；`node -e JSON.parse` ⇒ routing.json/benchmark 合法。**未跑**：`verify-routing-coherence.ps1`/`test-routing.ps1`/`extract-summaries.ps1`（无 pwsh；未新增 SKILL.md ⇒ INDEX 不受影响）；**未安装、未执行任何 `rea` 命令** ✗。
 - **packs 只读审计（子代理）后的处置**：修 A 类 2 项 + B 类 11 项 + C 类若干（详见 `DECISIONS.md` 同日条目）；**留一项待用户决策**：`packs/reverse-skill` 落后上游 main 约一个月（+R44 threat-intelligence / +R45 binary-ninja-reverse、基准 168→≥178、+plugins(Codex 适配)/SECURITY.md/reports/多份 docs，另有 macOS sed、yara 发现、binwalk 手动化、IDA HTTP stall、内部文档链接守门等修复；本地有 4 个文件是**故意定制**：`edd62689f` 改过 README/README_zh/kali README-kali/skills/SKILL.md）⇒ 属"重新 vendored"，需人工合并，已报用户要 go/no-go。
+
+### packs/reverse-skill 同步到上游 main（cab634bd）：44 路由 / 181 用例（2026-10-15）
+
+- 用户回"继续" ⇒ 按已披露计划执行（抓取→逐文件校验→三方合并→跑 pack 自带测试与仓库守门）。
+- 通道：raw.githubusercontent / cdn.jsdelivr 全 000；api.github.com 通；codeload 与 api tarball 都通（3,762,168 B）⇒ 一次 tarball 拿全仓（免 API 配额）；
+  ★ gitclone.com 对本仓给的是陈旧快照（HEAD fe2e2def5 / 2026-06-12 / 无 VERSION）⇒ 不能当上游。
+- 完整性：git/trees/main?recursive=1 取 880 条（599 blob）→ 解包后逐文件 git hash-object --path=… ⇒ 599/599 一致；
+  坑：tarball 按 .gitattributes 转行尾（.ps1/.bat→CRLF）⇒ 直接比会假不一致 42 个，归一化后全对。
+- 合并：base=edd62689f^ / ours=HEAD / theirs=上游 ⇒ 56 纯上游变更取上游、26 新增直接加、9 三方合并；冲突 3 个（README/README_zh 数字行、
+  benchmark 因上游重排 JSON 整文件冲突）⇒ 数字取实测（44 路由/181 用例/45 模块），benchmark=上游 178+我的 3 条 REA=181。
+- 新增能力：R44 threat-intelligence、R45 binary-ninja-reverse、plugins/（Codex 适配）、SECURITY.md、reports/、多份 docs，并继承上游两个新守门
+  （verify-doc-links.py / verify-repository-security.py）；★上游 AGENTS.md 变严（读≠授权、跑脚本须显式同意、客户端配置 opt-in）随同步进来。
+- 验证：test-routing.sh 181/181 PASS；test-bootstrap-manifest.sh passed；上游两守门在独立副本里跑（它们假定 cwd=仓库根）
+  ⇒ verify-doc-links OK（内部链接全可解析）、verify-repository-security OK（tracked=600/exec=74/binary_like=1/agent_entries=4/symlinks=0）；
+  等价 coherence 复刻全过；仓库侧 check-conventions 全绿（含 .ps1 i/lf w/crlf）、check-doc-links 172 md、golden --fast 全绿。
+- 未跑（✗）：pwsh 专属四脚本（verify-routing-coherence/test-routing/smoke/extract-summaries）用等价复刻替代，文档级语义检查未验；INDEX.md 取上游版未重生成。

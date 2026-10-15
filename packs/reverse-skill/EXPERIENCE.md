@@ -18,3 +18,30 @@
   - `bash skills/scripts/master-route.sh --hint "用 rea 逆向这个 electron 应用"` → PRIMARY `skills/reverse-engineering/SKILL.md`（confidence: high）
   - `node -e 'JSON.parse(...)'` → `config/routing.json` / `tests/routing-benchmark.json` 合法
 - 未跑/未核实（✗）: `verify-routing-coherence.ps1` 与 `test-routing.ps1`（本机无 pwsh；**priority 与 `MASTER-ROUTING.md` 表未改动**，故该门禁的两条不变量按构造保持）；`extract-summaries.ps1`（未新增 `SKILL.md` ⇒ `INDEX.md` 不受影响）；REA 本体（未安装、未执行任何 `rea` 命令）。
+
+## 2026-10-15 上游同步（vendored 快照 → upstream main `cab634bd`）
+
+- 环境: proot-ubuntu aarch64 (Termux/PRoot)；无 pwsh ⇒ **两道 PowerShell 门禁跑不了**（如实用等价复刻替代，见下）
+- **通道事实（省后人一次排查）**：本机 `curl`/`git` 到 `raw.githubusercontent.com`、`cdn.jsdelivr.net` **全部 000/reset**；
+  `api.github.com` **通**（HTTP 200）；`codeload.github.com` 与 `api.github.com/repos/<o>/<r>/tarball/main` **都通**（3,762,168 B）；
+  `gitclone.com` 也能 `ls-remote`，但它对本仓返回的是**陈旧快照**（HEAD=2026-06-12 `fe2e2def5`，无 `VERSION`）⇒ **不可当上游用** ✗。
+  ⇒ 正确做法：`curl -sSL https://codeload.github.com/zhaoxuya520/reverse-skill/tar.gz/refs/heads/main` **一次拿全仓**（还省 API 配额：未认证只有 60/h）。
+- **完整性校验（关键手法）**：用 `api.github.com/.../git/trees/main?recursive=1` 拿 **path+blob sha** 全表（880 条/599 blob），
+  再对解包内容逐文件 `git hash-object --path=packs/reverse-skill/<path> <file>` 比对 ⇒ **599/599 一致** ✓。
+  ★ 坑：GitHub tarball 会按 `.gitattributes` 做**行尾转换** ⇒ `.ps1`/`.bat`（`eol=crlf`）在 tarball 里是 CRLF（37 个 CR），
+  直接 `git hash-object` 会**假不一致**（42 个）✗；按 CRLF→LF 归一化后全部对上 ✓（且这正好说明"工作树该是 CRLF、blob 是 LF"）。
+- **合并策略（保住本地定制）**：用 `git merge-file` 三方合并：base=`edd62689f^:<path>`（vendored 快照）、ours=`HEAD:<path>`、
+  theirs=上游文件。结果：**56 个纯上游变更直接取上游、26 个新增文件直接加、9 个需三方合并**（4 个是 `edd62689f` 的旧定制 +
+  5 个是本次 REA 相关改动）。冲突只有 3 个文件：README.md / README_zh.md（都是**数字行**）/ routing-benchmark.json
+  （上游把 JSON **重排成 2 空格缩进** ⇒ 整文件冲突）⇒ 前两个取上游结构 + **实测数字**（44 路由 / 181 用例 / 45 模块）；
+  benchmark **整取上游 178 条 + 追加我的 3 条 REA 用例 = 181** ✓。
+- **验证（全部可复跑）**：
+  - `bash skills/scripts/test-routing.sh` ⇒ **181/181 PASS**（含上游新增的 R44/R45/R40 用例与我的 3 条）
+  - `bash skills/scripts/test-bootstrap-manifest.sh` ⇒ passed
+  - ★ **上游新引入的两个守门**（本仓无 pwsh 也能跑）在**独立副本**里跑（脚本假设 cwd=仓库根，vendored 场景下会误读父仓的 `git ls-files`）：
+    `python3 skills/scripts/verify-doc-links.py` ⇒ **OK（所有内部 Markdown 链接可解析）**；
+    `python3 skills/scripts/verify-repository-security.py` ⇒ **OK（tracked=600 / executable_sources=74 / binary_like=1 / agent_entries=4 / symlinks=0）**
+  - **等价 coherence 复刻**（镜像 `verify-routing-coherence.ps1` 的机械判据）：routes=44 / priority 1:1 / MASTER-ROUTING 表与 JSON 顺序一致 /
+    benchmark 覆盖每条路由 / expect 全部存在 / INDEX 存在 / RULES(.md,_zh) 含 case-init+scope+auth 硬门 / master-route.ps1 无硬编码路由表 ⇒ **全过** ✓
+- **未跑（✗ 如实）**：`verify-routing-coherence.ps1`、`test-routing.ps1`、`smoke.ps1`、`extract-summaries.ps1`（本机无 pwsh）；
+  `INDEX.md` 未用生成器重跑（直接取上游版本；模块数=45 与上游 README 一致 ✓）。
