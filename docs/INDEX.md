@@ -532,7 +532,7 @@
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 - `docs/BUG-REPLAYS.md` · #38 **创建/切换会话打断在跑的那一轮**：TUI 里 `/new`（新建会话）或 `/resume`（会话选择器）会把当前会话**正在跑的那一轮直接中止** —— 用户视角是「我刚让它做的事被打断、结果丢了」。**根因在 pi 内部* · 切换前 pane 有工作指示器；切换后**旧会话文件末条是 `stopReason=aborted` / 空 content 的 assistant 记录**；同一轮本该落盘的回复**永远不再出现**在旧会话文件里；PID 不变（不是重启） · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
 
-## 设计文档（200 条）
+## 设计文档（206 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -577,6 +577,12 @@
 - `docs/design/DSH-HOOK-MAPPING.md` · 7. 第三类扩展点：服务替换清单（2026-10-11 复核二新增） · **为什么要清点它**：第 6 节发现「扩展点不止事件一类」。本轮把**服务替换**这一类**完整清点**了一遍 —— · 数字: 132 个 / 85 个 / 47 个 / 84 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 8. 复核二：追 `CompactionEngine` 的调用者（补齐第 4 节第 2 条的残留缺口） · **结论：缺口②已被回答 —— 存在「每次压缩前必然触发」的服务级点** ✓； · 数字: 1 条
 - `docs/design/DSH-HOOK-MAPPING.md` · 7.4 复核三：`schedule` 是否依赖交互客户端（**已核实 ✓**） · **问题**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：无头会话只做种子对账、不启调度器 ✗） · 数字: 289 个 / 3011 个 · 证据: 1e7f6d9597241db0
+- `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒
+- `docs/design/DSH-MIGRATION-PLAN.md` · 2. 迁移面（本仓实测口径） · ### 2.1 四个原语与 DSH 的对应（登记表） · 数字: 18 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗； · 数字: 18 个 / 100% / 36 条 / 2.5 GB · 证据: npx vitest run custom/adapters/dsh
+- `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 5. 未核实（✗，本轮开工时如实登记） · 1. `@deepseek-ai/dsh-commands` 的命令契约**未读** ⇒ `registerCommand`（14 处）能否干净映射待验； · 数字: 223 个
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ② 分材料明细 · ### 2.1 WikiSkill（arXiv:2608.27454） · 数字: 48.7% / 63.7% / 15.0% / 60.9%
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ③ 这些新信息改变了什么判断（只写确凿的） · 1. **WikiSkill：那条"读 wiki 有害"必须带条件引用。** 新数字显示它是**条件性**的：只有在 **Skill Proposer 也有 wiki 访问**时， · 数字: 10 个 / 204 个 / 46 个

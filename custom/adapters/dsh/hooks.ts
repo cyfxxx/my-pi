@@ -1,0 +1,196 @@
+/**
+ * 钩子桥接：把 pi 形状的处理器**翻译**成 DSH 期望的监听器。
+ *
+ * ## 为什么必须翻译（本轮实测的硬事实）
+ *
+ * DSH 的 `tools/pre-execute` / `tools/execute` / `tools/post-execute` 是 **waterfall**：
+ * 监听器返回的东西就是**决策**。实测（真实 `@deepseek-ai/dsh-tools@0.2.0-rc.2`，最小 harness）：
+ *
+ * ```
+ * ctx.on('tools/pre-execute', () => undefined)      // 一个"只观察"的监听器
+ * → 执行结果 = { isError: true, error: { message: "Cannot read properties of undefined (reading 'kind')" } }
+ * ```
+ *
+ * ⇒ **直接把 pi 处理器原样挂上去会把工具调用打挂**（静默变成 isError）。正确做法：
+ *   ① 处理器不干预（pi 语义：返回 `undefined`）⇒ 必须调用 `next()` 放行；
+ *   ② 处理器要拦（pi：`{ block: true, reason }`）⇒ 翻译成 DSH 的 `{ kind: 'deny', reason }`；
+ *   ③ 有形态差异的能力（改参数 / `terminate` / `details`）⇒ **显式上报**，不静默吞掉。
+ *
+ * ## 逐项映射（pi → DSH）
+ *
+ * | pi（`tool_call` 处理器） | DSH（`tools/pre-execute`） | 说明 |
+ * |---|---|---|
+ * | 返回 `undefined` | `next()` | 不干预 = 放行 |
+ * | `{ block: true, reason }` | `{ kind: 'deny', reason }` | **安全关键路径**（plan-mode 之类靠它否决工具） |
+ * | `{ block: false }` | `next()` | |
+ * | `{ terminate: true }` | 无对应 ✗ | 上报；DSH 的回合终止在 agent 层 |
+ * | **就地改 `event.input`** | 无对应 ✗（DSH 明确排除：参数已记录/已呈现） | 通过"执行前后快照比对"**检测到并上报** |
+ *
+ * | pi（`tool_result` 处理器） | DSH（`tools/post-execute`） | 说明 |
+ * |---|---|---|
+ * | 返回 `undefined` | `next()` | |
+ * | `{ content }` | `{ kind: 'accept', content }` | 文本/图片块同形 |
+ * | `{ details }` / `{ isError }` | 无对应 ✗ | 上报 |
+ */
+
+import type { DshContentBlock, DshEventListener, DshEventVia } from './types';
+
+/** 上报通道（与 facade 共用形状） */
+export type ReportFn = (member: string, detail: string) => void;
+
+/** DSH 的 pre-execute 决策（只声明我们会产出的分支） */
+type PreToolDecision = { kind: 'allow' } | { kind: 'deny'; reason: string };
+
+/** DSH 的 post-execute 决策（只声明我们会产出的分支） */
+type PostToolDecision = { kind: 'accept'; content?: DshContentBlock[] } | { kind: 'allow' };
+
+/** pi 的 `tool_call` 处理器返回值（只声明我们认识的字段） */
+interface PiToolCallResult {
+  block?: boolean;
+  reason?: string;
+  terminate?: boolean;
+}
+
+/** pi 的 `tool_result` 处理器返回值（只声明我们认识的字段） */
+interface PiToolResultResult {
+  content?: readonly DshContentBlock[];
+  details?: unknown;
+  isError?: boolean;
+}
+
+/** 处理器签名：pi 侧是 `(event, ctx) => …`；桥接层不解释 ctx 内容，原样透传 */
+export type PiHookHandler = (event: unknown, context: unknown) => unknown;
+
+export interface HookBridgeContext {
+  readonly report: ReportFn;
+  /** pi 形状的事件上下文字段（DSH 侧能拿到的部分；拿不到的留给使用方显式降级） */
+  readonly piContext?: unknown;
+}
+
+/** 从 DSH 的执行对象里取字段（不假设它一定有，缺就缺） */
+function execField(exec: unknown, key: string): unknown {
+  if (typeof exec === 'object' && exec !== null) return (exec as Record<string, unknown>)[key];
+  return undefined;
+}
+
+/** 深拷贝一份"参数快照"用于检测就地改动（args 是 lossless JSON ⇒ JSON 往返安全） */
+function snapshotArgs(args: unknown): string {
+  try {
+    return JSON.stringify(args ?? null);
+  } catch {
+    return '<unserializable>';
+  }
+}
+
+/**
+ * 构造给 pi 处理器的 `tool_call` 事件（形状对齐 pi：`{type, toolCallId, toolName, input}`）。
+ * `input` 是**可变的副本**——这样"就地改参数"的处理器不会直接改到 DSH 的冻结参数，
+ * 我们也就能检测到它想改（然后显式上报"DSH 不支持改参数"）。
+ */
+export function toPiToolCallEvent(exec: unknown): Record<string, unknown> {
+  const input = execField(exec, 'arguments');
+  return {
+    type: 'tool_call',
+    toolCallId: execField(exec, 'callId') ?? '',
+    toolName: execField(exec, 'name') ?? '',
+    input: typeof input === 'object' && input !== null ? { ...(input as Record<string, unknown>) } : input,
+  };
+}
+
+/** 构造给 pi 处理器的 `tool_result` 事件（只填我们能填的字段） */
+export function toPiToolResultEvent(exec: unknown, result: unknown): Record<string, unknown> {
+  return {
+    type: 'tool_result',
+    toolCallId: execField(exec, 'callId') ?? '',
+    toolName: execField(exec, 'name') ?? '',
+    input: execField(exec, 'arguments'),
+    result,
+  };
+}
+
+/**
+ * pi 的 `tool_call` 决策 → DSH 的 `PreToolDecision`。
+ * 返回 `undefined` 表示"无干预"（调用方必须 `next()`）。
+ */
+export function mapToolCallDecision(decision: unknown): PreToolDecision | undefined {
+  if (decision === undefined || decision === null) return undefined;
+  const d = decision as PiToolCallResult;
+  if (d.block === true) {
+    return { kind: 'deny', reason: d.reason ?? '被扩展钩子阻断（pi 兼容层）' };
+  }
+  if (d.block === false) return undefined;
+  // 只写了 terminate / 其它未知字段：没有可翻译的决策 ⇒ 视为无干预（由调用方上报）
+  return undefined;
+}
+
+/** pi 的 `tool_result` 决策 → DSH 的 `PostToolDecision`；`undefined` = 无干预 */
+export function mapToolResultDecision(decision: unknown): PostToolDecision | undefined {
+  if (decision === undefined || decision === null) return undefined;
+  const d = decision as PiToolResultResult;
+  if (Array.isArray(d.content)) return { kind: 'accept', content: d.content as DshContentBlock[] };
+  return undefined;
+}
+
+/**
+ * 把 pi 形状的处理器包装成 DSH 监听器。
+ *
+ * 判定 waterfall 的方式是**运行时探测**：cordis 的 waterfall 监听器收到的最后一个实参是 `next` 函数。
+ * 这比在映射表里硬编码 `@mode` 更可靠（映射表里的 mode 来自文档注解，未逐个回源确认，见
+ * DSH-HOOK-MAPPING.md §4#5）。
+ */
+export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge: HookBridgeContext): DshEventListener {
+  return async (...args: readonly unknown[]): Promise<unknown> => {
+    const report = bridge.report;
+    const last = args.length > 0 ? args[args.length - 1] : undefined;
+    const next = typeof last === 'function' ? (last as () => Promise<unknown>) : undefined;
+    const first = args.length > 0 ? args[0] : undefined;
+
+    if (piEvent === 'tool_call') {
+      const event = toPiToolCallEvent(first);
+      const before = snapshotArgs((event as { input?: unknown }).input);
+      const decision = await handler(event, bridge.piContext);
+      // ① 想改参数？DSH 在 pre-execute 阶段明确不支持（参数已记录/已呈现）⇒ 检测到就上报
+      const after = snapshotArgs((event as { input?: unknown }).input);
+      if (before !== after) {
+        report(
+          'hook.tool_call.input',
+          '处理器就地修改了 event.input；DSH 的 tools/pre-execute 不支持改写参数（参数已记录/已呈现）⇒ 改动被忽略',
+        );
+      }
+      // ② terminate 无对应
+      const terminate = (decision as PiToolCallResult | undefined)?.terminate;
+      if (terminate === true) {
+        report('hook.tool_call.terminate', 'DSH 的 tools/pre-execute 无 terminate 语义（回合终止在 agent 层）');
+      }
+      // ③ 决策翻译
+      const mapped = mapToolCallDecision(decision);
+      if (mapped) return mapped;
+      return next ? next() : undefined;
+    }
+
+    if (piEvent === 'tool_result') {
+      const event = toPiToolResultEvent(first, args.length > 1 ? args[1] : undefined);
+      const decision = await handler(event, bridge.piContext);
+      const d = decision as PiToolResultResult | undefined;
+      if (d && d.details !== undefined) {
+        report('hook.tool_result.details', 'DSH 的 tools/post-execute 决策没有 details 字段');
+      }
+      if (d && d.isError !== undefined) {
+        report('hook.tool_result.isError', 'DSH 的 tools/post-execute 决策没有 isError 字段（错误由结果自身携带）');
+      }
+      const mapped = mapToolResultDecision(decision);
+      if (mapped) return mapped;
+      return next ? next() : undefined;
+    }
+
+    // 其余事件：先按观察者语义调用处理器，然后**必须**按 waterfall/emit 语义收尾
+    const decision = await handler(first, bridge.piContext);
+    if (decision !== undefined && decision !== null) {
+      report(`hook.${piEvent}.decision`, '该事件的返回值在本层还没有翻译规则（可能是拦截语义）⇒ 本次按"不干预"处理');
+    }
+    return next ? next() : undefined;
+  };
+}
+
+/** 映射表的落点类型（供 facade 判断是否需要包 session/event 信封） */
+export type { DshEventVia };

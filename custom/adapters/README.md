@@ -11,6 +11,7 @@
 | `tool-adapter.ts` | 工具注册 | `ToolParameter`、`ToolExecuteContext`、`ToolDefinition`、`registerTool` |
 | `ui-adapter.ts` | 命令 / 快捷键 / 渲染器 / 状态 | `registerCommand`、`registerShortcut`、`registerMessageRenderer`、`sendMessage`、`sendUserMessage`、`appendEntry`、`getActiveTools`、`setActiveTools`、`getAllToolNames`、`getFlag`、`registerFlag`、`getThinkingLevel`、`setThinkingLevel`、`getMarkdownTheme`、`PiApi`，以及 pi-tui 组件 `Key/Container/Markdown/Spacer/Text/truncateToWidth/visibleWidth` |
 | `session-adapter.ts` | 会话枚举 | `SessionRow`、`listSessions`、`resolveSession` |
+| `dsh/`（子目录） | **DSH 换基座适配层**（2026-10-15 起在分支 `feat/base-switch-dsh` 上开发） | `createDshExtensionApi`（DSH `Context` → pi 形状 API）、`apply`（cordis 插件入口）、事件/工具/钩子映射；见 [dsh/README.md](dsh/README.md) |
 
 ## 关键约定
 

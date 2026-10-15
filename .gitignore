@@ -105,3 +105,7 @@ __pycache__/
 # 由 scripts/run-my-pi.ps1 的 Find-Runtime（优先 <repo>\runtime）与
 # scripts/pi-supervisor.sh 的便携布局查找共同识别。
 runtime/
+
+# DSH 换基座 spike 的依赖（@deepseek-ai/*，按需装；随分支走，不入库）
+dsh/spike/node_modules/
+dsh/spike/package-lock.json
