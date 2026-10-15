@@ -1,5 +1,12 @@
-# 上游 pi 1.2 同步切换（Runbook）
+# 上游 pi 1.2 同步切换（Runbook · **已执行**）
 
+> ## ✅ 状态：**已完成**（2026-10-14，提交 `d51f7255b`）
+> 执行结果：`vendor/pi` HEAD = **`c3bc10e24`**（`local: 011-tool-search-cjk`）、`LAST_SYNC_POINT` = `PINNED_COMMIT` =
+> **`6374c2baf432419ccb4541a99ce4958ecd03dae0`**、`packages/coding-agent` 版本 = **1.2.0**、`upstream` URL 已还原为 GitHub；
+> 1.2 版 `002`/`010` 已换入 `patches/`（见第 4 步）；`voice` 三处 `deliverAs: 'steer'` 已加；
+> `patches-next/` **已于 2026-10-15 删除**（内容与 `patches/` 逐字节相同，见第 4 步的 sha256）。
+> **本文件保留为"当时怎么做 + 怎么回滚"的历史记录**；下次同步**不要照抄**，先读 `docs/design/UPSTREAM-SYNC-PLAN.md` 与脚本当前形态。
+>
 > **适用**：把 `vendor/pi` 从 **1.0.4**（`LAST_SYNC_POINT` = `28dcce2b…`）切到上游 **1.2**。
 > **分工**：本 runbook 的每一步都有验证门槛；**失败是显式的**（脚本"全成功才移动 vendor 分支"），但仍**必须在用户在场时执行**。
 > **纪律**：**绝不为让门禁变绿而改断言/阈值**；**注入面基线哈希若变必须有意更新并写明理由**。
@@ -37,10 +44,17 @@ bash scripts/sync-upstream.sh
 - 它在**临时 worktree** 里重放 `patches/*.patch`；**任一失败 ⇒ vendor 不变** ✓。
 - ★ 预期风险点：**001 需要 `git apply -3`**（三方合并）；002/010 需要 1.2 版（见第 4 步）。
 
-## 4. 换入 1.2 版补丁（两个）
+## 4. 换入 1.2 版补丁（两个）—— **已完成**
 
-用 **`patches-next/1.2/`** 里的文件替换 `patches/002-local-pi-mods.patch` 与 `patches/010-disable-share-bug.patch`
-（★ **保留补丁内自标记 `Patch (NNN-name):`** ✓；目标 commit 与生成法见该目录的 `README.md` ✓）。
+原来放在 `patches-next/1.2/`（当时刻意放在 `patches/` 之外：`golden-tasks.sh` 第 6 步只 glob `patches/*.patch`，
+在 vendor 还停在 1.0.4 时把 1.2 版放进 `patches/` 会**当场让门禁变红**），切换时换入 `patches/002-local-pi-mods.patch`
+与 `patches/010-disable-share-bug.patch`（★ **保留补丁内自标记 `Patch (NNN-name):`** ✓）。
+
+**因此 `patches-next/` 已完成使命，2026-10-15 删除**。删除前的等价性是**逐字节 sha256 相同**（当时的核对命令：
+`sha256sum patches-next/1.2/002-local-pi-mods.patch patches/002-local-pi-mods.patch`；`010` 同）——
+★ 该命令**现在已不可复跑**（目录已删），要复核请用 git：`git show bc3e4ba11:patches-next/1.2/002-local-pi-mods.patch | sha256sum`
+与 `sha256sum patches/002-local-pi-mods.patch` 对比 ✓。
+要回看当时的原文/生成法：`git show bc3e4ba11:patches-next/1.2/README.md` ✓（该目录只在那一笔提交里）。
 
 ## 5. 加一行适配（语音路径）
 
@@ -76,6 +90,14 @@ echo 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9 > vendor/pi/LAST_SYNC_POINT
 # 再重建 dist 与"好 pi"缓存；并恢复 patches/ 里的 002/010 为 1.0.4 版
 ```
 
+★ **1.0.4 版补丁从 git 历史取**（`patches-next/` 已删，但那不是来源）：
+
+```bash
+git log --oneline -- patches/002-local-pi-mods.patch        # 找到切换前那一笔
+git show <切换前那笔 SHA>:patches/002-local-pi-mods.patch > patches/002-local-pi-mods.patch
+git show <切换前那笔 SHA>:patches/010-disable-share-bug.patch > patches/010-disable-share-bug.patch
+```
+
 ## 9. 仍未核实（执行前请知道 ✗）
 
 - **指定 tag 的开关名**（第 1 节）✗；
@@ -92,3 +114,10 @@ echo 28dcce2ba45ce4a9efeb0f5b686f0be830fd89b9 > vendor/pi/LAST_SYNC_POINT
 - **引用层**：无"必炸"引用 ✓（`pi-client`/`pi-protocol`/`pi-server` 0 命中；`pi-agent-core` 的 harness API 0 命中）
 - **编译层**：`custom/` 类型检查 **0 错误**（源码面等价 ✓）
 - **适配层**：`before_agent_start` 已按 `messageType` 双兼容适配 ✓（`custom/features/intervention/index.ts`）；`voice` 的 `deliverAs` 与补丁换入列为第 4/5 步 ✓；**010 实测无需扩展** ✓
+
+## 附二：切换后的收尾（2026-10-15）
+
+- **`patches-next/` 已删除**（冗余：与 `patches/` 里换入后的两份补丁 **sha256 逐字节相同**；可 `git show bc3e4ba11:patches-next/…` 回看）。
+- **`packs/reverse-skill` 已从更早的上游快照同步到上游 main `cab634bd`**（与本 runbook 无关，见 `DECISIONS.md` 同日条目）。
+- **回归确认**：`golden-tasks.sh --fast` 全绿（含第 6 步"patches 全部可应用/已应用"）；`node_modules/.bin/tsc --noEmit -p custom/` rc=0；
+  全量 vitest / 两个 pty 场景见切换当时的记录（`DECISIONS.md` 2026-10-14 条目）。

@@ -22,6 +22,7 @@
 > | `pcb-design` | PCB、原理图、硬件、电路板审查、KiCad | PCB/硬件设计辅助 |
 > | `pdf-toolkit` | PDF、pdf、文档提取、合并、加密 | PDF 全场景处理 |
 > | `reverse-skill` | 逆向、渗透、安全研究、CTF、漏洞利用 | 逆向/授权渗透/安全研究技能路由（包内 frontmatter `name: reverse-skill-router`；入口 `skills/SKILL.md`） |
+> | `termux` | ZeroTermux、Termux、平板开发、proot 容器、proot-distro、换源、pkg、保活、定时任务、X11、ZtInfo、zt 命令 | Android 平板/手机上的 ZeroTermux/Termux 开发辅助：宿主↔proot 容器互通、包管理与换源、保活与定时任务、平板交互与互传、容器实测坑（入口 `SKILL.md`） |
 > | `skill-integration` | 技能包、整合、外部技能、GitHub 技能包 | 外部技能包整合流程 |
 >
 > ## 二级功能索引

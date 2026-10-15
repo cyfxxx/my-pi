@@ -291,6 +291,21 @@ if [ -f scripts/gen-changes-ledger.mjs ]; then
   fi
 fi
 
+# ── G. packs 内部链接（既有 check-doc-links **有意排除 packs/** ⇒ 这里补上）──
+# 为什么单独一条：packs 是 vendored 外部技能包，链接长期无回归保护（一次改名就能让文档指向不存在的目标）。
+# 判定口径与上游 reverse-skill 自己的 verify-doc-links.py 一致（相对链接、跳过围栏代码、命中集合 = git 跟踪文件∪目录），
+# 但按**本仓的 vendored 布局**（packs/<pkg>/…）判定 —— 上游脚本假定 cwd=它自己的仓库根，在 vendored 下会误读父仓。
+if [ -f scripts/check-packs-links.mjs ]; then
+  if packs_out=$("$NODE_BIN" scripts/check-packs-links.mjs 2>&1); then
+    ok "${packs_out#✓ }"
+  else
+    bad "packs 内部链接有断链（跑 node scripts/check-packs-links.mjs 看明细）"
+    printf '%s\n' "$packs_out" | head -10 | sed 's/^/      /'
+  fi
+else
+  bad "缺少 scripts/check-packs-links.mjs（packs 链接守门）"
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "🎉 约定守门全部通过"

@@ -96,6 +96,7 @@ packs/
 | `media-toolkit/` | 图片/视频/游戏美术处理：通用 CLI `bin/media_core`（图片：转换/压缩/水印/批量；视频：转码/剪辑/拼接/抽帧/音频/GIF/字幕；游戏：精灵表拆分/图集打包/资产优化）+ 三个子技能（image-basics/video-basics/game-art）；TexturePacker/GIMP/whisper 等繁重能力记录在 references/specialized-tools.md。全部本地执行（ImageMagick+ffmpeg+Pillow） |
 | `books/` | 书籍知识库框架（`scripts/books.py`：探针/索引/按需提页/缓存/记录，两端通用）+ 使用说明 `SKILL.md`；方案与实测见 [docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md](../docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md)。之所以放 packs 而非 agentDir/skills：零系统提示词成本（低频按需能力） |
 | `knowledge-fetch/` | 零 LLM 知识订阅搭建（渠道调研/抓取脚本/去重过滤容错/定时任务接入）。已验证实例：`scripts/knowledge-fetch.py` v2 + `scripts/knowledge-ingest.mjs`（零 LLM 入库），接入定时任务 `knowledge-subscribe`/`daily-review`。来源：drafts/knowledge-fetch-setup（2026-08-27 升格；该草稿已随升格删除，`packs/drafts/` 现为空） |
+| `termux/` | ZeroTermux（Termux 0.118.3 的中文增强 fork）与 Termux 的平板开发辅助：三层身份判定（宿主 Termux / proot 容器 / PC）、宿主前缀 `/data/data/com.termux/files/usr` 的绝对路径互通、`zt` 命令与 ZT 的 socket 桥、pkg/换源/存储、保活（phantom killer/signal 9）与 ZT 定时任务（`~/.timerdir`）、X11/VNC 与容器管理、proot 里的实测坑（`/proc` 时钟矛盾、`ps etimes` 溢出、f2fs `find -type f` 漏文件、systemctl=offline）。全部含本机（aarch64 proot）实测证据 |
 | `skill-integration/` | 外部技能包引入与整合统一流程：选包/许可核对/安全审查/验收冒烟/通用-专用-繁重三层归置/整合纪律 |
 | `net-mirror/` | **细节层**（无 SKILL.md）：网络加速实测表与命令模板，内置技能 `pi-net-mirror` 按需 read |
 | `security-baseline/` | **细节层**（无 SKILL.md）：分层完整性基线（`BASELINE.md` + `tiers.json` + `yara/starter.yar`），内置技能 `pi-download-safety` 用 `scripts/security-baseline.mjs` 消费 |

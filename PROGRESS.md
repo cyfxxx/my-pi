@@ -3975,3 +3975,18 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   ⇒ verify-doc-links OK（内部链接全可解析）、verify-repository-security OK（tracked=600/exec=74/binary_like=1/agent_entries=4/symlinks=0）；
   等价 coherence 复刻全过；仓库侧 check-conventions 全绿（含 .ps1 i/lf w/crlf）、check-doc-links 172 md、golden --fast 全绿。
 - 未跑（✗）：pwsh 专属四脚本（verify-routing-coherence/test-routing/smoke/extract-summaries）用等价复刻替代，文档级语义检查未验；INDEX.md 取上游版未重生成。
+
+### 三件收尾：删 patches-next + packs 链接守门 + termux 技能（2026-10-15）
+
+- ① patches-next/ 已删：002/010 与 patches/ 里换入后的两份 sha256 **逐字节相同** ⇒ 冗余；runbook 改写成"已执行"（状态横幅 + 等价性说明 +
+  回滚补"1.0.4 版补丁从 git 历史取"的可复跑命令），并警告后人下次同步不要照抄。
+- ② 新增 scripts/check-packs-links.mjs（我的决定：需要）：既有的 check-doc-links.mjs **有意排除 packs/** ⇒ 那 600+ md 的内部链接零回归保护；
+  上游 verify-doc-links.py 又假定 cwd=它自己的仓库根，vendored 下会误读父仓。新脚本按 vendored 布局判定（口径同上游：相对链接、跳围栏、命中=git ls-files packs 文件∪父目录，
+  另放行磁盘存在/被 ignore 的目标），接进 check-conventions 新增 G 段 ⇒ 随 golden（含 --fast）跑，不动 golden 步数。
+  证据：681 md / 1236 条相对链接 0 断；反证探针注入断链 ⇒ exit 1 并点名，复原后与 HEAD 逐字节相同。
+- ③ 新建 packs/termux/（SKILL.md + EXPERIENCE.md）：一手版本 facts（官方 Termux v0.118.3 / ZeroTermux 0.118.3.64，基于 0.118.3；许可 NOASSERTION 如实标注）；
+  本机实测（宿主前缀可见 + 720 可执行；容器 $PREFIX 空/$HOME=/root；共享网络命名空间 ⇒ 容器内 127.0.0.1:19951 可连；~/.ZtInfo 菜单、~/.timerdir 定时任务、~/.skill 自带 skills；
+  宿主源=aliyun；坑：/proc 时钟矛盾、ps etimes 溢出、f2fs find -type f 漏文件、systemctl offline；★纠正"chmod 对目录不生效"的说法——实测可用）；
+  内容含三层身份判定、宿主↔容器互通命令表、zt 桥与 ZT 内置智能体 vs my-pi 分工、包管理/换源、保活（signal 9 按 Android 版本处置）、定时任务、平板交互与互传、
+  proot 实测坑、容器里跑 Node/Python/AI、安全边界、未核实清单 + 经验沉淀段；已登记 packs/INDEX.md 与 packs/README.md。
+- 未核实（✗）：ZT 许可细节、本机安装版本号、zt↔19951 协议、ZT 内置工具语义未实测、termux-change-repo 各镜像、X11/VNC、phantom killer adb 命令未在本平板实测。

@@ -6024,3 +6024,38 @@ xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效�
 
 **未跑（✗）**：`verify-routing-coherence.ps1` / `test-routing.ps1` / `smoke.ps1` / `extract-summaries.ps1`（本机无 pwsh）——用上面的等价复刻替代，**不等价的部分（文档级语义检查）如实未验**；
 `INDEX.md` 直接取上游版本未用生成器重跑（模块数 45 与上游 README 一致）。
+### [2026-10-15] 三件收尾：删冗余 `patches-next/`、加 packs 链接守门、新建 termux 技能
+
+**① `patches-next/` 已删（已切换完成后它就是冗余）**：`patches-next/1.2/002-local-pi-mods.patch` 与 `010-disable-share-bug.patch`
+与 `patches/` 里换入后的两份 **sha256 逐字节相同**（BOM 级核对）⇒ 目录完成使命。处置：删除目录（内容可 `git show bc3e4ba11:patches-next/…` 取回），
+并把 `docs/operations/PI-1.2-SWITCH.md` **改写成"已执行"**（顶部状态横幅；第 4 步说明它与 `patches/` 的等价性；回滚段落补上
+**1.0.4 版补丁从 git 历史取**的可复跑命令 —— 因为 `/tmp/patches-1.0.4/` 不可依赖）。★ 保留本文件作为"当时怎么做+怎么回滚"的历史记录，
+但警告后人下次同步**不要照抄**。
+
+**② 新增 `scripts/check-packs-links.mjs`（我的决定：需要）**：既有 `check-doc-links.mjs` **有意排除 `packs/`**
+（文件头注释与 `SKIP` 集合都写明"外部技能包，链接不由本仓保证"）⇒ `packs/` 下 600+ 个 md 的内部链接**长期零回归保护**。
+上游 `reverse-skill` 自己新增的 `verify-doc-links.py` 又假定 **cwd=它自己的仓库根**（`git ls-files` + `git show :<path>`），
+在 vendored 布局下会去枚举**父仓库**并报 `cannot read tracked Markdown blob`。新脚本按 vendored 布局判定，口径与上游一致
+（只查相对链接、跳过围栏代码块与 `http(s)`/`mailto`/纯锚点、以 `/` 开头的按上游口径跳过并计数、命中集合 = `git ls-files packs`
+的文件∪父目录 ⇒ 天然忽略 `work/`、`tool-index.md` 等 gitignore 生成物，另放行"磁盘存在"或"被 ignore"的目标）。
+接进 `check-conventions.sh` 新增的 **G 段** ⇒ 随 golden（含 `--fast`）跑，**不动 golden 步数**（避免又一轮计数漂移）。
+证据：全量 **681 个 md / 1236 条相对链接，0 断链** ✓；**反证探针**：往 `EXPERIENCE.md` 注入一条断链 ⇒ **exit 1** 并点名
+`packs/reverse-skill/EXPERIENCE.md:49 -> ../no-such-file-xyz.md`，复原后 rc=0 且**与 HEAD 逐字节相同** ✓。
+
+**③ 新建 `packs/termux/`（用户：主要在平板上用 ZeroTermux 做开发，要 AI 帮得上忙）**：
+- **一手事实（GitHub API）**：官方 Termux 最新 **v0.118.3**（2025-05-22）；ZeroTermux = `hanxinhao000/ZeroTermux`（3k+ stars）
+  最新 **ZeroTermux-0.118.3.64**（2026-08-08，arm64 `debug`≈94MB / `release`≈83MB）⇒ **它基于 Termux 0.118.3** ✓；许可 `NOASSERTION`（如实标"再分发前自行核对"✗）。
+- **本机实测（aarch64 + proot Ubuntu 24.04）**：宿主前缀 `/data/data/com.termux/files/usr`（**720** 个可执行）在容器内**直接可见**；
+  容器里 **`$PREFIX` 为空、`$HOME=/root`**（脚本别依赖 `$PREFIX`）；**共享网络命名空间**（容器内 `127.0.0.1:19951` 可连 ✓ = ZeroTermux 的 Java 服务，
+  `19952` 只在宿主 `zt` 执行期间按需监听）；ZeroTermux 的机制目录 `~/.ZtInfo/main_menu_path.xml`（左侧菜单，`zt menu reset|update`，菜单项可 `java:`/`jumpUrl:`/`ztShell:`）、
+  `~/.timerdir/{shell_timer.sh,termux_timer.sh,log/}`（定时任务）、`~/.skill/<name>/SKILL.md`（它自带的 agent skills，本机已有 `termux-pkg-guide`）；
+  宿主 termux-main 源已是 **aliyun**、`x11` 源仍指官方 CF；实测坑：`/proc` 时钟自相矛盾、`ps -o etimes=` 溢出 `4294967295`、f2fs `find -type f` **漏文件**、`systemctl` ⇒ `offline`。
+  ★ **纠正一处流传说法**：`chmod` 对目录在本机**可用**（700→755 实测）——`security-baseline.mjs --self-check` 打印的"不生效"是它那条更严判据的免责，**别当普适事实**。
+- **技能内容**：三层身份判定（宿主 Termux / proot 容器 / PC）→ 从容器操作宿主的绝对路径命令表 → ZT 桥（`zt`/端口）与 **ZT 内置智能体 vs my-pi 的分工表** →
+  包管理与换源 → **保活（signal 9 / phantom process killer 按 Android 版本处置 + wake-lock + 电池优化）** → ZT 定时任务 → 平板交互与互传 → proot 实测坑表 →
+  容器里跑 Node/Python/AI → 安全边界 → **未核实清单** → 使用后经验沉淀段。并登记进 `packs/INDEX.md`（包索引）与 `packs/README.md`（当前包表）。
+- **与用户已有资产的边界**：ZeroTermux 自带 `~/.skill/termux-pkg-guide`（宿主层 `pkg` 安装/换源）⇒ 本包是 **my-pi 侧**技能，侧重"三层判定 + 宿主↔容器互通 + 保活/定时任务 + proot 实测坑"，**互补不重复**（技能里写了分工表）。
+- **未核实（✗）**：ZeroTermux 许可条款细节；本机安装的 ZT/Termux 版本号（容器内无可靠读取途径）；`zt`↔19951 的协议；ZT 内置工具语义（只在 my-pi 侧读其 SKILL.md 原文，未实测调用）；
+  `termux-change-repo` 各镜像可用性；X11/VNC 实际效果；phantom killer 的 adb 命令（公开文档，未在本平板实测）。
+
+**边界**：本轮未碰 `vendor/**`、`patches/**`（只删了 `patches-next/**` 这个已冗余的暂存目录）、`custom/**`；未提交他人改动（`portable/agent/settings.json` 仍留在工作区）。
