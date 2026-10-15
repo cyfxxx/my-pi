@@ -23,6 +23,8 @@
  *      在真实装配结果里可见（`assembly.contexts` + `joinContextSections(renderContextSections())`）
  *   A13 **会话事件桥（session/event + type 过滤）真跑**：真实 `Session.append()` 发日志事件，
  *      按 `event.type` 派发到对应的 pi 处理器，且**不同 type 不会串台**
+ *   A14 **工具结果桥（`tools/post-execute`）真跑**：pi 的 `tool_result` 处理器能收到结果，
+ *      返回 `{content}` 时**真的替换**注册表返回的内容块
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -434,6 +436,47 @@ async function main(): Promise<void> {
     a13 = { id: 'A13', ok: 'skip', detail: `会话事件桥不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a13);
+
+  // ── A14：工具结果桥（tools/post-execute）+ 结果替换 ─────────────────────────
+  let a14: Check = { id: 'A14', ok: false, detail: '未执行' };
+  try {
+    const tCtx = new Context();
+    tCtx.plugin(SystemPrompt);
+    tCtx.plugin(ToolRuntime);
+    await tick();
+    const tFacade = createDshExtensionApi(tCtx as unknown as DshContext, { onUnsupported: () => undefined });
+    tFacade.api.registerTool({
+      name: 'spike_post',
+      description: 'A14 探针',
+      parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+      execute: async () => ({ content: [{ type: 'text', text: 'ORIGINAL' }] }),
+    } as never);
+
+    const seenResults: unknown[] = [];
+    tFacade.api.on('tool_result' as never, ((event: unknown) => {
+      seenResults.push(event);
+      return { content: [{ type: 'text', text: 'REPLACED' }] };
+    }) as never);
+
+    const out = await tCtx.tools.execute({
+      callId: 'a14-1',
+      name: 'spike_post',
+      arguments: { text: 'x' },
+      signal: new AbortController().signal,
+    });
+    const rendered = JSON.stringify(out.content ?? []);
+    const valueText = typeof out.value === 'string' ? out.value : '';
+    const ok = seenResults.length === 1 && (rendered.includes('REPLACED') || valueText.includes('REPLACED'));
+    a14 = {
+      id: 'A14',
+      ok,
+      detail: `tool_result 处理器触发 ${seenResults.length} 次；替换后 content=${rendered.slice(0, 80)}｜value=${JSON.stringify(valueText).slice(0, 40)}｜isError=${String(out.isError)}`,
+    };
+    tFacade.dispose();
+  } catch (error) {
+    a14 = { id: 'A14', ok: 'skip', detail: `工具结果桥不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a14);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

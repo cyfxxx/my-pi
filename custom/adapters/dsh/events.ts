@@ -106,6 +106,7 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     tier: 'direct',
     dsh: ['tools/post-execute', 'tools/result'],
     via: 'cordis',
+    degradedNote: '实测（spike A14）：pi 返回 `{content}` 会**真的替换**注册表返回的内容块（`accept,content`），但 **`value`（结构化 canonical 值）不随之改变** ⇒ 若下游依赖 value，需另行处理',
     note: '3 处；accept/replace/enrich/block 都有对应（只观察用 tools/result）',
   },
   {
