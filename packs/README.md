@@ -14,7 +14,8 @@ packs/
 约定：
 - **不再有 active/ 中间态**：草稿确认后直接在 `packs/` 下建 `<name>/` 包（含 SKILL.md）；未确认的留在 `drafts/`
 - **同类型合并**：确认草稿时若 packs 已有同类型技能 → 合并/优化进现有包，不另立新包（例：colab-cli 草稿并入 colab-bridge；comfyui-agent 旧稿并入 comfyui-agent 包），合并后删草稿
-- drafts 草稿文件名 `<短名>.SKILL.md`，YAML frontmatter：name/description（1-2 句、不带时间戳，缓存友好）
+- drafts 草稿文件名以**生成器为准**：`scripts/task-summarizer.mjs` 写的是 `packs/drafts/workticket-<短名>.md`，**首行 `status: proposed`**（人工确认时按这个格式找文件；旧的 `<短名>.SKILL.md` 说法已作废）
+- **细节层目录**：允许存在"不是独立技能包、而是某个内置技能的细节层"的目录（无 `SKILL.md`、无 frontmatter）——目前有 `net-mirror/`（`pi-net-mirror` 的实测表）、`security-baseline/`（`pi-download-safety` 的基线与规则集）。它们**不适用**"必须有 SKILL.md"这一条，但必须在 `INDEX.md` 的二级功能索引里登记
 
 ## 流程
 
@@ -38,7 +39,7 @@ packs/
 4. **跨包复用**：有跨包通用价值的工具坑（网络通道、依赖安装、API 变化）同时 `memory_store`（带环境标签）
 5. **技能缺陷**：流程本身暴露的问题（命令失效/字段过时/章节不合理）直接改 SKILL.md 对应章节，不只写经验文件
 
-各包 SKILL.md 末尾应有"使用后经验沉淀"引导段（当前仅 gamedev 已落地为范本）；存量包下次使用时先补段再执行。
+各包 SKILL.md 末尾应有"使用后经验沉淀"引导段（**已落地 13 个**：10 个包根 SKILL.md + `media-toolkit` 三个子技能；`gamedev` 是范本之一；`pdf-toolkit` 已于 2026-10-15 补齐）；存量包下次使用时先补段再执行。
 
 ## 更新与整合原则（整合优先，禁止直接覆盖）
 
@@ -94,8 +95,10 @@ packs/
 | `pdf-toolkit/` | PDF 处理：通用能力 CLI `bin/pdf_core`（提取/合并/拆分/旋转/加密/水印/渲染/报告）+ 表单填写与扫描件 OCR 子技能；去水印/签名/压缩/Stirling/MinerU 等繁重能力记录在 references/specialized-tools.md。整合 anthropics/pdf skill 技术栈 |
 | `media-toolkit/` | 图片/视频/游戏美术处理：通用 CLI `bin/media_core`（图片：转换/压缩/水印/批量；视频：转码/剪辑/拼接/抽帧/音频/GIF/字幕；游戏：精灵表拆分/图集打包/资产优化）+ 三个子技能（image-basics/video-basics/game-art）；TexturePacker/GIMP/whisper 等繁重能力记录在 references/specialized-tools.md。全部本地执行（ImageMagick+ffmpeg+Pillow） |
 | `books/` | 书籍知识库框架（`scripts/books.py`：探针/索引/按需提页/缓存/记录，两端通用）+ 使用说明 `SKILL.md`；方案与实测见 [docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md](../docs/development/BOOK-KNOWLEDGE-BASE-PLAN.md)。之所以放 packs 而非 agentDir/skills：零系统提示词成本（低频按需能力） |
-| `knowledge-fetch/` | 零 LLM 知识订阅搭建（渠道调研/抓取脚本/去重过滤容错/定时任务接入）。已验证实例：`scripts/knowledge-fetch.py` v2 + `scripts/knowledge-ingest.mjs`（零 LLM 入库），接入定时任务 `knowledge-subscribe`/`daily-review`。来源：drafts/knowledge-fetch-setup（2026-08-27 升格） |
+| `knowledge-fetch/` | 零 LLM 知识订阅搭建（渠道调研/抓取脚本/去重过滤容错/定时任务接入）。已验证实例：`scripts/knowledge-fetch.py` v2 + `scripts/knowledge-ingest.mjs`（零 LLM 入库），接入定时任务 `knowledge-subscribe`/`daily-review`。来源：drafts/knowledge-fetch-setup（2026-08-27 升格；该草稿已随升格删除，`packs/drafts/` 现为空） |
 | `skill-integration/` | 外部技能包引入与整合统一流程：选包/许可核对/安全审查/验收冒烟/通用-专用-繁重三层归置/整合纪律 |
+| `net-mirror/` | **细节层**（无 SKILL.md）：网络加速实测表与命令模板，内置技能 `pi-net-mirror` 按需 read |
+| `security-baseline/` | **细节层**（无 SKILL.md）：分层完整性基线（`BASELINE.md` + `tiers.json` + `yara/starter.yar`），内置技能 `pi-download-safety` 用 `scripts/security-baseline.mjs` 消费 |
 
 ## 与 pi-backup 的关系
 

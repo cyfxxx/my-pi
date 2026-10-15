@@ -81,6 +81,7 @@ r2pm -ci r2ghidra   # Native Ghidra decompiler for radare2
 - [platforms-hardware.md](platforms-hardware.md) - Hardware and advanced architecture RE: HD44780 LCD controller GPIO reconstruction, RISC-V advanced (custom extensions, privileged modes, debugging), ARM64/AArch64 reversing and exploitation (calling convention, ROP gadgets, qemu-aarch64-static emulation)
 - [field-notes.md](field-notes.md) - Quick reference notes: binary types, anti-debugging bypass, specialized patterns, CTF case notes
 
+- [references/rea.md](references/rea.md) - **可选外部引擎 REA（Reverse Engineer Anything）的接线**：何时该用它（JS/Electron、.NET、Android、WASM、Mach-O、离线 pcap/qlog/SAZ/SQLite 证据…）、手动 pin 版安装（`npx -y rea-agents@6.5.0 …`）、stdio MCP 接入（含 **my-pi/pi 的 `PI_CODING_AGENT_DIR` 陷阱**）、平台与前置边界（**本机 Termux/PRoot 未在其声明面内 ⇒ 先 `doctor` 实测**）、以及与 scope/证据契约的接法。关键词归 `R0`；**它不替代 `config/routing.json` 的路由**。
 ---
 
 ## When to Pivot
@@ -200,6 +201,7 @@ Use [field-notes.md](field-notes.md) after the first round of triage when you kn
 - 遇到 CTF 模式 → `patterns*.md`
 
 **同级关联模块**: `apk-reverse/`（APK 定位到 .so 时可切回本模块的 Frida/radare2 分支）
+- **可选外部引擎**：点名 REA（`rea` / `rea-agents` / reverse engineer anything）时仍由本模块作 PRIMARY，接线与取舍见 `references/rea.md`（**不是一个新路由**：关键词挂在 `R0` 上）
 
 
 ## 任务完成自检（声称完成前 MUST 通过）

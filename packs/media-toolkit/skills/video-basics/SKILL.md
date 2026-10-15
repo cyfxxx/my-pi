@@ -1,3 +1,8 @@
+---
+name: video-basics
+description: 通用视频处理：转码/剪辑/拼接/抽帧/音频/GIF/字幕烧录，经 bin/media_core video（ffmpeg）。
+---
+
 # video-basics — 通用视频处理
 
 处理：转码/剪辑/拼接/抽帧/音频/GIF/字幕烧录。工具：ffmpeg 6.1。全部经 `bin/media_core video ...`。

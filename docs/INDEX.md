@@ -5,7 +5,7 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（236 条）
+## 决策台账（237 条）
 
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
@@ -243,8 +243,9 @@
 - `DECISIONS.md` · [2026-10-01] tsx 由 my-pi 自己声明，不再借 vendor/pi 的依赖 · **背景**：`scripts/run-ts.sh` 此前从 `$ROOT/vendor/pi/node_modules/.bin/tsx` 取 tsx（`custom/` 的 TS 用无扩展名导入，Node 内置类型剥离解析不了，必须走  · 数字: 26 个 · 证据: bash scripts/run-ts.sh scripts/memory-lifecycle.mjs
 - `DECISIONS.md` · [2026-10-01] 模式：`current` 移出入库文件，切换改为自动重启 · **背景**：用户报告"用 `/mode` 切到角色扮演，重启后没生效"。逐条核查后确认**机制没问题**：supervisor 的模式解析（`--append-system-prompt` + `PI_MEMORY_NAMESPACE`）
 - `DECISIONS.md` · [2026-10-14] 会话切换守卫：`/new`、`/resume` 不再打断在跑的那一轮（在 pi 的事件层等，不改上游语义） · **背景**（用户实测）：TUI 里"创建新会话或切换会话会导致正在运行的会话中断"。两问定范围后确认：
+- `DECISIONS.md` · [2026-10-15] REA 接进 packs 逆向技能（挂 `R0`，不新增路由）+ packs 审计修问题 · **背景**：用户要求把 GitHub `morluto/rea`（"Reverse Engineer Anything"）整合进 packs 的逆向技能，并体检 packs、非重大影响的问题自行处理。 · 数字: 3 条 / 13 个 / 4 个 / 232 个 · 证据: d201760ff / 6374c2baf
 
-## 进度记录（234 条）
+## 进度记录（235 条）
 
 - `PROGRESS.md` · 阶段零：准备与冻结 · - 完成时间：2026-09-20 · 数字: 5 个
 - `PROGRESS.md` · 阶段一：目录结构重置 · - 完成时间：2026-09-20
@@ -480,6 +481,7 @@
 - `PROGRESS.md` · 修缺陷：台账 --settle 不收敛（2026-10-11） · - 症状：改 DECISIONS（不改生成结果）→ update → commit → settle ⇒ "❌ 4 轮仍未收敛" + --check 报漂移 ⇒ pre-push 拦推送； · 数字: 4 轮 / 120 条 / 1 轮
 - `PROGRESS.md` · ★ 上游 pi 1.2 同步已执行（2026-10-11） · - 结果：vendor/pi HEAD db03484e2 → c3bc10e24 local: 011-tool-search-cjk；LAST_SYNC_POINT 28dcce2b → 6374c2baf； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf（第一位置参数=目标；UPSTREAM_URL
 - `PROGRESS.md` · 修"创建/切换会话打断在跑的那一轮"：会话切换守卫（2026-10-14） · - **需求（用户实测）**：TUI 里"创建新会话或切换会话会导致正在运行的会话中断"。定位用两个问题定死范围： · 数字: 5 条 · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
+- `PROGRESS.md` · REA（morluto/rea）接进 packs 逆向技能 + packs 审计修问题（2026-10-15） · - **需求**：用户要求把 GitHub 的 `morluto/rea` 整合进 packs 的逆向技能，并体检 packs 各技能、非重大影响的问题自行处理。 · 数字: 496 KB / 290 KB / 3 条 / 168 条 · 证据: 3b79af28 / edd62689f
 
 ## 缺陷回放（38 条）
 

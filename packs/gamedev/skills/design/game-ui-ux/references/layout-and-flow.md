@@ -86,6 +86,8 @@ func pop() -> void:
 
 This mirrors the state-stack idea in `love2d-core`'s `references/state-stack.md`, applied to UI.
 
+> ⚠️ `love2d-core` 属上游 `other-engines/`（**本包未收编**，见 `gamedev/SKILL.md`「未收编」清单）⇒ 该文件在本包内读不到，需要时回上游取。
+
 ## 5. Diegetic vs non-diegetic UI
 
 - **Non-diegetic:** drawn on the screen plane, outside the fiction (most HUDs). Cheapest, clearest.

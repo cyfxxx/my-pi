@@ -5981,3 +5981,23 @@ xterm 内部 buffer，只能靠它自己的手势模拟（移动端实测无效�
 "`slice(mark)` 里没有某段文本"做断言——pi 的 TUI 全屏重绘会把**换会话之前**打印过的文本重新写一遍，
 既能把"没有"断言污染成假失败，也能让"等它出现"提前命中（本次 E4 提前返回 ⇒ E3b 在持久化之前读盘）。
 决定性断言一律落在盘上产物 / provider 侧事实上。
+
+### [2026-10-15] REA 接进 packs 逆向技能（挂 `R0`，不新增路由）+ packs 审计修问题
+
+**背景**：用户要求把 GitHub `morluto/rea`（"Reverse Engineer Anything"）整合进 packs 的逆向技能，并体检 packs、非重大影响的问题自行处理。
+
+**决策 1：REA 作为"可选外部引擎"接进 `reverse-engineering/`，不新增路由。**
+- REA = CLI + **stdio MCP** + bundled skill（npm `rea-agents@6.5.0`，MIT）；它与本包**不是同类**：本包是"路由 + 域 skill + scope/证据契约"，REA 是"引擎"。⇒ 按 packs/README「同类型合并」的反面用法：**在域 skill 里指路，不另立路由**。
+- 关键词挂 **`R0`**（`\brea\b|rea-agents|reverse.?engineer.?anything|rea.?mcp|rea.?doctor|rea.?cli`）⇒ **不碰 priority**：`MASTER-ROUTING.md` 的优先级表与 `routing.json` 必须一一对应，而本机**没有 pwsh**、跑不了 `verify-routing-coherence.ps1` ⇒ 任何 priority 改动都会失去那两道不变量保护（**不测就不动**）。
+- 证据：`test-routing.sh` 171/171（168 + 3 条新用例，无回归）；`master-route.sh` 上 "用 rea 逆向这个 electron 应用" ⇒ PRIMARY = `reverse-engineering/SKILL.md`。
+- 供应链：**不进 `bootstrap-manifest.json`**（自动装有 pin/hash 硬要求）；只用官方 npm 渠道 + **版本钉死** `@6.5.0`；来源/日期/边界记入 `references/community-security-skills.md` §1.2 与包根 `EXPERIENCE.md`。
+- **my-pi 侧的坑（源码级核实）**：上游 `rea setup --client pi` 写 `~/.pi/agent/mcp.json`；而 `getAgentDir()` 优先取 `PI_CODING_AGENT_DIR`（`config.ts:605-611`），MCP 全局配置 = `join(agentDir,'mcp.json')`（`extensions/mcp/cli.ts:373/411`），my-pi 把它指向 `portable/agent`（`my-pi.sh:12`）⇒ **必须显式带 `PI_CODING_AGENT_DIR`**，否则 my-pi 读不到；改完要 `/reload`。
+- 平台边界如实写进文档：声明面 = Linux x64/arm64 + macOS x64/arm64（Windows 仅 experimental P0）；**Termux/PRoot 未声明** ⇒ 本机先 `doctor` 实测；商用工具需自行获授权（上游原文）。
+
+**决策 2：packs 审计发现的问题分类处置（非重大影响者自决）。**
+- **A 类（坏掉，必错）已修**：① `security-baseline/BASELINE.md` §六 把用法写成 `security-scan.mjs --baseline`（实测 exit 2；真实实现是 `security-baseline.mjs --tierN --init|--verify`）⇒ 改正并补 `--self-check`；② `dg-piagent/SKILL.md:22` 指向已不存在的 `vendor/pi/packages/pi-ai/dist/compat.d.ts`（真实 `packages/ai/dist/compat.d.ts`）⇒ 改正；③ `packs/INDEX.md` 表格被无 `>` 前缀行割裂（books 行脱离表格、net-mirror 行悬空在注记后）⇒ 归位并补 `security-baseline` 登记。
+- **B 类（过时/不一致）已修**：`BASELINE.md` 的 §二 规模（scripts 53→70 文件、packs 841→850）与两处互相矛盾的 Tier1 总数（949/939 ⇒ 改为"以脚本实测为准"）、§七"下一步"改为**已完成并逐条给证据**（`--self-check` rc=0）；`dg-piagent` 三处把 vendored pi 写成 v0.87.0/`d201760ff` ⇒ 更正为 **1.2.0/`6374c2baf…`** 并**如实标注"API 基线 0.83.0 待复核"**（不是机械改号）；`packs/README.md` 的 drafts 约定与生成器不符（`task-summarizer.mjs` 写 `workticket-<短名>.md` + 首行 `status: proposed`）⇒ 以生成器为准；README「仅 gamedev 已落地经验沉淀段」⇒ 改为已落地 13 个并给 `pdf-toolkit` 补段；README「当前包」表补 `net-mirror`/`security-baseline` 两个**细节层目录**并在约定里承认这一类（不强行给它们造 SKILL.md）；`media-toolkit` 三个子技能缺 frontmatter ⇒ 补 `name`/`description`；`image-basics` 自称"PDF→图也走 media_core"（实测解析器无 pdf 子命令）⇒ 改为走外部 `pdftoppm` 或 `pdf-toolkit`；`pdf-toolkit` 把 pandoc/weasyprint 写成"已装"（本机实测均未装）⇒ 改为"需先自备"并给预检命令；`gamedev` 引用了未收编的 `love2d-core` ⇒ 标注为上游；`security-baseline` 两个文件 0600 ⇒ 0644。
+- **留待用户决策（未动）**：`packs/reverse-skill` 落后上游 main 约一个月（**+R44 threat-intelligence、+R45 binary-ninja-reverse（42→44 路由）、基准 168→≥178、+`plugins/`(Codex 适配)、+SECURITY.md、+reports/、+多份 docs**，另有 macOS BSD sed、Kali yara 发现、binwalk 手动化、IDA MCP HTTP stall、内部文档链接守门等修复）。**为什么不自决**：这不是"改个 bug"，是**重新 vendored**——本地有 4 个文件是**故意定制**（`edd62689f` 改过 `README.md`/`README_zh.md`/`kali/README-kali.md`/`skills/SKILL.md`），按 packs/README「禁止整目录覆盖」必须人工合并；且新增路由会动 priority ⇒ 触到本机跑不了的 coherence 门禁；上游 HEAD 的**精确基准用例数**子代理标为未核实（`82441dd8` 自述 175→178，但 contents API 的 size 与本地矛盾）⇒ **不拿存疑数字做合并依据**。
+- **建议但未做**：packs 的内部链接**没有守门**（`check-doc-links.mjs` 明确排除 `packs/`；本次自扫 232 个 md 的相对链接 0 断）⇒ 可加一个 `scripts/check-packs-links.mjs` 进 golden（属新增门禁，等用户点头）。
+
+**未核实（✗）**：REA 未安装/未跑（命令清单来自上游 docs 原文，非 `--help` 实测）；172 个工具逐个名未核；Termux/PRoot 宿主可用性未实测；上游 `reverse-skill` HEAD 的精确用例数存疑。

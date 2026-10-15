@@ -309,6 +309,7 @@
       "keywords": [
         { "must": "ollvm|anti-?debug|unicorn|angr|gdb|deobfuscat|控制流平坦|反调试|unity|il2cpp|游戏.?逆向|game.?reverse|anti-?cheat|反作弊", "note": "Unity/游戏逆向归通用逆向 (seed-014)" },
         { "must": "frida", "exclude": "\\bapk\\b|smali|jadx|android|安卓", "note": "APK 语境下 frida 归 R1" },
+        { "must": "\\brea\\b|rea-agents|reverse.?engineer.?anything|rea.?mcp|rea.?doctor|rea.?cli", "note": "点名 REA（morluto/rea）⇒ 通用逆向模块里的可选外部引擎，接线见 reverse-engineering/references/rea.md" },
         { "must": "reverse|逆向", "exclude": "apk|js.?reverse|ios|mobile|\\.net|firmware|malware|安卓|固件|恶意|protocol|ghidra|extension|macos|mach|golang|rust|工控|厚客户端|取证|协议|扩展", "note": "泛逆向兜底；命中更具体域时让位" }
       ]
     }

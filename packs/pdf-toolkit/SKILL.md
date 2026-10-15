@@ -59,3 +59,8 @@ pdf-toolkit/
 - 依赖安装采用 `pip install --break-system-packages`（PEP 668 环境）
 - OCR 需额外 `apt install tesseract-ocr tesseract-ocr-chi-sim`（Debian 系）
 - 坐标约定全包统一 pymupdf 左上原点，避免混用
+
+## 使用后经验沉淀
+
+任务结束后按 `packs/README.md` 的"经验沉淀机制"收尾：把执行过程与本节/`references/` 的偏差（工具坑、命令失效、输出约束不足、新发现）追加到包根 `EXPERIENCE.md`
+（格式：`## YYYY-MM-DD <子技能> / - 环境: … / - 场景·经验: …`，环境必须标注）；未合并条目 ≥3 条时合并进本文件对应章节。

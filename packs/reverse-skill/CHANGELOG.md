@@ -17,6 +17,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 - `ida-reverse` watchdog / scheduled-task installer / GUI launcher / supervisor wrapper (`watchdog.ps1`, `install-autostart.ps1`, `start-gui.ps1`, `run-supervisor.py`) plus portable `LOCAL-SETUP.md`.
+- **REA（Reverse Engineer Anything）接线** — 通用逆向模块新增 `reverse-engineering/references/rea.md`：把外部引擎 [morluto/rea](https://github.com/morluto/rea)（npm `rea-agents@6.5.0`，CLI + stdio MCP）作为**可选引擎**接入，含手动 pin 版安装、my-pi/pi 的 `PI_CODING_AGENT_DIR` 接线陷阱、平台/前置边界（**Termux/PRoot 未在其实测声明面内 ⇒ 先 `doctor`**）与 scope/证据契约接法。关键词挂 `R0`（`\brea\b` / `rea-agents` / `reverse engineer anything` …），**不新增路由、不改 priority**；基准 168 → **171** 条。来源日期与版本记在 `references/community-security-skills.md` §1.2；**不进** `bootstrap-manifest.json`（手动装）。
 
 ## [1.0.1] — 2026-08-08
 ### Added

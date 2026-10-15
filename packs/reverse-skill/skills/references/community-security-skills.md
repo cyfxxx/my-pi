@@ -37,6 +37,21 @@
 | [appsecsanta AI pentesting agents 2026](https://appsecsanta.com/research/ai-pentesting-agents-2026) | 39+ 开源 AI 渗透 agent 架构分类 | 多 agent ≠ 必须；我们用 role-map |
 | Snyk 评测「更多 skill ≠ 更好」 | 技能堆叠可能降低审计质量 | 强化「深 skill + 路由」策略 |
 
+### 1.2 第三轮增补（2026-10-14，检索日 2026-10-14）
+
+| 仓库 / 资源 | 定位 | 本包落点 |
+|-------------|------|----------|
+| [morluto/rea](https://github.com/morluto/rea) | **REA (Reverse Engineer Anything)**：CLI + **stdio MCP**（同一套 workflow/Evidence 引擎）+ bundled skill。npm **`rea-agents@6.5.0`**（MIT；`engines: ^22.19.0 \|\| ^24.11.0 \|\| >=26.0.0`；无 Docker、无独立二进制 release）；release `rea-agents-6.5.0` / 2026-10-14，目标 commit `3b79af28e80785afce9f5998d8f03289402a1847`；MCP 工具 **172** 个（上游实测默认 profile 清单 ≈496 KB / compact ≈290 KB ⇒ 上下文成本要先算） | 作为**可选外部引擎**接进通用逆向：见 [`../reverse-engineering/references/rea.md`](../reverse-engineering/references/rea.md)。**不整库并入**（体量大、自带 4 个 skill 与多宿主工具桥） |
+
+**为什么单列它**（与本包既有路径的关系，避免重复造轮子）：
+- 本包的长处是**深 skill + 域路由 + scope/证据契约**；REA 的长处是**把"某一类容器格式/运行时"的静态分析封装成 MCP 工具**（JS bundle、.NET 托管、Android/JADX、Dart AOT、WASM/WABT、Mach-O、Electron fuses、Rust cargo-auditable、Go buildinfo、HarmonyOS HAP、pcap/qlog/SAZ/SQLite 离线证据、Ghidra/IDA 桥）。
+- ⇒ 用法是**"路由到域 skill，域 skill 里按需点名 REA 引擎"**，而不是用它替代 `routing.json`（本包路由仍是唯一 PRIMARY 事实源）。
+- ★ **平台边界**：声明支持 Linux x64/arm64 + macOS x64/arm64，Windows 仅 `experimental Windows x64 P0`；**Termux / PRoot 在 README/docs/install.sh 中 0 命中**（Termux 只出现在它把 Termux 当**浏览器采集目标**的 CI 工作流里）⇒ 本机要用**必须先 `doctor` 实测**。
+- ★ **商用工具合规**（上游原文）：`You must legally obtain and be authorized to use commercial tools`（IDA/Hex-Rays、Hopper、JEB）——REA **不**附带任何许可/密钥；与 `ops/scope-contract` 的授权门禁同向。
+- ⇒ 它的 release notes 自带**很诚实的验证边界**（大量条目写明 "recorded coverage is Linux x64 / macOS arm64 …; Windows/macOS remain unverified"）⇒ 我们在 `rea.md` 里原样保留这些边界，**不替它背书**。
+
+**供应链处置（按 `ops/skill-supply-chain.md` §3）**：**不自动安装**（不进 `scripts/bootstrap-manifest.json`）；只用官方 release/npm 渠道并 pin 版本；装前人工读其 SKILL/脚本；来源日期与版本记录在本文件与 `rea.md`。
+
 ## 2. 安全标准与威胁（2025–2026）
 
 | 来源 | 要点 | 本包落点 |

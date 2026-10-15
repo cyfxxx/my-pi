@@ -15,11 +15,12 @@ description: |
 
 > ⚠️ **版本基线**: 本 skill 的 API 描述已对齐到 **pi-coding-agent v0.83.0**。
 >
-> 🖥 **本机注记（my-pi 仓库）**: 本仓库 vendored 的 pi 为 **v0.87.0**（`vendor/PINNED_COMMIT` = `d201760ff`），高于
+> 🖥 **本机注记（my-pi 仓库）**: 本仓库 vendored 的 pi 为 **v1.2.0**（`vendor/PINNED_COMMIT` = `6374c2baf432419ccb4541a99ce4958ecd03dae0`），远高于
+> ⚠️ **API 基线（v0.83.0）因此已落后两个大版本**：本包 `sdk_doc/` 与场景 references **尚未按 1.2 复核**（不是机械改号），以 `vendor/pi/packages/*/dist/**/*.d.ts` 实测为准。旧值记为
 > 本 skill 基线。涉及本机实际 SDK 使用时，若与 skill 描述相抵触，以
 > `vendor/pi/packages/coding-agent/dist/**/*.d.ts` + `vendor/pi/packages/coding-agent/CHANGELOG.md` 为准。
 >
-> **遇 pi-ai import 失败时**，先查 `vendor/pi/packages/pi-ai/dist/compat.d.ts` 的 `export *` 列表，确认符号归属哪个入口。
+> **遇 pi-ai import 失败时**，先查 `vendor/pi/packages/ai/dist/compat.d.ts` 的 `export *` 列表，确认符号归属哪个入口。
 >
 > 📁 **路径映射（本文档其余部分沿用 pi 默认路径）**: pi 的默认 agentDir 是 `~/.pi/agent`，本仓库通过
 > `PI_CODING_AGENT_DIR` 指向 **`portable/agent`**（技能 `portable/agent/skills/`、会话 `portable/agent/sessions/`）。

@@ -1,6 +1,13 @@
+---
+name: game-art
+description: 面向游戏项目（Godot/Unity/Web）的资产管线：精灵表拆分/图集打包/透明底/优化压缩/九宫格，经 bin/media_core game（Pillow + ImageMagick）；美术方向与引擎侧资产规划见 gamedev 的 create-game-assets。
+---
+
 # game-art — 游戏美术资产处理
 
 面向游戏项目（Godot/Unity/Web）的资产管线：精灵表、图集、透明底、优化压缩、九宫格。工具：Pillow + ImageMagick。经 `bin/media_core game ...`。
+
+> 与 `gamedev/skills/design/create-game-assets/` 分工：那边是**引擎无关的美术方向/资产规划**（含 raster/3D 管线与校验脚本），这边是**本地 CLI 落地**（拆分/打包/优化）；两边互相指路，不重复实现。
 
 ## 使用场景
 

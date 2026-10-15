@@ -3948,3 +3948,14 @@ P2（按需提取）/P3（规模化与沉淀），每期带可验证判据。需
   **未验证**：等待期间用户继续输入并触发新回合时守卫会连等（"等所有在途工作"）——无场景覆盖；
   超预算路径只在单测里覆盖（场景未设预算）。
 - 证据现场：`/tmp/my-pi-switch-scenario-7qCVCh`（`PI_SCENARIO_KEEP=1` 保留的成功现场）。
+
+### REA（morluto/rea）接进 packs 逆向技能 + packs 审计修问题（2026-10-15）
+
+- **需求**：用户要求把 GitHub 的 `morluto/rea` 整合进 packs 的逆向技能，并体检 packs 各技能、非重大影响的问题自行处理。
+- **REA 是什么（一手核实，2026-10-14/15）**：CLI + **stdio MCP**（同一套 workflow/Evidence 引擎）+ 一个 bundled skill；npm **`rea-agents@6.5.0`**（MIT，release `rea-agents-6.5.0`，target commit `3b79af28…`）；`bin` = `rea`/`rea-agents` → `scripts/rea.mjs`；**无 Docker、无独立二进制 release**；MCP 工具 **172** 个（上游实测默认 profile 清单 ≈496 KB / compact ≈290 KB）。
+  抓取通道事实：本机 `curl` 到 `raw.githubusercontent.com` 被 reset（000），jsdelivr/jina/statically/githack 全失败 ⇒ **只有 `api.github.com` 可用，其 `contents`/`readme` 返回 base64**，解码即原文。
+- **接法（不新增路由）**：新建 `packs/reverse-skill/skills/reverse-engineering/references/rea.md`（何时用/手动 pin 装/MCP 接法/平台前置/与 scope·证据契约接法/未核实清单），`reverse-engineering/SKILL.md` 的 Additional Resources 与「路由上下文」各加一条，关键词挂 **`R0`**（`\brea\b|rea-agents|reverse.?engineer.?anything|rea.?mcp|rea.?doctor|rea.?cli`）⇒ **priority 与 `MASTER-ROUTING.md` 表未动**（本机无 pwsh、跑不了 `verify-routing-coherence.ps1`，故不许碰那两条不变量）。基准 168 → **171**；来源与 pin 记进 `references/community-security-skills.md` §1.2；包 `CHANGELOG.md` 加 `[Unreleased]/Added`；新建包根 `EXPERIENCE.md`。
+- **★ my-pi 侧接线陷阱（按源码核实，不是抄上游）**：上游 `rea setup --client pi` 写 `~/.pi/agent/mcp.json`，而 pi 的 agent 目录优先取 `PI_CODING_AGENT_DIR`（`vendor/pi/packages/coding-agent/src/config.ts:605-611`），MCP 全局配置 = `join(agentDir,'mcp.json')`（`extensions/mcp/cli.ts:373/411`），my-pi 又把它指向 `<repo>/portable/agent`（`my-pi.sh:12`）⇒ **必须带 `PI_CODING_AGENT_DIR=… setup --client pi`**，否则条目落到 `~/.pi/`，my-pi 读不到。改 MCP 配置后需 `/reload`。
+- **平台边界（如实）**：声明支持 Linux x64/arm64 + macOS x64/arm64，Windows 仅 experimental P0；**Termux/PRoot 0 命中**（Termux 只出现在它把 Termux 当浏览器采集目标的 CI 工作流里）⇒ 本机要用先 `npx -y rea-agents@6.5.0 doctor --json` 实测。商用工具（IDA/Hopper/JEB）上游明确要求自行获授权。
+- **REA 侧验证（可复跑）**：`bash skills/scripts/test-routing.sh` ⇒ **171/171 PASS**（新增 3 条 REA 用例；168 条无回归）；`bash skills/scripts/test-bootstrap-manifest.sh` ⇒ passed；`bash skills/scripts/master-route.sh --hint "用 rea 逆向这个 electron 应用"` ⇒ PRIMARY `skills/reverse-engineering/SKILL.md`（confidence high，生成物 `work/` 已清）；`node -e JSON.parse` ⇒ routing.json/benchmark 合法。**未跑**：`verify-routing-coherence.ps1`/`test-routing.ps1`/`extract-summaries.ps1`（无 pwsh；未新增 SKILL.md ⇒ INDEX 不受影响）；**未安装、未执行任何 `rea` 命令** ✗。
+- **packs 只读审计（子代理）后的处置**：修 A 类 2 项 + B 类 11 项 + C 类若干（详见 `DECISIONS.md` 同日条目）；**留一项待用户决策**：`packs/reverse-skill` 落后上游 main 约一个月（+R44 threat-intelligence / +R45 binary-ninja-reverse、基准 168→≥178、+plugins(Codex 适配)/SECURITY.md/reports/多份 docs，另有 macOS sed、yara 发现、binwalk 手动化、IDA HTTP stall、内部文档链接守门等修复；本地有 4 个文件是**故意定制**：`edd62689f` 改过 README/README_zh/kali README-kali/skills/SKILL.md）⇒ 属"重新 vendored"，需人工合并，已报用户要 go/no-go。

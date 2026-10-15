@@ -42,14 +42,15 @@
 
 ```
 .githooks               2 文件 /  16K
-scripts                53 文件 / 720K
+scripts                70 文件 / 896K
 patches                12 文件 /  76K
 portable/agent/skills  25 文件 / 307K
-packs                 841 文件 /  13M   ← 占 Tier1 的 ~90%（其中 drafts 必须排除）
+packs                 850 文件 /  13M   ← 占 Tier1 的 ~90%（其中 drafts 必须排除；2026-10-15 实测）
 sync                    6 文件 / 248K
 控制面单体文件            7 个
 ──────────────────────────────────────
-Tier1 合计           ≈939 文件 / ≈14.4M
+Tier1 合计           **以脚本实测为准**（`--tier1 --init` 会打印真实条目数）——
+                     本节旧值 ≈939 与本文件开头记的 949 曾不一致，故不再并列猜数
 Tier2 入口（custom/adapters + core + bootstrap.ts）≈182K
 ```
 
@@ -81,20 +82,23 @@ Tier2 入口（custom/adapters + core + bootstrap.ts）≈182K
 ## 六、用法（实现落地后）
 
 ```
-node scripts/security-scan.mjs --baseline --tier1 --init       # 生成基线（运行时目录）
-node scripts/security-scan.mjs --baseline --tier1 --verify     # 增量验证：unchanged/changed/added/removed
-node scripts/security-scan.mjs --baseline --tier2 --verify     # Tier2（进程内入口 + 系统级持久化点）
+node scripts/security-baseline.mjs --tier1 --init      # 生成基线（运行时目录）
+node scripts/security-baseline.mjs --tier1 --verify    # 增量验证：unchanged/changed/added/removed
+node scripts/security-baseline.mjs --tier2 --verify    # Tier2（进程内入口 + 系统级持久化点）
+node scripts/security-baseline.mjs --self-check        # 只读自证（四类 + PATH + env 桩）
 ```
 **默认只记录、不阻断**（任何自动阻断都属"改默认行为"，需用户批准）。
 
-## 七、下一步（重做时的清单）
+## 七、重做清单（**已完成**，2026-10-15 逐条核对）
 
-1. 修掉那次 WIP 的崩溃（`ReferenceError`），**先证明脚本能跑**，再谈别的；
-2. `tiers.json` 里**补上 `packs/drafts/**` 与 `**/.venv/**`**（本文件已列为必排除）；
-3. **双向自证**：不改 ⇒ `unchanged`；**改一字节** ⇒ `changed` 且**给出路径**；加文件 ⇒ `added`；
-   并保证"永远返回未变"的假实现会**失败**；
-4. 交付**实测耗时**（Tier1 init / 热 verify），写回本文件；
-5. 不许调用任何外部命令（便携化）——重做后要再自查一次。
+> 结论：下面 5 条都已落地；核对方式与证据见括号。**不要再当待办**。
+
+1. ✅ WIP 崩溃已修，脚本可跑（`node scripts/security-baseline.mjs --self-check` ⇒ rc=0）；
+2. ✅ `tiers.json` 已含 `packs/drafts/**`、`**/.venv/**`、`**/__pycache__/**`、`portable/memory/**`（`node -e 'JSON.parse(...)'` 可解析）；
+3. ✅ 双向自证：`--self-check` 实测 `不改⇒unchanged=2 / 改一字节⇒changed=["a.txt"] / 加⇒added=["c.txt"] / 删⇒removed=["sub/b.txt"]`
+   （含 PATH 可写目录分支；**唯一未实测项**：本机 proot 下 `chmod` 对目录不生效 ⇒ "不可写目录被排除"分支用代码判据代替，脚本自己会打印这条免责）；
+4. ✅ 实测耗时已写回（上文与 §九/§十）；
+5. ✅ 便携化：自证里不允许外部命令（`env 自证` 用不存在命令 `crontab` 反证）。
 
 ## 八、第 ⑤ 层：供应链（`scripts/supply-chain-check.mjs`，离线）
 

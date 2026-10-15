@@ -845,6 +845,22 @@
                       "hint":  "case review evidence chain traceability",
                       "expect":  "R40",
                       "quick":  true
+                  },
+                  {
+                      "hint":  "用 rea 逆向这个 electron 应用",
+                      "expect":  "R0",
+                      "quick":  true
+                  },
+                  {
+                      "hint":  "reverse engineer anything mcp install rea-agents",
+                      "expect":  "R0",
+                      "quick":  false
+                  },
+                  {
+                      "hint":  "rea doctor 检查逆向环境",
+                      "expect":  "R0",
+                      "quick":  false
                   }
+
               ]
 }

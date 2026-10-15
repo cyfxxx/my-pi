@@ -51,7 +51,8 @@
 
 ## 8. Markdown → PDF（生成方向补充）
 
-- 已装中文环境的快捷路线：`pandoc in.md -o out.pdf --pdf-engine=weasyprint`（CSS 控制样式），或 wkhtmltopdf
+- 中文环境的快捷路线（**需先自备**）：`pandoc in.md -o out.pdf --pdf-engine=weasyprint`（CSS 控制样式），或 wkhtmltopdf。
+  ⚠️ 2026-10-15 本机实测：`pandoc` / `weasyprint` / `wkhtmltopdf` **均未安装** ⇒ 先 `command -v pandoc`、`python3 -c 'import weasyprint'` 预检，缺则先装或改走 `browser_pdf`（Chromium 打印）。
 - reportlab 直接编程生成适合"表格+固定样式"的票据/报表（pdf_core 未封装，需要时临时写脚本）
 - 纯网页类内容：`browser_pdf`（pi-browser 扩展，Chromium 打印）现成可用
 

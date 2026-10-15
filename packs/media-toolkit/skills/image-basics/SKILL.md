@@ -1,6 +1,11 @@
+---
+name: image-basics
+description: 通用图片处理：缩放/裁剪/格式转换/压缩/水印/批量/透明底/PDF 转图；图片操作走 bin/media_core image，PDF→图走 pdftoppm（或 pdf-toolkit 的 pdf_core render）。
+---
+
 # image-basics — 通用图片处理
 
-处理：缩放/裁剪/格式转换/压缩/水印/批量/透明/PDF→图。工具：ImageMagick 6（convert）+ Pillow。全部经 `bin/media_core image ...`。
+处理：缩放/裁剪/格式转换/压缩/水印/批量/透明/PDF→图。工具：ImageMagick 6（convert）+ Pillow。**图片操作**经 `bin/media_core image ...`；**PDF→图**不在 media_core 里（实测其解析器无 pdf 子命令）⇒ 走外部 `pdftoppm`（见下表）或 `pdf-toolkit` 的 `pdf_core render`。
 
 ## 常见操作
 
