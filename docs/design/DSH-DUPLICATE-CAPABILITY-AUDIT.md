@@ -109,8 +109,15 @@
 - **描述不加长**：`searxng` 的 `description` 保持原文（`搜索网络并返回结果列表`）⇒ 工具声明面总字节
   **25,761 → 25,758 B（降 3 B）**，没有抬被守门盯着的预算（纪律："不擅自抬预算"）。
   后端细节写在仓库的 `portable/agent/AGENTS.md`，不占每次请求都要付的声明面。
-- **残留影响（如实登记）**：`packs/` 里若仍有"用 `web_search`"的表述（vendored 外部技能包，**不改上游内容**），
-  改名后这类指令会落到**宿主的 `web_search`**（DeepSeek 后端，需凭据）上 —— 语义仍成立，但后端不同。
+- **残留影响（如实登记，逐文件处置）**：`packs/` 里还有 4 处提到 `web_search`，两个底座的后果**不同**：
+  | 文件 | 归属 | 处置 | 后果 |
+  |---|---|---|---|
+  | `packs/README.md:61` | **本仓自己维护**的 packs 索引 | ✅ 已改为 `searxng` | — |
+  | `packs/reverse-skill/RULES_zh.md:409` | vendored 上游 | 保留（"如 `web_search`、Perplexity、Tavily 等"是**泛指联网搜索能力**的举例，不是绑定某个工具） | 无 |
+  | `packs/books/SKILL.md:3` | vendored 上游 | 保留 | 在 **pi** 底座上该指令指向已不存在的工具（模型会白试一次）；在 **DSH** 底座上落到宿主的 `web_search`（DeepSeek 后端，需凭据） |
+  | `packs/gamedev/references/webgame-autopilot.md:8` | vendored 上游 | 保留 | 同上 |
+  为什么不改 vendored 三个：`packs/` 是**上游技能包**（有各自的同步与链接/结构守门），
+  本地改名不该制造与上游的漂移；代价是**已知且已登记**的两处陈旧指令。
   检索面：`grep -rn "web_search" packs/`。
 
 ## 7. 待重设计项（登记，**不静默丢**）
