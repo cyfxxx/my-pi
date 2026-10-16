@@ -163,7 +163,7 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 | 5 | `turn_end` | **①** | `turn/end`（同上）；更强的是 `agent/turn-stopping`（serial, `:387`） | 观察点存在；若需要"能否让回合继续"，DSH 的 `turn-stopping` 比 pi 更强（可 steer 继续），按需选一个 |
 | 6 | `agent_settled` | **①** | `agent/status`（emit, `:252`，进入 `idle`） | DSH 把「settled」表达为状态翻到 `idle`（无驱动在排队/在跑），语义等价、形态不同 |
 | 7 | `agent_end` | **②** | `agent/turn-stopping`（serial, `:387`）、`agent/status`（emit, `:252`） | pi 的 `agent_end` 是"整段 agent 结束"；DSH 这一层是**回合级**，需要把处理器从"结束一次"改成"每回合判条件" |
-| 8 | `input` | **②** | `agent/pre-step`（waterfall, `:304`，可替换进入 step 的 messages）、`agent/inbox/inserted`（emit, `:263`） | pi 的 `input` 能改写用户输入；DSH 的对应干预点在"步"这一层（inbox 只是观察），改写对象从"输入"变成"进入 step 的消息数组" |
+| 8 | `input` | **②** | `agent/pre-step`（waterfall, `:304`，可替换进入 step 的 messages）、`agent/inbox/inserted`（emit, `:263`）、`agent/inbox/spliced`（会话日志事件，带 `target`） | pi 的 `input` 能改写用户输入；DSH 的对应干预点在"步"这一层（inbox 只是观察），改写对象从"输入"变成"进入 step 的消息数组"。**`streamingBehavior` 已可派生（2026-10-18）**：DSH 把它记在会话日志 `agent/inbox/spliced.target`（`InboxTarget = 「next-turn」｜「next-step」`，`dsh-agent/lib/types/types.d.ts:31`）⇒ `next-step`=steer、`next-turn`=followUp，按"进入本步的消息 id"反查填入；查不到才置空并上报（不猜）。真 Host 实测：该降级上报从每次运行 3 条降为 0 条 |
 | 9 | `tool_call` | **①** | `tools/pre-execute`（waterfall, `dsh-tools:47`） | 两者都是分发前的闸门，能力等价乃至更强（DSH 多了 cancel/ask）；改动基本是换事件名 + 换 decision 形状 |
 | 10 | `tool_result` | **①** | `tools/post-execute`（waterfall, `:70`）；只观察用 `tools/result`（emit, `:92`） | 两者都能 accept/replace/enrich/block 工具结果；差别只在 decision 形状与错误路径的表达 |
 | 11 | `tool_execution_start` | **①** | `tools/execute`（waterfall, `:58`） | 阶段相同（分发前），DSH 版本是环绕瀑布、能力是超集（超时/重试/指标） |

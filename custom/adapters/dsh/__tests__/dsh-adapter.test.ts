@@ -18,6 +18,7 @@ import {
   deriveSessionInfo,
   idleOnly,
   inputTextFromPayload,
+  streamingBehaviorFromInboxTarget,
   makeDshListener,
   mapToolCallDecision,
   mapToolResultDecision,
@@ -485,6 +486,85 @@ describe('消息投递（sendUserMessage / sendMessage / appendEntry）', () => 
     const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
     facade.api.appendEntry('my-pi/x', { a: 1 });
     expect(reports.some((r) => r.startsWith('appendEntry') && r.includes('SessionEventMap'))).toBe(true);
+  });
+});
+
+describe('input 的 streamingBehavior：从会话日志的收件箱目标反查（原先是"置空 + 上报"）', () => {
+  it('纯映射：next-step ⇒ steer、next-turn ⇒ followUp、其它 ⇒ undefined（不猜）', () => {
+    expect(streamingBehaviorFromInboxTarget('next-step')).toBe('steer');
+    expect(streamingBehaviorFromInboxTarget('next-turn')).toBe('followUp');
+    expect(streamingBehaviorFromInboxTarget('whatever')).toBeUndefined();
+    expect(streamingBehaviorFromInboxTarget(undefined)).toBeUndefined();
+  });
+
+  it('★ 端到端：先记 splice 目标，再走 pre-step ⇒ 处理器拿到 streamingBehavior，且不再上报缺字段', async () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    const seen: Array<string | undefined> = [];
+    facade.api.on('input' as never, ((event: unknown) => {
+      seen.push((event as { streamingBehavior?: string }).streamingBehavior);
+      return undefined;
+    }) as never);
+    const preStep = fake.listeners.get('agent/pre-step')?.[0];
+    const infra = fake.listeners.get('session/event')?.[0];
+    expect(preStep).toBeDefined();
+    expect(infra).toBeDefined();
+
+    // 会话日志里先出现"把消息投到 next-step"（= steer）
+    await infra?.({ id: 's' }, {
+      type: 'agent/inbox/spliced',
+      data: { target: 'next-step', start: 0, inserted: [{ id: 'msg-1', role: 'user', content: [{ type: 'text', text: '插一句' }] }] },
+    });
+    await preStep?.({
+      agent: { session: { id: 's' } },
+      messages: [{ id: 'msg-1', role: 'user', content: [{ type: 'text', text: '插一句' }] }],
+      turn: 1,
+      step: 1,
+    });
+    expect(seen).toEqual(['steer']);
+    expect(reports.some((r) => r.startsWith('hook.input.streamingBehavior'))).toBe(false);
+  });
+
+  it('★ 反向探针：查不到目标时**不猜** ⇒ 字段为空 + 明确上报', async () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    const seen: Array<string | undefined> = [];
+    facade.api.on('input' as never, ((event: unknown) => {
+      seen.push((event as { streamingBehavior?: string }).streamingBehavior);
+      return undefined;
+    }) as never);
+    await fake.listeners.get('agent/pre-step')?.[0]?.({
+      agent: { session: { id: 's' } },
+      messages: [{ id: 'unknown-msg', role: 'user', content: [{ type: 'text', text: 'x' }] }],
+      turn: 1,
+      step: 1,
+    });
+    expect(seen).toEqual([undefined]);
+    expect(reports.some((r) => r.startsWith('hook.input.streamingBehavior'))).toBe(true);
+  });
+
+  it('★ 反向探针：next-turn ⇒ followUp（不是 steer；别把排队消息当成 steer）', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: () => undefined });
+    const seen: Array<string | undefined> = [];
+    facade.api.on('input' as never, ((event: unknown) => {
+      seen.push((event as { streamingBehavior?: string }).streamingBehavior);
+      return undefined;
+    }) as never);
+    const infra = fake.listeners.get('session/event')?.[0];
+    await infra?.({ id: 's' }, {
+      type: 'agent/inbox/spliced',
+      data: { target: 'next-turn', start: 0, inserted: [{ id: 'msg-2', role: 'user', content: [{ type: 'text', text: '下一回合' }] }] },
+    });
+    await fake.listeners.get('agent/pre-step')?.[0]?.({
+      agent: { session: { id: 's' } },
+      messages: [{ id: 'msg-2', role: 'user', content: [{ type: 'text', text: '下一回合' }] }],
+      turn: 2,
+      step: 1,
+    });
+    expect(seen).toEqual(['followUp']);
   });
 });
 

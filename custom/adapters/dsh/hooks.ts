@@ -75,6 +75,17 @@ export interface HookBridgeContext {
    */
   readonly piContextFor?: (payload: unknown) => unknown;
   /**
+   * 为 pi 的 `input` 事件派生 `streamingBehavior`（可选；返回值只能是 `'steer' | 'followUp'`）。
+   *
+   * 背景：pi 的 `input` 负载带 `streamingBehavior`（steer = 注入**正在跑**的这一步；followUp = 排到
+   * **下一回合**），而 DSH 的 `agent/pre-step` 负载**不含这一维**（所以原先这个字段只能置空 + 上报）。
+   * 但 DSH 把它记在**会话日志**里：`agent/inbox/spliced` 的 `target` 是
+   * `InboxTarget = 'next-turn' | 'next-step'`（`dsh-agent/lib/types/types.d.ts:31`），
+   * 其中 `next-step` 正是 steer、`next-turn` 正是 followUp ⇒ 可以按"进入本步的消息 id"反查出来。
+   * 返回 `undefined` = **不知道**（调用方保持置空 + 上报，不许猜）。
+   */
+  readonly streamingBehaviorFor?: (payload: unknown) => string | undefined;
+  /**
    * 把"每步"事件适配成"每回合一次"用的去重键（可选）。
    *
    * 背景：pi 的 `before_agent_start` 是**每回合一次**，DSH 的对应点 `agent/pre-step` 是**每步一次**
@@ -280,8 +291,15 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
         source: string;
         streamingBehavior?: string;
       };
-      // DSH 的 pre-step 负载里没有"steer / followUp"这一维 ⇒ 置空并**上报**（否则 pi 处理器会以为不是 steer）
-      report('hook.input.streamingBehavior', 'DSH 的 agent/pre-step 负载不含 streamingBehavior（steer/followUp）⇒ 该字段为空，依赖它的处理器会走非 steer 分支');
+      // DSH 的 pre-step 负载里没有"steer / followUp"这一维 ⇒ 先从**会话日志**的
+      // `agent/inbox/spliced.target` 反查（`next-step`=steer / `next-turn`=followUp）；查不到才置空并上报
+      // （否则 pi 处理器会以为不是 steer，intervention 这类"记录 steer 文本"的功能会静默记空）。
+      const derived = bridge.streamingBehaviorFor?.(first);
+      if (derived) {
+        event.streamingBehavior = derived;
+      } else {
+        report('hook.input.streamingBehavior', '本条输入没查到收件箱目标（`agent/inbox/spliced.target`）⇒ 该字段为空，依赖它的处理器会走非 steer 分支');
+      }
       const decision = (await handler(event, piContext)) as { action?: unknown } | undefined;
       const action = decision?.action;
       if (action === 'handled') {
@@ -359,6 +377,19 @@ export function withSessionContext(base: unknown, payload: unknown): unknown {
  * （消息刚从收件箱里取出来）⇒ 取**最后一条**含文本块的 user 消息的文本（多块用换行拼接）。
  * 取不到就返回空串（不编造）。
  */
+/**
+ * DSH 的收件箱目标 → pi 的 `streamingBehavior`。
+ *
+ * 契约出处：`InboxTarget = 'next-turn' | 'next-step'`（`dsh-agent/lib/types/types.d.ts:31`）+
+ * `Agent.steer()`/`followup()` 的语义（`runtime-types.d.ts:186` 的 `send(message, target, wakeup)`）。
+ * 不认识的值返回 `undefined`（**不猜**：宁可让调用方上报缺字段，也不要把它误标成 steer）。
+ */
+export function streamingBehaviorFromInboxTarget(target: unknown): 'steer' | 'followUp' | undefined {
+  if (target === 'next-step') return 'steer';
+  if (target === 'next-turn') return 'followUp';
+  return undefined;
+}
+
 export function inputTextFromPayload(payload: unknown): string {
   const messages = (typeof payload === 'object' && payload !== null ? (payload as { messages?: unknown }).messages : undefined);
   if (!Array.isArray(messages)) return '';

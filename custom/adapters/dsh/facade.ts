@@ -28,7 +28,15 @@
 
 import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil-works/pi-coding-agent';
 import { assertEventsMapped, resolveDshEvent } from './events';
-import { dedupeByTurn, deriveSessionInfo, idleOnly, makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
+import {
+  dedupeByTurn,
+  deriveSessionInfo,
+  idleOnly,
+  makeDshListener,
+  streamingBehaviorFromInboxTarget,
+  withSessionContext,
+  type PiHookHandler,
+} from './hooks';
 import { getDshService } from './service';
 import { toDshToolPayload, type UnsupportedReporter } from './tool';
 import { createTurnUsageAccumulator, mergeTurnUsage } from './usage-accumulator';
@@ -274,6 +282,15 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   /** 真正订阅成功的 pi 事件名（去重；用于核对"哪些钩子真的活着"） */
   const registeredHooks = new Set<string>();
   /**
+   * 收件箱投递目标（消息 id → `InboxTarget`）：从会话日志的 `agent/inbox/spliced` 记录。
+   *
+   * 为什么需要：pi 的 `input` 负载带 `streamingBehavior`（steer/followUp），而 DSH 的 `agent/pre-step`
+   * 负载不带这一维 ⇒ 只能从"这条消息当初被投到哪个收件箱"反查（`next-step`=steer、`next-turn`=followUp）。
+   * 上限 64 条并淘汰最早的：这是长跑进程里的长期订阅，不能无限增长。
+   */
+  const inboxTargetByMessage = new Map<string, string>();
+  const INBOX_TARGET_MAX = 64;
+  /**
    * 从 `session/event` 的实参里取会话 id（第一参就是 Session；见 A13 实测的 `(session, event)`）。
    * 用途：把用量桶按会话隔离 —— 另一个会话的回合号会**重新从 1 开始**，不隔离必然串账。
    */
@@ -291,6 +308,19 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
 
   /** pi 处理器第二个参数（ExtensionContext）的 DSH 侧替身：能给的给，给不了的不编造 */
   const basePiContext: unknown = options.piContext ?? { hasUI: options.hasUI, cwd: options.cwd };
+
+  /** 从 `agent/pre-step` 负载里找"进入本步的消息"，按收件箱目标派生 streamingBehavior（找不到 ⇒ undefined） */
+  const streamingBehaviorOfPreStep = (payload: unknown): string | undefined => {
+    const messages = (payload as { messages?: unknown } | undefined)?.messages;
+    if (!Array.isArray(messages)) return undefined;
+    for (const m of messages) {
+      const id = typeof (m as { id?: unknown })?.id === 'string' ? (m as { id: string }).id : undefined;
+      if (!id) continue;
+      const derived = streamingBehaviorFromInboxTarget(inboxTargetByMessage.get(id));
+      if (derived) return derived;
+    }
+    return undefined;
+  };
 
   const registerTool = (definition: PiToolDefinition): void => {
     ledger.use('registerTool');
@@ -374,6 +404,9 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       ...(event === 'before_agent_start' ? { dedupeKey: dedupeByTurn } : {}),
       // agent/status 在 running/idle 两个方向都发；pi 的 settled/end 只在静置时该跑（失败开放）
       ...(event === 'agent_settled' || event === 'agent_end' ? { payloadFilter: idleOnly } : {}),
+      // pi 的 input 负载要 streamingBehavior，而 DSH 的 pre-step 负载没有 ⇒ 按"进入本步的消息 id"
+      // 反查收件箱目标（记录见 inboxTargetByMessage）。查不到就返回 undefined ⇒ 桥接层置空并上报。
+      ...(event === 'input' ? { streamingBehaviorFor: streamingBehaviorOfPreStep } : {}),
     });
     if (via === 'cordis') {
       const degraded = mapping.status === 'degraded';
@@ -447,7 +480,30 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
             typeof a === 'object' && a !== null && typeof (a as { type?: unknown }).type === 'string',
         );
         if (!envelope || envelope.type !== 'assistant/message') {
-          if (traceSessionEvents) console.log(`[dsh-facade] trace session/event type=${envelope?.type ?? '(无 type)'}`);
+          // 收件箱投递目标：`agent/inbox/spliced` 的 `target` 是 InboxTarget（见 inboxTargetByMessage 注释）
+          if (envelope?.type === 'agent/inbox/spliced') {
+            const spliced = typeof envelope.data === 'object' && envelope.data !== null ? (envelope.data as Record<string, unknown>) : {};
+            const target = typeof spliced.target === 'string' ? spliced.target : undefined;
+            const inserted = Array.isArray(spliced.inserted) ? spliced.inserted : [];
+            if (target) {
+              for (const m of inserted) {
+                const id = typeof (m as { id?: unknown })?.id === 'string' ? (m as { id: string }).id : undefined;
+                if (!id) continue;
+                inboxTargetByMessage.set(id, target);
+                if (inboxTargetByMessage.size > INBOX_TARGET_MAX) {
+                  const oldest = inboxTargetByMessage.keys().next();
+                  if (!oldest.done) inboxTargetByMessage.delete(oldest.value);
+                }
+              }
+            }
+            if (traceSessionEvents) {
+              console.log(
+                `[dsh-facade] trace session/event type=agent/inbox/spliced target=${target ?? '(无)'} 插入 ${inserted.length} 条`,
+              );
+            }
+          } else if (traceSessionEvents) {
+            console.log(`[dsh-facade] trace session/event type=${envelope?.type ?? '(无 type)'}`);
+          }
           return undefined;
         }
         const data = typeof envelope.data === 'object' && envelope.data !== null ? (envelope.data as Record<string, unknown>) : {};

@@ -584,7 +584,7 @@
 - `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 1. 第一步：my-pi 的钩子归类（实测，非估算） · grep 命令（可复跑）： · 数字: 55 个 / 53 个 / 2 个 / 18 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 2. 第二步：DSH 实际声明的事件（附行号） · DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不在 my-pi 的 `node_modules`**）。 · 数字: 105 个 / 41 个 / 59 个 / 2 条 · 证据: 1e7f6d9597241db0
-- `docs/design/DSH-HOOK-MAPPING.md` · 3. 第三步：逐类映射（18 个 my-pi 事件） · ### 3.1 三档汇总 · 数字: 1 次 / 22 个 / 31 个 / 0 个
+- `docs/design/DSH-HOOK-MAPPING.md` · 3. 第三步：逐类映射（18 个 my-pi 事件） · ### 3.1 三档汇总 · 数字: 1 次 / 3 条 / 0 条 / 22 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 4. 未核实项（必读，明确列出） · 1. **自动化任务（autopilot）的 21 个调用点是本清单里最难的一块**：它注册 `session_start`/`session_shutdown`/`turn_*`/`tool_*`/`input`/`agent_settl · 数字: 21 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 5. 复跑命令（供核对） · # my-pi 侧 · 数字: 53 个 / 105 个 / 59 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 6. 复核轮（2026-10-11）：验证或推翻"压缩前干预缺失" · **结论：原结论被推翻。** DSH **有**压缩前介入能力，只是形态与 pi 不同（pi 是"每次压缩前的回调闸门"，DSH 是"**可替换的压缩引擎服务**"＋失败路径瀑布）。 · 数字: 289 个 / 5 个 / 4 个 / 1 个 · 证据: 1e7f6d9597241db0
@@ -594,7 +594,7 @@
 - `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒 / 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 2. 迁移面（本仓实测口径） · ### 2.1 四个原语与 DSH 的对应（登记表） · 数字: 18 个
-- `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗； · 数字: 18 个 / 100% / 36 条 / 761 B · 证据: npx vitest run custom/adapters/dsh
+- `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > ✅ **2026-10-18 更新**：P5 的完整 Host 验证**已获用户授权并跑通**（隔离 `DSH_HOME`、不动 `~/.dsh`、 · 数字: 18 个 / 100% / 36 条 / 761 B · 证据: npx vitest run custom/adapters/dsh
 - `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个 / 53 个 / 758 B / 19 个 · 证据: bash scripts/dsh-baseline.sh --tools / bash scripts/dsh-baseline.sh --prompt
 - `docs/design/DSH-MIGRATION-PLAN.md` · 5. 未核实（✗，本轮开工时如实登记） · 1. ~~`@deepseek-ai/dsh-commands` 的命令契约**未读**~~ **已补读并实测（2026-10-16）**： · 数字: 223 个
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
