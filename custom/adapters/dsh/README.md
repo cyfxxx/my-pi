@@ -45,7 +45,9 @@ features/**  ──registerTool(pi, internalDef)──▶  custom/adapters/tool-
 
 | pi 面 | DSH 侧 | 处置 |
 |---|---|---|
-| `sendMessage` / `sendUserMessage` / `appendEntry` | 内核无"往会话里塞消息"的等价 API | 上报 unsupported（客户端 bundle 可能需要） |
+| `sendUserMessage` | ★ 有落点：`agent.followup(UserMessage)` / `agent.steer(UserMessage)`（`dsh-agent` 的 `Agent`，`runtime-types.d.ts:138-200`） | **已映射**（degraded）：`deliverAs:"steer"` → `steer`，其余 → `followup`；agent 由 `agent/created` 跟踪 + `ctx.agents.currentInitiator()` 兜底；A15 经真实 cordis 派发验证接线 |
+| `sendMessage` | 同上，但 pi 的**自定义消息类型**在 DSH 无概念 | **部分映射**（degraded）：只投递文本，`customType`/`display`/`details` 丢失**显式上报** |
+| `appendEntry` | 会话日志类型是**封闭声明**（`SessionEventMap`） | **显式不支持**：运行时虽接受未声明类型（实测 `append("my-pi/custom", …)` 成功），但写进投影/不变式都会读的 durable log 有**污染风险** ⇒ 要支持得先在 DSH 侧声明事件类型（架构决策） |
 | `setSessionName` | ★ 有落点：`ctx.sessionTitle.rename(session, title)`（`dsh-session-title`） | **已映射**（degraded）：会话对象由 `session/created` 跟踪；服务缺失/拿不到会话对象时**显式上报**（多会话不猜） |
 | `registerShortcut` / `registerMessageRenderer` / `registerFlag` | 内核无 | 上报 |
 | `getThinkingLevel` / `setThinkingLevel` | **没有同名 API**，但请求配置里有 `reasoningEffort` | API 上报 unsupported；**档位本身可表达**：`agent/request` 替换冻结配置 + `thinking-level.ts` 的纯映射（见下）|
@@ -63,10 +65,10 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 14 条检查（A1–A14）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 15 条检查（A1–A15）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）。
-实测结果：**14 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）。
+实测结果：**15 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
 **7 直接 / 11 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。

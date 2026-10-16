@@ -105,6 +105,8 @@ export interface DshContext {
   readonly sessions?: DshSessions;
   /** 会话标题服务（`@deepseek-ai/dsh-session-title`；`setSessionName` 的落点） */
   readonly sessionTitle?: DshSessionTitle;
+  /** agent 注册表（`@deepseek-ai/dsh-agent`；`sendUserMessage`/`sendMessage` 靠它拿当前 agent） */
+  readonly agents?: DshAgents;
   /** 会话事件信封（用于 `session/event` 派发：`event.type` 是日志事件类型） */
   readonly [service: string]: unknown;
 }
@@ -150,6 +152,30 @@ export interface DshCommandInvocation {
 export type DshCommandResult =
   | { readonly kind: 'success'; readonly text?: string }
   | { readonly kind: 'error'; readonly text: string };
+
+/**
+ * 一个 agent 的最小快照（`@deepseek-ai/dsh-agent` 的 `Agent`，出处 `runtime-types.d.ts:138-200`）。
+ *
+ * ★ 与 pi 的对应关系（2026-10-17 读到）：
+ *   - `followup(message)`：排队一个**普通后续回合**并唤醒驱动 ⇒ pi 的 `sendUserMessage(..., {deliverAs:'followUp'})`；
+ *   - `steer(message)`：给**最近一步**注入转向 ⇒ pi 的 `deliverAs:'steer'`；
+ *   - `send(message, target, wakeup)`：更底层的路由（可指定 next-turn/next-step 边界）；
+ *   - `status`：`idle` ⇄ `running`；`session`：它驱动的会话。
+ */
+export interface DshAgentLike {
+  readonly status?: string;
+  readonly session?: unknown;
+  send?(message: unknown, target: unknown, wakeup: boolean): void;
+  followup?(message: unknown): void;
+  steer?(message: unknown): void;
+}
+
+/** agent 注册表（`ctx.agents`）：`currentInitiator()` 在工具/事件处理里给出"当前这个 agent" */
+export interface DshAgents {
+  currentInitiator?(): DshAgentLike | undefined;
+  requireInitiator?(): DshAgentLike;
+  get?(id: unknown): DshAgentLike | undefined;
+}
 
 /**
  * 会话存储服务（`@deepseek-ai/dsh-session` 的 `SessionStore`，服务名 **`sessions`**）。

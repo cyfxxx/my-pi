@@ -25,6 +25,8 @@
  *      按 `event.type` 派发到对应的 pi 处理器，且**不同 type 不会串台**
  *   A14 **工具结果桥（`tools/post-execute`）真跑**：pi 的 `tool_result` 处理器能收到结果，
  *      返回 `{content}` 时**真的替换**注册表返回的内容块
+ *   A15 **消息投递接线**（`sendUserMessage` → `agent.followup/steer`）：经真实 cordis 派发
+ *      `agent/created`（契约负载 `{agent}`），外观层应解析出当前 agent 并投递**契约形状的 UserMessage**
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -477,6 +479,47 @@ async function main(): Promise<void> {
     a14 = { id: 'A14', ok: 'skip', detail: `工具结果桥不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a14);
+
+  // ── A15：消息投递接线（agent/created → sendUserMessage → agent.followup/steer）──
+  let a15: Check = { id: 'A15', ok: false, detail: '未执行' };
+  try {
+    const mCtx = new Context();
+    mCtx.plugin(SystemPrompt);
+    mCtx.plugin(ToolRuntime);
+    await tick();
+    const mFacade = createDshExtensionApi(mCtx as unknown as DshContext, { onUnsupported: () => undefined });
+    const delivered: Array<{ method: string; message: unknown }> = [];
+    const fakeAgent = {
+      status: 'idle',
+      followup: (message: unknown) => delivered.push({ method: 'followup', message }),
+      steer: (message: unknown) => delivered.push({ method: 'steer', message }),
+    };
+    // 真实派发：`agent/created` 是 @mode serial，契约负载是 `{agent, source, signal?}`
+    await (mCtx as unknown as { serial: (n: string, p: unknown) => Promise<unknown> }).serial('agent/created', {
+      agent: fakeAgent,
+      source: 'startup',
+    });
+    mFacade.api.sendUserMessage('A15 你好');
+    mFacade.api.sendUserMessage([{ type: 'text', text: 'A15 转向' }], { deliverAs: 'steer' } as never);
+    const first = delivered[0]?.message as { role?: string; content?: Array<{ type: string; text: string }>; source?: { kind?: string }; id?: string };
+    const ok =
+      delivered.length === 2 &&
+      delivered[0]?.method === 'followup' &&
+      delivered[1]?.method === 'steer' &&
+      first?.role === 'user' &&
+      first?.source?.kind === 'user' &&
+      first?.content?.[0]?.text === 'A15 你好' &&
+      typeof first?.id === 'string';
+    a15 = {
+      id: 'A15',
+      ok,
+      detail: `投递 ${delivered.length} 次（${delivered.map((d) => d.method).join(',')}）；UserMessage = role:${String(first?.role)}/source:${String(first?.source?.kind)}/text:${JSON.stringify(first?.content?.[0]?.text)}/id:${typeof first?.id}`,
+    };
+    mFacade.dispose();
+  } catch (error) {
+    a15 = { id: 'A15', ok: 'skip', detail: `消息投递接线不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a15);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

@@ -31,6 +31,7 @@ import { assertEventsMapped, resolveDshEvent } from './events';
 import { dedupeByTurn, idleOnly, makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
 import { toDshToolPayload, type UnsupportedReporter } from './tool';
 import type {
+  DshAgentLike,
   DshCommandDefinition,
   DshCommandInvocation,
   DshCommandResult,
@@ -161,8 +162,6 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     'getFlag',
     'getThinkingLevel',
     'setThinkingLevel',
-    'sendMessage',
-    'sendUserMessage',
     'appendEntry',
   ]) {
     ledger.declare(member, 'unsupported', '内核侧无等价服务；需要时由具体 DSH 客户端 bundle 提供（不得静默当作已支持）');
@@ -178,6 +177,10 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
    * ★ 这条订阅是**基础设施**，不对外声明成 pi 面成员。
    */
   let currentSession: unknown;
+  /** 当前 agent（由 `agent/created` 跟踪；拿不到时回退 `ctx.agents.currentInitiator()`） */
+  let currentAgent: unknown;
+  /** 生成 UserMessage 的稳定 id 的序号（brand 在运行时是恒等函数，实测 `MessageId('abc') === 'abc'`） */
+  let messageSeq = 0;
 
   /** pi 处理器第二个参数（ExtensionContext）的 DSH 侧替身：能给的给，给不了的不编造 */
   const basePiContext: unknown = options.piContext ?? { hasUI: options.hasUI, cwd: options.cwd };
@@ -269,12 +272,21 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     );
   };
 
-  // 基础设施订阅：跟踪最近创建/公告的会话（供 setSessionName 等需要 Session 对象的映射使用）
+  // 基础设施订阅：跟踪最近创建/公告的会话与 agent（供 setSessionName / sendUserMessage 等映射使用）
   if (canOn && ctx.on) {
     disposers.push(
       ctx.on('session/created', (...args: readonly unknown[]) => {
         const first = args[0];
         if (typeof first === 'object' && first !== null) currentSession = first;
+        return undefined;
+      }),
+    );
+    disposers.push(
+      ctx.on('agent/created', (...args: readonly unknown[]) => {
+        // `agent/created` 的负载是 `{agent, ...}`（serial 事件）——两种形状都兜住
+        const first = args[0] as { agent?: unknown } | undefined;
+        const agent = first && typeof first === 'object' && 'agent' in first ? first.agent : first;
+        if (typeof agent === 'object' && agent !== null) currentAgent = agent;
         return undefined;
       }),
     );
@@ -390,14 +402,106 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   const setThinkingLevel = (): void => {
     ledger.use('setThinkingLevel');
   };
-  const sendMessage = (): void => {
-    ledger.use('sendMessage');
+  /**
+   * 解析"当前 agent"：优先取 `agent/created` 跟踪到的，其次问注册表 `ctx.agents.currentInitiator()`
+   * （在工具执行/事件处理里它给出当前 agent）。
+   */
+  const resolveAgent = (member: string): DshAgentLike | undefined => {
+    if (currentAgent) return currentAgent as DshAgentLike;
+    const registry = ctx.agents;
+    const initiator = typeof registry?.currentInitiator === 'function' ? registry.currentInitiator() : undefined;
+    if (initiator) return initiator;
+    report(member, '拿不到当前 agent（未跟踪到 agent/created 且 ctx.agents.currentInitiator() 为空）⇒ 未发送');
+    return undefined;
   };
-  const sendUserMessage = (): void => {
+
+  /**
+   * 构造 DSH 的 `UserMessage`（`dsh-llm/lib/types/message.d.ts:128-147`）。
+   * id 用普通字符串：DSH 的 brand 在运行时是**恒等函数**（实测 `MessageId('abc-123') === 'abc-123'`），
+   * 这样适配层不必在运行时 import `@deepseek-ai/dsh-llm`（保持产物零 DSH import）。
+   */
+  const toUserMessage = (content: string | Array<{ type: 'text'; text: string }>): unknown => {
+    messageSeq += 1;
+    const blocks = Array.isArray(content)
+      ? content.map((b) => ({ type: 'text', text: String(b?.text ?? '') }))
+      : [{ type: 'text', text: String(content ?? '') }];
+    return {
+      id: `my-pi-${Date.now().toString(36)}-${messageSeq.toString(36)}`,
+      role: 'user',
+      content: blocks,
+      source: { kind: 'user' },
+    };
+  };
+
+  /** `deliverAs` 映射：`steer` → `agent.steer`；其余（followUp/nextTurn/缺省）→ `agent.followup` */
+  const deliverAsUserMessage = (
+    member: string,
+    content: string | Array<{ type: 'text'; text: string }>,
+    deliverAs: string | undefined,
+  ): void => {
+    const agent = resolveAgent(member);
+    if (!agent) return;
+    const message = toUserMessage(content);
+    if (deliverAs === 'steer') {
+      if (typeof agent.steer !== 'function') {
+        report(member, 'agent.steer 不存在 ⇒ 未投递（steer 需要运行中的 agent）');
+        return;
+      }
+      agent.steer(message);
+      ledger.declare(member, 'degraded', '→ agent.steer(UserMessage)（注入最近一步）');
+      return;
+    }
+    if (typeof agent.followup !== 'function') {
+      report(member, 'agent.followup 不存在 ⇒ 未投递');
+      return;
+    }
+    agent.followup(message);
+    ledger.declare(
+      member,
+      'degraded',
+      `→ agent.followup(UserMessage)${deliverAs && deliverAs !== 'followUp' ? `（交付意图 ${deliverAs} 归一到 followup）` : ''}`,
+    );
+  };
+
+  const sendUserMessage = (
+    content: string | Array<{ type: 'text'; text: string }>,
+    options?: { deliverAs?: 'steer' | 'followUp'; expandPromptTemplates?: boolean },
+  ): void => {
     ledger.use('sendUserMessage');
+    if (options?.expandPromptTemplates) {
+      report('sendUserMessage.expandPromptTemplates', 'pi 的模板展开在 DSH 没有对应 ⇒ 原样投递（不做展开）');
+    }
+    deliverAsUserMessage('sendUserMessage', content, options?.deliverAs);
   };
+
+  const sendMessage = (
+    message: { customType?: string; content?: string; display?: boolean; details?: unknown },
+    options?: { triggerTurn?: boolean; deliverAs?: 'steer' | 'followUp' | 'nextTurn' },
+  ): void => {
+    ledger.use('sendMessage');
+    // pi 的"自定义消息类型"（customType/display/details + 消息渲染器）在 DSH 没有概念：
+    // DSH 的消息只有 user/assistant/tool/system/developer ⇒ 只投递文本，并**显式上报**丢失的字段。
+    report(
+      'sendMessage',
+      `pi 的自定义消息字段（customType=${String(message?.customType ?? '')}、display、details）在 DSH 无对应 ⇒ 只投递文本内容`,
+    );
+    deliverAsUserMessage('sendMessage', String(message?.content ?? ''), options?.deliverAs);
+  };
+  /**
+   * `appendEntry(customType, data)`：**显式不支持**（不是漏做）。
+   *
+   * 原因（实测 + 契约）：DSH 的会话日志是**强类型事件流**，每个 `type` 由某个包用
+   * declaration merging 声明（`interface SessionEventMap`）。运行时不校验未知类型 ——
+   * 实测 `session.append('my-pi/custom', {...})` **成功**并进入 durable log ——
+   * 但把未声明的类型写进"投影/不变式都会读"的持久日志有**污染风险** ✗。
+   * ⇒ 要支持它，必须先在 DSH 侧正式声明事件类型并确认投影接受，属**架构决策**，不做静默写入。
+   */
   const appendEntry = (): void => {
     ledger.use('appendEntry');
+    report(
+      'appendEntry',
+      'DSH 的会话日志类型是封闭声明（SessionEventMap）；运行时虽接受未声明类型（实测），但写入 durable log 有污染风险 ⇒ 需先在 DSH 侧声明事件类型再谈支持',
+    );
   };
   /**
    * `setSessionName(title)` → `ctx.sessionTitle.rename(session, title)`。

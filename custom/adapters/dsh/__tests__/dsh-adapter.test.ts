@@ -359,6 +359,69 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
   });
 });
 
+describe('消息投递（sendUserMessage / sendMessage / appendEntry）', () => {
+  const agentSpy = () => {
+    const calls: Array<{ method: string; message: unknown }> = [];
+    return {
+      calls,
+      agent: {
+        status: 'idle',
+        followup: (message: unknown) => calls.push({ method: 'followup', message }),
+        steer: (message: unknown) => calls.push({ method: 'steer', message }),
+      },
+    };
+  };
+
+  it('sendUserMessage：默认 → agent.followup(UserMessage)；deliverAs=steer → agent.steer', () => {
+    const fake = makeFakeDsh();
+    const spy = agentSpy();
+    (fake.ctx as unknown as Record<string, unknown>).agents = { currentInitiator: () => spy.agent };
+    const facade = createDshExtensionApi(fake.ctx);
+
+    facade.api.sendUserMessage('你好');
+    expect(spy.calls).toHaveLength(1);
+    expect(spy.calls[0]?.method).toBe('followup');
+    const msg = spy.calls[0]?.message as { id: string; role: string; content: Array<{ type: string; text: string }>; source: { kind: string } };
+    expect(msg.role).toBe('user');
+    expect(msg.content).toEqual([{ type: 'text', text: '你好' }]);
+    expect(msg.source).toEqual({ kind: 'user' });
+    expect(typeof msg.id).toBe('string'); // brand 在运行时是恒等函数 ⇒ 普通字符串即可
+
+    facade.api.sendUserMessage([{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }], { deliverAs: 'steer' });
+    expect(spy.calls[1]?.method).toBe('steer');
+    expect((spy.calls[1]?.message as { content: unknown[] }).content).toHaveLength(2);
+    expect(facade.surfaceReport().find((e) => e.member === 'sendUserMessage')?.status).toBe('degraded');
+  });
+
+  it('sendMessage：自定义消息字段丢失**会被上报**，文本照投', () => {
+    const fake = makeFakeDsh();
+    const spy = agentSpy();
+    const reports: string[] = [];
+    (fake.ctx as unknown as Record<string, unknown>).agents = { currentInitiator: () => spy.agent };
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    facade.api.sendMessage({ customType: 'my-pi/notice', content: '状态更新', display: true, details: { a: 1 } }, { deliverAs: 'nextTurn' });
+    expect(spy.calls[0]?.method).toBe('followup');
+    expect((spy.calls[0]?.message as { content: Array<{ text: string }> }).content[0]?.text).toBe('状态更新');
+    expect(reports.some((r) => r.startsWith('sendMessage') && r.includes('customType=my-pi/notice'))).toBe(true);
+  });
+
+  it('拿不到 agent ⇒ 上报且不抛错', () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m) => reports.push(m) });
+    expect(() => facade.api.sendUserMessage('x')).not.toThrow();
+    expect(reports).toContain('sendUserMessage');
+  });
+
+  it('appendEntry：**显式不支持**（日志类型是封闭声明，写入有污染风险）', () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    facade.api.appendEntry('my-pi/x', { a: 1 });
+    expect(reports.some((r) => r.startsWith('appendEntry') && r.includes('SessionEventMap'))).toBe(true);
+  });
+});
+
 describe('会话事件桥（session/event 的真实签名与负载）', () => {
   it('`(session, event)` 两参形态能被识别；按 event.type 过滤；type 换成 pi 名；data 摊平到顶层', async () => {
     const fake = makeFakeDsh();
