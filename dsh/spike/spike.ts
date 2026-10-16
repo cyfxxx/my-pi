@@ -35,6 +35,8 @@
  *      这类**只在真实 Host 里才炸**的问题（2026-10-18 Host 冒烟实测：未 inject 就访问 `ctx.tools` 会抛）
  *   A19 **注册结果必须是编译产物**：`ctx.tools.register()` 要的是 `defineTool(options)` 的结果；
  *      直接注册原始 spec 会让真实 provider 拒掉每个请求（Host 冒烟实测 `got 'type: null'`）
+ *   A22 **`commands.execute()` 真跑**：命令服务真的调用我们注册的处理器（rawInput 保留前导空格、
+ *      会话身份注入、抛错映射成 `{kind:error}`、未知命令返回 undefined）—— 此前这条一直是 ✗
  *   A21 **插件入口的配置通路 + 命令名重映射**：按真实装载路径（cordis loader + 第二参 `config`）
  *      装载产物 ⇒ ① `config.facade.*` 真的送达 facade（原先摊在顶层会被**静默忽略**）；
  *      ② 宿主同名命令被**换名注册**（`plan` → 指定名）而不是丢掉
@@ -903,6 +905,77 @@ async function main(): Promise<void> {
     a21 = { id: 'A21', ok: 'skip', detail: `配置通路检查不可用：${(error as Error).message.slice(0, 110)}` };
   }
   checks.push(a21);
+
+  // ── A22：`commands.execute()` 真跑（此前一直是 ✗："需要真 agent"）──────────────
+  //
+  // 为什么值得单独验：14 处 `registerCommand` 的处理器**只有被宿主真正调用**才算接通；
+  // 而在此之前我们只验到"注册进注册表 + find() 命中"（A10）。`execute(agent, line, attachments, signal)`
+  // 需要的是 `agent.session`（用于追加 `command/run`/`command/done` 生命周期事件）与命令可见性视图，
+  // 不需要模型/网络 ⇒ 可以用**最小 agent 对象 + 真实 Session**把这条路径跑通。
+  // ✗ 说清楚边界：这不是"真 agent（agent loop 驱动）"下的验证，而是"命令服务 + 真实会话"下的验证。
+  let a22: Check = { id: 'A22', ok: false, detail: '未执行' };
+  try {
+    const commandsModule = (await import('@deepseek-ai/dsh-commands')) as unknown as { default?: unknown; CommandRuntime?: unknown };
+    const runtimePlugin = (commandsModule.default ?? commandsModule.CommandRuntime) as never;
+    const sessionModule = (await import('@deepseek-ai/dsh-session')) as unknown as {
+      Session?: { create: (id: string) => unknown };
+      SessionStore?: unknown;
+    };
+    if (!sessionModule.Session) throw new Error('dsh-session 未导出 Session');
+
+    const eCtx = new Context();
+    eCtx.plugin(SystemPrompt);
+    eCtx.plugin(ToolRuntime);
+    eCtx.plugin(runtimePlugin);
+    if (sessionModule.SessionStore) eCtx.plugin(sessionModule.SessionStore as never);
+    await tick(200);
+
+    const eFacade = createDshExtensionApi(eCtx as unknown as DshContext, { onUnsupported: () => undefined });
+    const ran: Array<{ args: string; sessionId?: string }> = [];
+    eFacade.api.registerCommand('spike-exec' as never, {
+      description: 'A22 用：记录被调用的参数与会话身份',
+      handler: async (args: string, hookCtx: unknown) => {
+        const sm = (hookCtx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager;
+        ran.push({ args, sessionId: sm?.getSessionId?.() });
+      },
+    } as never);
+    eFacade.api.registerCommand('spike-boom' as never, {
+      description: 'A22 用：处理器抛错应映射成 {kind:error}',
+      handler: async () => {
+        throw new Error('A22 故意抛错');
+      },
+    } as never);
+
+    const session = sessionModule.Session.create('spike-cmd-exec');
+    const agent = { session, id: 'spike-agent' } as never;
+    const signal = new AbortController().signal;
+    const okOut = await (eCtx.commands as unknown as {
+      execute: (a: unknown, line: string, att: unknown[], sig: AbortSignal) => Promise<{ result?: { kind?: string } } | undefined>;
+    }).execute(agent, '/spike-exec  甲 乙', [], signal);
+    const boomOut = await (eCtx.commands as unknown as {
+      execute: (a: unknown, line: string, att: unknown[], sig: AbortSignal) => Promise<{ result?: { kind?: string; text?: string } } | undefined>;
+    }).execute(agent, '/spike-boom', [], signal);
+    const unknownOut = await (eCtx.commands as unknown as {
+      execute: (a: unknown, line: string, att: unknown[], sig: AbortSignal) => Promise<unknown>;
+    }).execute(agent, '/spike-nope', [], signal);
+
+    const okKind = okOut?.result?.kind === 'success';
+    const rawKept = ran.length === 1 && ran[0].args === '  甲 乙';
+    const sessionInjected = ran.length === 1 && ran[0].sessionId === 'spike-cmd-exec';
+    const boomMapped = boomOut?.result?.kind === 'error' && String(boomOut?.result?.text ?? '').includes('A22 故意抛错');
+    const unknownUndef = unknownOut === undefined;
+    a22 = {
+      id: 'A22',
+      ok: okKind && rawKept && sessionInjected && boomMapped && unknownUndef,
+      detail: `execute(成功) ⇒ kind=${okOut?.result?.kind ?? 'n/a'}、处理器被调 ${ran.length} 次、rawInput=${JSON.stringify(ran[0]?.args ?? null)}（保留前导空格）、`
+        + `会话身份=${ran[0]?.sessionId ?? 'n/a'}；execute(抛错) ⇒ kind=${boomOut?.result?.kind ?? 'n/a'}（文本含原因=${String(boomOut?.result?.text ?? '').includes('A22 故意抛错')}）；`
+        + `execute(未知命令) ⇒ ${unknownOut === undefined ? 'undefined（正确）' : '非 undefined（异常）'}`,
+    };
+    eFacade.dispose();
+  } catch (error) {
+    a22 = { id: 'A22', ok: 'skip', detail: `execute 检查不可用：${(error as Error).message.slice(0, 130)}` };
+  }
+  checks.push(a22);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

@@ -31,13 +31,23 @@ if [ ! -f "$SPIKE_DIR/package.json" ]; then
 fi
 
 echo "=== DSH spike 准备（$SPIKE_DIR）==="
-if [ ! -d "$SPIKE_DIR/node_modules/@deepseek-ai/dsh-tools" ]; then
+# ★ 判据是"**package.json 里声明的每一个依赖**是否都在 node_modules 里"，不是只看 dsh-tools：
+#   原先只看 dsh-tools 存在就跳过安装 ⇒ **往 package.json 里加依赖不会生效**（实测：加了
+#   dsh-agent / dsh-agent-loop / dsh-llm 后仍显示"依赖已就绪"，直到手工 npm install 才发现）。
+MISSING_DEPS="$(node -e '
+const fs = require("fs");
+const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const dir = process.argv[2];
+const miss = Object.keys(p.dependencies ?? {}).filter((d) => !fs.existsSync(`${dir}/${d}`));
+process.stdout.write(miss.join(" "));
+' "$SPIKE_DIR/package.json" "$SPIKE_DIR/node_modules" 2>/dev/null)"
+if [ -n "${MISSING_DEPS:-}" ]; then
   if [ "$NO_INSTALL" = "1" ]; then
     echo "❌ 未安装 DSH 包，且指定了 --no-install" >&2
     echo "   先跑：npm --prefix $SPIKE_DIR install --no-audit --no-fund" >&2
     exit 2
   fi
-  echo "→ 安装 spike 依赖（@deepseek-ai/dsh-tools / dsh-system-prompt / cordis）…"
+  echo "→ 安装 spike 依赖（缺：${MISSING_DEPS}）…"
   # 用仓库的 npm（便携 node 里自带），registry 走本机 .npmrc/npmmirror
   if ! npm --prefix "$SPIKE_DIR" install --no-audit --no-fund --loglevel=error; then
     echo "❌ 依赖安装失败（网络/registry？）" >&2
