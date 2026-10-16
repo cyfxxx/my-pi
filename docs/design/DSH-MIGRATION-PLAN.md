@@ -215,7 +215,10 @@ pi 侧的 11 个补丁是"底座替换"的账；换到 DSH 后**没有"能不能
    ① 插件加载与钩子触发（退出码 0、插件日志 28 行、模型回「收到」）；② **工具调用**（强制调 `memory_stats` ⇒
    会话日志记到 `tool/call name=memory_stats`，`tool/result` 内容正是 my-pi 的输出）；③ **回合用量**（见 #18-v，
    未被改动的特性真的落盘）；④ **诊断可观测**（`MY_PI_DSH_TRACE_EVENTS=1` 能把"事件没到 / 到了没识别 /
-   识别了没处理器"分开）。仍 ✗：`input.transform` 的运行时语义（`{kind:'reject'}` 是否重排消息）、
+   识别了没处理器"分开）。仍 ✗：`input.transform` 的运行时语义（`{kind:'reject'}` 是否重排消息）——
+   **2026-10-18 补测：这属于"潜伏能力"而不是现实缺口**：本仓 4 个 `input` 处理器
+   （autopilot/context/intervention/link）**全部只观察、没有任何一个返回改写**（`grep -n "event: 'input'" -A 25`
+   逐个看过）⇒ 该映射在 DSH 上目前**没有活的消费者**；哪天有 feature 开始返回改写，才需要真 agent 验证；
    `commands.execute()`、`sendUserMessage` 的唤醒/转向语义、P6③ 三个场景测试（模式切换/两实例隔离/会话切换）。
    另一处如实登记的缺口：合成用量的 `cost` 是占位 0（DSH `TokenUsage` **不含定价**，已标 `costUnavailable`）——
    当前**没有任何 feature 读 `usage.cost`**（已 grep 确认），故无现实影响，但将来要算钱得另找定价源；
