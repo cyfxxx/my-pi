@@ -83,21 +83,24 @@ PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh
 | `commands.execute()` 真的会调用我们注册的处理器 | 计划 #18-ac；spike A22 |
 | `sendUserMessage` 映射与 DSH 实现一致（`followup→next-turn`、`steer→next-step`） | 计划 #18-ab（读 `dsh-agent-loop/lib/index.js:798-811`） |
 | 产物自包含 ⇒ 不再需要 profile 级 `pnpm.overrides` | 计划 #18-aa（搬走别名后真 Host 仍 0 解析失败） |
+| **前缀缓存（第一成本杠杆）在 DSH 上成立**：每步只付增量、其余走 `cacheRead`，且**跨会话/跨 `--session-id` 续接**都命中 | 计划 #18-ad（真 Host 会话日志的 `usage` 逐条对比） |
+| 移动端并发：宿主 `maxActiveSubagents` 是 `Volatile`（只有拥有者可写）⇒ 插件**读出来 + 超限报警 + 给部署片段** | 计划 #18-ae；spike A23；真 Host 两分支日志 |
 
 ## 5. 剩余缺口（**不假装已完成**）
 
-| 项 | 分类 | 原因 / 依赖 |
+| 项 | 分诊结论 | 依据 / 依赖 |
 |---|---|---|
-| **DR-1** chain 模式（`{previous}` 串接） | 待重设计 | 宿主 `subagent` 无模式参数；单次调用内的多步编排要在 my-pi 侧重做（增量价值：省模型回合） |
-| **DR-2** 目录扫描式 agent 定义（md + frontmatter） | 待重设计 | 宿主用 YAML 组合式预设；需要把发现逻辑映射成宿主预设（待查预设注册 API） |
-| **DR-3** 逐任务 `cwd` | 待重设计 | 宿主 `subagent` 无该参数（要宿主支持或改成任务内显式 `cd`） |
-| **DR-4** 进程外投递 CLI（`scripts/subagent-inbox.mjs`） | 待重设计 | 宿主只有模型侧 `send_message`；进程外投递需要宿主侧的投递/远程 API |
-| **DR-5** Termux 并发降级（8→2） | 待重设计 | 宿主 `maxActiveSubagents` 默认 8（固定）；要按环境改需在部署层做 |
-| 真 agent（loop 驱动）层语义 | 待装置 | `steer` 在 step 边界被消费、真 agent 下命令执行；spike 里单独建 root agent 报 `no agent factory registered`（loop 需完整组合） |
-| `input.transform` | 潜伏能力 | 4 个 `input` 处理器**全是观察者**、无人返回改写 ⇒ 目前无活消费者 |
-| 合成用量的 `cost` | 已知占位 | DSH `TokenUsage` 不含定价；**当前无 feature 读 `usage.cost`**（已 grep） |
-| `turn_end` 的 `toolResults` | 已知缺口 | 适配层只补 `turnIndex`/`message.usage`；`toolResults` 未合成 |
-| `appendEntry` | 明确不支持 | DSH 日志类型封闭声明（写进去会污染投影/不变式） |
+| **DR-1** chain 模式（`{previous}`） | ✅ **不需要移植** | 宿主自带 `workflow`（模型写 JS **扇出** subagent，支持 phases/结构化结果/前后台）且在 headless profile 里**已启用** ⇒ 覆盖了"顺序链"；差别只是宿主建议小规模委派用普通 `subagent` 调用（`dsh-tool-workflow/README.zh.md`） |
+| **DR-5** Termux 并发降级（8→2） | 🟡 **部分恢复**（读+报警+片段） | 契约核实 `Volatile<number>` **只有 `get()`**、值只由其拥有者更新 ⇒ 插件**改不动**；改为只读核对 + 移动端超限**明确报警**并给部署层覆盖片段。真 Host：桌面 `=8 保持默认`、`TERMUX_VERSION=1` 打出警告与片段。✗ 运行期自动压到 2 **做不到** |
+| **DR-2** 目录扫描式 agent 定义 | ⏳ 待重设计（机制已查清） | 宿主支持**每实例 persona/工具权限**的 subagent 工具实例，`AgentPresetRegistry.register()` 也能编程注册预设；但 `subagent` 工具**没有 agent/preset 参数** ⇒ "这次委派用哪个具名 agent"表达不出来。要恢复需**按目录动态生成 patch 条目**（静态 YAML 做不到）或宿主加参数 |
+| **DR-3** 逐任务 `cwd` | ⏳ 待重设计（宿主缺参数） | 已核实宿主 `subagent` 参数只有 `prompt/description/provider/model/reasoning_effort/run_in_background`；替代：任务里显式 `cd` |
+| **DR-4** 进程外投递 CLI | ⏳ 待重设计（依赖宿主侧通道） | 宿主只有**模型侧** `send_message`；进程外投递需要宿主侧可远程访问的投递 API（`dsh-api-*`/typert 属客户端-宿主层）⇒ 需部署层集成 |
+| 真 agent（loop 驱动）层语义 | ⏳ 待装置 | `steer` 在 step 边界被消费、真 agent 下命令执行；spike 里单独建 root agent 报 `no agent factory registered`（loop 需完整组合：模型路由等） |
+| `input.transform` | 潜伏能力（**已测无消费者**） | 4 个 `input` 处理器全是观察者、无人返回改写（逐个读过） |
+| `turn_end` 的 `toolResults` | 潜伏缺口（**已测无消费者**） | `grep -rn "toolResults" custom/features` 无命中 ⇒ 目前没人读它（哪天有 feature 读，再按会话日志合成） |
+| 合成用量的 `cost` | 已知占位（**已测无消费者**） | DSH `TokenUsage` 不含定价；`grep` 确认无 feature 读 `usage.cost` |
+| `appendEntry` | 明确不支持 | DSH 日志类型封闭声明（写进去污染投影/不变式） |
+| 客户端层（快捷键/消息渲染器） | 明确不支持 | 属 DSH 客户端插件领域，非内核 |
 
 ## 6. 经验与陷阱（本次新增）
 

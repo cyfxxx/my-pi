@@ -128,11 +128,11 @@
 |---|---|---|---|---|
 | DR-6 | `plan` 命令面（`resume`/`todos`/`plans`/`clear`/`help`） | §3 | ✅ **已解决**（2026-10-18，`mypi-plan`） | 适配层命令名重映射；真 Host 实测注册为 `mypi-plan`、命令数 9→10 |
 | DR-7 | 计划任务状态机 + `plan-<ts>/plan.md` 落盘/恢复 | §3 | ✅ **已解决（命令侧）** | 命令恢复 ⇒ `clear`/`plans`/`resume` 路径回来；`todo` 工具驱动的落盘与重启 `restoreStateFromPlans` 本就不依赖命令 |
-| DR-1 | `subagent` 的 `chain` 模式（`{previous}` 串接） | §2 | ⏳ 待重设计 | 宿主无模式参数，并行靠多次调用；可在 my-pi 侧实现为"多步编排 + 复用宿主 `subagent`" |
-| DR-2 | 目录扫描式 agent 定义（md + frontmatter，scout/worker/reviewer） | §2 | ⏳ 待重设计 | 宿主是 YAML 组合配置；可保留发现逻辑、把结果映射成宿主的 agent 配置 |
-| DR-3 | 逐任务 `cwd` | §2 | ⏳ 待重设计 | 宿主无该参数；需宿主支持或改用"任务里显式 cd" |
-| DR-4 | 进程外投递 CLI（`scripts/subagent-inbox.mjs`） | §2 | ⏳ 待重设计 | 宿主只有模型侧 `send_message`；可用宿主 adapter 的投递接口重做 |
-| DR-5 | Termux 并发降级（8→2） | §2 | ⏳ 待重设计 | 宿主固定默认 8；移动端内存约束需另想办法 |
+| DR-1 | `subagent` 的 `chain` 模式（`{previous}` 串接） | §2 | ✅ **不需要移植**（宿主有更通用的等价） | 宿主自带 `workflow` 工具：模型写一段 JS **扇出**多个 subagent（支持 phases / 结构化结果 / 前后台），且它在 headless profile 里**是启用状态**（`tool-workflow` + `workflow-ptc`，`dsh-tool-workflow/README.zh.md`）⇒ my-pi 的"顺序链 + `{previous}` 占位"被其覆盖；差别只在用法取向（宿主建议"一两项委派用普通 subagent 调用"，即小规模编排不做成一次工具调用） |
+| DR-2 | 目录扫描式 agent 定义（md + frontmatter，scout/worker/reviewer） | §2 | ⏳ 待重设计（机制已查清） | 宿主支持**每实例 persona/工具权限**的 subagent 工具实例（`dsh-tool-subagent/README.zh.md`：`toolName` 每实例须不同、每实例可设 persona），`AgentPresetRegistry.register()` 也可**编程注册预设**；但 DSH 的 `subagent` 工具**没有 agent/preset 参数** ⇒ "这一次委派用哪个具名 agent"表达不出来。要恢复需**按目录动态生成 patch 条目**（静态 YAML 做不到）或宿主支持该参数 |
+| DR-3 | 逐任务 `cwd` | §2 | ⏳ 待重设计（宿主缺参数） | 已核实：宿主 `subagent` 工具参数只有 `prompt/description/provider/model/reasoning_effort/run_in_background`，无 `cwd`；替代是任务里显式 `cd` |
+| DR-4 | 进程外投递 CLI（`scripts/subagent-inbox.mjs`） | §2 | ⏳ 待重设计（依赖宿主侧通道） | 宿主只有**模型侧** `send_message`；进程外投递需要宿主侧可远程访问的投递 API（`dsh-api-*`/typert 属客户端-宿主层）⇒ 需部署层集成 |
+| DR-5 | Termux 并发降级（8→2） | §2 | 🟡 **部分恢复**（2026-10-16） | 契约核实：宿主的 `maxActiveSubagents` 是 `Volatile<number>`，接口**只有 `get()`**（"value is updated only by its owning runtime"）⇒ **插件无权改**。于是改为"**读出来 + 移动端超限时明确报警 + 给部署层覆盖片段**"（`custom/adapters/dsh/subagent-capacity.ts`，spike **A23** + 单测 6 项；片段写在 `dsh/profile/my-pi.patch.yml` 注释里，由部署方显式启用）；✗ 运行期自动压到 2 在 DSH 上**做不到**。**真 Host 实测**：桌面 ⇒ `[my-pi-dsh] subagent 并发：宿主并发上限 = 8（非移动端，保持宿主默认）`；`TERMUX_VERSION=1` ⇒ 打出**警告**并附 `- id: subagent / config: {maxActiveSubagents: 2, maxDepth: 1}` 片段，两次都退出码 0 |
 
 **另记一处当前的可用性瑕疵**（不是让位造成）：my-pi 的只读护栏在拒绝时提示"使用 `/plan exit` 退出"
 （`custom/features/plan-mode/index.ts` 的 block reason）。在 pi 底座上这句是对的（`/plan exit` 就是 my-pi 的命令）；

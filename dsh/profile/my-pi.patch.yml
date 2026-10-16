@@ -18,6 +18,18 @@
 #   * 产物只含本仓代码；第三方依赖见 dsh/plugin/package.json（仓库在本机时由本仓 node_modules 解析；
 #     正式部署应把 `my-pi-dsh-plugin` 作为 profile 依赖安装）。
 #   * ✗ 尚未做：Host 级真正启动（需要凭据/内存；且不得打扰正在运行的 dsh web）。
+# ── （可选）移动端并发上限：**默认不启用**，需要时把下面两条取消注释 ────────────────────────
+# 背景：宿主的 `maxActiveSubagents` 默认 8，而 my-pi 在 Termux/android 上刻意压到 2（手机内存小）。
+# 它是 `Volatile<number>`（**只有其拥有者可写**）⇒ 插件改不动，只能：① 启动时**读出来并在超限时报警**
+# （见 custom/adapters/dsh/subagent-capacity.ts，真 Host 日志里有一行 `[my-pi-dsh] subagent 并发：…`）；
+# ② 由**部署方**在这里显式覆盖。注意：`- id:` 形式是"覆盖已有条目"，会**整体替换**该条目的 config，
+# 所以这里把 schema 的另一个字段（maxDepth，默认 1）也写全，避免把别人的设置抹掉。
+#
+# - id: subagent
+#   config:
+#     maxActiveSubagents: 2
+#     maxDepth: 1
+
 - insert:
     - id: my-pi
       name: "../plugin/dist/my-pi-plugin.mjs"

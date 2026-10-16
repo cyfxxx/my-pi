@@ -20,8 +20,10 @@ import bootstrap from '../../custom/bootstrap';
 import { apply as applyFacade, inject, name } from '../../custom/adapters/dsh/plugin';
 import { registerMyPiSystemPrompt } from '../../custom/adapters/dsh/system-prompt';
 import { listDshSessions } from '../../custom/adapters/dsh/session-list';
+import { auditSubagentCapacity } from '../../custom/adapters/dsh/subagent-capacity';
 import { setSessionLister } from '../../custom/adapters/session-adapter';
 import type { DshContext } from '../../custom/adapters/dsh/types';
+import { getDshService } from '../../custom/adapters/dsh/service';
 import type { DshFacade } from '../../custom/adapters/dsh/facade';
 
 export { inject, name };
@@ -101,6 +103,18 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
       report: (member, detail) => console.warn(`[my-pi-dsh] ${member}：${detail}`),
     }),
   );
+  // 子代理并发核对（**只读 + 明确报警**）：移动端上宿主默认允许 8 个并发子代理，而 my-pi 的移动端上限是 2。
+  // 宿主的 maxActiveSubagents 是 Volatile（契约：只有其拥有者可写）⇒ 我们改不动，那就**别静默**：
+  // 读出来、说清楚、给出部署层改法（完整理由与"做不到什么"见 custom/adapters/dsh/subagent-capacity.ts）。
+  try {
+    const audit = auditSubagentCapacity(getDshService(ctx, 'subagents'));
+    const line = `[my-pi-dsh] subagent 并发：${audit.note}`;
+    if (audit.tooHigh) console.warn(line);
+    else console.log(line);
+  } catch (error) {
+    console.warn(`[my-pi-dsh] subagent 并发核对失败（不影响启动）：${String(error)}`);
+  }
+
   // 诊断汇总（`MY_PI_DSH_TRACE_EVENTS=1` 才打）：把"到底注册成功了多少 / 哪些因同名冲突被跳过"
   // 变成**可核对的一行**。为什么需要：DSH 原生会占用同名工具/命令，而"跳过"如果不可见，
   // 就变成静默少能力（2026-10-18 Host 冒烟实测过连带损失，见 custom/adapters/dsh/facade.ts）。

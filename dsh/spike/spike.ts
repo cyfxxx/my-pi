@@ -35,6 +35,8 @@
  *      这类**只在真实 Host 里才炸**的问题（2026-10-18 Host 冒烟实测：未 inject 就访问 `ctx.tools` 会抛）
  *   A19 **注册结果必须是编译产物**：`ctx.tools.register()` 要的是 `defineTool(options)` 的结果；
  *      直接注册原始 spec 会让真实 provider 拒掉每个请求（Host 冒烟实测 `got 'type: null'`）
+ *   A23 **移动端子代理并发核对**：对真实 `dsh-subagent` 的 `Volatile<number>` 只读取值，
+ *      非移动端不报警、模拟移动端（Termux）会报警并给出部署层覆盖片段（插件无权写宿主配置）
  *   A22 **`commands.execute()` 真跑**：命令服务真的调用我们注册的处理器（rawInput 保留前导空格、
  *      会话身份注入、抛错映射成 `{kind:error}`、未知命令返回 undefined）—— 此前这条一直是 ✗
  *   A21 **插件入口的配置通路 + 命令名重映射**：按真实装载路径（cordis loader + 第二参 `config`）
@@ -55,6 +57,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools';
 
 import { createDshExtensionApi } from '../../custom/adapters/dsh/facade';
 import { listDshSessions } from '../../custom/adapters/dsh/session-list';
+import { auditSubagentCapacity } from '../../custom/adapters/dsh/subagent-capacity';
 import type { DshContext } from '../../custom/adapters/dsh/types';
 // ★ 走**真实的** pi 侧适配器把内部定义编译成 pi 形状，再交给 DSH 外观层 ——
 //   这正是运行期的调用链（feature → tool-adapter → facade → DSH），不是"直接调 facade"的理想路径。
@@ -976,6 +979,45 @@ async function main(): Promise<void> {
     a22 = { id: 'A22', ok: 'skip', detail: `execute 检查不可用：${(error as Error).message.slice(0, 130)}` };
   }
   checks.push(a22);
+
+  // ── A23：移动端子代理并发核对（对着**真实** `dsh-subagent` 服务的 Volatile 读）──────────
+  //
+  // 为什么值得单独验：宿主的 `maxActiveSubagents` 是 `Volatile<number>`（只有 `get()`，**只有拥有者可写**）
+  // ⇒ 我们的插件**改不动**它。既然改不动，就必须"读出来 + 移动端超限时明确报警"，而不是静默超载。
+  // 这条用真实服务证明：读得到、非移动端不报警、模拟移动端会报警并给出部署层片段。
+  let a23: Check = { id: 'A23', ok: false, detail: '未执行' };
+  try {
+    const subagentModule = (await import('@deepseek-ai/dsh-subagent')) as unknown as {
+      default?: unknown;
+      SubagentRuntime?: unknown;
+    };
+    const subagentPlugin = (subagentModule.default ?? subagentModule.SubagentRuntime) as never;
+    const sCtx = new Context();
+    sCtx.plugin(SystemPrompt);
+    sCtx.plugin(ToolRuntime);
+    sCtx.plugin(subagentPlugin, { maxActiveSubagents: 8, maxDepth: 1 } as never);
+    await tick(200);
+    const service =
+      (sCtx as unknown as { get?: (n: string) => unknown }).get?.('subagents') ??
+      (sCtx as unknown as { subagents?: unknown }).subagents;
+    const desktop = auditSubagentCapacity(service, false);
+    const termux = auditSubagentCapacity(service, true);
+    const ok =
+      desktop.effective === 8 &&
+      desktop.tooHigh === false &&
+      termux.effective === 8 &&
+      termux.tooHigh === true &&
+      termux.note.includes('maxActiveSubagents: 2');
+    a23 = {
+      id: 'A23',
+      ok,
+      detail: `真实 dsh-subagent 的 Volatile 读到 ${String(desktop.effective)}；桌面 ⇒ 报警=${desktop.tooHigh}（期望 false）；`
+        + `模拟移动端 ⇒ 报警=${termux.tooHigh}（期望 true，且附部署层片段=${termux.note.includes('maxActiveSubagents: 2')}）`,
+    };
+  } catch (error) {
+    a23 = { id: 'A23', ok: 'skip', detail: `并发核对检查不可用：${(error as Error).message.slice(0, 120)}` };
+  }
+  checks.push(a23);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');
