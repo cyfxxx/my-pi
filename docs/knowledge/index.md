@@ -6,7 +6,7 @@
 > 每页四件事：是什么 / 根因 / **确切命令序列** / **含确切语法的解法**；篇幅 **10–30 行**；只记可泛化的。
 > **本产物不自动进模型上下文、不改任何运行时行为**，只供人审阅。
 
-## 失败模式（44 条，来源：`docs/BUG-REPLAYS.md`）
+## 失败模式（45 条，来源：`docs/BUG-REPLAYS.md`）
 
 - [bug-001](patterns/bug-001.md): 切了模式、重启后没生效 + `modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` + `check-conventions`（状态不入库）+ 状态体检 `modes-legacy-current`；模式状态已迁到 gitignored 的 `modes-sessions.json`
 - [bug-002](patterns/bug-002.md): 模式解析"第 3 轮工厂执行后漂回 full" + `PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 + `mode-switch.test.ts` 的三轮回归 + `resolveStartupMode()` 单一写入点
@@ -52,8 +52,9 @@
 - [bug-042](patterns/bug-042.md): **`local`/`declare` 同一行里引用刚声明的变量 ⇒ `set -u` 下失败，报错却指向变量名** + 写 DSH 模式场景脚本时写成 `local label="$1" mode="$2" out="$LOG_DIR/run-$label.log"`，脚本跑到那里直接 `line 89: label: unbound variable` 退出 —— **看起来像"调用方没传参"，实际是 bash 语义**：`local` 的所有词**先展开**再赋值，同一行里 `$label` 展开时那个赋值还没生效 + **无自动守门**（属 bash 写法约束；结节见 `docs/design/CODING-TRAPS.md` #13），已修 `scripts/dsh-scenario-mode.sh`
 - [bug-043](patterns/bug-043.md): **打包形态冒烟自 2026-10-18 起静默失效**（连带暴露 `ln -sfn` 的目录语义坑） + `dsh-package.sh` 把 tgz 装到**独立目录**再从那里加载，而 `entry.ts` 那天为 `defineTool` 编译新增了宿主 import `@deepseek-ai/dsh-tools` ⇒ 独立目录里没有宿主包，脚本开始以 `ERR_MODULE_NOT_FOUND: @deepseek-ai/dsh-tools` 失败。它**不在任何自动门禁里**（重、要装包），所以从当天到被发现一直是坏的 —— 典型的"没跑过的守门等于没有守门"。修的过程中又撞上第二个坑：`npm install` 因 peerDependency 先建了**真目录** `node_modules/@deepseek-ai/`，而 `ln -sfn "$SRC" "$D/node_modules/@deepseek-ai"` 会把链接建到**目录里面**（`@deepseek-ai/@deepseek-ai → SRC`）⇒ 症状是"补了宿主包还是找不到" + **已修**：宿主包**逐包**补链接（跳过已存在项，与 `dsh-build.sh` 同做法）；并把"产物不得含 `@earendil-works/*` import"的**零成本断言**加进构建冒烟（`smoke-built.mjs`）⇒ 自包含性从此每次构建都被检查（灵敏度已验：不带 `--alias` 构建时该断言命中 3 处）。结节见 `docs/design/CODING-TRAPS.md` #14
 - [bug-044](patterns/bug-044.md): **把依赖 `this` 的方法「取下来」再调用 ⇒ 静默返回 undefined，打穿整条重启链**（本分支自己造成的真实回归） + DSH 换基座时新增了 `sessionKeyOf()` 统一"这是哪个会话"的键，内部写成了 `const f = ctx.sessionManager.getSessionFile; f()` —— 而 pi 的实现是 `getSessionFile() { return this.sessionFile; }`（`vendor/pi/packages/coding-agent/src/core/session-manager.ts:1156-1158`），**解绑后 `this` 是 undefined** ⇒ 抛 TypeError ⇒ **被同一函数里的 try/catch 吞掉** ⇒ 返回 `undefined`。后果不是小错：模式记录键成了 undefined（`modes-sessions.json` 恒为 `{}`）、重启请求的 `targetSession` 也变 undefined ⇒ `/mode roleplay` 不再真的换档重启。**单元测试全绿**（我的 fake 用的是箭头函数、不依赖 `this` ⇒ 测试把 bug 当成了契约） + **已修**：改为闭包调用（`() => sm?.getSessionFile?.()`）保住接收者，并在注释里写明"必须方法形式调用"与事故出处；新增反向探针单测（用真实现那样依赖 `this` 的类）⇒ 该写法以后会被立刻抓住。★ 教训：**fake 用箭头函数会把"依赖 this 的方法"这类 bug 保护起来** —— fake 应尽量模仿真实实现的形状（结节见 `docs/design/CODING-TRAPS.md` #15）
+- [bug-045](patterns/bug-045.md): **"记录被否提案"的机制实际不生效** + `record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledger.mjs` 会用 `git log + DECISIONS.md` 把它**整个重新生成**（rejected 是从 `DECISIONS.md` 按标题标记抽取的）⇒ 手写的记录在下一次重建时**静默消失**。最毒的是它**打印"✓ 已记录"**，而且约定守门在台账漂移时会**提示你去跑 `--update`** —— 那正是抹掉记录的那一步 + **已修（2026-10-16）**：`--reject` 改为按抽取器认得的格式**追加到 `DECISIONS.md`（事实来源）**，随后自动跑 `gen-changes-ledger --update`，并**自检**这条真的进了台账（进不去就 exit 1 并给原因，不许"打印成功、实际没记上"）。顺带把"理由"里重复的"不采用："前缀去掉、同时保证理由行仍含标记词。本次据此**耐久地**登记了 8 条被否提案（`pnpm.overrides` 别名方案、写死让位名单、`mypi_subagent` 改名、plan 直接让位、诊断报"入桶 yes/no"、箭头函数 fake、`ln -sfn` 整目录软链、vendored packs 一并改名）。结节见 `docs/design/CODING-TRAPS.md` #16
 
-## 被否提案（7 条，来源：`docs/CHANGES.jsonl` 的 rejected）
+## 被否提案（15 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 
 > 判据第 ② 条：**成功与失败都记**。这些是"试过但被否"的提案，留着是为了**不被重复提出**。
 
@@ -64,6 +65,14 @@
 - [rej-f597d3](patterns/rej-f597d3.md): [2026-09-22] 不迁移 auto-compact 控制器与 task-summarizer 流水线（口径） + **背景**：pi-tools `pi-context/auto-compact-controller.ts` 与 `task-summarizer.mjs` 依赖 `.usage-diag.jsonl`、task-record、thinking-level、warm-prefix、prune-dump 等一整条未迁移的数据/编排链。 + 未实施（被否）
 - [rej-38ab10](patterns/rej-38ab10.md): [2026-09-22] task-record/task-summarizer 改为适配迁移（取代同日"不迁移"口径） + **背景**：先前以"依赖整条未迁移数据链"为由暂缓；实际 `task-record` 生产者可确定性重建（agent_settled 写结构化记录），总结层可去掉 spawn 强依赖。 + 未实施（被否）
 - [rej-1d6971](patterns/rej-1d6971.md): [2026-09-25] 通知与入站通道：出站用 webhook、入站用 link（不迁移 notify.json / ntfy-relay） + **决策**：两者均**不迁移**，由既有能力取代： + 未实施（被否）
+- [rej-74dae3](patterns/rej-74dae3.md): [2026-10-16] ✗ 不采用：部署方案：用 profile 级 pnpm.overrides 把 pi 包 specifier 别名到本仓 shim + **理由（不采用）**：dsh/plugin/package.json 的 files 只发 dist+README，shim 根本不在分发包里 ⇒ 真 profile 装出来解析不到；改为构建期 esbuild --alias 把 shim 打进产物（自包含） + 未实施（被否）
+- [rej-32360d](patterns/rej-32360d.md): [2026-10-16] ✗ 不采用：同名冲突处置：写死一份「让位名单」（宿主占用的名字直接跳过） + **理由（不采用）**：不采用：名单会过期——宿主哪天不再提供同名工具时，我们仍会跳过 ⇒ 静默少能力；改为靠宿主注册表抛同名错就地跳过并点名上报，宿主不提供时自动生效 + 未实施（被否）
+- [rej-9d847e](patterns/rej-9d847e.md): [2026-10-16] ✗ 不采用：把 my-pi 的 subagent 工具改名保留（如 mypi_subagent） + **理由（不采用）**：不采用：它在 DSH 底座上是跨运行时 spawn pi 子进程，且 context:fork 在 DSH 上已静默降级；宿主原生 subagent 是同进程 spawn/fork 且自带 steer/cancel/list ⇒ 让位更优，my-pi 独有 5 项登记为待重设计 + 未实施（被否）
+- [rej-4683fe](patterns/rej-4683fe.md): [2026-10-16] ✗ 不采用：让 plan 命令直接让位给宿主的 /plan（只保留护栏与 plan_enter/plan_exit） + **理由（不采用）**：会丢掉用户命令面（resume/todos/plans/clear/help）与 clear/resume 的计划落盘·续跑路径；改为适配层命令名重映射，以 mypi-plan 换名注册（工具名不做此重映射，因为工具名对模型可见） + 未实施（被否）
+- [rej-cfeebc](patterns/rej-cfeebc.md): [2026-10-16] ✗ 不采用：诊断 trace 报「入桶 yes/no」表示会话用量是否记上 + **理由（不采用）**：不采用：同一回合的第二个 step 不会让桶数增加 ⇒ 会把「已并入已有桶」打成「没入桶」，诊断自己在说谎；改为报桶内调用数 + 未实施（被否）
+- [rej-2baf31](patterns/rej-2baf31.md): [2026-10-16] ✗ 不采用：写 sessionKeyOf 的单测时用箭头函数 fake（{getSessionFile: () => '…'}） + **理由（不采用）**：不采用：箭头函数不依赖 this，会把「方法被解绑调用」这类 bug 保护起来——实际就这么漏掉了一次真回归（留出集 33/33 → 11/33）；fake 必须模仿真实实现形状（getSessionFile() { return this.x }） + 未实施（被否）
+- [rej-0df654](patterns/rej-0df654.md): [2026-10-16] ✗ 不采用：用 ln -sfn 整体软链整个 @scope 目录来补宿主包 + **理由（不采用）**：不采用：目标已是真目录时链接会建到目录里面（@scope/@scope → SRC），症状是「补了却还是找不到」；改为逐包补并跳过已存在项 + 未实施（被否）
+- [rej-1ee288](patterns/rej-1ee288.md): [2026-10-16] ✗ 不采用：把 vendored packs 里所有 web_search 表述一并改成 searxng + **理由（不采用）**：不采用：packs/ 是上游技能包（有各自同步与链接/结构守门），本地改名不该制造与上游的漂移；只改本仓自己维护的 packs/README.md，其余三处保留并逐条登记后果 + 未实施（被否）
 
 ## 反复失败的错误指纹（1 条，来源：`portable/memory/logs/error-fingerprints.jsonl`）
 

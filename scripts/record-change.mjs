@@ -23,6 +23,19 @@
  *   node scripts/record-change.mjs --reject "提案" --reason "为什么否" [--evidence "…"]
  *   node scripts/record-change.mjs --remind    # HEAD 未登记则提示（pre-push 用；退出码恒 0）
  *   node scripts/record-change.mjs --check     # 校验每一行都是合法 JSON（守门用）
+ *
+ * ## ★ 被否提案写进 `DECISIONS.md`（事实来源），**不是** `CHANGES.jsonl`（派生物）
+ *
+ * `gen-changes-ledger.mjs` 会用 **git log + `DECISIONS.md`** 重新生成 `docs/CHANGES.jsonl`
+ * （其中 `rejected` 是**从 `DECISIONS.md` 里按标题标记抽取**的）。所以"往 CHANGES.jsonl 追加一条
+ * rejected"是**写进了会被覆盖的文件**：
+ *
+ *   实测（2026-10-16）：`--reject` 追加后 rejected 行数 7 → 8；`gen-changes-ledger --check` **报漂移**；
+ *   按提示跑 `--update` 后回到 7 行，**那条探测记录 0 命中** ⇒ 记录机制**实际不生效**（很隐蔽：
+ *   命令打印"✓ 已记录"，只是下次重建就没了）。
+ *
+ * ⇒ 现在 `--reject` 把条目按抽取器认得的格式**追加到 `DECISIONS.md`**，随后立即重建台账，
+ * 并**自检**这条真的进了 `CHANGES.jsonl`（没进就报错，不假装成功）。
  */
 
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
@@ -75,13 +88,51 @@ if (has('--check')) {
 if (has('--reject')) {
   const proposal = val('--reject');
   const reason = val('--reason', '（未写理由）');
+  const evidence = val('--evidence', '');
   if (!proposal) {
     console.error('用法：--reject "<提案>" --reason "<为什么否>" [--evidence "…"]');
     process.exit(2);
   }
-  append({ kind: 'rejected', ts: new Date().toISOString(), proposal, reason, evidence: val('--evidence', '') });
-  console.log(`✓ 已记录被否的提案：${proposal}`);
-  process.exit(0);
+  // ★ 写**事实来源**（DECISIONS.md），标题带负结果标记（抽取器只在标题里认标记）：
+  //   NEG_TITLE = /否掉|已否掉|不迁移|不推荐|负结果|收下但不分叉|不做|暂不做|不采用|予以否决|拒绝采纳/
+  //   理由行也带标记词，好让抽取器把它当 reason（它优先取"含标记的那一行"）。
+  const date = new Date().toISOString().slice(0, 10);
+  // 理由前面常被写成"不采用：…"（与标题的标记重复）⇒ 去掉前缀，读起来干净；同时**保证**理由行仍含标记词
+  const cleaned = reason.replace(/^\s*(不采用|不做|改做|不推荐|否掉|拒绝采纳)\s*[:：]\s*/, '');
+  const marked = /否掉|已否掉|不迁移|不推荐|负结果|收下但不分叉|不做|暂不做|不采用|予以否决|拒绝采纳/.test(cleaned)
+    ? cleaned
+    : `不采用：${cleaned}`;
+  const section = [
+    '',
+    `### [${date}] ✗ 不采用：${proposal}`,
+    '',
+    `**理由（不采用）**：${marked}`,
+    ...(evidence ? [`**证据**：${evidence}`] : []),
+    '',
+  ].join('\n');
+  appendFileSync(join(ROOT, 'DECISIONS.md'), section, 'utf8');
+  console.log(`✓ 已记入 DECISIONS.md（事实来源）：不采用 ${proposal}`);
+
+  // 立即重建派生物，避免留下漂移（否则守门报 CHANGES.jsonl 漂移，而按提示跑 --update 也**不会**丢这条了）
+  try {
+    execFileSync(process.execPath, [join(ROOT, 'scripts', 'gen-changes-ledger.mjs'), '--update'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+  } catch (error) {
+    console.error(`⚠ 重建台账失败（请手工跑 node scripts/gen-changes-ledger.mjs --update）：${String(error)}`);
+  }
+
+  // ★ 自检：这条必须真的进了 CHANGES.jsonl（没进就报错 —— 不许"打印成功、实际没记上"）
+  const hit = readAll().some(
+    (r) => r.kind === 'rejected' && typeof r.proposal === 'string' && r.proposal.includes(proposal.slice(0, 12)),
+  );
+  if (hit) {
+    console.log('✓ 自检通过：该条已在 docs/CHANGES.jsonl 的 rejected 里（下次重建也不会丢）');
+    process.exit(0);
+  }
+  console.error('❌ 自检失败：CHANGES.jsonl 里找不到这条 rejected ⇒ 标题可能没被抽取器认出来（需含负结果标记）');
+  process.exit(1);
 }
 
 // ── --remind：HEAD 未登记则提示（pre-push 调用；只读、退出码恒 0）──

@@ -10,6 +10,9 @@
 
 ---
 
+> **收口与交接**：迁移已结项（阶段 P0–P6 全部完成）。"怎么复跑全部验证 / 部署形态 / 剩余缺口分诊 /
+本次新增的经验陷阱"都整理在 [`DSH-MIGRATION-CLOSEOUT.md`](DSH-MIGRATION-CLOSEOUT.md)。
+
 ## 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改
 
 my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）：

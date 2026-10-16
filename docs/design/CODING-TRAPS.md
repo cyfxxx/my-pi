@@ -193,6 +193,21 @@
 - **复现**：`node -e 'const sm={f:"x",getSessionFile(){return this.f}}; const g=sm.getSessionFile; try{console.log(g())}catch(e){console.log("throws:",e.message)}'`
 - 台账：`docs/BUG-REPLAYS.md` #44。
 
+## 16. 把**派生产物**当事实来源写 ⇒ 记录被生成器静默覆盖（还打印"已记录"）
+
+- **症状**：`record-change.mjs --reject` 打印"✓ 已记录被否的提案"，但**下一次**重建台账时那条记录消失。
+  更隐蔽的是：约定守门发现台账漂移后**提示你跑的正是抹掉它的那条命令**。
+- **根因**：`docs/CHANGES.jsonl` 是**派生物**（`gen-changes-ledger.mjs` 用 `git log` + `DECISIONS.md`
+  整个重新生成；`rejected` 抽取自 `DECISIONS.md`），而写入方却往派生物里追加 ⇒ 写进了"会被覆盖的文件"。
+- **判据（改法）**：① **写事实来源**（生成器读的那个文件/表），不写生成物；
+  ② 写完**自检**"它真的出现在派生结果里"（进不去就报错，不许打印成功）；
+  ③ 工具自己触发重建，避免留下"漂移 → 按提示重建 → 记录被抹掉"的陷阱路径。
+- **复现**（一条命令看懂修前的行为）：
+  `node scripts/record-change.mjs --reject "探测" --reason "探测用"; node scripts/gen-changes-ledger.mjs --check; node scripts/gen-changes-ledger.mjs --update; grep -c "探测" docs/CHANGES.jsonl`
+- **同类**：任何 `*-generated.* / *.jsonl（由脚本重建） / docs/INDEX.md / docs/knowledge/**` 都属"只读派生物"，
+  要改就改它们的源，或改生成器。
+- 台账：`docs/BUG-REPLAYS.md` #45。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

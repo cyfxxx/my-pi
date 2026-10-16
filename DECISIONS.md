@@ -6122,3 +6122,74 @@ Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sher
 
 **证据**：`check-conventions`/`check-portability` 全绿；`portable-runtime.sh verify` 全绿；`test-portability-move.sh` **7/7**（含 SearXNG 在新路径搜出 35 条结果）；`tsc -p custom/` rc=0；`vitest run` 109 文件 / 1166 用例通过。
 **未核实（✗）**：仅本机 `linux-arm64` 实跑；voice 重依赖未端到端；systemd 单元未用 `systemd-analyze` 校验。
+
+### [2026-10-16] ✗ 不采用：部署方案：用 profile 级 pnpm.overrides 把 pi 包 specifier 别名到本仓 shim
+
+**理由（不采用）**：dsh/plugin/package.json 的 files 只发 dist+README，shim 根本不在分发包里 ⇒ 真 profile 装出来解析不到；改为构建期 esbuild --alias 把 shim 打进产物（自包含）
+**证据**：搬走仓库根 node_modules/@earendil-works 后真 Host 仍退出码 0、模块解析失败 0 条（实测 #18-aa）
+
+### [2026-10-16] ✗ 不采用：同名冲突处置：写死一份「让位名单」（宿主占用的名字直接跳过）
+
+**理由（不采用）**：不采用：名单会过期——宿主哪天不再提供同名工具时，我们仍会跳过 ⇒ 静默少能力；改为靠宿主注册表抛同名错就地跳过并点名上报，宿主不提供时自动生效
+**证据**：facade.registerTool/registerCommand 的 try/catch 就地隔离 + registrationSummary()；真 Host 汇总行 工具 53/命令 10/冲突 1/钩子 18
+
+### [2026-10-16] ✗ 不采用：把 my-pi 的 subagent 工具改名保留（如 mypi_subagent）
+
+**理由（不采用）**：不采用：它在 DSH 底座上是跨运行时 spawn pi 子进程，且 context:fork 在 DSH 上已静默降级；宿主原生 subagent 是同进程 spawn/fork 且自带 steer/cancel/list ⇒ 让位更优，my-pi 独有 5 项登记为待重设计
+**证据**：能力审计 §2（dsh-agent-loop/dsh-subagent-*-in-process 对比）；真 Host 汇总行显示 subagent 让位为唯一冲突
+
+### [2026-10-16] ✗ 不采用：让 plan 命令直接让位给宿主的 /plan（只保留护栏与 plan_enter/plan_exit）
+
+**理由（不采用）**：会丢掉用户命令面（resume/todos/plans/clear/help）与 clear/resume 的计划落盘·续跑路径；改为适配层命令名重映射，以 mypi-plan 换名注册（工具名不做此重映射，因为工具名对模型可见）
+**证据**：真 Host 注册汇总：命令 9 → 10（含 mypi-plan）、同名冲突 2 → 1；DshFacadeOptions.commandNameMap
+
+### [2026-10-16] ✗ 不采用：诊断 trace 报「入桶 yes/no」表示会话用量是否记上
+
+**理由（不采用）**：不采用：同一回合的第二个 step 不会让桶数增加 ⇒ 会把「已并入已有桶」打成「没入桶」，诊断自己在说谎；改为报桶内调用数
+**证据**：真 Host trace 实测出现 入桶=no 而该回合确实累积了 2 次调用；修正后报 桶内调用数=2
+
+### [2026-10-16] ✗ 不采用：写 sessionKeyOf 的单测时用箭头函数 fake（{getSessionFile: () => '…'}）
+
+**理由（不采用）**：不采用：箭头函数不依赖 this，会把「方法被解绑调用」这类 bug 保护起来——实际就这么漏掉了一次真回归（留出集 33/33 → 11/33）；fake 必须模仿真实实现形状（getSessionFile() { return this.x }）
+**证据**：BUG-REPLAYS #44：pi 的 SessionManager.getSessionFile() 用 this.sessionFile（session-manager.ts:1156）
+
+### [2026-10-16] ✗ 不采用：用 ln -sfn 整体软链整个 @scope 目录来补宿主包
+
+**理由（不采用）**：不采用：目标已是真目录时链接会建到目录里面（@scope/@scope → SRC），症状是「补了却还是找不到」；改为逐包补并跳过已存在项
+**证据**：BUG-REPLAYS #43：npm install 因 peerDependency 先建了真目录，补链后仍 ERR_MODULE_NOT_FOUND
+
+### [2026-10-16] ✗ 不采用：把 vendored packs 里所有 web_search 表述一并改成 searxng
+
+**理由（不采用）**：不采用：packs/ 是上游技能包（有各自同步与链接/结构守门），本地改名不该制造与上游的漂移；只改本仓自己维护的 packs/README.md，其余三处保留并逐条登记后果
+**证据**：能力审计 §6 的逐文件处置表；check-packs-links 682 md/1238 链接仍绿
+
+### [2026-10-16] ★ DSH 换基座迁移收口：阶段 P0–P6 全部完成（同名冲突处置 / 产物自包含 / 守门扩到 J·K·L 段）
+
+**结论**：分支 `feat/base-switch-dsh` 上，my-pi 的底座从 pi 迁到 DSH 已收口；`main` 全程未动。
+分阶段证据、实测事实与剩余缺口分别归档在
+[`docs/design/DSH-MIGRATION-PLAN.md`](docs/design/DSH-MIGRATION-PLAN.md)（计划 + 实测 #18-a…18-ac + §3.1 覆盖度）、
+[`docs/design/DSH-HOOK-MAPPING.md`](docs/design/DSH-HOOK-MAPPING.md)（19 事件档位）、
+[`docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md`](docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md)（同名冲突审计 + 决策 + DR 清单）。
+
+**关键决策（本次定稿）**：
+1. **features 不改**：只在 `custom/adapters/dsh/**` 提供"看起来像 pi"的外观层，`custom/bootstrap.ts` 一行不改（§0 的策略，本轮验证有效）。
+2. **同名冲突三件分别处置**：工具 `web_search` → **改名 `searxng`** 保留（宿主那个需 DeepSeek 凭据，我们的免 key 可降级，能力不同）；
+   工具 `subagent` → **让位**宿主（宿主是同进程 spawn/fork 且自带 steer/cancel/list，我们那套是跨运行时 spawn pi 且 fork 已降级）；
+   命令 `plan` → **换名注册 `mypi-plan`**（保住子命令面与计划落盘/续跑路径，且不动 feature）。
+3. **改名的边界**：**工具名**对模型可见 ⇒ 改名要走 feature 侧并重过工具声明面基线（`searxng` 因此让总字节**降** 3 B，未抬预算）；
+   **命令名**是用户敲的 ⇒ 允许适配层重映射（`DshFacadeOptions.commandNameMap`，只给命令、不给工具）。
+4. **让位不写死名单**：靠"宿主注册表抛同名错 ⇒ 就地跳过 + 点名上报"，宿主哪天不再提供同名工具时我们的注册自动生效。
+5. **产物自包含**：构建期用 esbuild `--alias:` 把 `@earendil-works/pi-*` 改写成本仓 shim 的路径并**打进产物** ⇒
+   真 profile 不再需要 `pnpm.overrides` 别名（此前包清单不含 shim，那条路走不通）。构建冒烟每次断言这一点。
+6. **不静默降级**：无等价物一律经 `surfaceReport()`/`onUnsupported` 上报；让位的代价逐条登记为 **DR-1…DR-5**（不是"已完成"）。
+7. **守门扩面**：`check-conventions.sh` 从 A–I 扩到 **J**（DSH 双基线条件守门）、**K**（`dsh/plugin` 类型检查，官方 `tsc -p custom/` 不收 `dsh/`）、
+   **L**（Markdown 表体完整性，抓"程序化编辑把表格行写断"）。
+
+**证据（可复跑）**：spike **22/22**（真实 `@deepseek-ai/*` 0.2.0-rc.2 + cordis 4.0.4）；Host 级四类路径（插件加载/工具调用/回合用量/注册汇总）+
+三个 DSH 场景（两实例隔离、会话续接、模式启动期）；**留出集**（`PI_GOLDEN_SCENARIO=1`）模式切换 **33/33**、两实例隔离 **33/33**、会话切换 **18/18**；
+全量 vitest **1294**；`tsc -p custom/` 与 `tsc -p dsh/` 均 0 错；约定守门（A–L）全绿。
+
+**未核实（✗，如实登记）**：① "loop 驱动的真 agent"下的两处运行时语义（`steer` 在 step 边界被消费、真 agent 下 `commands.execute()`）——
+试过在 spike 里单独建 root agent，loop 需要完整组合（模型路由等）⇒ 报 `no agent factory registered`，留给真 Host/交互客户端；
+② `input.transform` 属**潜伏能力**（本仓 4 个 `input` 处理器全是观察者，无人返回改写）；
+③ 合成用量的 `cost` 是占位 0（DSH `TokenUsage` 不含定价；当前无 feature 读它）。

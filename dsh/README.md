@@ -1,3 +1,5 @@
+> 迁移已结项：复跑清单、部署形态与剩余缺口见 [`../docs/design/DSH-MIGRATION-CLOSEOUT.md`](../docs/design/DSH-MIGRATION-CLOSEOUT.md)。
+
 # dsh/ —— my-pi 在 DSH 上的落点（插件打包 + profile 接线）
 
 底座从 pi 换到 DSH 分两层：
