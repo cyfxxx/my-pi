@@ -34,6 +34,34 @@ describe('sessionKeyOf', () => {
     expect(sessionKeyOf({ sessionManager: { getSessionId: () => '' } })).toBeUndefined();
   });
 
+  it('★ 反向探针：方法**依赖 this** 时也必须拿到值（真实 pi 的 SessionManager 就是这样）', () => {
+    // pi 的实现：`getSessionFile() { return this.sessionFile; }`
+    //（vendor/pi/packages/coding-agent/src/core/session-manager.ts:1156-1158）
+    // 若把方法**解绑**后再调用（`const f = sm.getSessionFile; f()`），`this` 变 undefined ⇒ 抛错被吞 ⇒
+    // 静默返回 undefined —— 这正是 2026-10-16 让留出集从 33/33 掉到 11/33 的原因（BUG-REPLAYS #44）。
+    class RealLikeSessionManager {
+      sessionFile = '/tmp/pi/sessions/--root-my-pi--/real.jsonl';
+      sessionId = 'real-id';
+      getSessionFile(): string | undefined {
+        return this.sessionFile;
+      }
+      getSessionId(): string | undefined {
+        return this.sessionId;
+      }
+    }
+    const sm = new RealLikeSessionManager();
+    expect(sessionKeyOf({ sessionManager: sm })).toBe('/tmp/pi/sessions/--root-my-pi--/real.jsonl');
+
+    // 没有文件路径时退回 id（DSH 形态），同样必须保住 this
+    class IdOnlySessionManager {
+      sessionId = 'sess-7';
+      getSessionId(): string | undefined {
+        return this.sessionId;
+      }
+    }
+    expect(sessionKeyOf({ sessionManager: new IdOnlySessionManager() })).toBe('dsh-session:sess-7');
+  });
+
   it('取值抛错时不炸（退化为 undefined，而不是让功能注册失败）', () => {
     expect(
       sessionKeyOf({

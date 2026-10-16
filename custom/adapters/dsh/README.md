@@ -293,5 +293,7 @@ DSH 原生占用了工具名与命令名。DSH 对同名注册**抛错**，而�
 ⇒ `facade.registerTool`/`registerCommand` 各自 try/catch，**只跳过冲突的那一个**并点名上报
 （`registerTool.duplicate:<名>`）；`registrationSummary()` 给出"成功工具/命令 + 跳过项 + 钩子清单"，
 由 `MY_PI_DSH_TRACE_EVENTS=1` 打成一行 ⇒ 少了什么**可量**。
-修后真 Host：`工具 52 个、命令 9 个；同名冲突跳过 3 个；钩子 18 个`，`⚠️ 注册功能失败` 0 条。
-✗ 冲突本身的**策略**（让位原生 / 改前缀 / 挂 per-agent）仍待产品决策。
+修后真 Host（2026-10-18 决策落地后的口径）：`工具 53 个、命令 10 个（… mypi-plan …）；同名冲突跳过 1 个
+（工具:subagent）；钩子 18 个`，`⚠️ 注册功能失败` 0 条 —— `web_search` 已改名 `searxng`、`plan` 已换名
+`mypi-plan`，只剩 `subagent` 让位。**冲突策略已决策**；让位带来的独有能力（DR-1…DR-5）登记在
+[`../../../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md`](../../../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md) §7。

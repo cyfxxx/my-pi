@@ -28,17 +28,28 @@ export function sessionKeyOf(ctx: {
     getSessionId?: () => string | undefined;
   };
 }): string | undefined {
-  const call = (fn: (() => string | undefined) | undefined): string | undefined => {
+  const sm = ctx?.sessionManager;
+  /**
+   * ★ 必须以**方法**形式调用（`sm.getSessionFile?.()`），不能取下来再调用（`const f = sm.getSessionFile; f()`）。
+   *
+   * pi 的实现是 `getSessionFile() { return this.sessionFile; }`
+   * （`vendor/pi/packages/coding-agent/src/core/session-manager.ts:1156-1158`，`getSessionId` 同理）
+   * —— **依赖 `this`**。解绑后 `this` 是 undefined ⇒ 抛 TypeError ⇒ 被下面的 catch 吞掉 ⇒ 静默返回 undefined
+   * ⇒ 模式记录键成了 undefined、重启请求的 `targetSession` 也变 undefined（**实际事故**：2026-10-16
+   * 留出集"模式切换/两实例隔离"从 33/33 掉到 11/33 与 8/33，见 BUG-REPLAYS #44）。
+   * 所以这里用**闭包**而不是把方法引用传出去。
+   */
+  const read = (get: (() => string | undefined) | undefined): string | undefined => {
     try {
-      const v = fn?.();
+      const v = get?.();
       return typeof v === 'string' && v.length > 0 ? v : undefined;
     } catch {
       return undefined;
     }
   };
-  const file = call(ctx?.sessionManager?.getSessionFile);
+  const file = read(() => sm?.getSessionFile?.());
   if (file) return file;
-  const id = call(ctx?.sessionManager?.getSessionId);
+  const id = read(() => sm?.getSessionId?.());
   return id ? `${DSH_SESSION_KEY_PREFIX}${id}` : undefined;
 }
 

@@ -179,6 +179,20 @@
   （会看到 `dst/@s/@s -> /tmp/ln-probe/src`）。
 - 台账：`docs/BUG-REPLAYS.md` #43。
 
+## 15. 把依赖 `this` 的方法"取下来"再调用 ⇒ 静默 undefined；而**箭头函数 fake 会把这个 bug 保护起来**
+
+- **症状**：`const f = ctx.sessionManager.getSessionFile; f()` 在 `this` 依赖型方法上**抛 TypeError**，
+  若外面有 try/catch（我们为了"不炸"而加的那些）⇒ **静默返回 undefined**，功能"看起来还在跑、只是什么都没存"。
+  实际事故：`sessionKeyOf()` 因此对 pi 恒返回 `undefined` ⇒ 模式记录键为 undefined、重启请求 `targetSession` 为空
+  ⇒ 留出集"模式切换/两实例隔离"从 **33/33** 掉到 **11/33 / 8/33**（`docs/BUG-REPLAYS.md` #44）。
+- **为什么单测没抓到（最值得记的一点）**：测试里的 fake 写成
+  `{ sessionManager: { getSessionFile: () => '/x.jsonl' } }` —— **箭头函数不依赖 `this`**，
+  所以解绑调用照样通过 ⇒ **fake 把 bug 当成了契约**（与第 6 条"测试可能是 bug 的保护壳"同源）。
+- **判据（改法）**：① 调用时保住接收者：`sm?.getSessionFile?.()`，或包一层闭包 `() => sm.getSessionFile?.()`；
+  ② **fake 要模仿真实实现的形状** —— 用 `class`/对象方法（`getSessionFile() { return this.x }`）而不是箭头函数属性。
+- **复现**：`node -e 'const sm={f:"x",getSessionFile(){return this.f}}; const g=sm.getSessionFile; try{console.log(g())}catch(e){console.log("throws:",e.message)}'`
+- 台账：`docs/BUG-REPLAYS.md` #44。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

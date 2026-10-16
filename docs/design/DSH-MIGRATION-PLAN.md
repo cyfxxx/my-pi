@@ -162,7 +162,7 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | **会话枚举** | `session-adapter` | ✗ 当前走 pi shim（返回空表） | `SessionStore.list()` / `ctx.sessionQuery` **存在**（已读契约） | **可做**：换成 `ctx.sessions.list()`（下一轮候选） |
 | **thinking 档位** | 1 处 | 部分：级别→档位**纯映射**已实现（只降不升） | 单测 7 项；`agent/request` + `reasoningEffort`（`call-config.d.ts:19`） | 真正替换配置需模型路由 |
 | **注入面（系统提示词）** | 1 | ✓ `APPEND_SYSTEM.md` 注册为提示段（order 2500，实测在末尾） | 基线 `dsh/baseline/system-prompt.json` + 反证（改源文件 ⇒ exit 1）；`check-conventions` J 段 | — |
-| **工具面基线** | 1 | ✓ 25,761 B / sha256 | `dsh/baseline/tool-surface.json` + 反证；J 段守门 | — |
+| **工具面基线** | 1 | ✓ 54 工具 / **25,758 B** / sha256（改名 `searxng` 后**降** 3 B，未抬预算） | `dsh/baseline/tool-surface.json` + 反证；J 段守门 | — |
 | **补丁账** | 11 | ✓ 收敛为 **0 个需移植**（§4.2） | 逐条依据 | `010`/`011` 的检索面未穷尽 |
 | **打包/接线** | 1 | ✓ 产物 + profile 组合 + 正式安装；**产物自包含**（pi 包 specifier 已打进产物 ⇒ 不再依赖 profile 别名） | `dsh-build`/`dsh-smoke-profile`/`dsh-package`；A9 全量；**实测 #18-aa**（搬走仓库根别名后真 Host 仍退出码 0、0 条解析失败） | ~~profile 级 `pnpm.overrides` 未在真 profile 跑过~~ **已不需要**（产物自带 shim） |
 | **场景测试** | 3 场景 | **3/3 已重建**（均为 DSH 版重写）：两实例隔离 ✓、会话续接 ✓、模式（启动期）✓ | `MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-isolation.sh`（两实例并发、各自会话/用量互不串、仓库默认台账未变、无脏目录、A 答「甲」B 答「乙」）；`MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-session-resume.sh`（两轮 sessionId 相同、会话目录数不变、插件在位、第二轮答出第一轮让它记的词）；`MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-mode.sh`（同插件：默认 `工具 53/命令 10` vs `PI_AGENT_MODE=minimal` `工具 0/命令 1`） | pi 式"运行中热切换 + 自动重启续接"在 DSH 无落点（要靠客户端/Host 重做）；pi 式"切换前否决"同样无落点 —— 均已如实记录，非待办 |
