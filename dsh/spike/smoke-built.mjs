@@ -53,13 +53,13 @@ const okName = name === 'my-pi';
 const okInject = Array.isArray(inject) && inject.includes('tools');
 const okTools = registered.length >= 20;
 const okNoFail = failures.length === 0;
-const hasWebSearch = registered.includes('web_search');
+const hasWebSearch = registered.includes('searxng');
 
 console.log('=== 构建产物冒烟（纯 node，无 tsx）===');
 console.log(`${okName ? '✓' : '❌'} 插件名 = ${name}`);
 console.log(`${okInject ? '✓' : '❌'} inject = ${JSON.stringify(inject)}`);
 console.log(`${okTools ? '✓' : '❌'} 注册工具 ${registered.length} 个（前 6：${registered.slice(0, 6).join(', ')}）`);
-console.log(`${hasWebSearch ? '✓' : '❌'} 含真实特性工具 web_search = ${hasWebSearch}`);
+console.log(`${hasWebSearch ? '✓' : '❌'} 含真实特性工具 searxng = ${hasWebSearch}`);
 console.log(`${okNoFail ? '✓' : '❌'} 特性注册失败 ${failures.length} 个${failures.length ? ' ⇒ ' + failures.join(' | ') : ''}`);
 console.log(`${okNoStray ? '✓' : '❌'} 未产生脏目录 dsh/portable（根目录解析被显式钉住）`);
 facade.dispose();

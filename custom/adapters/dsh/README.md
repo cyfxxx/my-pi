@@ -39,7 +39,7 @@ features/**  ──registerTool(pi, internalDef)──▶  custom/adapters/tool-
 
 外观层坐在 **pi 原来的位置**上 ⇒ 它拿到的是 **pi 形状**。第一版按内部形状解析，
 把 TypeBox 根 schema 的 `type/properties/required/additionalProperties` 当成四个参数，
-真实 spike 立刻报 `tool "web_search" returned invalid output: value is not lossless JSON`。
+真实 spike 立刻报 `tool "web_search" returned invalid output: value is not lossless JSON`（该工具 2026-10-18 已改名 `searxng`）。
 ⇒ 现在 `tool.ts` 明确以 pi 形状为输入，并在文件头写清了这条。
 
 ## 未迁移 / 无等价物（**显式**，不静默）
@@ -66,10 +66,10 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 19 条检查（A1–A19）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 20 条检查（A1–A20）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）、**会话枚举**（A16）、**流帧翻译**（A17）、**按插件装载产物**（A18）、**注册定义是编译产物**（A19）。
-实测结果：**19 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）、**会话枚举**（A16）、**流帧翻译**（A17）、**按插件装载产物**（A18）、**注册定义是编译产物**（A19）、**回合用量桥 + 兄弟子 ctx 可见性**（A20）。
+实测结果：**20 通过 / 0 失败 / 0 跳过**（A7 真实 `searxng` 打出结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
 **7 直接 / 11 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
@@ -106,7 +106,7 @@ DSH 的 `SessionHeader` 只有 `id`/`createdAt`/`cwd`，**没有会话文件路�
 
 | 特性 | DSH 侧工具数 | 工具名 |
 |---|---|---|
-| web-search | 2 | `web_search` `fetch_url` |
+| web-search | 2 | `searxng`（2026-10-18 由 `web_search` 改名） `fetch_url` |
 | context | 3 | `edit_and_run` `session_title` `thinking_level` |
 | memory | 8 | `memory_store/search/stats/forget` + `ctx_note/list/snap/exec` |
 | plan-mode | 4 | `ask_user` `plan_enter` `plan_exit` `todo` |
@@ -271,8 +271,18 @@ MY_PI_DSH_TRACE_EVENTS=1 …   # 每收到一条会话事件打一行；turn/end
 
 ## ★ 同名冲突必须**就地隔离**（Host 冒烟实测：冒泡会连带丢注册）
 
-DSH 原生占用了 `web_search`（工具）、`subagent`（工具）、`plan`（命令）。DSH 对同名注册**抛错**，
-而那个错如果冒泡，会被 `registerAll` 的"每特性 try/catch"接住 ⇒ **该特性排在冲突之后的注册全部被跳过**：
+DSH 原生占用了工具名与命令名。DSH 对同名注册**抛错**，而那个错如果冒泡，会被 `registerAll` 的
+"每特性 try/catch"接住 ⇒ **该特性排在冲突之后的注册全部被跳过**：
+
+**当前状态（2026-10-18 决策后）**：冲突只剩 **2 个** —— 工具 `subagent`（让位宿主）与命令 `plan`
+（让位宿主的 `/plan`）；原先第 3 个 `web_search` 已**改名 `searxng`**（宿主那个是 DeepSeek 后端、
+需 key，本仓这个是自建后端、免 key，能力不同必须并存）。决策见
+[`../../../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md`](../../../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md)。
+
+★ 让位**不写死名单**：仍靠"宿主注册表抛同名错 ⇒ 就地跳过并点名上报"，这样宿主哪天不再提供同名工具，
+我们的注册会**自动生效**，不会因名单过期而静默少能力。
+
+下表是**修前**的连带损失（保留现场，说明"为什么必须就地隔离"）：
 
 | 特性 | 连带损失（修前实测） |
 |---|---|

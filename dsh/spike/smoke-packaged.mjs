@@ -51,7 +51,7 @@ const checks = [
   ['导出 apply 为函数', typeof mod.apply === 'function'],
   ['inject 含 tools', Array.isArray(mod.inject) && mod.inject.includes('tools')],
   [`注册工具 ≥ 50（实际 ${registered.length}）`, registered.length >= 50],
-  ['含真实特性工具 web_search', registered.includes('web_search')],
+  ['含真实特性工具 searxng', registered.includes('searxng')],
   [`特性注册失败 0 个（实际 ${failures.length}）`, failures.length === 0],
   ['工具清单可枚举（schemas 映射）', facade.api.getAllTools().length === registered.length],
 ];

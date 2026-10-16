@@ -3,7 +3,7 @@
 #
 # 背景/注意（原项目经验）：默认 SearXNG 会启用一批被 GFW 封锁的引擎（google/duckduckgo/
 # brave/wikipedia/wikidata…），它们在本机网络下全部 timeout，且阻塞整次搜索直到超时，
-# 表现为 web_search 返回空结果或超时。因此必须显式把不可达引擎 disabled，并把 bing 的
+# 表现为 searxng 工具返回空结果或超时。因此必须显式把不可达引擎 disabled，并把 bing 的
 # base_url 指向 https://cn.bing.com。
 #
 # 用法:

@@ -35,7 +35,7 @@ const EXT_TOOLS = [
   'autopilot_status', 'autopilot_stats', 'autopilot_failover', 'autopilot_policy',
   'schedule_task', 'verify_report', 'verify_config', 'verify_test',
   'admin_status', 'admin_restart', 'admin_list_sessions', 'admin_switch_session',
-  'web_search', 'fetch_url', 'web_fetch',
+  'searxng', 'fetch_url', 'web_fetch',
 ];
 
 /** 扩展提供的斜杠命令 */

@@ -154,14 +154,14 @@ async function main(): Promise<void> {
 
   // ── A6/A7：真实特性经外观层注册（web-search 只用 tool-adapter，不碰 pi 运行时包）──
   registerWebSearch(facade.api as never);
-  const wsRegistered = typeof tools.get('web_search') === 'object' && typeof tools.get('fetch_url') === 'object';
-  record('A6', wsRegistered, `web_search=${typeof tools.get('web_search')} fetch_url=${typeof tools.get('fetch_url')}`);
+  const wsRegistered = typeof tools.get('searxng') === 'object' && typeof tools.get('fetch_url') === 'object';
+  record('A6', wsRegistered, `searxng=${typeof tools.get('searxng')} fetch_url=${typeof tools.get('fetch_url')}`);
 
   let a7: Check = { id: 'A7', ok: 'skip', detail: '未执行（前置未满足）' };
   if (wsRegistered) {
     const search = await tools.execute({
       callId: 'spike-4',
-      name: 'web_search',
+      name: 'searxng',
       arguments: { query: 'deepseek harness', maxResults: 3 },
       signal: new AbortController().signal,
     });
@@ -218,7 +218,7 @@ async function main(): Promise<void> {
       // 工具清单：ToolRuntime.schemas() 映射（2026-10-17 新增）——全量注册后应能看到全部工具名
       const listed = bootFacade.api.getAllTools();
       const active = bootFacade.api.getActiveTools();
-      const listOk = listed.length === names.length && listed.includes('web_search') && active.length === listed.length;
+      const listOk = listed.length === names.length && listed.includes('searxng') && active.length === listed.length;
       a9 = {
         id: 'A9',
         ok: failures.length === 0 && names.length > 20 && unsupported === 0 && compactOk && listOk,

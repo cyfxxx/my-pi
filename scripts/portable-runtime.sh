@@ -16,7 +16,7 @@
 #   bash scripts/portable-runtime.sh python          # 装便携 CPython
 #   bash scripts/portable-runtime.sh deps [profile…] # 装 pack 依赖到仓内站点目录
 #   bash scripts/portable-runtime.sh env             # 打印 eval 用的环境（不安装）
-#   bash scripts/portable-runtime.sh searxng         # 把 SearXNG 源码+依赖装进仓库（web_search 后端）
+#   bash scripts/portable-runtime.sh searxng         # 把 SearXNG 源码+依赖装进仓库（searxng 工具后端）
 #   bash scripts/portable-runtime.sh repair          # 从已校验缓存重解包运行时（符号链接被污染时自愈）
 #   bash scripts/portable-runtime.sh verify          # 自证：版本/落点/导入/无仓外写入
 #   bash scripts/portable-runtime.sh all             # node + python + 默认依赖
@@ -340,7 +340,7 @@ EOF
 }
 
 # ── SearXNG：源码 + 它自己的 Python 依赖都装进仓库 ───────────────────────────
-# 为什么源码也要进仓库：`web_search` 依赖本地 SearXNG；若它装在 /opt 或系统 python
+# 为什么源码也要进仓库：`searxng` 工具依赖本地 SearXNG；若它装在 /opt 或系统 python
 # 里，换机器/换路径就没了——正是用户要求消除的"分散"。这里把
 #   ext/searxng/src   源码（commit 内容地址 + sha256 双重锚定）
 #   ext/searxng/site  它自己的依赖（pip --target，纯数据、可搬迁）
@@ -386,7 +386,7 @@ cmd_searxng() {
   fi
   ok "SearXNG 已装入仓库：$ext"
   info "启动：bash scripts/setup-external.sh searxng     停止：bash scripts/setup-external.sh searxng-stop"
-  info "自检：bash scripts/setup-external.sh status（web_search 默认打 http://127.0.0.1:8889）"
+  info "自检：bash scripts/setup-external.sh status（searxng 工具默认打 http://127.0.0.1:8889）"
   return 0
 }
 

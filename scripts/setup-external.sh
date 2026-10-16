@@ -91,7 +91,7 @@ setup_age() {
   info "私钥仍在仓外（默认 ~/.config/my-pi/age.key）——这是刻意的，别搬进仓库"
 }
 
-# ── SearXNG（web_search 的本地后端）──────────────────────────────────────────
+# ── SearXNG（searxng 工具的本地后端）─────────────────────────────────────────
 # 默认位置：<repo>/runtime/<平台>/ext/searxng（源码 + 依赖 + settings + 日志 + pid），
 # 一律**仓内**；`SEARXNG_HOME` 仍可覆盖（兼容旧布局 /opt/searxng）。
 SEARXNG_HOME="${SEARXNG_HOME:-$(pi_ext_dir searxng)}"
@@ -214,7 +214,7 @@ status() {
   else
     warn "SearXNG 未装入仓库（bash scripts/portable-runtime.sh searxng）"
   fi
-  searxng_running && ok "SearXNG 运行中（127.0.0.1:$SEARXNG_PORT）" || warn "SearXNG 未运行（web_search 将降级为 HTTP fallback；bash scripts/setup-external.sh searxng）"
+  searxng_running && ok "SearXNG 运行中（127.0.0.1:$SEARXNG_PORT）" || warn "SearXNG 未运行（searxng 工具将降级为 HTTP fallback；bash scripts/setup-external.sh searxng）"
   curl -s --max-time 3 http://127.0.0.1:18766/health >/dev/null 2>&1 && ok "whisper 运行中（127.0.0.1:18766）" || warn "whisper 未运行（voice 转写不可用）"
   # 一键体检里也带上"便携性"结论（node/python 是否已在仓内）
   pi_portable_status | sed 's/^/  | /'
@@ -227,7 +227,7 @@ setup_web() {
   warn "还没把 SearXNG 装进仓库，提供便携部署路径（需网络）"
   info "1) bash scripts/portable-runtime.sh searxng     # 源码+依赖 → runtime/<平台>/ext/searxng"
   info "2) bash scripts/setup-external.sh searxng       # 启动（127.0.0.1:8889）"
-  info "3) bash scripts/setup-external.sh status        # 自检；web_search 默认就用这个地址"
+  info "3) bash scripts/setup-external.sh status        # 自检；searxng 工具默认就用这个地址"
 }
 
 case "${1:-status}" in

@@ -79,18 +79,44 @@
   （检索面：`dsh-plan-mode/lib/index.js` 全文仅 `:181`（命令）与 `:232`（`exit_plan_mode`）两处注册；
   `dsh-tool-plan-mode` **包不存在**；`dsh-client-shortcuts/lib/client.js` 无 `plan`）。
 
-## 6. 待决策（**未决**，不擅自定）
+## 6. 决策（**2026-10-18 已定**）
 
-三个选项见 `DSH-MIGRATION-PLAN.md` 实测 #18-u。基于本文证据的**倾向**（尚待确认）：
+| 能力 | 决策 | 落地 | 依据 |
+|---|---|---|---|
+| `web_search` | **保留 my-pi 版，改名 `searxng`** | `custom/features/web-search/index.ts` 的 `name`；注册面基线（`scripts/registration-baseline.json`）、工具声明面基线、spike A6/A7、产物冒烟、`scripts/check-seeds-headless.mjs`、`portable/agent/AGENTS.md` 与 3 个脚本里的工具名同步改名。**真 Host 复验**：`tool/call name=searxng arguments={"query":"deepseek harness","maxResults":5}`（DSH 会话日志），结果内容即本工具的降级输出 ⇒ 模型可见且可执行；冲突从 3 个降为 2 个 | §1：DSH 覆盖不了"无 key / 自建后端 / 模型可控条数" |
+| `subagent` | **让位 DSH 原生** | 不写死让位名单：仍靠"宿主注册表抛同名错 ⇒ 就地跳过并点名上报"这条机制（**万一宿主不再提供，我们的注册自动生效**，不会因名单过期而静默少能力）；my-pi 独有的 5 项见 §7 | §2：fork/steer/取消/列出等价或更强；my-pi 那套是跨运行时 spawn pi 且 fork 已降级 |
+| `plan` | **DSH 的 `/plan` 管入口 + 保留 my-pi 的护栏与工具** | `plan` 命令命中同名后跳过（预期）；`plan_enter`/`plan_exit` 与 `tool_call` 只读护栏**不在冲突范围**、照常注册；命令面与落盘见 §7 | §3：强制语义是最实在的能力，且它不在冲突范围内 |
 
-| 能力 | 倾向 | 依据 |
-|---|---|---|
-| `web_search` | **保留 my-pi 版**（改前缀名或挂 per-agent） | §1：DSH 覆盖不了"无 key / 自建后端 / 模型可控条数" |
-| `subagent` | **让位 DSH 原生**，5 项独有登记为待重设计 | §2：fork/steer/取消/列出等价或更强；my-pi 那套是跨运行时 spawn pi 且 fork 已降级 |
-| `plan` | **DSH 的 `/plan` 管入口 + 保留 my-pi 的护栏与工具**；命令面与落盘登记为待重设计 | §3：强制语义是最实在的能力，且它不在冲突范围内 |
+**改名的两点刻意取舍**：
+
+- **描述不加长**：`searxng` 的 `description` 保持原文（`搜索网络并返回结果列表`）⇒ 工具声明面总字节
+  **25,761 → 25,758 B（降 3 B）**，没有抬被守门盯着的预算（纪律："不擅自抬预算"）。
+  后端细节写在仓库的 `portable/agent/AGENTS.md`，不占每次请求都要付的声明面。
+- **残留影响（如实登记）**：`packs/` 里若仍有"用 `web_search`"的表述（vendored 外部技能包，**不改上游内容**），
+  改名后这类指令会落到**宿主的 `web_search`**（DeepSeek 后端，需凭据）上 —— 语义仍成立，但后端不同。
+  检索面：`grep -rn "web_search" packs/`。
+
+## 7. 待重设计项（登记，**不静默丢**）
+
+让位/改名的代价逐条登记如下。每项都是"my-pi 有、宿主没有"，需要重设计才能回到 DSH 上。
+
+| ID | 项 | 来源 | 现状 | 备注 |
+|---|---|---|---|---|
+| DR-1 | `subagent` 的 `chain` 模式（`{previous}` 串接） | §2 | 宿主无模式参数，并行靠多次调用 | 可在 my-pi 侧实现为"多步编排 + 复用宿主 `subagent`" |
+| DR-2 | 目录扫描式 agent 定义（md + frontmatter，scout/worker/reviewer） | §2 | 宿主是 YAML 组合配置 | 可保留发现逻辑、把结果映射成宿主的 agent 配置 |
+| DR-3 | 逐任务 `cwd` | §2 | 宿主无该参数 | 需宿主支持或改用"任务里显式 cd" |
+| DR-4 | 进程外投递 CLI（`scripts/subagent-inbox.mjs`） | §2 | 宿主只有模型侧 `send_message` | 可用宿主 adapter 的投递接口重做 |
+| DR-5 | Termux 并发降级（8→2） | §2 | 宿主固定默认 8 | 移动端内存约束需另想办法 |
+| DR-6 | `plan` 命令面（`resume`/`todos`/`plans`/`clear`/`help`） | §3 | 宿主 `/plan` 只接受 `[off\|message]` | 可另起命令名（如 `/mypi-plan`）或挂到宿主命令的扩展点 |
+| DR-7 | 计划任务状态机 + `plan-<ts>/plan.md` 落盘/恢复 | §3 | 宿主只存 mode 位，正文仅在 `exit_plan_mode` 参数里 | 可继续用 my-pi 自己的落盘（与宿主 mode 位并存） |
+
+**另记一处当前的可用性瑕疵**（不是让位造成，但改名/让位后会更容易被注意到）：my-pi 的只读护栏在拒绝时
+提示"使用 `/plan exit` 退出"（`custom/features/plan-mode/index.ts` 的 block reason）。在 pi 底座上这句是对的
+（`/plan exit` 就是 my-pi 的命令）；在 DSH 上 `/plan` 已被宿主占用、语义还是**建议式**的 ⇒ 这句提示会**指错**。
+模型仍可用 `plan_exit` 工具退出，故只记为瑕疵、未改 feature 文案（改它会同时改变 pi 侧行为）。
 
 ## 相关
 
-- 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v
+- 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v；决策记录 #18-x
 - 事件级对应：[`DSH-HOOK-MAPPING.md`](DSH-HOOK-MAPPING.md)
 - 事故复盘（同名冲突冒泡连带丢注册）：[`../BUG-REPLAYS.md`](../BUG-REPLAYS.md) #41

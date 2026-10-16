@@ -137,6 +137,7 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 |---|---|---|
 | 插件加载 / 钩子触发 | 默认 prompt | 退出码 0、插件日志 28 行、模型回「收到」 |
 | **工具调用**路径（模型→注册表→特性处理器→模型） | `MY_PI_HOST_PROMPT="请调用 memory_stats 工具…"` | DSH 会话日志 `tool/call name=memory_stats`、`tool/result` 内容正是 my-pi 的输出，模型据此作答（128 行插件日志） |
+| **改名后的 `searxng`**（模型可见性 + 可执行） | `MY_PI_HOST_PROMPT="请调用 searxng 工具搜索…"` | `tool/call name=searxng arguments={"query":"deepseek harness","maxResults":5}`；结果即本工具的 SearXNG 降级输出 |
 | **回合用量**路径（`assistant/message.usage` → pi `turn_end`） | 加 `MY_PI_DSH_TRACE_EVENTS=1 PI_USAGE_DIAG_FILE=/tmp/x.jsonl` | 三条桥接全部 `用量补丁=yes`；未被改动的特性写出 `{"input":213,"cacheRead":10368,"output":2,"total":10583}`（见实测 #18-v） |
 | 会话事件**到没到**（静默失效排查） | `MY_PI_DSH_TRACE_EVENTS=1` | 每收到一条会话事件打一行 ⇒ 区分"没到 / 到了没识别 / 识别了没处理器" |
 
@@ -146,11 +147,11 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 ### 真 Host 实测的"注册汇总"（`MY_PI_DSH_TRACE_EVENTS=1`）
 
 ```
-[my-pi-dsh] trace 注册汇总：工具 52 个、命令 9 个；同名冲突跳过 3 个
-             （工具:web_search, 命令:plan, 工具:subagent）；钩子 18 个（…）
+[my-pi-dsh] trace 注册汇总：工具 53 个、命令 9 个；同名冲突跳过 2 个
+             （命令:plan, 工具:subagent）；钩子 18 个（…）
 ```
 
-★ 这一行是**必需**的，不是锦上添花：DSH 原生占用了 `web_search` / `subagent` / `plan` 三个名字，
+★ 这一行是**必需**的，不是锦上添花：DSH 原生占用了工具 `subagent` 与命令 `plan`（原先还有工具 `web_search`，已于 2026-10-18 **改名 `searxng`** 以保留自家后端），
 而"同名冲突"原先会**冒泡**，被 `registerAll` 的"每特性 try/catch"接住 ⇒ **该特性排在后面的注册
 全部被跳过**（实测：`web-search` 丢了 `fetch_url`，`subagent`/`plan-mode` 丢了钩子 —— 而 plan-mode
 的只读护栏很可能就在钩子里，从工具数量上看不出来）。现在冲突**就地隔离**（只跳过冲突项并点名上报），
@@ -164,5 +165,8 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 `readonly DshDisposer[]` 冲突），而那两行**每次插件启动都要跑**。spike.ts 刻意**不**纳入：它是类型探针，
 故意往真实 API 传裸值，补一堆 `as` 换不到安全性。
 
-✗ 待产品决策：Host 里 **3 个特性与 DSH 原生同名**（`web_search` / `plan` 命令 / `subagent`）注册失败，
-需在"让位 DSH 原生 / 改 my-pi 前缀 / 挂 per-agent"之间选一个。
+✓ **同名冲突已决策（2026-10-18）**：工具 `subagent` 让位宿主、命令 `plan` 让位宿主的 `/plan`（但 my-pi 的
+只读护栏钩子与 `plan_enter`/`plan_exit` **保留**）、工具 `web_search` 改名 `searxng` 保留。让位的代价
+（chain、目录扫描式 agent 定义、逐任务 `cwd`、进程外投递、Termux 并发降级、plan 命令面与落盘）
+逐条登记为 **DR-1…DR-7**，见
+[`../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md`](../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md) §6/§7。

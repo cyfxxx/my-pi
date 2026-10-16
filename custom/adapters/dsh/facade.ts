@@ -95,7 +95,7 @@ export interface RegistrationSummary {
   /** 成功注册进 DSH 的命令名（规范化后、按注册顺序） */
   readonly commands: readonly string[];
   /**
-   * 因**同名冲突**被跳过的名字（`工具:web_search` / `命令:plan` 形式）。
+   * 因**同名冲突**被跳过的名字（`工具:subagent` / `命令:plan` 形式）。
    * 为什么单独记：DSH 原生已占用这些名字，而"跳过"必须是**可见**的（不然就是静默少能力）。
    */
   readonly skippedDuplicates: readonly string[];
@@ -307,13 +307,26 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       // ★ 同名冲突（DSH 原生已占用）**不能**让它冒泡：冒泡会被 registerAll 的"每特性 try/catch"抓住，
       //   于是该特性**排在后面的**注册**全部被跳过**。2026-10-18 Host 冒烟实测的连带损失：
       //   `web-search` 因此丢了 `fetch_url`、`subagent` 与 `plan-mode` 因此丢了各自的钩子
-      //   （plan-mode 的钩子很可能就是只读护栏）⇒ 冲突的影响面远大于"少一个同名工具"。
+      //   （plan-mode 的钩子就是只读护栏）⇒ 冲突的影响面远大于"少一个同名工具"。
       //   这里只跳过**这一个**，并把冲突如实点名上报（不静默）。
+      //
+      // ★★ 处置策略（2026-10-18 **已决策**，依据 docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md）：
+      //   - 工具 `subagent`：**让位** DSH 原生（宿主的是同进程 spawn/fork + steer/cancel/list，
+      //     我们那套是跨运行时 spawn pi 且 fork 在 DSH 上已降级）⇒ 命中这里被跳过是**预期行为**；
+      //     被让位后 my-pi 独有的 5 项（chain、目录扫描式 agent 定义、逐任务 cwd、进程外投递、
+      //     Termux 并发降级）已在审计文档登记为**待重设计**，不静默丢。
+      //   - 命令 `plan`：**让位** DSH 的 `/plan`（入口层），但保留 my-pi 的只读护栏钩子与
+      //     `plan_enter`/`plan_exit`（它们不在冲突范围内）⇒ 强制语义不丢。
+      //   - 工具 `web_search`：**不让位**——宿主那个是 DeepSeek 后端（需 key），我们的是自建后端
+      //     （免 key、可降级），能力不同 ⇒ 已在 2026-10-18 **改名 `searxng`**，从此不再命中这里。
+      //   ★ 机制上刻意保留"靠注册表抛错来发现冲突"（而不是写死一份让位名单）：这样**万一宿主
+      //     不再提供同名工具，我们的注册会自动生效**，不会因为名单过期而静默少能力。
       skippedDuplicates.push(`工具:${definition.name}`);
       report(
         `registerTool.duplicate:${definition.name}`,
         `工具 "${definition.name}" 注册失败：${error instanceof Error ? error.message : String(error)}`
-          + ' ⇒ 只跳过这一个（其余注册继续）；DSH 原生同名工具优先，要保留 my-pi 版本需改名或挂 per-agent',
+          + ' ⇒ 只跳过这一个（其余注册继续）；这正是"宿主同名工具优先"的预期路径'
+          + '（策略与待重设计项见 docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md）',
       );
     }
   };
@@ -520,7 +533,8 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       report(
         `registerCommand.duplicate:${normalized}`,
         `命令 "${normalized}" 注册失败：${error instanceof Error ? error.message : String(error)}`
-          + ' ⇒ 只跳过这一个（其余注册继续）；DSH 原生同名命令优先',
+          + ' ⇒ 只跳过这一个（其余注册继续）；这正是"宿主同名命令优先"的预期路径'
+          + '（`plan` 让位 DSH 的 `/plan`；my-pi 的护栏钩子与 plan_enter/plan_exit 不受影响）',
       );
     }
   };

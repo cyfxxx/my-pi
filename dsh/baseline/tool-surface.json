@@ -6,8 +6,8 @@
     "cordis": "4.0.4"
   },
   "toolCount": 54,
-  "totalBytes": 25761,
-  "sha256": "7458f198ca81a59f1cec3ec3f05caceda50e29c3779964ab22f3dae78a95004b",
+  "totalBytes": 25758,
+  "sha256": "1887029c73f87a054b4c674d8d479995453439ecf19f5a5b811160059a42a329",
   "perTool": {
     "admin_get_config": 279,
     "admin_list_models": 156,
@@ -52,6 +52,7 @@
     "plan_enter": 215,
     "plan_exit": 249,
     "schedule_task": 1426,
+    "searxng": 267,
     "session_title": 469,
     "subagent": 1860,
     "thinking_level": 642,
@@ -61,7 +62,6 @@
     "tmux_status": 300,
     "tmux_stop": 317,
     "tmux_wait": 629,
-    "todo": 1003,
-    "web_search": 270
+    "todo": 1003
   }
 }

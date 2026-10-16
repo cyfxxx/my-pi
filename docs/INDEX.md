@@ -535,7 +535,7 @@
 - `docs/BUG-REPLAYS.md` · #40 **"取走即销毁"的共享状态被多个订阅者消费 ⇒ 只有第一个拿到，其余静默拿空**（DSH 换基座时抓到的真事故）：`turn_end` 这类 pi 事件会被**多个特性**注册（本仓 3 个），而适配层是"每个 pi 事件注册 ⇒ · 真 Host 打开 `MY_PI_DSH_TRACE_EVENTS=1` 一眼可见：`用量补丁=yes(calls=1)` 之后紧跟着**两条** `用量补丁=no`；而 `portable/memory/context/.usage-di · 数字: 1.66 天 / 3 个 · 证据: npx vitest run custom/adapters/dsh/__tests__/usage-accumulator.test.ts
 - `docs/BUG-REPLAYS.md` · #41 **上游"注册冲突"错误冒泡 ⇒ 连带丢掉该特性后面的一切注册**（DSH 换基座实录）：真 Host 里 my-pi 的 3 个名字与 DSH 原生撞车（`web_search`/`subagent` 工具、`plan` 命令）。 · 修前：`grep -c "注册功能失败" /tmp/dsh-host-run.log` = 3，且注册汇总缺失（根本无从知道少了什么）。修后真 Host：`⚠️ 注册功能失败` **0 条**，改为 3 条点名上报 `registerToo · 数字: 0 条 / 3 条 / 52 个 / 9 个
 
-## 设计文档（216 条）
+## 设计文档（217 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -578,8 +578,9 @@
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 3. `plan`：DSH 只管"入口"，**完全不管强制** · ★ **关键区分（别混为一谈）**：让位只跳过 `plan` **命令**。`plan_enter`/`plan_exit` 工具与那条 · 数字: 18 个
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 4. 汇总：三块全部让位时会真正丢失什么 · - **`web_search`**：① 无 key/自建 SearXNG 端点；② 免配置 Bing 降级；③ 模型可控 `maxResults`；④ `max_length`。
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 5. 明确的"未查到"清单（附检索面） · - DSH：搜索的**时间范围过滤 / 分页 / cookie**（检索面：`dsh-tool-web`、`dsh-web` 的 schema 与
-- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 6. 待决策（**未决**，不擅自定） · 三个选项见 `DSH-MIGRATION-PLAN.md` 实测 #18-u。基于本文证据的**倾向**（尚待确认）：
-- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 相关 · - 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](design/DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 6. 决策（**2026-10-18 已定**） · **改名的两点刻意取舍**： · 数字: 3 个 / 2 个 / 758 B / 3 B
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 7. 待重设计项（登记，**不静默丢**） · 让位/改名的代价逐条登记如下。每项都是"my-pi 有、宿主没有"，需要重设计才能回到 DSH 上。
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 相关 · - 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](design/DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v；决策记录 #18-x
 - `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 1. 第一步：my-pi 的钩子归类（实测，非估算） · grep 命令（可复跑）： · 数字: 55 个 / 53 个 / 2 个 / 18 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 2. 第二步：DSH 实际声明的事件（附行号） · DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不在 my-pi 的 `node_modules`**）。 · 数字: 105 个 / 41 个 / 59 个 / 2 条 · 证据: 1e7f6d9597241db0
@@ -591,10 +592,10 @@
 - `docs/design/DSH-HOOK-MAPPING.md` · 8. 复核二：追 `CompactionEngine` 的调用者（补齐第 4 节第 2 条的残留缺口） · **结论：缺口②已被回答 —— 存在「每次压缩前必然触发」的服务级点** ✓； · 数字: 1 条
 - `docs/design/DSH-HOOK-MAPPING.md` · 7.4 复核三：`schedule` 是否依赖交互客户端（**已核实 ✓**） · **问题**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：无头会话只做种子对账、不启调度器 ✗） · 数字: 289 个 / 3011 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
-- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒 / 18 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · '**真 Host 复验（改名后）**：`工具 53 个、命令 9 个；同名冲突跳过 2 个（命令:plan, 工具:subagent）；钩子 18 个`、' · 数字: 57 个 / 12 MB / 25 秒 / 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 2. 迁移面（本仓实测口径） · ### 2.1 四个原语与 DSH 的对应（登记表） · 数字: 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗； · 数字: 18 个 / 100% / 36 条 / 761 B · 证据: npx vitest run custom/adapters/dsh
-- `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个 / 52 个 / 2 个 / 761 B · 证据: bash scripts/dsh-baseline.sh --tools / bash scripts/dsh-baseline.sh --prompt
+- `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个 / 53 个 / 758 B / 19 个 · 证据: bash scripts/dsh-baseline.sh --tools / bash scripts/dsh-baseline.sh --prompt
 - `docs/design/DSH-MIGRATION-PLAN.md` · 5. 未核实（✗，本轮开工时如实登记） · 1. ~~`@deepseek-ai/dsh-commands` 的命令契约**未读**~~ **已补读并实测（2026-10-16）**： · 数字: 223 个
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ② 分材料明细 · ### 2.1 WikiSkill（arXiv:2608.27454） · 数字: 48.7% / 63.7% / 15.0% / 60.9%

@@ -24,7 +24,8 @@
  * 若按"内部形状"去解析（本文件的第一版就是这么写的 ✗），TypeBox 根 schema 的
  * `type/properties/required/additionalProperties` 会被当成**四个参数**，
  * 而且 `execute` 的实参全错位——真实 spike 当场暴露为：
- * `tool "web_search" returned invalid output: value is not lossless JSON`。
+ * `tool "web_search" returned invalid output: value is not lossless JSON`
+ *　（该工具 2026-10-18 已改名 `searxng`；此处保留当时的报错原文）。
  * ⇒ 结论：**外观层必须消费 pi 形状**；这条写进 `DSH-MIGRATION-PLAN.md` 的实测补充。
  *
  * ## 输出：通用合成（评估阶段高估的那一条被实测推翻）

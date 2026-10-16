@@ -679,19 +679,20 @@ describe('同名冲突必须**就地隔离**（Host 冒烟实测：冒泡会连�
   it('★ 一个工具同名冲突 ⇒ 只跳过它，**后面注册的工具照常进注册表**', () => {
     const fake = makeFakeDsh();
     const reports: string[] = [];
-    makeDuplicateAt(fake, ['web_search']);
+    // 用**真实施策里会让位**的那个名字（`subagent`）：DSH 底座上宿主自带同名工具
+    makeDuplicateAt(fake, ['subagent']);
     const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
-    // 模拟 web-search 特性真实的注册顺序：web_search（冲突）→ fetch_url（必须仍然注册成功）
-    facade.api.registerTool({ ...samplePiTool(), name: 'web_search' } as never);
+    // 模拟 subagent 特性真实的注册顺序：subagent（冲突、让位）→ 后面的注册必须照常成功
+    facade.api.registerTool({ ...samplePiTool(), name: 'subagent' } as never);
     facade.api.registerTool({ ...samplePiTool(), name: 'fetch_url' } as never);
     expect(fake.tools.map((t) => t.name)).toEqual(['fetch_url']);
     // 冲突必须点名上报（不静默）
-    expect(reports.some((r) => r.startsWith('registerTool.duplicate:web_search') && r.includes('already registered'))).toBe(true);
+    expect(reports.some((r) => r.startsWith('registerTool.duplicate:subagent') && r.includes('already registered'))).toBe(true);
     // 注册汇总必须可量（真 Host 上就靠这行核对"到底少了什么"）
     expect(facade.registrationSummary()).toEqual({
       tools: ['fetch_url'],
       commands: [],
-      skippedDuplicates: ['工具:web_search'],
+      skippedDuplicates: ['工具:subagent'],
       hooks: [],
     });
   });
@@ -729,13 +730,13 @@ describe('工具清单与会话名（2026-10-17 新增落点）', () => {
   it('getActiveTools/getAllTools 落到 ctx.tools.schemas()（状态 degraded，不再报 unsupported）', () => {
     const fake = makeFakeDsh();
     (fake.ctx.tools as { schemas?: () => Array<{ name: string }> }).schemas = () => [
-      { name: 'web_search' },
+      { name: 'searxng' },
       { name: 'fetch_url' },
       { name: 'subagent' },
     ];
     const facade = createDshExtensionApi(fake.ctx);
-    expect(facade.api.getActiveTools()).toEqual(['web_search', 'fetch_url', 'subagent']);
-    expect(facade.api.getAllTools()).toEqual(['web_search', 'fetch_url', 'subagent']);
+    expect(facade.api.getActiveTools()).toEqual(['searxng', 'fetch_url', 'subagent']);
+    expect(facade.api.getAllTools()).toEqual(['searxng', 'fetch_url', 'subagent']);
     expect(facade.surfaceReport().find((e) => e.member === 'getAllTools')?.status).toBe('degraded');
   });
 
