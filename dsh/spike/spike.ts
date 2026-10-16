@@ -35,6 +35,9 @@
  *      这类**只在真实 Host 里才炸**的问题（2026-10-18 Host 冒烟实测：未 inject 就访问 `ctx.tools` 会抛）
  *   A19 **注册结果必须是编译产物**：`ctx.tools.register()` 要的是 `defineTool(options)` 的结果；
  *      直接注册原始 spec 会让真实 provider 拒掉每个请求（Host 冒烟实测 `got 'type: null'`）
+ *   A21 **插件入口的配置通路 + 命令名重映射**：按真实装载路径（cordis loader + 第二参 `config`）
+ *      装载产物 ⇒ ① `config.facade.*` 真的送达 facade（原先摊在顶层会被**静默忽略**）；
+ *      ② 宿主同名命令被**换名注册**（`plan` → 指定名）而不是丢掉
  *   A20 **回合用量桥真跑**（真实 `SessionStore` + **兄弟子 ctx** 拓扑）：`assistant/message` 的用量应被
  *      累积并按回合**求和**，`turn/end` 时补进 pi 的 `turn_end` 负载；且**多个** `turn_end` 订阅
  *      （真 Host 有 3 个特性这么干）**每个**都要拿到同一份用量（"取走即清桶"会静默丢数据，见 #18-v）。
@@ -850,6 +853,56 @@ async function main(): Promise<void> {
     a20 = { id: 'A20', ok: 'skip', detail: `回合用量桥检查不可用：${(error as Error).message.slice(0, 110)}` };
   }
   checks.push(a20);
+
+  // ── A21：插件入口的**配置通路**与命令名重映射（守护"配置被静默忽略"这类失效）──────
+  //
+  // 为什么值得单独一条：`dsh/plugin/entry.ts` 原先把 facade 选项**摊在顶层**
+  // （`...(config.facade ?? {})`），而 `MyPiDshConfig` 只认 `compileTool`/`facade`/`features`
+  // ⇒ profile 里写的 `config.facade.*` 被**静默忽略**（只有 `compileTool` 侥幸命中）。
+  // 这条按**真实装载路径**（cordis loader + 第二参 config）装载产物，并把命令注册抓下来看名字，
+  // 同时验证：① 配置确实送达 facade；② 宿主同名命令被**换名注册**而不是丢掉。
+  let a21: Check = { id: 'A21', ok: false, detail: '未执行' };
+  try {
+    const pluginModule = (await import('../plugin/dist/my-pi-plugin.mjs')) as unknown as {
+      name?: string;
+      inject?: readonly string[];
+      apply?: (...args: readonly unknown[]) => unknown;
+    };
+    const commandsModule = (await import('@deepseek-ai/dsh-commands')) as unknown as {
+      default?: unknown;
+      CommandRuntime?: unknown;
+    };
+    const runtimePlugin = (commandsModule.default ?? commandsModule.CommandRuntime) as never;
+    const cmdCtx = new Context();
+    cmdCtx.plugin(SystemPrompt);
+    cmdCtx.plugin(ToolRuntime);
+    cmdCtx.plugin(runtimePlugin);
+    await tick(200);
+    const registeredCommands: string[] = [];
+    const cmdRegistry = cmdCtx.commands as unknown as { register: (d: { name: string }) => unknown };
+    const originalCmdRegister = cmdRegistry.register.bind(cmdCtx.commands);
+    cmdRegistry.register = (def) => {
+      registeredCommands.push(def.name);
+      return originalCmdRegister(def as never);
+    };
+    // ★ 与真实 profile 同路径：第二个参数就是条目里的 `config:`
+    cmdCtx.plugin({ name: pluginModule.name, inject: pluginModule.inject, apply: pluginModule.apply } as never, {
+      facade: { commandNameMap: { plan: 'spike-plan' } },
+    } as never);
+    await tick(400);
+    const hasMapped = registeredCommands.includes('spike-plan');
+    const hasOriginal = registeredCommands.includes('plan');
+    a21 = {
+      id: 'A21',
+      ok: hasMapped && !hasOriginal,
+      detail: `命令注册共 ${registeredCommands.length} 个（${registeredCommands.slice(0, 3).join(', ')}…）`
+        + `｜含 spike-plan=${hasMapped}（期望 true，证明 config.facade 真的送达并生效）`
+        + `｜含 plan=${hasOriginal}（期望 false，宿主已占用该名）`,
+    };
+  } catch (error) {
+    a21 = { id: 'A21', ok: 'skip', detail: `配置通路检查不可用：${(error as Error).message.slice(0, 110)}` };
+  }
+  checks.push(a21);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

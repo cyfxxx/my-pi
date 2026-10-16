@@ -578,7 +578,7 @@
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 3. `plan`：DSH 只管"入口"，**完全不管强制** · ★ **关键区分（别混为一谈）**：让位只跳过 `plan` **命令**。`plan_enter`/`plan_exit` 工具与那条 · 数字: 18 个
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 4. 汇总：三块全部让位时会真正丢失什么 · - **`web_search`**：① 无 key/自建 SearXNG 端点；② 免配置 Bing 降级；③ 模型可控 `maxResults`；④ `max_length`。
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 5. 明确的"未查到"清单（附检索面） · - DSH：搜索的**时间范围过滤 / 分页 / cookie**（检索面：`dsh-tool-web`、`dsh-web` 的 schema 与
-- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 6. 决策（**2026-10-18 已定**） · **改名的两点刻意取舍**： · 数字: 3 个 / 2 个 / 758 B / 3 B
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 6. 决策（**2026-10-18 已定**） · **命令名重映射（为什么只给命令做）**：工具名对**模型**可见，改名会改变模型行为 ⇒ 工具冲突只能 · 数字: 3 个 / 2 个 / 10 个 / 1 个
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 7. 待重设计项（登记，**不静默丢**） · 让位/改名的代价逐条登记如下。每项都是"my-pi 有、宿主没有"，需要重设计才能回到 DSH 上。
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 相关 · - 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](design/DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v；决策记录 #18-x
 - `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
@@ -592,7 +592,7 @@
 - `docs/design/DSH-HOOK-MAPPING.md` · 8. 复核二：追 `CompactionEngine` 的调用者（补齐第 4 节第 2 条的残留缺口） · **结论：缺口②已被回答 —— 存在「每次压缩前必然触发」的服务级点** ✓； · 数字: 1 条
 - `docs/design/DSH-HOOK-MAPPING.md` · 7.4 复核三：`schedule` 是否依赖交互客户端（**已核实 ✓**） · **问题**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：无头会话只做种子对账、不启调度器 ✗） · 数字: 289 个 / 3011 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
-- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · '**真 Host 复验（改名后）**：`工具 53 个、命令 9 个；同名冲突跳过 2 个（命令:plan, 工具:subagent）；钩子 18 个`、' · 数字: 57 个 / 12 MB / 25 秒 / 18 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒 / 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 2. 迁移面（本仓实测口径） · ### 2.1 四个原语与 DSH 的对应（登记表） · 数字: 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > P5 的完整 Host 在本机内存（约 1.8–2.5 GB 可用）与"不要打扰正在跑的 GUI"两条约束下**不轻率执行** ✗； · 数字: 18 个 / 100% / 36 条 / 761 B · 证据: npx vitest run custom/adapters/dsh
 - `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个 / 53 个 / 758 B / 19 个 · 证据: bash scripts/dsh-baseline.sh --tools / bash scripts/dsh-baseline.sh --prompt

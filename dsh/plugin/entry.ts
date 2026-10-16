@@ -66,7 +66,20 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
     // ★ 必须注入：`ctx.tools.register()` 要的是 `defineTool(options)` 的**编译产物**
     //   （spec → 模型侧 JSON Schema）；不注入会被真实 provider 拒掉每个请求。
     compileTool: defineTool as never,
-    ...(config.facade ?? {}),
+    // ★ facade 选项必须**嵌在 `facade:` 下**（`MyPiDshConfig` 的字段是 `compileTool` / `facade` / `features`）。
+    //   原先这里写的是 `...(config.facade ?? {})`（把 facade 选项摊在**顶层**）⇒ 部署方在 profile 里写的
+    //   `config.facade.*` 会被**静默忽略**（只有 `compileTool` 侥幸还能命中）。这是"配置看起来生效、实际没生效"
+    //   那类静默失效，2026-10-18 加 `commandNameMap` 时被 TS 当场拦下才发现。
+    facade: {
+      // 宿主已占用 `plan`（DSH 自己的建议式计划模式）⇒ 把 my-pi 的 `plan` 命令**换名注册**为 `mypi-plan`，
+      // 从而保住它的子命令面（enter/exit/resume/todos/plans/clear/help）与 `clear`/`resume` 那两条
+      // 计划落盘/续跑路径 —— 不靠改 feature（feature 不认识 DSH）。
+      // 工具**不**做这种重映射：工具名对模型可见，改名会改变模型行为，那是另一个决策
+      // （`web_search` 就是走 feature 侧改名 + 重过声明面基线，见 DSH-DUPLICATE-CAPABILITY-AUDIT.md）。
+      // 部署方可用 `config.facade.commandNameMap` 覆盖（展开顺序：默认在前、部署方在后）。
+      commandNameMap: { plan: 'mypi-plan' },
+      ...(config.facade ?? {}),
+    },
     features: [
       (api) => {
         bootstrap(api as Parameters<typeof bootstrap>[0]);
@@ -94,7 +107,8 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
   if (process.env.MY_PI_DSH_TRACE_EVENTS === '1') {
     const summary = facade.registrationSummary();
     console.log(
-      `[my-pi-dsh] trace 注册汇总：工具 ${summary.tools.length} 个、命令 ${summary.commands.length} 个；`
+      `[my-pi-dsh] trace 注册汇总：工具 ${summary.tools.length} 个、命令 ${summary.commands.length} 个`
+        + `（${summary.commands.join(', ')}）；`
         + `同名冲突跳过 ${summary.skippedDuplicates.length} 个`
         + `${summary.skippedDuplicates.length > 0 ? `（${summary.skippedDuplicates.join(', ')}）` : ''}；`
         + `钩子 ${summary.hooks.length} 个（${summary.hooks.join(', ')}）`,

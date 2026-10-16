@@ -147,8 +147,9 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 ### 真 Host 实测的"注册汇总"（`MY_PI_DSH_TRACE_EVENTS=1`）
 
 ```
-[my-pi-dsh] trace 注册汇总：工具 53 个、命令 9 个；同名冲突跳过 2 个
-             （命令:plan, 工具:subagent）；钩子 18 个（…）
+[my-pi-dsh] trace 注册汇总：工具 53 个、命令 10 个
+             （usage-diag, context, tools, memory, mode, mypi-plan, …）；同名冲突跳过 1 个
+             （工具:subagent）；钩子 18 个（…）
 ```
 
 ★ 这一行是**必需**的，不是锦上添花：DSH 原生占用了工具 `subagent` 与命令 `plan`（原先还有工具 `web_search`，已于 2026-10-18 **改名 `searxng`** 以保留自家后端），
@@ -165,8 +166,9 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 `readonly DshDisposer[]` 冲突），而那两行**每次插件启动都要跑**。spike.ts 刻意**不**纳入：它是类型探针，
 故意往真实 API 传裸值，补一堆 `as` 换不到安全性。
 
-✓ **同名冲突已决策（2026-10-18）**：工具 `subagent` 让位宿主、命令 `plan` 让位宿主的 `/plan`（但 my-pi 的
-只读护栏钩子与 `plan_enter`/`plan_exit` **保留**）、工具 `web_search` 改名 `searxng` 保留。让位的代价
+✓ **同名冲突已决策（2026-10-18）**：工具 `subagent` 让位宿主；命令 `plan` **换名注册为 `mypi-plan`**
+（不再让位 ⇒ 子命令面与落盘/续跑路径保住，见 `DshFacadeOptions.commandNameMap`）；工具 `web_search`
+改名 `searxng` 保留；my-pi 的只读护栏钩子与 `plan_enter`/`plan_exit` **保留**。让位的代价
 （chain、目录扫描式 agent 定义、逐任务 `cwd`、进程外投递、Termux 并发降级、plan 命令面与落盘）
 逐条登记为 **DR-1…DR-7**，见
 [`../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md`](../docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md) §6/§7。

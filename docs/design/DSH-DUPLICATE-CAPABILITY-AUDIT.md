@@ -85,7 +85,24 @@
 |---|---|---|---|
 | `web_search` | **保留 my-pi 版，改名 `searxng`** | `custom/features/web-search/index.ts` 的 `name`；注册面基线（`scripts/registration-baseline.json`）、工具声明面基线、spike A6/A7、产物冒烟、`scripts/check-seeds-headless.mjs`、`portable/agent/AGENTS.md` 与 3 个脚本里的工具名同步改名。**真 Host 复验**：`tool/call name=searxng arguments={"query":"deepseek harness","maxResults":5}`（DSH 会话日志），结果内容即本工具的降级输出 ⇒ 模型可见且可执行；冲突从 3 个降为 2 个 | §1：DSH 覆盖不了"无 key / 自建后端 / 模型可控条数" |
 | `subagent` | **让位 DSH 原生** | 不写死让位名单：仍靠"宿主注册表抛同名错 ⇒ 就地跳过并点名上报"这条机制（**万一宿主不再提供，我们的注册自动生效**，不会因名单过期而静默少能力）；my-pi 独有的 5 项见 §7 | §2：fork/steer/取消/列出等价或更强；my-pi 那套是跨运行时 spawn pi 且 fork 已降级 |
-| `plan` | **DSH 的 `/plan` 管入口 + 保留 my-pi 的护栏与工具** | `plan` 命令命中同名后跳过（预期）；`plan_enter`/`plan_exit` 与 `tool_call` 只读护栏**不在冲突范围**、照常注册；命令面与落盘见 §7 | §3：强制语义是最实在的能力，且它不在冲突范围内 |
+| `plan` | **DSH 的 `/plan` 管入口 + 保留 my-pi 的护栏与工具 + 命令换名注册** | `plan_enter`/`plan_exit` 与 `tool_call` 只读护栏**不在冲突范围**、照常注册；命令**不再让位**而是由适配层**换名注册为 `mypi-plan`**（`DshFacadeOptions.commandNameMap`，见下）⇒ 子命令面与 `clear`/`resume` 的落盘/续跑路径都保住（DR-6/DR-7 因此**已解决**）。**真 Host 复验**：`命令 10 个（…, mypi-plan, …）`、同名冲突从 2 个降为 **1 个** | §3：强制语义是最实在的能力，且它不在冲突范围内 |
+
+**命令名重映射（为什么只给命令做）**：工具名对**模型**可见，改名会改变模型行为 ⇒ 工具冲突只能
+"让位"或在 feature 侧改名（并重过声明面基线）；命令名是**用户敲的**，换名只影响输入习惯、不改变能力
+⇒ 可以在适配层解决。实现是 `DshFacadeOptions.commandNameMap`（默认 `{ plan: 'mypi-plan' }` 在
+`dsh/plugin/entry.ts` 注入，部署方可用 `config.facade.commandNameMap` 覆盖），合法性由宿主校验
+（`dsh-commands`：`/^[a-z][a-z0-9_-]*$/`）。**顺带修掉一个静默失效**：入口原先把 facade 选项摊在
+**顶层**（`...(config.facade ?? {})`），而 `MyPiDshConfig` 只认 `compileTool`/`facade`/`features`
+⇒ profile 里写的 `config.facade.*` 会被**静默忽略**；现已嵌进 `facade:` 并加 spike **A21** 守门
+（按真实装载路径断言 `config.facade.commandNameMap` 生效）。
+
+**命令名重映射（为什么只给命令做）**：工具名对**模型**可见，改名会改变模型行为 ⇒ 工具冲突只能"让位"
+或在 feature 侧改名（并重过声明面基线）；命令名是**用户敲的**，换名只影响输入习惯、不改变能力 ⇒ 可以在
+适配层解决。实现 = `DshFacadeOptions.commandNameMap`（默认 `{ plan: 'mypi-plan' }` 在 `dsh/plugin/entry.ts`
+注入，部署方可用 `config.facade.commandNameMap` 覆盖），合法性交给宿主校验（`dsh-commands`：
+`/^[a-z][a-z0-9_-]*$/`）。**顺带修掉一个静默失效**：入口原先把 facade 选项摊在**顶层**
+（`...(config.facade ?? {})`），而 `MyPiDshConfig` 只认 `compileTool`/`facade`/`features` ⇒ profile 里写的
+`config.facade.*` 会被**静默忽略**；现已嵌进 `facade:`，并加 spike **A21** 按真实装载路径守门。
 
 **改名的两点刻意取舍**：
 
@@ -100,20 +117,21 @@
 
 让位/改名的代价逐条登记如下。每项都是"my-pi 有、宿主没有"，需要重设计才能回到 DSH 上。
 
-| ID | 项 | 来源 | 现状 | 备注 |
+| ID | 项 | 来源 | 状态 | 现状与备注 |
 |---|---|---|---|---|
-| DR-1 | `subagent` 的 `chain` 模式（`{previous}` 串接） | §2 | 宿主无模式参数，并行靠多次调用 | 可在 my-pi 侧实现为"多步编排 + 复用宿主 `subagent`" |
-| DR-2 | 目录扫描式 agent 定义（md + frontmatter，scout/worker/reviewer） | §2 | 宿主是 YAML 组合配置 | 可保留发现逻辑、把结果映射成宿主的 agent 配置 |
-| DR-3 | 逐任务 `cwd` | §2 | 宿主无该参数 | 需宿主支持或改用"任务里显式 cd" |
-| DR-4 | 进程外投递 CLI（`scripts/subagent-inbox.mjs`） | §2 | 宿主只有模型侧 `send_message` | 可用宿主 adapter 的投递接口重做 |
-| DR-5 | Termux 并发降级（8→2） | §2 | 宿主固定默认 8 | 移动端内存约束需另想办法 |
-| DR-6 | `plan` 命令面（`resume`/`todos`/`plans`/`clear`/`help`） | §3 | 宿主 `/plan` 只接受 `[off\|message]` | 可另起命令名（如 `/mypi-plan`）或挂到宿主命令的扩展点 |
-| DR-7 | 计划任务状态机 + `plan-<ts>/plan.md` 落盘/恢复 | §3 | 宿主只存 mode 位，正文仅在 `exit_plan_mode` 参数里 | 可继续用 my-pi 自己的落盘（与宿主 mode 位并存） |
+| DR-6 | `plan` 命令面（`resume`/`todos`/`plans`/`clear`/`help`） | §3 | ✅ **已解决**（2026-10-18，`mypi-plan`） | 适配层命令名重映射；真 Host 实测注册为 `mypi-plan`、命令数 9→10 |
+| DR-7 | 计划任务状态机 + `plan-<ts>/plan.md` 落盘/恢复 | §3 | ✅ **已解决（命令侧）** | 命令恢复 ⇒ `clear`/`plans`/`resume` 路径回来；`todo` 工具驱动的落盘与重启 `restoreStateFromPlans` 本就不依赖命令 |
+| DR-1 | `subagent` 的 `chain` 模式（`{previous}` 串接） | §2 | ⏳ 待重设计 | 宿主无模式参数，并行靠多次调用；可在 my-pi 侧实现为"多步编排 + 复用宿主 `subagent`" |
+| DR-2 | 目录扫描式 agent 定义（md + frontmatter，scout/worker/reviewer） | §2 | ⏳ 待重设计 | 宿主是 YAML 组合配置；可保留发现逻辑、把结果映射成宿主的 agent 配置 |
+| DR-3 | 逐任务 `cwd` | §2 | ⏳ 待重设计 | 宿主无该参数；需宿主支持或改用"任务里显式 cd" |
+| DR-4 | 进程外投递 CLI（`scripts/subagent-inbox.mjs`） | §2 | ⏳ 待重设计 | 宿主只有模型侧 `send_message`；可用宿主 adapter 的投递接口重做 |
+| DR-5 | Termux 并发降级（8→2） | §2 | ⏳ 待重设计 | 宿主固定默认 8；移动端内存约束需另想办法 |
 
-**另记一处当前的可用性瑕疵**（不是让位造成，但改名/让位后会更容易被注意到）：my-pi 的只读护栏在拒绝时
-提示"使用 `/plan exit` 退出"（`custom/features/plan-mode/index.ts` 的 block reason）。在 pi 底座上这句是对的
-（`/plan exit` 就是 my-pi 的命令）；在 DSH 上 `/plan` 已被宿主占用、语义还是**建议式**的 ⇒ 这句提示会**指错**。
-模型仍可用 `plan_exit` 工具退出，故只记为瑕疵、未改 feature 文案（改它会同时改变 pi 侧行为）。
+**另记一处当前的可用性瑕疵**（不是让位造成）：my-pi 的只读护栏在拒绝时提示"使用 `/plan exit` 退出"
+（`custom/features/plan-mode/index.ts` 的 block reason）。在 pi 底座上这句是对的（`/plan exit` 就是 my-pi 的命令）；
+在 DSH 上 my-pi 的命令已换名为 **`/mypi-plan`**（`/plan` 是宿主的建议式计划模式）⇒ 这句提示**指错**，
+正确写法是 `/mypi-plan exit`。模型仍可用 `plan_exit` 工具退出，故只记为瑕疵、未改 feature 文案
+（改它会同时改变 pi 侧行为；要修得在 feature 里做成可配置的文案）。
 
 ## 相关
 

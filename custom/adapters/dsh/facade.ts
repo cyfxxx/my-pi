@@ -86,6 +86,18 @@ export interface DshFacadeOptions {
    * 由 `dsh/plugin/entry.ts` 注入，`custom/` 因此保持零 DSH import。
    */
   readonly compileTool?: DshDefineTool;
+  /**
+   * **命令名重映射**（pi 命令名 → DSH 命令名）。
+   *
+   * 用途：宿主已占用某个命令名时，**不丢** my-pi 的命令面，而是换一个名字注册
+   * （本仓实际用法：`plan` → `mypi-plan`，让位宿主的 `/plan` 同时保住自己的子命令面）。
+   *
+   * 为什么只给**命令**留重映射、不给工具：工具名对**模型**可见，改名会改变模型行为
+   * （所以要改就走 feature 侧改名 + 重新过声明面基线）；命令名是**用户敲的**，
+   * 换名只影响输入习惯、不改变能力 ⇒ 可以在适配层解决。合法性由宿主校验
+   * （`dsh-commands`：`/^[a-z][a-z0-9_-]*$/`），非法名会被宿主拒绝并如实上报。
+   */
+  readonly commandNameMap?: Readonly<Record<string, string>>;
 }
 
 /** 注册汇总（诊断用；见 `DshFacade.registrationSummary`） */
@@ -498,6 +510,15 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     if (normalized !== String(name)) {
       report(`command.${String(name)}.name`, `DSH 要求小写、不带前导斜杠 ⇒ 已规范化为 "${normalized}"`);
     }
+    // ★ 命令名重映射（宿主占用了这个名字时，换名注册以**保住命令面**，见 DshFacadeOptions.commandNameMap）
+    const registeredName = options.commandNameMap?.[normalized] ?? normalized;
+    if (registeredName !== normalized) {
+      report(
+        `command.${normalized}.renamed`,
+        `宿主已占用 "${normalized}" ⇒ 本仓这条命令以 "${registeredName}" 注册（命令名是用户敲的，`
+          + '换名只影响输入习惯、不改变能力；工具名不做这种重映射，因为工具名对模型可见）',
+      );
+    }
     if (def.getArgumentCompletions) {
       report(
         `command.${normalized}.getArgumentCompletions`,
@@ -510,7 +531,7 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     if (!canCommand || !commands) return;
     const runtime = commands;
     const dshDefinition: DshCommandDefinition = {
-      name: normalized,
+      name: registeredName,
       description: def.description ?? normalized,
       handler: async (invocation: DshCommandInvocation): Promise<DshCommandResult> => {
         const handlerContext = withSessionContext(basePiContext, { session: invocation.agent?.session });
@@ -519,20 +540,20 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
           return { kind: 'success' };
         } catch (error) {
           const text = error instanceof Error ? error.message : String(error);
-          return { kind: 'error', text: `命令 ${normalized} 执行失败：${text}` };
+          return { kind: 'error', text: `命令 ${registeredName} 执行失败：${text}` };
         }
       },
     };
     try {
       disposers.push(runtime.register(dshDefinition));
-      registeredCommands.push(normalized);
+      registeredCommands.push(registeredName);
     } catch (error) {
       // 与 registerTool 同一条纪律：同名命令冲突只跳过这一个，不让它冒泡拖垮该特性其余注册
       //（Host 实测：plan-mode 的 3 个钩子排在 registerCommand('plan') 之后 ⇒ 冒泡就全丢）
-      skippedDuplicates.push(`命令:${normalized}`);
+      skippedDuplicates.push(`命令:${registeredName}`);
       report(
-        `registerCommand.duplicate:${normalized}`,
-        `命令 "${normalized}" 注册失败：${error instanceof Error ? error.message : String(error)}`
+        `registerCommand.duplicate:${registeredName}`,
+        `命令 "${registeredName}" 注册失败：${error instanceof Error ? error.message : String(error)}`
           + ' ⇒ 只跳过这一个（其余注册继续）；这正是"宿主同名命令优先"的预期路径'
           + '（`plan` 让位 DSH 的 `/plan`；my-pi 的护栏钩子与 plan_enter/plan_exit 不受影响）',
       );

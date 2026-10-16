@@ -387,6 +387,23 @@ else
   note "dsh/plugin 类型检查跳过（缺 dsh/spike/node_modules/@deepseek-ai；跑 bash scripts/dsh-spike.sh 后自动生效）"
 fi
 
+# ── L. Markdown 表体完整性（程序化编辑把表格行写断 / 台账表体空行）──
+# ★ 为什么有这一段（两份同源事故）：
+#   ① `BUG-REPLAYS.md` #33：台账表体被插空行 ⇒ 人眼仍看成一张表，按行解析的工具当成多张。
+#      当时结论是"建议后续加这条守门"，一直没加。
+#   ② 2026-10-18 自己踩到：用脚本改 `DSH-MIGRATION-PLAN.md` 时把**一行**表格写成 4 行、续行还带
+#      前导空格 + 单引号 ⇒ 那行在渲染里断成普通文本（该表少一条实测记录），而**当时所有守门都放行**。
+# ★ 判据放在 `scripts/check-md-tables.mjs` 里（要跳过围栏代码块、要排除 vendored 的 packs/，
+#   用 grep 表达不了 —— 直接 grep 会误报 60+ 个合法文件）。台账空行只报告不失败：实测
+#   `knowledge-compile --check` 在 3 处空行下仍解析出 41/41 条 ⇒ 做成硬门禁属于无证据。
+if [ -f scripts/check-md-tables.mjs ]; then
+  if "$NODE_BIN" scripts/check-md-tables.mjs >/tmp/md-tables.out 2>&1; then
+    ok "Markdown 表体完整（表行未被写断；明细见 /tmp/md-tables.out）"
+  else
+    bad "Markdown 表体守门失败（表行被写断；明细见 /tmp/md-tables.out）"
+  fi
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "🎉 约定守门全部通过"

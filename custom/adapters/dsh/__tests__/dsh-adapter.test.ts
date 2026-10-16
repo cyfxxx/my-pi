@@ -488,6 +488,53 @@ describe('消息投递（sendUserMessage / sendMessage / appendEntry）', () => 
   });
 });
 
+describe('命令名重映射（宿主占用同名命令时保住命令面；2026-10-18 决策）', () => {
+  it('★ 映射命中：以新名注册、上报换名、汇总里是新名（不再是"被跳过"）', () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, {
+      commandNameMap: { plan: 'mypi-plan' },
+      onUnsupported: (m, d) => reports.push(`${m} :: ${d}`),
+    });
+    facade.api.registerCommand('plan' as never, { description: '计划模式：只读探索与任务跟踪' } as never);
+    expect(fake.commands.map((c) => c.name)).toEqual(['mypi-plan']);
+    expect(reports.some((r) => r.startsWith('command.plan.renamed') && r.includes('mypi-plan'))).toBe(true);
+    expect(facade.registrationSummary()).toEqual({
+      tools: [],
+      commands: ['mypi-plan'],
+      skippedDuplicates: [],
+      hooks: [],
+    });
+  });
+
+  it('★ 未映射的命令名不变（重映射只作用于显式列出的名字）', () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const facade = createDshExtensionApi(fake.ctx, { commandNameMap: { plan: 'mypi-plan' } });
+    facade.api.registerCommand('memory' as never, { description: '记忆' } as never);
+    expect(fake.commands.map((c) => c.name)).toEqual(['memory']);
+  });
+
+  it('★ 反向探针：换了名也照样会在同名时让位（隔离逻辑不受重映射影响）', () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const register = (fake.ctx as unknown as { commands: { register: (d: { name: string }) => () => void } }).commands.register;
+    (fake.ctx as unknown as { commands: { register: unknown } }).commands.register = (definition: { name: string }) => {
+      if (definition.name === 'mypi-plan') throw new Error('command "mypi-plan" is already registered');
+      return register(definition);
+    };
+    const facade = createDshExtensionApi(fake.ctx, { commandNameMap: { plan: 'mypi-plan' } });
+    expect(() => facade.api.registerCommand('plan' as never, { description: 'x' } as never)).not.toThrow();
+    expect(facade.registrationSummary().skippedDuplicates).toEqual(['命令:mypi-plan']);
+  });
+
+  it('★ 反向探针：重映射**不**作用于工具（工具名对模型可见，改名是另一个决策）', () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx, { commandNameMap: { subagent: 'mypi-subagent' } });
+    facade.api.registerTool({ ...samplePiTool(), name: 'subagent' } as never);
+    // 映射表里的键对工具无效 ⇒ 工具仍以原名注册
+    expect(fake.tools.map((t) => t.name)).toEqual(['subagent']);
+  });
+});
+
 describe('会话事件桥（session/event 的真实签名与负载）', () => {
   it('`(session, event)` 两参形态能被识别；按 event.type 过滤；type 换成 pi 名；data 摊平到顶层', async () => {
     const fake = makeFakeDsh();
