@@ -57,6 +57,7 @@ adapters/**（唯一接触底座的地方）
 | 16 | **`pi-shims/` 让"零 pi 依赖"也成立** | 两个 specifier 别名到本仓 shim 后：`import('@earendil-works/pi-tui')` 只导出 7 个符号、`pi-coding-agent` 只导出 2 个（实测）⇒ A9 仍 **54 工具 / 0 失败** | ✓✓ 别名机制可用 shim 承载；漂移由单测守着 |
 | 17 | **打包产物**可行且足够小：只含本仓代码（712 KB），外部包全部 external | `scripts/dsh-build.sh` + `dsh/spike/smoke-built.mjs`（纯 node，无 tsx）⇒ 54 工具 / 0 失败 | ✓ 交付物形态确定 |
 | 18 | **真实 launcher 的 profile 组合**：`id:` 形式是"覆盖已有条目"，**插入新插件要用 `insert:`** | 隔离 DSH_HOME 干跑：`- id: my-pi` ⇒ `patch: entry "my-pi" not found`；`- insert: [{id: my-pi, name: …}]` ⇒ 组合树出现 `file:///…/my-pi-plugin.mjs` | ✓✓ P5② 的落地方式确定；Host 启动仍未做 ✗ |
+| 18-v | ★★ **`turn_end` 的用量在真 Host 里静默丢失**（先有反向证据、再定位）：适配层按契约把 `assistant/message.usage` 攒起来补进 `turn/end`，但真跑后 pi 侧 `recordUsage` **没有落盘**。原因**不是**"事件没到"（`MY_PI_DSH_TRACE_EVENTS=1` 实测：`session/event` 全到，含 `assistant/message … usage=yes 入桶=yes`），而是两个自家 bug：① 一条 DSH `turn/end` 会触发**多条**桥接（本仓 3 个特性都注册 `turn_end`；外观层是"每个 pi 事件注册 ⇒ 一条独立订阅"），原先"取走即清桶"⇒ 只有**第一条**桥接拿到用量（实测 `用量补丁=yes` 后跟两条 `=no`），而恰好需要它的处理器不是第一条；② 只按回合号分桶 ⇒ 不同会话的回合 1 会串账 | 新增 `custom/adapters/dsh/usage-accumulator.ts`：按 **会话 id + 回合号** 分桶、回合内多 step **求和**（DSH 一个回合多个 step，真日志实测两条用量）、对外只给 `read`（**只读不销毁**，靠 LRU/`drop` 回收）；用量由**基础设施订阅**累积（不能挂 pi 的 `message_end`：那只有默认关闭的 voice 注册 ⇒ 没人注册就永远攒不到）；该回合没数据时返回 `undefined`（**不合成全 0**）；`cost` 显式标 `costUnavailable`（DSH `TokenUsage` 不含定价）| ✓✓ **真 Host 复验：三条桥接全部 `用量补丁=yes(calls=1)`，未被改动的特性写出 `{"input":213,"cacheRead":10368,"output":2,"total":10583}`**（`PI_USAGE_DIAG_FILE` 指向临时文件，不污染仓库记忆库；仓库侧 `.usage-diag.jsonl` 行数前后均为 1536）；spike 新增 **A20**（真实 `SessionStore` + 兄弟子 ctx + 注册**两条** `turn_end` ⇒ 每个都拿到同一份用量）⇒ **20 通过 / 0 失败**；适配层单测 ⇒ **112 项**；诊断开关 `MY_PI_DSH_TRACE_EVENTS=1` 保留（正是它把"没到 / 到了没识别 / 识别了没处理器"三者分开）|
 | 18-u | ★★ **Host 级**真跑（`scripts/dsh-host-smoke.sh`，隔离 DSH_HOME + 最小 headless 任务）：**3 个特性因与 DSH 原生同名而注册失败** —— `web_search`（DSH 自带）、`plan` 命令（DSH 自带）、`subagent`（DSH 自带）；其余 7 个成功 | 日志：`tool "web_search" is already registered`、`command "plan" is already registered`、`tool "subagent" is already registered`（DSH 的 `NamedEntries.duplicateError`，提示可挂到 `agent.ctx` 做 per-agent 变体） | ✓ **这是只有在真 Host 里才会暴露的一类问题**（本地 harness 没有 DSH 原生工具/命令）；✗ 处置未做：需要决定"同名时让位给 DSH 原生 / 改 my-pi 前缀名 / 挂 per-agent"——**需要产品决策**，我不擅自动 |
 | 18-t | ★★★ **Host 级**真跑抓出**两个致命问题**（本地 19 项 spike 全绿也没抓到）：① **`inject` 约束**：cordis 里未 `inject` 就访问 `ctx.commands` 会**抛错**且插件**不激活**（`dsh: warning: 1 entry did not activate`）；② **工具定义必须编译**：`ctx.tools.register()` 要的是 `defineTool(options)` 的产物（spec → 模型侧 JSON Schema），我们直接注册原始 spec ⇒ 真实 provider 拒掉**每一个请求**：`Invalid schema for function 'admin_get_config': schema must be a JSON Schema of 'type: "object"', got 'type: null'` | ① 服务统一经新增的 `getDshService()`（先 `ctx.get()`、再属性读，两路都 try/catch）取；② 新增 `compileTool` 注入点（`DshFacadeOptions.compileTool`），由 `dsh/plugin/entry.ts` 注入 `defineTool`；缺编译器时**显式上报**（不静默注册坏定义）；`dsh-build.sh` 顺带把宿主包在仓库根建成本地别名（跑产物需要） | ✓ 修后：spike 新增 **A18**（走 cordis loader 装载产物 ⇒ 54 工具、0 激活错误）与 **A19**（`schemas()` 里 54 个工具的 `parameters.type` 全为 `object`，含 `admin_get_config`）⇒ **19 通过 / 0 失败**；单测 **86 项**；**复跑结果：退出码 0、插件日志 28 行、模型回了「收到」** ⇒ 端到端打通 ✓✓ | 
 | 18-s | **流式增量桥必须翻译**：pi 的 `message_update` 处理器读 `assistantMessageEvent.{type,delta}`，而 DSH 的 `agent/assistant-stream` 给的是**有序帧** `{type,chunk:{type:"text-delta",…}}` ⇒ 不翻译就"看不到任何增量"（静默失效） | `hooks.ts` 新增 `translateStreamFrame`：`text-delta→text_delta`、`reasoning-delta→thinking_delta`、`tool-call-delta→toolcall_delta`、`block-start/end→*_start/*_end`；✗ 不可表达项**显式上报**（`partial` 帧里没有；usage/finish 无对应变体；toolcall_end 需要 pi 的 ToolCall 形状）；同时按契约**更正三条 note**：`message_end` 其实**可用**（`assistant/message` 的 data 含 `message`/`usage`，桥接层已摊平）、`turn_end` 的差异是字段名与内容（`turn` vs `turnIndex`、无 message/toolResults）⇒ 处理器应改从 `assistant/message` 累积用量 | ✓ spike **A17**（真实 cordis 派发 `chunk` 帧 ⇒ 处理器收到 `type=text_delta/delta="真实派发"`；`usage` 帧 ⇒ 不调处理器 + 上报）⇒ **17 通过 / 0 失败**；单测 +4 ⇒ **84 项**；✗ `partial`/usage/finish/toolcall_end 仍不可表达（已逐条上报） |
@@ -143,7 +144,7 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | 面 | 规模 | 状态 | 证据（可复跑） | 剩余 ✗ |
 |---|---|---|---|---|
 | **工具** | 59 定义 / `full` 生效 54 | ✓ 全部注册进真实注册表并可执行 | spike A2/A3/A9、`dsh-baseline --tools`（25,761 B） | 依赖 `voice`/`link` 的模式需显式启用 |
-| **钩子（事件）** | 19 个事件（①9 / ②10 / ③0） | ✓ 映射齐；桥接台账 **7 支持 / 11 降级 / 0 无等价** | spike A4/A5（pre-execute 观察+拦截）、**A13**（session/event 真跑）、**A14**（post-execute 替换）、A11（会话生命周期）、A9 台账 | `turn_end` 处理器改从 `assistant/message` 累积用量；两处功能重设计（暖前缀、转录改写）；`partial`/usage/finish 帧不可表达（已上报） |
+| **钩子（事件）** | 19 个事件（①9 / ②10 / ③0） | ✓ 映射齐；桥接台账 **7 支持 / 11 降级 / 0 无等价** | spike A4/A5（pre-execute 观察+拦截）、**A13**（session/event 真跑）、**A14**（post-execute 替换）、A11（会话生命周期）、A9 台账 | ~~`turn_end` 处理器改从 `assistant/message` 累积用量~~ **已做**（适配层累积，见 #18-v + spike A20；真 Host 已复验落盘）；仍剩：两处功能重设计（暖前缀、转录改写）；`partial`/usage/finish 帧不可表达（已上报） |
 | **命令** | 14 处 | ✓ 契约已读 + 映射已实现（名称规范化/必填 description/`CommandResult`） | spike **A10**（真实 `dsh-commands`：find 命中、rawInput 透传、抛错映射） | 参数补全无对应 ✗；`commands.execute()` 需真 agent |
 | **快捷键** | 4 处 | ✗ 不支持（属**客户端层**） | 映射文档 §7.2（客户端 UI 服务） | 要等价能力得写 DSH 客户端插件 |
 | **消息渲染器** | — | ✗ 不支持（同上，且与 `sendMessage` 的 customType 同族） | 同上 | 同上 |
@@ -156,7 +157,7 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | **补丁账** | 11 | ✓ 收敛为 **0 个需移植**（§4.2） | 逐条依据 | `010`/`011` 的检索面未穷尽 |
 | **打包/接线** | 1 | ✓ 产物 + profile 组合 + 正式安装 | `dsh-build`/`dsh-smoke-profile`/`dsh-package`；A9 全量 | profile 级 `pnpm.overrides` 未在真 profile 跑过 |
 | **场景测试** | 3 场景 | ✗ 未重建（依赖 Host apparatus） | — | 模式切换/两实例隔离/会话切换 |
-| **Host 级启动** | — | ✓✓ **已跑通**（修完 inject + defineTool 编译后复跑：**退出码 0**、插件日志 28 行、钩子在真 Host 里触发、模型真的回了「收到」） | `MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh`（默认 SKIP，需显式 opt-in；凭据只临时拷一份 600 且退出即删）；日志 `/tmp/dsh-host-run.log` | ✗ 3 个特性与 DSH 原生同名（见 #18-u）需产品决策；profile 级 `pnpm.overrides` 仍未用 |
+| **Host 级启动** | — | ✓✓ **已跑通**（修完 inject + defineTool 编译后复跑：**退出码 0**、插件日志 28 行、钩子在真 Host 里触发、模型真的回了「收到」）；**工具调用路径也已跑通**（prompt 强制调 `memory_stats` ⇒ DSH 会话日志记到 `tool/call name=memory_stats`、`tool/result` 内容正是 my-pi 的输出，模型据此作答）；**回合用量路径也已跑通**（见 #18-v：桥接三条全拿到用量、未被改动的特性真的落盘） | `MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh`（默认 SKIP，需显式 opt-in；凭据只临时拷一份 600 且退出即删）；`MY_PI_HOST_PROMPT=…` 可换 prompt、`MY_PI_DSH_TRACE_EVENTS=1` 看会话事件、`PI_USAGE_DIAG_FILE=` 改用量落盘位置；日志 `/tmp/dsh-host-run.log` | ✗ 3 个特性与 DSH 原生同名（见 #18-u）需产品决策；profile 级 `pnpm.overrides` 仍未用 |
 
 ### 4.1 已重建（本轮）
 
@@ -203,6 +204,13 @@ pi 侧的 11 个补丁是"底座替换"的账；换到 DSH 后**没有"能不能
    `PreStepDecision = {kind:'reject'} | {kind:'enter', messages: UserMessage[], startsRequestSeries?: true}`
    （`dsh-agent/lib/types/runtime-types.d.ts:92-99`，事件签名 `:304`）⇒ pi 的 `input` **可以**翻译为
    "替换进入该 step 的消息数组"；✗ 仍未做**运行时**验证（需要 agent + LLM，属 Host 级，见 P5②）；
-5. 完整 profile / Host 级运行**未做**（内存与"别打扰 GUI"两条约束）⇒ P4 的端到端目前是**契约级**；
+5. ~~完整 profile / Host 级运行**未做**~~ **已做（2026-10-18，获用户显式授权）**：真 profile + 真模型跑通四类路径 ——
+   ① 插件加载与钩子触发（退出码 0、插件日志 28 行、模型回「收到」）；② **工具调用**（强制调 `memory_stats` ⇒
+   会话日志记到 `tool/call name=memory_stats`，`tool/result` 内容正是 my-pi 的输出）；③ **回合用量**（见 #18-v，
+   未被改动的特性真的落盘）；④ **诊断可观测**（`MY_PI_DSH_TRACE_EVENTS=1` 能把"事件没到 / 到了没识别 /
+   识别了没处理器"分开）。仍 ✗：`input.transform` 的运行时语义（`{kind:'reject'}` 是否重排消息）、
+   `commands.execute()`、`sendUserMessage` 的唤醒/转向语义、P6③ 三个场景测试（模式切换/两实例隔离/会话切换）。
+   另一处如实登记的缺口：合成用量的 `cost` 是占位 0（DSH `TokenUsage` **不含定价**，已标 `costUnavailable`）——
+   当前**没有任何 feature 读 `usage.cost`**（已 grep 确认），故无现实影响，但将来要算钱得另找定价源；
 6. DSH 是 `0.2.0-rc.2`（RC）⇒ 接口可能变动；本轮把用到的形状**固化成本地最小类型声明**（`custom/adapters/dsh/types.ts`），
    从而"RC 变了"只需改一处，而不是散落到 223 个文件。

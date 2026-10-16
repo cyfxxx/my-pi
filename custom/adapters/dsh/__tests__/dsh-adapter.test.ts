@@ -37,6 +37,18 @@ interface FakeDsh {
   disposeListeners: string[];
 }
 
+/**
+ * 取 `session/event` 上**给 pi 处理器用**的那条桥接监听器。
+ *
+ * ★ 索引不是随手写的：适配层自己会在 `session/event` 上注册一条**基础设施**订阅
+ *   （回合用量累积，见 `usage-accumulator.ts`），它在 `createDshExtensionApi` 内部就注册好、
+ *   早于调用方的任何 `api.on(...)` ⇒ 基础设施恒在索引 0，pi 面桥接从索引 1 起。
+ *   这条不变量由下面「session/event 的订阅顺序」一测钉住。
+ */
+function sessionBridge(fake: FakeDsh, nth = 1): DshEventListener | undefined {
+  return fake.listeners.get('session/event')?.[nth];
+}
+
 function makeFakeDsh(options: { withTools?: boolean; withCommands?: boolean } = {}): FakeDsh {
   const withTools = options.withTools ?? true;
   const withCommands = options.withCommands ?? false;
@@ -486,7 +498,7 @@ describe('会话事件桥（session/event 的真实签名与负载）', () => {
       return undefined;
     }) as never);
 
-    const listener = fake.listeners.get('session/event')?.[0];
+    const listener = sessionBridge(fake);
     expect(listener).toBeDefined();
     // 真实签名：(session, event)；事件是日志事件 {type, seq, time, data}
     const session = { id: 's-1', header: { id: 's-1' } };
@@ -507,10 +519,124 @@ describe('会话事件桥（session/event 的真实签名与负载）', () => {
     const facade = createDshExtensionApi(fake.ctx);
     const handler = vi.fn();
     facade.api.on('turn_start' as never, handler as never);
-    const listener = fake.listeners.get('session/event')?.[0];
+    const listener = sessionBridge(fake);
     await listener?.({ id: 's' }, { type: 'step/start', data: {} });
     await listener?.({ id: 's' });
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe('回合用量：从 assistant/message 累积并补进 turn/end（Host 日志实测的负载差异）', () => {
+  it('★ 订阅顺序不变量：基础设施（用量累积）恒在索引 0，pi 面桥接从 1 起', () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    // 一条 pi 面事件都没注册时，session/event 上就该已经有且只有基础设施那一条
+    expect(fake.listeners.get('session/event')).toHaveLength(1);
+    facade.api.on('turn_end' as never, vi.fn() as never);
+    expect(fake.listeners.get('session/event')).toHaveLength(2);
+  });
+
+  it('★ 端到端：assistant/message 的用量被累积，turn_end 处理器能读到 event.message.usage', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const seen: unknown[] = [];
+    facade.api.on('turn_end' as never, ((event: unknown) => {
+      seen.push(event);
+      return undefined;
+    }) as never);
+    const bridge = sessionBridge(fake);
+    const infra = fake.listeners.get('session/event')?.[0];
+
+    // 真 Host 日志里的两条用量（同一回合的两个 step）——先喂给基础设施订阅
+    await infra?.({ id: 's' }, { type: 'assistant/message', seq: 16, data: { turn: 1, step: 1, usage: { inputTokens: 358, outputTokens: 22, cacheReadTokens: 10240, cacheWriteTokens: 0, totalTokens: 10620 } } });
+    await infra?.({ id: 's' }, { type: 'assistant/message', seq: 23, data: { turn: 1, step: 2, usage: { inputTokens: 249, outputTokens: 89, cacheReadTokens: 10496, cacheWriteTokens: 0, totalTokens: 10834 } } });
+    // turn_end 桥接此时才该看到（处理器没注册 message_end 也能拿到 ⇒ 这是关键）
+    await bridge?.({ id: 's' }, { type: 'turn/end', seq: 25, data: { turn: 1, reason: { kind: 'completed' } } });
+
+    expect(seen).toHaveLength(1);
+    const event = seen[0] as { turnIndex?: number; message?: { usage?: { input?: number; output?: number; cacheRead?: number } }; reason?: unknown };
+    expect(event.message?.usage?.input).toBe(358 + 249);   // 多 step 求和
+    expect(event.message?.usage?.output).toBe(22 + 89);
+    expect(event.message?.usage?.cacheRead).toBe(10240 + 10496);
+    expect(event.turnIndex).toBe(1);
+    expect(event.reason).toEqual({ kind: 'completed' }); // DSH 原有字段不丢
+
+    // ★ 语义说明：`read` 不销毁桶 ⇒ 再 end 一次仍带用量（这是**故意的**：
+    //   多特性各自收到一条 turn/end 时都必须拿到用量，不能"谁先谁得"）。
+    seen.length = 0;
+    await bridge?.({ id: 's' }, { type: 'turn/end', seq: 26, data: { turn: 1, reason: { kind: 'completed' } } });
+    expect((seen[0] as { message?: { usage?: { input?: number } } }).message?.usage?.input).toBe(358 + 249);
+  });
+
+  it('★ 反向探针：没有 assistant/message 用量时，turn_end 处理器拿到的负载保持原样（不合成假用量）', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const seen: unknown[] = [];
+    facade.api.on('turn_end' as never, ((event: unknown) => {
+      seen.push(event);
+      return undefined;
+    }) as never);
+    await sessionBridge(fake)?.({ id: 's' }, { type: 'turn/end', seq: 1, data: { turn: 1, reason: { kind: 'completed' } } });
+    const event = seen[0] as { message?: unknown; usage?: unknown; turnIndex?: number };
+    expect(event.message).toBeUndefined();
+    expect(event.usage).toBeUndefined();
+    // 也没编 turnIndex（DSH 的 data.turn 摊平后是 turn，处理器要 turnIndex 时我们才补）
+    expect(event.turnIndex).toBeUndefined();
+  });
+
+  it('★ 反向探针：别的会话事件不会被误当用量（含 turn/end 自身带 usage 的异常负载）', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const seen: unknown[] = [];
+    facade.api.on('turn_end' as never, ((event: unknown) => {
+      seen.push(event);
+      return undefined;
+    }) as never);
+    const infra = fake.listeners.get('session/event')?.[0];
+    await infra?.({ id: 's' }, { type: 'turn/end', data: { turn: 1, usage: { inputTokens: 5, outputTokens: 5 } } });
+    await sessionBridge(fake)?.({ id: 's' }, { type: 'turn/end', seq: 1, data: { turn: 1 } });
+    expect((seen[0] as { message?: unknown }).message).toBeUndefined();
+  });
+
+  it('★ 多特性注册 turn_end 时**每个**处理器都能拿到用量（Host 冒烟实测：销毁式取值会丢）', async () => {
+    // 真 Host 里 3 个特性都注册了 turn_end ⇒ 一条 turn/end 触发 3 条桥接。
+    // 若桥接是"取走即清桶"，只有第一条能拿到用量，其余全部拿到 undefined。
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const got: Array<number | undefined> = [];
+    for (let i = 0; i < 3; i += 1) {
+      facade.api.on('turn_end' as never, ((event: unknown) => {
+        got.push((event as { message?: { usage?: { input?: number } } }).message?.usage?.input);
+        return undefined;
+      }) as never);
+    }
+    const infra = fake.listeners.get('session/event')?.[0];
+    await infra?.({ id: 's' }, { type: 'assistant/message', seq: 16, data: { turn: 1, step: 1, usage: { inputTokens: 300, outputTokens: 20 } } });
+    await infra?.({ id: 's' }, { type: 'assistant/message', seq: 17, data: { turn: 1, step: 2, usage: { inputTokens: 200, outputTokens: 10 } } });
+    // 三条桥接（索引 1/2/3）都该收到同一条 turn/end
+    for (const listener of (fake.listeners.get('session/event') ?? []).slice(1)) {
+      await listener({ id: 's' }, { type: 'turn/end', seq: 18, data: { turn: 1, reason: { kind: 'completed' } } });
+    }
+    expect(got).toEqual([500, 500, 500]);
+  });
+
+  it('★ 反向探针：不同会话的相同回合号不串账（桥接按会话 id 分桶）', async () => {
+    const fake = makeFakeDsh();
+    const facade = createDshExtensionApi(fake.ctx);
+    const got: Array<number | undefined> = [];
+    facade.api.on('turn_end' as never, ((event: unknown) => {
+      got.push((event as { message?: { usage?: { input?: number } } }).message?.usage?.input);
+      return undefined;
+    }) as never);
+    const infra = fake.listeners.get('session/event')?.[0];
+    const bridge = sessionBridge(fake);
+    // 真实 Session 形状（既有 id 也有 header.id）
+    await infra?.({ id: 's-A', header: { id: 's-A' } }, { type: 'assistant/message', data: { turn: 1, usage: { inputTokens: 111, outputTokens: 1 } } });
+    // 只带顶层 id 的中间层形状（兜底路径）
+    await infra?.({ id: 's-B' }, { type: 'assistant/message', data: { turn: 1, usage: { inputTokens: 222, outputTokens: 2 } } });
+    await bridge?.({ id: 's-B', header: { id: 's-B' } }, { type: 'turn/end', data: { turn: 1 } });
+    await bridge?.({ id: 's-A', header: { id: 's-A' } }, { type: 'turn/end', data: { turn: 1 } });
+    expect(got).toEqual([222, 111]);
   });
 });
 
@@ -839,9 +965,10 @@ describe('facade 外观层', () => {
     facade.api.on('tool_call' as never, toolCall as never);
     facade.api.on('turn_start' as never, turnStart as never);
     expect(fake.listeners.get('tools/pre-execute')).toHaveLength(1);
-    expect(fake.listeners.get('session/event')).toHaveLength(1);
+    // 2 条：基础设施（回合用量累积）+ 本测试注册的 turn_start 桥接
+    expect(fake.listeners.get('session/event')).toHaveLength(2);
 
-    const sessionListener = fake.listeners.get('session/event')?.[0];
+    const sessionListener = sessionBridge(fake);
     sessionListener?.({ type: 'turn/start' });
     expect(turnStart).toHaveBeenCalledTimes(1);
     sessionListener?.({ type: 'turn/end' });
@@ -860,10 +987,11 @@ describe('facade 外观层', () => {
     const handler = vi.fn();
     facade.api.on('session_before_compact' as never, handler as never);
     // 订阅的是会话事件流，不是某个 cordis 事件
-    expect(fake.listeners.get('session/event')).toHaveLength(1);
+    // （2 条：基础设施的回合用量累积 + 本测试注册的桥接）
+    expect(fake.listeners.get('session/event')).toHaveLength(2);
     expect(fake.listeners.get('compaction')).toBeUndefined();
 
-    const listener = fake.listeners.get('session/event')?.[0];
+    const listener = sessionBridge(fake);
     // 只转发压缩开始；其它会话事件（及 turn/end 之类）不应触发我们的处理器
     listener?.({ type: 'compaction/start', compactionId: 'c1', turn: 3 });
     expect(handler).toHaveBeenCalledTimes(1);

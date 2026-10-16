@@ -48,6 +48,10 @@ CREDS="${MY_PI_HOST_CREDENTIALS:-$HOME/.dsh/.credentials.yaml}"
 LOG_DIR="${MY_PI_HOST_LOG_DIR:-/tmp}"
 TIMEOUT_S="${MY_PI_HOST_TIMEOUT:-420}"
 
+# LOG_DIR 允许自定义 ⇒ 必须自己建：否则 `>"$LOG_DIR/…"` 会以"文件不存在"失败，
+# 而脚本把它报成"建 profile 失败"，指向错误的原因（实测踩过）。
+mkdir -p "$LOG_DIR" || { echo "❌ 无法创建日志目录 $LOG_DIR" >&2; exit 2; }
+
 echo "=== DSH Host 级冒烟 ==="
 echo "dsh        : $DSH_BIN（$(node "$DSH_BIN" --version 2>/dev/null || echo '?')）"
 echo "隔离 DSH_HOME: $HOME_DIR（不动 ~/.dsh）"

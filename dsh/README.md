@@ -131,5 +131,17 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 回归守门：spike **A18**（按 cordis loader 装载产物）＋ **A19**（`schemas()` 里每个工具的
 `parameters.type === 'object'`）。
 
+### 可复跑的四种路径 + 三个开关
+
+| 想验的东西 | 怎么跑 | 已验到的证据（2026-10-18） |
+|---|---|---|
+| 插件加载 / 钩子触发 | 默认 prompt | 退出码 0、插件日志 28 行、模型回「收到」 |
+| **工具调用**路径（模型→注册表→特性处理器→模型） | `MY_PI_HOST_PROMPT="请调用 memory_stats 工具…"` | DSH 会话日志 `tool/call name=memory_stats`、`tool/result` 内容正是 my-pi 的输出，模型据此作答（128 行插件日志） |
+| **回合用量**路径（`assistant/message.usage` → pi `turn_end`） | 加 `MY_PI_DSH_TRACE_EVENTS=1 PI_USAGE_DIAG_FILE=/tmp/x.jsonl` | 三条桥接全部 `用量补丁=yes`；未被改动的特性写出 `{"input":213,"cacheRead":10368,"output":2,"total":10583}`（见实测 #18-v） |
+| 会话事件**到没到**（静默失效排查） | `MY_PI_DSH_TRACE_EVENTS=1` | 每收到一条会话事件打一行 ⇒ 区分"没到 / 到了没识别 / 识别了没处理器" |
+
+其余可调：`MY_PI_HOST_PROMPT`（换任务）、`MY_PI_HOST_HOME`（换隔离 home）、`MY_PI_HOST_LOG_DIR`、
+`MY_PI_HOST_CREDENTIALS`（换凭据文件）、`PI_USAGE_DIAG_FILE`（用量落盘位置，避免写进仓库记忆库）。
+
 ✗ 待产品决策：Host 里 **3 个特性与 DSH 原生同名**（`web_search` / `plan` 命令 / `subagent`）注册失败，
 需在"让位 DSH 原生 / 改 my-pi 前缀 / 挂 per-agent"之间选一个。

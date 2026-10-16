@@ -14,8 +14,9 @@
 | `hooks.ts` | pi 处理器 → DSH waterfall 监听器 | **必须调 `next()`**；`{block:true}` → `{kind:'deny'}`；无等价物显式上报 |
 | `facade.ts` | DSH `Context` → pi 形状 API（18 个成员） | `surfaceReport()` 如实列出 `supported/degraded/unsupported` |
 | `plugin.ts` | cordis 插件入口 `apply(ctx, config)` | 特性列表**由调用方传入**（见下） |
+| `usage-accumulator.ts` | **回合用量桥**：`assistant/message.usage` → pi 的 `turn_end` 负载 | 按**会话+回合**分桶、回合内多 step 求和、`read` **只读不销毁**（多特性都注册 `turn_end` 时不能"谁先谁得"，见 #18-v）；无数据**不合成**；`cost` 标 `costUnavailable` |
 | `pi-shims/` | **pi 包 specifier 的等价实现**（让 DSH 侧零 pi 依赖也能加载） | 见 [pi-shims/README.md](pi-shims/README.md) |
-| `__tests__/` | 35 条纯逻辑单测 | 不需要装 DSH 包即可跑 |
+| `__tests__/` | 112 条纯逻辑单测（含用量累积/会话分桶/多订阅者等反向探针） | 不需要装 DSH 包即可跑 |
 
 ## 运行期调用链（实测走过的路径）
 
@@ -251,3 +252,19 @@ pi 的 `message_update` 处理器读 `event.assistantMessageEvent.{type,delta}`�
 
 **教训**：只比对"注册成功 / 能执行"是不够的 —— 还要比对**注册结果本身的形状**（A19），
 以及**按宿主的装载方式装载**（A18），而不是我们自己的 `apply(ctx)` 便捷路径。
+
+## ★ 会话事件"到底到没到"：诊断开关
+
+`session/event` 类落点（`turn_start`/`turn_end`/`session_*`/`message_end`…）一旦不通就是**静默失效**
+（处理器不报错、也不触发）。排查时打开：
+
+```bash
+MY_PI_DSH_TRACE_EVENTS=1 …   # 每收到一条会话事件打一行；turn/end 额外打印用量补丁有无
+```
+
+它能把三种情况分开 —— 正是 2026-10-18 定位 #18-v 的手段：
+① **事件没到**（一行都没有）；② **到了但没识别**（有 `session/event` 行、但 `usage=no`/`入桶=no`）；
+③ **识别了但处理器没跑**（`用量补丁=yes` 却没有对应的落盘/副作用）。
+
+回归守门：spike **A20**（真实 `SessionStore` + 兄弟子 ctx 拓扑 + 注册**两条** `turn_end`
+⇒ 两条都必须拿到同一份用量）；单测里也有对应的多订阅者与"跨会话不串账"反向探针。

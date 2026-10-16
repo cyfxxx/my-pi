@@ -28,9 +28,10 @@
 
 import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil-works/pi-coding-agent';
 import { assertEventsMapped, resolveDshEvent } from './events';
-import { dedupeByTurn, idleOnly, makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
+import { dedupeByTurn, deriveSessionInfo, idleOnly, makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
 import { getDshService } from './service';
 import { toDshToolPayload, type UnsupportedReporter } from './tool';
+import { createTurnUsageAccumulator, mergeTurnUsage } from './usage-accumulator';
 import type {
   DshAgentLike,
   DshDefineTool,
@@ -204,6 +205,37 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   let currentAgent: unknown;
   /** 生成 UserMessage 的稳定 id 的序号（brand 在运行时是恒等函数，实测 `MessageId('abc') === 'abc'`） */
   let messageSeq = 0;
+  /**
+   * 回合用量累积器：`assistant/message` 的 usage 攒起来，补进 `turn/end` 的 pi 负载。
+   *
+   * 为什么必须是**基础设施**订阅（而不是挂在 pi 的 `message_end` 上）：`turn_end` 要用到用量，
+   * 但 `message_end` 只有 voice 这一个默认关闭的 feature 注册（`custom/features/voice/index.ts:377`）
+   * ⇒ 挂在 pi 面事件上就等于"没人注册 message_end 时用量永远攒不到"。详见 usage-accumulator.ts。
+   */
+  const turnUsage = createTurnUsageAccumulator();
+  /**
+   * 会话事件诊断开关（默认关）：只在实际排查"事件到底到没到"时打开。
+   *
+   * 为什么需要它：`session/event` 这类**日志事件**的派发依赖 DSH 的会话挂载与作用域，
+   * 一旦不通就是**静默失效**（处理器不报错、也不触发 —— 2026-10-18 Host 冒烟踩过一次）。
+   * 打开后每收到一条会话事件就打一行，能把"没到 / 到了但没识别 / 识别了但处理器没跑"三者分开。
+   */
+  const traceSessionEvents = process.env.MY_PI_DSH_TRACE_EVENTS === '1';
+  /**
+   * 从 `session/event` 的实参里取会话 id（第一参就是 Session；见 A13 实测的 `(session, event)`）。
+   * 用途：把用量桶按会话隔离 —— 另一个会话的回合号会**重新从 1 开始**，不隔离必然串账。
+   */
+  const sessionIdOf = (args: readonly unknown[]): string | undefined => {
+    for (const arg of args) {
+      const { sessionId } = deriveSessionInfo(arg);
+      if (sessionId) return sessionId;
+      // 兜底：真实 Session **既有** `id` 也有 `header.id`，但中间层/测试假对象可能只带 `id`。
+      // 不兜底就会出现"会话 id 读不出来 ⇒ 不同会话落到同一个兜底桶 ⇒ 串账"（单测当场抓到过）。
+      const direct = (arg as { id?: unknown } | undefined)?.id;
+      if (typeof direct === 'string' && direct.length > 0) return direct;
+    }
+    return undefined;
+  };
 
   /** pi 处理器第二个参数（ExtensionContext）的 DSH 侧替身：能给的给，给不了的不编造 */
   const basePiContext: unknown = options.piContext ?? { hasUI: options.hasUI, cwd: options.cwd };
@@ -301,13 +333,54 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
         //   `message_update` 的 pi 字段是 `assistantMessageEvent` ⇒ 这类要**字段翻译或改处理器**。
         const raw = envelope as { data?: unknown } & Record<string, unknown>;
         const data = typeof raw.data === 'object' && raw.data !== null ? (raw.data as Record<string, unknown>) : {};
-        return listener({ ...raw, ...data, type: event }, undefined);
+        const piPayload: Record<string, unknown> = { ...raw, ...data, type: event };
+        // `turn/end` 补用量：DSH 的 turn/end 只有 {turn, reason}，pi 处理器读的是
+        // `event.message.usage` ⇒ 用基础设施订阅从 assistant/message 攒出来的结果**只补缺失字段**
+        // （用量累计与字段翻译见 usage-accumulator.ts；真 Host 日志实测的形状差异也在那里）。
+        if (envelope.type === 'turn/end') {
+          // ★ 用 `read`（不销毁）而不是"取走"：**多个特性**都注册了 `turn_end` ⇒ 一条 `turn/end`
+          //   会触发多条桥接，谁先谁后不确定；销毁式取值会让除第一条外的特性永远拿不到用量
+          //   （2026-10-18 Host 冒烟实测：补丁只落在第一条桥接上，`recordUsage` 恰好不是它 ⇒ 用量丢失）。
+          const patch = turnUsage.read(sessionIdOf(args), typeof data.turn === 'number' ? data.turn : undefined);
+          if (traceSessionEvents) {
+            console.log(
+              `[dsh-facade] trace turn/end 桥接触发 turn=${String(data.turn)} 用量补丁=${patch ? `yes(calls=${patch.usageCalls})` : 'no'}`,
+            );
+          }
+          return listener(mergeTurnUsage(piPayload, patch), undefined);
+        }
+        return listener(piPayload, undefined);
       }),
     );
   };
 
   // 基础设施订阅：跟踪最近创建/公告的会话与 agent（供 setSessionName / sendUserMessage 等映射使用）
   if (canOn && ctx.on) {
+    // 回合用量累积（**必须先于**任何 pi 面 `turn_end` 订阅注册 ⇒ 放在基础设施这批里，
+    // 而基础设施订阅都在 createDshExtensionApi 内部完成，调用方的 on() 之后才发生）
+    disposers.push(
+      ctx.on('session/event', (...args: readonly unknown[]) => {
+        const envelope = args.find(
+          (a): a is { type: string } & Record<string, unknown> =>
+            typeof a === 'object' && a !== null && typeof (a as { type?: unknown }).type === 'string',
+        );
+        if (!envelope || envelope.type !== 'assistant/message') {
+          if (traceSessionEvents) console.log(`[dsh-facade] trace session/event type=${envelope?.type ?? '(无 type)'}`);
+          return undefined;
+        }
+        const data = typeof envelope.data === 'object' && envelope.data !== null ? (envelope.data as Record<string, unknown>) : {};
+        // 记录**摊平后**的形状（`{type, turn, step, message, usage, …}`），与交给 pi 处理器的形状一致
+        const before = turnUsage.size();
+        turnUsage.record(sessionIdOf(args), { ...envelope, ...data });
+        if (traceSessionEvents) {
+          console.log(
+            `[dsh-facade] trace session/event type=assistant/message turn=${String(data.turn)} `
+              + `usage=${data.usage ? 'yes' : 'no'} 入桶=${turnUsage.size() > before ? 'yes' : 'no'}`,
+          );
+        }
+        return undefined;
+      }),
+    );
     disposers.push(
       ctx.on('session/created', (...args: readonly unknown[]) => {
         const first = args[0];

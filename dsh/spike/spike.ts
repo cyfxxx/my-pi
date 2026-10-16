@@ -35,6 +35,11 @@
  *      这类**只在真实 Host 里才炸**的问题（2026-10-18 Host 冒烟实测：未 inject 就访问 `ctx.tools` 会抛）
  *   A19 **注册结果必须是编译产物**：`ctx.tools.register()` 要的是 `defineTool(options)` 的结果；
  *      直接注册原始 spec 会让真实 provider 拒掉每个请求（Host 冒烟实测 `got 'type: null'`）
+ *   A20 **回合用量桥真跑**（真实 `SessionStore` + **兄弟子 ctx** 拓扑）：`assistant/message` 的用量应被
+ *      累积并按回合**求和**，`turn/end` 时补进 pi 的 `turn_end` 负载；且**多个** `turn_end` 订阅
+ *      （真 Host 有 3 个特性这么干）**每个**都要拿到同一份用量（"取走即清桶"会静默丢数据，见 #18-v）。
+ *      顺带钉住两条实测结论：造服务的插件不能 `inject` 那个服务；裸 `append('assistant/message')`
+ *      会因缺 `surfaceOp` 被真实 Session 拒绝
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -724,6 +729,127 @@ async function main(): Promise<void> {
     a19 = { id: 'A19', ok: false, detail: `编译产物检查抛错：${(error as Error).message.slice(0, 120)}` };
   }
   checks.push(a19);
+
+  // ── A20：会话事件 + 回合用量桥，**真实 SessionStore + 兄弟子 ctx 拓扑**真跑 ──────
+  //
+  // A13 是在**同一个** ctx 上 `enter()/announce()` 再订阅的 ⇒ 它证明的是"同一作用域内可见"，
+  // **不能**证明 profile 里的插件（与宿主是**兄弟**子 ctx）能看到宿主的会话事件。
+  // 2026-10-18 Host 冒烟的反向证据：适配层把 `assistant/message` 的用量攒起来补进 `turn_end`，
+  // 但真跑后 pi 侧 `turn_end` 处理器的 `recordUsage` **没有落盘** ⇒ 必须量出"事件到底到没到、
+  // 用量到底有没有被识别"。这条检查就把整条链路放在真实拓扑上跑一遍。
+  //
+  // 另外两条实测结论一并钉住（都是踩过的坑）：
+  //   ① 造服务的插件**不能** `inject` 那个服务（inject 会等不到 ⇒ 插件永不激活、服务不存在）；
+  //   ② `assistant/message` 是 **surface-eligible**，裸 `append()` 会抛
+  //      "requires a surfaceOp marker" ⇒ 必须带 `{surfaceOp:'append'}`。
+  let a20: Check = { id: 'A20', ok: false, detail: '未执行' };
+  try {
+    const sessionModule = (await import('@deepseek-ai/dsh-session')) as unknown as { SessionStore?: unknown };
+    if (!sessionModule.SessionStore) throw new Error('dsh-session 未导出 SessionStore');
+
+    const root = new Context();
+    root.plugin(SystemPrompt);
+    root.plugin(ToolRuntime);
+    await tick();
+
+    // 兄弟 A：宿主侧的会话存储（会话就是在这里 enter 的 ⇒ emitCtx 是这条子 ctx）
+    let hostCtx: Context | undefined;
+    root.plugin({
+      name: 'spike-host',
+      apply: (ctx: Context) => {
+        hostCtx = ctx;
+        ctx.plugin(sessionModule.SessionStore as never);
+      },
+    } as never);
+
+    // 兄弟 B：像 profile 里的 my-pi 那样是独立子 ctx；外观层装在这里
+    let pluginCtx: Context | undefined;
+    const seenOnPlugin: string[] = [];
+    const turnEnds: Array<{ turnIndex?: number; usage?: { input?: number; output?: number } }> = [];
+    let facadeB: ReturnType<typeof createDshExtensionApi> | undefined;
+    root.plugin({
+      name: 'spike-my-pi',
+      apply: (ctx: Context) => {
+        pluginCtx = ctx;
+        ctx.on('session/event', (_session: unknown, event: { type?: string }) => {
+          if (event?.type) seenOnPlugin.push(event.type);
+          return undefined;
+        });
+      },
+    } as never);
+    // 对照：直接挂 root
+    const seenOnRoot: string[] = [];
+    root.on('session/event', (_session: unknown, event: { type?: string }) => {
+      if (event?.type) seenOnRoot.push(event.type);
+      return undefined;
+    });
+    await tick(200);
+
+    if (pluginCtx) {
+      facadeB = createDshExtensionApi(pluginCtx as unknown as DshContext, { onUnsupported: () => undefined });
+      // ★ 注册**两条** turn_end（真 Host 里有 3 个特性这么做）：
+      //   一条 turn/end 会触发多条桥接 ⇒ 必须**每条**都能拿到用量（销毁式取值只有第一条拿得到）。
+      for (let i = 0; i < 2; i += 1) {
+        facadeB.api.on('turn_end' as never, ((event: unknown) => {
+          const e = event as { turnIndex?: number; message?: { usage?: { input?: number; output?: number } } };
+          turnEnds.push({ turnIndex: e.turnIndex, usage: e.message?.usage });
+          return undefined;
+        }) as never);
+      }
+    }
+
+    // 会话经宿主 ctx 建立（服务本身挂在 hostCtx 那棵子树上）
+    const store = (root as unknown as {
+      sessions?: { create: (id?: string) => { append: (t: string, d: unknown, o?: unknown) => unknown } };
+    }).sessions;
+    const hasStore = typeof store?.create === 'function';
+    let appended = 0;
+    if (hasStore) {
+      const session = store!.create('spike-usage-bridge');
+      session.append('turn/start', { turn: 1 });
+      // 两个 step、两条用量（与真 Host 日志同形）——必须带 surfaceOp，否则真实 Session 会拒绝
+      session.append('assistant/message', {
+        turn: 1,
+        step: 1,
+        message: { role: 'assistant', content: [{ type: 'text', text: 'step1' }] },
+        usage: { inputTokens: 358, outputTokens: 22, cacheReadTokens: 10240, cacheWriteTokens: 0, totalTokens: 10620 },
+      }, { surfaceOp: 'append' });
+      session.append('assistant/message', {
+        turn: 1,
+        step: 2,
+        message: { role: 'assistant', content: [{ type: 'text', text: 'step2' }] },
+        usage: { inputTokens: 249, outputTokens: 89, cacheReadTokens: 10496, cacheWriteTokens: 0, totalTokens: 10834 },
+      }, { surfaceOp: 'append' });
+      session.append('turn/end', { turn: 1, reason: { kind: 'completed' } });
+      appended = 4;
+    }
+    await tick(300);
+
+    const usage = turnEnds[0]?.usage;
+    const ok =
+      hasStore &&
+      appended === 4 &&
+      seenOnPlugin.length === appended &&
+      seenOnRoot.length === appended &&
+      turnEnds.length === 2 &&                                  // 两条桥接都要触发
+      turnEnds.every((t) => t.turnIndex === 1) &&               // 都要有 turnIndex
+      turnEnds.every((t) => t.usage?.input === 358 + 249) &&    // ★ 都要拿到同一份用量（多特性不丢）
+      turnEnds.every((t) => t.usage?.output === 22 + 89) &&
+      usage?.input === 358 + 249;
+    a20 = {
+      id: 'A20',
+      ok: hasStore ? ok : 'skip',
+      detail: hasStore
+        ? `兄弟子 ctx 收到 ${seenOnPlugin.length}/${appended} 条（root 对照 ${seenOnRoot.length}/${appended}）；`
+          + `pi turn_end 处理器 ${turnEnds.length} 次（期望 2），各自 usage.input=[${turnEnds.map((t) => t.usage?.input ?? 'n/a').join(',')}]`
+          + `（期望每个 ${358 + 249}）、turnIndex=[${turnEnds.map((t) => t.turnIndex ?? 'n/a').join(',')}]`
+        : '会话服务不可用（skip）',
+    };
+    facadeB?.dispose();
+  } catch (error) {
+    a20 = { id: 'A20', ok: 'skip', detail: `回合用量桥检查不可用：${(error as Error).message.slice(0, 110)}` };
+  }
+  checks.push(a20);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

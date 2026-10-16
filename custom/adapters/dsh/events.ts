@@ -115,7 +115,7 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     dsh: ['turn/end', 'agent/turn-stopping'],
     via: 'session-event',
     note: '3 处；需要"让回合继续"时 DSH 的 turn-stopping 比 pi 更强（可 steer）',
-    degradedNote: '负载差异（2026-10-17 按契约核对）：pi 的 `turn_end` 带 `{turnIndex, message, toolResults, …}`，而 DSH 的 `turn/end` data 只有 `{turn, reason}`（连回合号字段名都不同：turn vs turnIndex）⇒ 读 `event.message.usage` 的处理器拿不到东西；正解是**改处理器从 `assistant/message` 累积用量**，而不是等 turn/end 带过来',
+    degradedNote: '负载差异（2026-10-18 更新）：pi 的 `turn_end` 是 `{turnIndex, message, toolResults}`（`vendor/pi/packages/agent/src/types.ts:522`），DSH 的 `turn/end` data 只有 `{turn, reason}` ⇒ **用量已由适配层补上**（`usage-accumulator.ts`：从 `assistant/message` 按回合累加，合成 `{turnIndex, message:{usage}}` 并只补缺失字段；真 Host 日志实测多 step 回合要**求和**），`toolResults` 仍未提供 ⇒ 读它的处理器拿不到东西',
   },
   {
     pi: 'session_compact',
