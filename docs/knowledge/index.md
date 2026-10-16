@@ -6,7 +6,7 @@
 > 每页四件事：是什么 / 根因 / **确切命令序列** / **含确切语法的解法**；篇幅 **10–30 行**；只记可泛化的。
 > **本产物不自动进模型上下文、不改任何运行时行为**，只供人审阅。
 
-## 失败模式（41 条，来源：`docs/BUG-REPLAYS.md`）
+## 失败模式（43 条，来源：`docs/BUG-REPLAYS.md`）
 
 - [bug-001](patterns/bug-001.md): 切了模式、重启后没生效 + `modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` + `check-conventions`（状态不入库）+ 状态体检 `modes-legacy-current`；模式状态已迁到 gitignored 的 `modes-sessions.json`
 - [bug-002](patterns/bug-002.md): 模式解析"第 3 轮工厂执行后漂回 full" + `PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 + `mode-switch.test.ts` 的三轮回归 + `resolveStartupMode()` 单一写入点
@@ -49,6 +49,8 @@
 - [bug-039](patterns/bug-039.md): **守门脚本的开关组合会把它变成"只测量"（虚假绿）** + `scripts/dsh-baseline.sh` 最初把参数写成三选一的位置参数（`--check` / `--update` / `--tools`／`--prompt`），于是 `--prompt --check` 只取第一个开关、**丢掉 `--check`** —— 命令看起来在守门，实际只打印测量值并 exit 0；此时改动被守门的源文件也不会报错。这类失效能骗过"我跑过守门了"的自述，属本项目最忌讳的虚假绿 + **已修（2026-10-15，分支 `feat/base-switch-dsh`）**：参数解析改为**正交可组合**（`--check`／`--update` 与 `--tools`／`--prompt` 分开解析），并显式拒绝"`--check` 与 `--update` 同时给"；反证：改源文件 ⇒ exit 1 且三条漂移全部点名，`git checkout` 复原 ⇒ exit 0
 - [bug-040](patterns/bug-040.md): **"取走即销毁"的共享状态被多个订阅者消费 ⇒ 只有第一个拿到，其余静默拿空**（DSH 换基座时抓到的真事故） + `turn_end` 这类 pi 事件会被**多个特性**注册（本仓 3 个），而适配层是"每个 pi 事件注册 ⇒ 一条独立订阅"⇒ **一条** DSH `turn/end` 触发**多条**桥接。回合用量累积器对外只提供 `take()`（取走即清桶），于是**只有第一条**桥接拿到用量，其余全部 `undefined` —— 而恰好需要它的 `recordUsage`（token 记账）**不在第一条** ⇒ 用量永久丢失，且**没有任何报错**：处理器正常返回、字段只是"恰好为空"。同类征兆是"某功能看起来接上了却永远没数据" + **已修（2026-10-18，分支 `feat/base-switch-dsh`）**：`custom/adapters/dsh/usage-accumulator.ts` 对外只给 **`read`（只读不销毁）**，桶靠 LRU（32）与 `drop` 回收；并顺带修掉"只按回合号分桶"⇒ 不同会话的回合 1 会串账（改为**会话 id + 回合号**）。守门：单测 **112 项**（含多订阅者、跨会话不串账、无数据不合成、LRU 淘汰等反向探针）+ spike **A20**；真 Host 复验：三条桥接全部 `用量补丁=yes` 且**未被改动的特性**真的落盘 ✓
 - [bug-041](patterns/bug-041.md): **上游"注册冲突"错误冒泡 ⇒ 连带丢掉该特性后面的一切注册**（DSH 换基座实录） + 真 Host 里 my-pi 的 3 个名字与 DSH 原生撞车（`web_search`/`subagent` 工具、`plan` 命令）。原处置是让 `ctx.tools.register()` 的 `already registered` 冒泡，被 `registerAll` 的"每特性 try/catch"接住 —— 看起来"只丢一个特性"，实际**该特性排在冲突之后的注册全部被跳过**：`web-search` 丢了 `fetch_url`、`subagent` 与 `plan-mode` 各丢了自己的钩子（而 plan-mode 的只读护栏很可能就在钩子里）。**日志只有 3 行"注册功能失败"，少的是钩子 —— 从工具数量上根本看不出来** + duplicate:\
+- [bug-042](patterns/bug-042.md): **`local`/`declare` 同一行里引用刚声明的变量 ⇒ `set -u` 下失败，报错却指向变量名** + 写 DSH 模式场景脚本时写成 `local label="$1" mode="$2" out="$LOG_DIR/run-$label.log"`，脚本跑到那里直接 `line 89: label: unbound variable` 退出 —— **看起来像"调用方没传参"，实际是 bash 语义**：`local` 的所有词**先展开**再赋值，同一行里 `$label` 展开时那个赋值还没生效 + **无自动守门**（属 bash 写法约束；结节见 `docs/design/CODING-TRAPS.md` #13），已修 `scripts/dsh-scenario-mode.sh`
+- [bug-043](patterns/bug-043.md): **打包形态冒烟自 2026-10-18 起静默失效**（连带暴露 `ln -sfn` 的目录语义坑） + `dsh-package.sh` 把 tgz 装到**独立目录**再从那里加载，而 `entry.ts` 那天为 `defineTool` 编译新增了宿主 import `@deepseek-ai/dsh-tools` ⇒ 独立目录里没有宿主包，脚本开始以 `ERR_MODULE_NOT_FOUND: @deepseek-ai/dsh-tools` 失败。它**不在任何自动门禁里**（重、要装包），所以从当天到被发现一直是坏的 —— 典型的"没跑过的守门等于没有守门"。修的过程中又撞上第二个坑：`npm install` 因 peerDependency 先建了**真目录** `node_modules/@deepseek-ai/`，而 `ln -sfn "$SRC" "$D/node_modules/@deepseek-ai"` 会把链接建到**目录里面**（`@deepseek-ai/@deepseek-ai → SRC`）⇒ 症状是"补了宿主包还是找不到" + **已修**：宿主包**逐包**补链接（跳过已存在项，与 `dsh-build.sh` 同做法）；并把"产物不得含 `@earendil-works/*` import"的**零成本断言**加进构建冒烟（`smoke-built.mjs`）⇒ 自包含性从此每次构建都被检查（灵敏度已验：不带 `--alias` 构建时该断言命中 3 处）。结节见 `docs/design/CODING-TRAPS.md` #14
 
 ## 被否提案（7 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 

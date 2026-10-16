@@ -5,11 +5,15 @@
 # 它加载的是 **JS 模块**，而本仓是 TS（无扩展名导入 + 依赖 tsx）。所以要产出一个自包含
 # 的 ESM 文件，DSH 侧不需要 tsx、也不需要本仓的 node_modules。
 #
-# 外部化策略：**所有裸包名都 external**（esbuild `--packages=external`），只有本仓 TS 进产物。
-#   - `@deepseek-ai/*`：**宿主提供**（DSH 自己就是这些包的宿主）
-#   - `@earendil-works/*`：由部署别名到 `custom/adapters/dsh/pi-shims/`（见 pi-shims/README.md）
-#   - typebox / ws / tinyglobby 等：由 `dsh/plugin/package.json` 声明，profile 安装时解析
-# 这样产物只含我们自己的代码（小、可读），依赖关系显式写在 package.json 里。
+# 外部化策略：`--packages=external`（所有**裸包名**都不进产物），**外加把两个 pi specifier 改写成
+# 本仓 shim 的路径** ⇒ 它们不是裸包名了，于是被**打进产物**（本仓 TS 本就该进产物）。
+#   - `@deepseek-ai/*`：**宿主提供**（DSH 自己就是这些包的宿主）⇒ external
+#   - `@earendil-works/pi-coding-agent` / `pi-tui`：**别名到 `custom/adapters/dsh/pi-shims/` 并打包**
+#     （2026-10-18 改）。原先靠"部署侧把 specifier 别名到 shim"，而 `dsh/plugin/package.json` 的
+#     `files` 只发 `dist/`+README ⇒ 装到真 profile 时 shim **根本不在包里**，只能靠 profile 级
+#     `pnpm.overrides` 兜底，而那条路从未在真 profile 跑过（登记为未核实 ✗）。改成打包后产物**自带**
+#     shim：少一个部署期依赖，也不再需要 overrides。
+#   - typebox / ws / tinyglobby 等：由 `dsh/plugin/package.json` 声明，profile 安装时解析 ⇒ external
 # 为什么不用"只 external @deepseek-ai/*"：那会把 playwright-core 的**可选**依赖
 # （chromium-bidi 等未安装的包）也拖进打包并直接报错 —— 浏览器能力本就该按需安装。
 #
@@ -47,6 +51,8 @@ echo "=== 构建 DSH 插件产物 ==="
 "$ESBUILD" "$ROOT/dsh/plugin/entry.ts" \
   --bundle --platform=node --format=esm --target=node22 \
   --packages=external \
+  --alias:@earendil-works/pi-coding-agent="$ROOT/custom/adapters/dsh/pi-shims/coding-agent/index.js" \
+  --alias:@earendil-works/pi-tui="$ROOT/custom/adapters/dsh/pi-shims/tui/index.js" \
   --banner:js='/* my-pi DSH 插件（由 scripts/dsh-build.sh 从 dsh/plugin/entry.ts 打包；勿手改） */' \
   --outfile="$OUT" --log-level=warning || { echo "❌ esbuild 失败" >&2; exit 2; }
 echo "✓ 产物：$OUT（$(du -h "$OUT" | awk '{print $1}')）"

@@ -161,6 +161,24 @@
   ```
 - 台账：`docs/BUG-REPLAYS.md` #42。
 
+## 14. `ln -sfn <源> <目标>` 在"目标已是**真目录**"时会把链接建到**它里面**
+
+- **症状**：`ln -sfn "$SRC" "$D/node_modules/@scope"` 之后，`$D/node_modules/@scope/pkg` **依然找不到**
+  ⇒ 看起来像"补了软链却没生效"。实际是生成了 `$D/node_modules/@scope/@scope → $SRC`。
+- **根因**：`-n`（`--no-dereference`）只在**目标本身是符号链接**时把链接当作文件替换；
+  目标是**已存在的真目录**时，`ln` 的行为是"在目录里建一个同名链接"（经典语义）。
+  实测场景：`npm install` 因为 peerDependency 先建了真的 `node_modules/@deepseek-ai/`（含 `cordis`），
+  于是整体软链把 `@scope` 建进了目录内部。
+- **判据（改法）**：**逐包**补，跳过已存在的项（本仓 `scripts/dsh-build.sh` 早就是这么写的）：
+  ```bash
+  mkdir -p "$D/node_modules/@scope"
+  for pkg in "$SRC"/*; do n="$(basename "$pkg")"; [ -e "$D/node_modules/@scope/$n" ] || ln -sfn "$pkg" "$D/node_modules/@scope/$n"; done
+  ```
+  想整体替换就先 `rm -rf` 目标（GNU 的 `ln -sfnT` 也行，但可移植性差）。
+- **复现**：`bash -c 'mkdir -p /tmp/ln-probe/{src,dst/@s}; touch /tmp/ln-probe/src/p; ln -sfn /tmp/ln-probe/src /tmp/ln-probe/dst/@s; ls -l /tmp/ln-probe/dst/@s'`
+  （会看到 `dst/@s/@s -> /tmp/ln-probe/src`）。
+- 台账：`docs/BUG-REPLAYS.md` #43。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

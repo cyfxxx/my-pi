@@ -28,8 +28,18 @@ ln -sfn "$PWD/custom/adapters/dsh/pi-shims/coding-agent" node_modules/@earendil-
 bash scripts/dsh-spike.sh --no-install           # A9：全量 bootstrap 仍应 54 工具 / 0 失败
 ```
 
-真正的 DSH 部署把这两条写成 profile 的依赖覆盖（`pnpm.overrides` / `file:` 依赖）即可，
-等价于把 specifier 指向本目录。
+★ **2026-10-18 起打包产物不再依赖这条别名**：`scripts/dsh-build.sh` 用 esbuild 的
+`--alias:@earendil-works/pi-coding-agent=…/pi-shims/coding-agent/index.js`（`pi-tui` 同理）把这两个
+specifier **改写成本目录的路径再打进产物** ⇒ 产物**自带** shim，装到真 profile 时也不需要
+profile 级 `pnpm.overrides`。
+
+为什么改：包清单是 `files: ["dist", "README.md"]` ⇒ shim **不在分发包里**，而原先的策略要求
+"部署侧把 specifier 别名到本目录" —— 那条路从未在真 profile 跑过（一直登记为未核实 ✗）。
+实测（把仓库根的别名**搬走**后跑真 Host）：退出码 0、模块解析失败 **0** 条、注册汇总不变
+（`工具 53 / 命令 10 / 冲突 1 / 钩子 18`）⇒ 自包含成立。
+
+上面那段 `ln -sfn …` 仍然有用：**本地开发/spike**（`tsx` 直接跑 TS 时不做打包，需要 Node 能解析
+这两个 specifier）。
 
 `PI_SPIKE_PI_ALIAS=vendor` 可切成"别名到 vendor/pi 真包"的**对照模式**（行为更完整，但那是 pi 的代码）。
 
