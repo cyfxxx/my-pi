@@ -535,7 +535,7 @@
 - `docs/BUG-REPLAYS.md` · #40 **"取走即销毁"的共享状态被多个订阅者消费 ⇒ 只有第一个拿到，其余静默拿空**（DSH 换基座时抓到的真事故）：`turn_end` 这类 pi 事件会被**多个特性**注册（本仓 3 个），而适配层是"每个 pi 事件注册 ⇒ · 真 Host 打开 `MY_PI_DSH_TRACE_EVENTS=1` 一眼可见：`用量补丁=yes(calls=1)` 之后紧跟着**两条** `用量补丁=no`；而 `portable/memory/context/.usage-di · 数字: 1.66 天 / 3 个 · 证据: npx vitest run custom/adapters/dsh/__tests__/usage-accumulator.test.ts
 - `docs/BUG-REPLAYS.md` · #41 **上游"注册冲突"错误冒泡 ⇒ 连带丢掉该特性后面的一切注册**（DSH 换基座实录）：真 Host 里 my-pi 的 3 个名字与 DSH 原生撞车（`web_search`/`subagent` 工具、`plan` 命令）。 · 修前：`grep -c "注册功能失败" /tmp/dsh-host-run.log` = 3，且注册汇总缺失（根本无从知道少了什么）。修后真 Host：`⚠️ 注册功能失败` **0 条**，改为 3 条点名上报 `registerToo · 数字: 0 条 / 3 条 / 52 个 / 9 个
 
-## 设计文档（209 条）
+## 设计文档（216 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -573,6 +573,13 @@
 - `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 四、本次的实测数字（本项的"效率指标"） · - 未接线清单规模：**A 段 18 条 + B 段 4 条 + C 段 1 条（我误放的，已移正）**； · 数字: 18 条 / 4 条 / 1 条 / 5 条
 - `docs/design/DORMANT-AUDIT.md` · 五、执行结果（2026-10-08）：`TOOL_LAYERING` 已删除 · 用户授权"由你决定"。**判断：删除。** 依据（按分量排序）： · 数字: 100 个 / 18 个 / 442B / 60.8%
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 1. `web_search`：DSH **覆盖不了**（真缺口） · ⇒ **让位会丢**：无 key/自建后端搜索、模型可控的结果条数与抓取长度。
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 2. `subagent`：DSH **大体覆盖**，但 my-pi 有 5 项独有 · ⇒ **让位会丢**：chain、目录扫描式 agent 定义、逐任务 `cwd`、进程外投递、Termux 并发降级。 · 证据: node scripts/subagent-inbox.mjs post
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 3. `plan`：DSH 只管"入口"，**完全不管强制** · ★ **关键区分（别混为一谈）**：让位只跳过 `plan` **命令**。`plan_enter`/`plan_exit` 工具与那条 · 数字: 18 个
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 4. 汇总：三块全部让位时会真正丢失什么 · - **`web_search`**：① 无 key/自建 SearXNG 端点；② 免配置 Bing 降级；③ 模型可控 `maxResults`；④ `max_length`。
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 5. 明确的"未查到"清单（附检索面） · - DSH：搜索的**时间范围过滤 / 分页 / cookie**（检索面：`dsh-tool-web`、`dsh-web` 的 schema 与
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 6. 待决策（**未决**，不擅自定） · 三个选项见 `DSH-MIGRATION-PLAN.md` 实测 #18-u。基于本文证据的**倾向**（尚待确认）：
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 相关 · - 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](design/DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v
 - `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 1. 第一步：my-pi 的钩子归类（实测，非估算） · grep 命令（可复跑）： · 数字: 55 个 / 53 个 / 2 个 / 18 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 2. 第二步：DSH 实际声明的事件（附行号） · DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不在 my-pi 的 `node_modules`**）。 · 数字: 105 个 / 41 个 / 59 个 / 2 条 · 证据: 1e7f6d9597241db0
