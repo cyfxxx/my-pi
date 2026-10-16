@@ -143,6 +143,24 @@
   `registrationSummary()`）、单测 `dsh-adapter.test.ts`、诊断开关 `MY_PI_DSH_TRACE_EVENTS=1`。
 - 台账：[`docs/BUG-REPLAYS.md`](../BUG-REPLAYS.md) #41。
 
+## 13. `local`/`declare` 同一行里引用前面刚声明的变量 ⇒ `set -u` 下报 `unbound variable`
+
+- **症状**：函数里写
+  ```bash
+  local label="$1" mode="$2" out="$LOG_DIR/run-$label.log"
+  ```
+  在 `set -u` 的脚本里直接失败：`line 89: label: unbound variable` —— **报错指向变量名**，
+  看起来像"调用方没传参"，实际是写法问题。
+- **根因**：`local`/`declare`/`export`/`readonly` 这类内建命令的**所有词先展开、再逐个赋值**
+  ⇒ 同一行里 `$label` 展开时那个赋值还没生效。
+- **判据（改法）**：拆成多条 `local`（或先算好再声明）。
+- **复现**（一条命令看懂）：
+  ```bash
+  bash -c 'set -u; f(){ local a="$1" b="x-$a"; echo "$b"; }; f one'   # ❌ a: unbound variable
+  bash -c 'set -u; f(){ local a="$1"; local b="x-$a"; echo "$b"; }; f one'  # ✓ x-one
+  ```
+- 台账：`docs/BUG-REPLAYS.md` #42。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

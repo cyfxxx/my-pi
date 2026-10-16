@@ -491,7 +491,7 @@
 - `PROGRESS.md` · packs 全量整理：补回 1 个被静默吞掉的上游文件 + 结构约定升格为守门（2026-10-15） · - 用户："查看 packs 目录，做一下整理和优化"。先做全量只读体检（体积/追踪面/147 个 SKILL.md 的 frontmatter/许可/空目录/跨包重复/索引登记/引用可达性）， · 数字: 147 个 / 2 个 / 13 个 / 17 个 · 证据: cab634bd
 - `PROGRESS.md` · Linux 完全便携化：运行时装进仓库、随项目移动（2026-10-15） · - 用户："之前在 windows 上实现了完全便携化……现在继续优化便携化能力，实现在 Linux 环境中的完全便携化，所有项目相关内容全部集中在一起，不分散不依赖系统环境。 · 数字: 28.83 MB / 12 秒 / 6.5 MB / 29 个
 
-## 缺陷回放（41 条）
+## 缺陷回放（42 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -534,8 +534,9 @@
 - `docs/BUG-REPLAYS.md` · #39 **守门脚本的开关组合会把它变成"只测量"（虚假绿）**：`scripts/dsh-baseline.sh` 最初把参数写成三选一的位置参数（`--check` / `--update` / `--tools`／`--prompt` · 未改任何文件时 `--prompt --check` 与 `--prompt` 输出**完全一样**且都 exit 0；改一行源文件后 `--prompt --check` 仍 exit 0（应 1） · 证据: bash scripts/dsh-baseline.sh --prompt
 - `docs/BUG-REPLAYS.md` · #40 **"取走即销毁"的共享状态被多个订阅者消费 ⇒ 只有第一个拿到，其余静默拿空**（DSH 换基座时抓到的真事故）：`turn_end` 这类 pi 事件会被**多个特性**注册（本仓 3 个），而适配层是"每个 pi 事件注册 ⇒ · 真 Host 打开 `MY_PI_DSH_TRACE_EVENTS=1` 一眼可见：`用量补丁=yes(calls=1)` 之后紧跟着**两条** `用量补丁=no`；而 `portable/memory/context/.usage-di · 数字: 1.66 天 / 3 个 · 证据: npx vitest run custom/adapters/dsh/__tests__/usage-accumulator.test.ts
 - `docs/BUG-REPLAYS.md` · #41 **上游"注册冲突"错误冒泡 ⇒ 连带丢掉该特性后面的一切注册**（DSH 换基座实录）：真 Host 里 my-pi 的 3 个名字与 DSH 原生撞车（`web_search`/`subagent` 工具、`plan` 命令）。 · 修前：`grep -c "注册功能失败" /tmp/dsh-host-run.log` = 3，且注册汇总缺失（根本无从知道少了什么）。修后真 Host：`⚠️ 注册功能失败` **0 条**，改为 3 条点名上报 `registerToo · 数字: 0 条 / 3 条 / 52 个 / 9 个
+- `docs/BUG-REPLAYS.md` · #42 **`local`/`declare` 同一行里引用刚声明的变量 ⇒ `set -u` 下失败，报错却指向变量名**：写 DSH 模式场景脚本时写成 `local label="$1" mode="$2" out="$LOG_DIR · 脚本输出只有那一条 unbound variable（第 89 行），函数第一行；同一函数改成多条 `local` 后立刻正常（场景随即跑通并给出 53/10 与 0/1 两组注册汇总）
 
-## 设计文档（217 条）
+## 设计文档（218 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -567,6 +568,7 @@
 - `docs/design/CODING-TRAPS.md` · 10. `find -type f` 在本机 PRoot/FUSE 下会**间歇性漏掉普通文件**（比 #8 更毒：它会污染守门结论） · - **症状 A（守门虚假失败）**：`check-conventions.sh` 的"模式资产引用成对"突然报 · 数字: 0 个 / 0KB / 9 个 / 8 条
 - `docs/design/CODING-TRAPS.md` · 11. 共享状态对外给"取走即销毁"的接口 ⇒ 多订阅者场景下静默丢数据 · - **症状**：某功能"看着接上了却永远没数据"——处理器正常返回、字段只是**恰好为空**， · 数字: 3 个 / 3 条
 - `docs/design/CODING-TRAPS.md` · 12. 上游"注册冲突"错误直接冒泡 ⇒ **连带丢掉该特性后面的一切注册**（且数量上看不出来） · - **症状**：真实宿主里某些能力就是没有，而**日志只说了一个冲突**。2026-10-18 DSH 换基座实测：
+- `docs/design/CODING-TRAPS.md` · 13. `local`/`declare` 同一行里引用前面刚声明的变量 ⇒ `set -u` 下报 `unbound variable` · - **症状**：函数里写
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条

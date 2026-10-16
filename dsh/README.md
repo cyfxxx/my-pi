@@ -163,6 +163,7 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 ```bash
 MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-isolation.sh     # 两实例隔离（并发跑两次真实模型）
 MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-session-resume.sh # 会话续接（--session-id 收养，跑两轮）
+MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-mode.sh           # 模式（启动期）生效（跑两次）
 ```
 
 换底座后**旧的绿色不能继承**：pi 侧 `scripts/test-scenario-*.mjs` 断言的是 pi 的进程/状态语义，
@@ -176,7 +177,11 @@ DSH 的 Host/Session 语义不同 ⇒ 场景必须**重写**。已重写的第�
 但有 `--session-id <id>` **收养**已持久化会话继续跑。实测：两轮报出的 sessionId 相同、会话目录数不变
 （是收养而不是新开）、续接的会话里我们的插件仍在位、第二轮答出了第一轮让它"记住"的词（历史被带上）。
 ✗ 明确**不**验"切换前可否决"——DSH 上该语义没有落点（钩子映射 `session_before_switch` 行）；
-只剩**模式切换**待重写（依赖命令执行，而 `commands.execute()` 需要客户端/真 agent）。
+已重写的第三个（模式）换了问法：pi 侧断言的是 supervisor **自动重启链**，DSH 没有那条链
+（`admin_restart` 在适配层明确报 unsupported）⇒ 改为测"模式 = 启动期决定注册哪些特性"，这在 DSH 上仍成立：
+实测**同一插件**默认模式 `工具 53 / 命令 10（含换名的 mypi-plan）`、`PI_AGENT_MODE=minimal` 时
+`工具 0 / 命令 1（mode）`，两次都退出码 0，`mode` 命令始终在（否则极简模式切不回来）。
+✗ 不验"运行中热切换 + 自动重启续接"（DSH 上要靠客户端/Host 层重做）—— P6③ 到此 **3/3**。
 
 ### 类型守门：`dsh/` 有自己的 tsconfig
 
