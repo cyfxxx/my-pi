@@ -20,7 +20,8 @@
  *     的截断兜底（DSH 自带的 `foldSessionTitle()` 更精细，但引入它会破坏"适配层零 DSH import"）。
  */
 
-import type { DshContext } from './types';
+import { getDshService } from './service';
+import type { DshContext, DshSessions, DshSessionTitle } from './types';
 
 /** 与 pi 侧 `SessionRow` 同形的行（避免跨模块 import：`session-adapter.ts` 会在运行时 import pi） */
 export interface DshSessionRow {
@@ -111,7 +112,7 @@ export function toDshSessionRow(session: unknown, sessionTitle?: { get?: (s: unk
  * 会话服务缺失 ⇒ **显式失败**（`success:false` + 原因），不返回空表假装"没有会话"。
  */
 export function listDshSessions(ctx: DshContext, cwd?: string): DshSessionListResult {
-  const sessions = ctx.sessions;
+  const sessions = getDshService<DshSessions>(ctx, 'sessions');
   if (!sessions || typeof sessions.list !== 'function') {
     return { success: false, error: 'DSH 未加载会话服务（ctx.sessions.list 不可用）⇒ 无法枚举会话' };
   }
@@ -121,7 +122,7 @@ export function listDshSessions(ctx: DshContext, cwd?: string): DshSessionListRe
   } catch (error) {
     return { success: false, error: `ctx.sessions.list() 抛错：${error instanceof Error ? error.message : String(error)}` };
   }
-  const titleService = ctx.sessionTitle as { get?: (s: unknown) => unknown } | undefined;
+  const titleService = getDshService<DshSessionTitle>(ctx, 'sessionTitle') as { get?: (s: unknown) => unknown } | undefined;
   let rows = raw.map((session) => toDshSessionRow(session, titleService));
   if (typeof cwd === 'string' && cwd.length > 0) rows = rows.filter((row) => row.cwd === cwd);
   rows.sort((a, b) => b.modifiedMs - a.modifiedMs);

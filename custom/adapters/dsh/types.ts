@@ -82,6 +82,22 @@ export interface DshDefineToolOptions {
 /** 注册表返回的 disposer（DSH 比 pi 多这一层，便于卸载/HMR） */
 export type DshDisposer = () => void;
 
+/**
+ * 工具定义的**编译器**：DSH 的 `defineTool(options)`（`dsh-tools/lib/index.js:844-856`）。
+ *
+ * ★ 为什么必须过它（2026-10-18 Host 级冒烟实测的**致命 bug**）：
+ *   `ctx.tools.register()` 要的是**已编译**的 `ToolDefinition` —— `defineTool()` 会把
+ *   "逐属性 spec" 编译成模型侧的 JSON Schema（`{type:'object', properties:{…}}`）。
+ *   我们此前直接把**原始 options**（spec）注册进去，于是 provider 收到的
+ *   `input_schema` 是 `{key:{type:'string'}}`（没有 `type:'object'`）⇒ 真实 Host 里
+ *   **每一个请求都被拒**：`Invalid schema for function 'admin_get_config': schema must be a
+ *   JSON Schema of 'type: "object"', got 'type: null'`。
+ *   本地 harness 一直没抓到，是因为我们只比对了"注册成功/能执行"，没比对**注册结果本身是不是编译产物**。
+ *
+ * 由 `dsh/plugin/entry.ts` 注入（那里可以 import DSH 包），从而让 `custom/` 保持零 DSH import。
+ */
+export type DshDefineTool = (options: unknown) => unknown;
+
 /** 工具注册服务（`ctx.tools`） */
 export interface DshToolRegistry {
   register(definition: DshDefineToolOptions): DshDisposer;

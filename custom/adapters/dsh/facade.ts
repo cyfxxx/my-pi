@@ -29,16 +29,23 @@
 import type { ExtensionAPI, ToolDefinition as PiToolDefinition } from '@earendil-works/pi-coding-agent';
 import { assertEventsMapped, resolveDshEvent } from './events';
 import { dedupeByTurn, idleOnly, makeDshListener, withSessionContext, type PiHookHandler } from './hooks';
+import { getDshService } from './service';
 import { toDshToolPayload, type UnsupportedReporter } from './tool';
 import type {
   DshAgentLike,
+  DshDefineTool,
+  DshAgents,
   DshCommandDefinition,
   DshCommandInvocation,
   DshCommandResult,
   DshContext,
   DshDisposer,
+  DshCommandRuntime,
   DshEventListener,
   DshEventVia,
+  DshSessions,
+  DshSessionTitle,
+  DshToolRegistry,
 } from './types';
 
 /** 成员的可用性判定 */
@@ -69,6 +76,15 @@ export interface DshFacadeOptions {
   readonly eventOverrides?: Readonly<Record<string, string>>;
   /** 透传给 pi 处理器的第二个实参（DSH 侧拿不到 pi 的 ExtensionContext ⇒ 默认 undefined） */
   readonly piContext?: unknown;
+  /**
+   * DSH 的 `defineTool` 编译器（**强烈建议提供**）。
+   *
+   * 为什么必须：`ctx.tools.register()` 要的是 `defineTool(options)` 的**编译产物**
+   * （逐属性 spec → 模型侧 JSON Schema）；直接注册原始 options 会让真实 provider 拒掉每个请求
+   * （2026-10-18 Host 冒烟实测：`schema must be a JSON Schema of 'type: "object"', got 'type: null'`）。
+   * 由 `dsh/plugin/entry.ts` 注入，`custom/` 因此保持零 DSH import。
+   */
+  readonly compileTool?: DshDefineTool;
 }
 
 export interface DshFacade {
@@ -122,7 +138,7 @@ class SurfaceLedger {
 /**
  * 创建 DSH 版 pi 外观。
  *
- * @param ctx DSH 的插件上下文（`ctx.tools` / `ctx.on` 至少要有其一；缺 `ctx.tools` 时工具注册会如实上报）
+ * @param ctx DSH 的插件上下文（`tools` / `ctx.on` 至少要有其一；缺 `tools` 时工具注册会如实上报）
  */
 export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions = {}): DshFacade {
   const report = options.onUnsupported ?? ((member, detail) => console.warn(`[dsh-facade] 无等价物：${member} —— ${detail}`));
@@ -132,28 +148,35 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   let disposed = false;
 
   // ── 能力探测：先声明基线，再按运行时实际拥有的服务降级 ─────────────────────
-  const canRegisterTool = typeof ctx.tools?.register === 'function';
-  ledger.declare('registerTool', canRegisterTool ? 'supported' : 'unsupported', canRegisterTool ? undefined : 'ctx.tools 缺失（需要加载 DSH 的工具插件；裸 Context 没有该服务）');
+  // ★ 服务一律经 `getDshService` 取：cordis 里"未 inject 就访问 `ctx.x`"会**抛错**（真实 Host 实测）
+  const tools = getDshService<DshToolRegistry>(ctx, 'tools');
+  const commands = getDshService<DshCommandRuntime>(ctx, 'commands');
+  const sessions = getDshService<DshSessions>(ctx, 'sessions');
+  const sessionTitleService = getDshService<DshSessionTitle>(ctx, 'sessionTitle');
+  const agents = getDshService<DshAgents>(ctx, 'agents');
+
+  const canRegisterTool = typeof tools?.register === 'function';
+  ledger.declare('registerTool', canRegisterTool ? 'supported' : 'unsupported', canRegisterTool ? undefined : 'tools 缺失（需要加载 DSH 的工具插件；裸 Context 没有该服务）');
   const canOn = typeof ctx.on === 'function';
   ledger.declare('on', canOn ? 'supported' : 'unsupported', canOn ? undefined : 'ctx.on 缺失');
-  const canCommand = typeof ctx.commands?.register === 'function';
-  ledger.declare('registerCommand', canCommand ? 'degraded' : 'unsupported', canCommand ? 'DSH 命令服务契约未读（dsh-commands），载荷为尽力映射' : 'ctx.commands 缺失（命令服务未加载）');
-  const canRestrict = typeof (ctx.tools as { restrict?: unknown } | undefined)?.restrict === 'function';
-  ledger.declare('setActiveTools', canRestrict ? 'degraded' : 'unsupported', canRestrict ? '映射到 ctx.tools.restrict（DSH 的限制是"求交"，与 pi 的"设置激活集"不完全等价）' : undefined);
+  const canCommand = typeof commands?.register === 'function';
+  ledger.declare('registerCommand', canCommand ? 'degraded' : 'unsupported', canCommand ? 'DSH 命令服务契约未读（dsh-commands），载荷为尽力映射' : 'commands 缺失（命令服务未加载）');
+  const canRestrict = typeof (tools as { restrict?: unknown } | undefined)?.restrict === 'function';
+  ledger.declare('setActiveTools', canRestrict ? 'degraded' : 'unsupported', canRestrict ? '映射到 tools.restrict（DSH 的限制是"求交"，与 pi 的"设置激活集"不完全等价）' : undefined);
   ledger.declare(
     'getActiveTools',
-    typeof (ctx.tools as { schemas?: unknown } | undefined)?.schemas === 'function' ? 'degraded' : 'unsupported',
+    typeof (tools as { schemas?: unknown } | undefined)?.schemas === 'function' ? 'degraded' : 'unsupported',
     '落到 ToolRuntime.schemas()（DSH 没有"全部 vs 激活"两个清单）',
   );
   ledger.declare(
     'getAllTools',
-    typeof (ctx.tools as { schemas?: unknown } | undefined)?.schemas === 'function' ? 'degraded' : 'unsupported',
+    typeof (tools as { schemas?: unknown } | undefined)?.schemas === 'function' ? 'degraded' : 'unsupported',
     '与 getActiveTools 同源（DSH 没有未受限的完整清单 API）',
   );
   ledger.declare(
     'setSessionName',
-    typeof (ctx.sessionTitle as { rename?: unknown } | undefined)?.rename === 'function' ? 'degraded' : 'unsupported',
-    '映射到 ctx.sessionTitle.rename(当前会话, 标题)（@deepseek-ai/dsh-session-title）；会话对象来自 session/created 跟踪',
+    typeof (sessionTitleService as { rename?: unknown } | undefined)?.rename === 'function' ? 'degraded' : 'unsupported',
+    '映射到 sessionTitleService.rename(当前会话, 标题)（@deepseek-ai/dsh-session-title）；会话对象来自 session/created 跟踪',
   );
   for (const member of [
     'registerShortcut',
@@ -177,7 +200,7 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
    * ★ 这条订阅是**基础设施**，不对外声明成 pi 面成员。
    */
   let currentSession: unknown;
-  /** 当前 agent（由 `agent/created` 跟踪；拿不到时回退 `ctx.agents.currentInitiator()`） */
+  /** 当前 agent（由 `agent/created` 跟踪；拿不到时回退 `agents.currentInitiator()`） */
   let currentAgent: unknown;
   /** 生成 UserMessage 的稳定 id 的序号（brand 在运行时是恒等函数，实测 `MessageId('abc') === 'abc'`） */
   let messageSeq = 0;
@@ -187,14 +210,25 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
 
   const registerTool = (definition: PiToolDefinition): void => {
     ledger.use('registerTool');
-    if (!canRegisterTool || !ctx.tools) return;
+    if (!canRegisterTool || !tools) return;
     // 输入是 **pi 形状**的 ToolDefinition（外观层坐在 pi 原来的位置上）——
     // 详见 custom/adapters/dsh/tool.ts 文件头的"两个形状"说明。
     const payload = toDshToolPayload(definition, {
       onUnsupported: report,
       piContext: options.piContext ?? { hasUI: options.hasUI, cwd: options.cwd },
     });
-    disposers.push(ctx.tools.register(payload));
+    // ★ 必须注册**编译产物**：`ctx.tools.register()` 要的是 `defineTool(options)` 的结果
+    //   （spec → 模型侧 JSON Schema）。直接注册原始 options 会让真实 provider 拒掉每个请求
+    //   （Host 冒烟实测：`Invalid schema for function …: got 'type: null'`）。
+    if (typeof options.compileTool !== 'function') {
+      report(
+        'registerTool.compile',
+        '未提供 DSH 的 defineTool 编译器（facadeOptions.compileTool）⇒ 注册的是**未编译**定义，'
+          + '真实 provider 会以 "schema must be a JSON Schema of type object" 拒绝请求；请由插件入口注入 defineTool',
+      );
+    }
+    const registered = options.compileTool ? options.compileTool(payload) : payload;
+    disposers.push(tools.register(registered as never));
   };
 
   // ── 钩子 ───────────────────────────────────────────────────────────────────
@@ -325,8 +359,8 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     if (!def.description) {
       report(`command.${normalized}.description`, 'pi 侧 description 可选、DSH 必填 ⇒ 用命令名兜底');
     }
-    if (!canCommand || !ctx.commands) return;
-    const runtime = ctx.commands;
+    if (!canCommand || !commands) return;
+    const runtime = commands;
     const dshDefinition: DshCommandDefinition = {
       name: normalized,
       description: def.description ?? normalized,
@@ -366,15 +400,15 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
    * 所以 `getActiveTools` 与 `getAllTools` 都落到它上面，并在报告里写明这是**降级**（不是等价）。
    */
   const toolNamesFromSchemas = (member: string): string[] => {
-    const schemas = (ctx.tools as { schemas?: (scope?: unknown) => readonly { name?: unknown }[] } | undefined)?.schemas;
+    const schemas = (tools as { schemas?: (scope?: unknown) => readonly { name?: unknown }[] } | undefined)?.schemas;
     if (typeof schemas !== 'function') {
-      report(member, 'ctx.tools.schemas() 不可用 ⇒ 无法枚举工具名');
+      report(member, 'tools.schemas() 不可用 ⇒ 无法枚举工具名');
       return [];
     }
     try {
-      return schemas.call(ctx.tools).map((sch) => String(sch?.name ?? '')).filter((n) => n.length > 0);
+      return schemas.call(tools).map((sch) => String(sch?.name ?? '')).filter((n) => n.length > 0);
     } catch (error) {
-      report(member, `ctx.tools.schemas() 调用失败：${error instanceof Error ? error.message : String(error)}`);
+      report(member, `tools.schemas() 调用失败：${error instanceof Error ? error.message : String(error)}`);
       return [];
     }
   };
@@ -386,7 +420,7 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
   };
   const setActiveTools = (names: string[]): void => {
     ledger.use('setActiveTools');
-    const restrict = (ctx.tools as { restrict?: (filter: { allow?: readonly string[] }) => DshDisposer } | undefined)?.restrict;
+    const restrict = (tools as { restrict?: (filter: { allow?: readonly string[] }) => DshDisposer } | undefined)?.restrict;
     if (typeof restrict !== 'function') return;
     disposers.push(restrict({ allow: names }));
   };
@@ -403,15 +437,15 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     ledger.use('setThinkingLevel');
   };
   /**
-   * 解析"当前 agent"：优先取 `agent/created` 跟踪到的，其次问注册表 `ctx.agents.currentInitiator()`
+   * 解析"当前 agent"：优先取 `agent/created` 跟踪到的，其次问注册表 `agents.currentInitiator()`
    * （在工具执行/事件处理里它给出当前 agent）。
    */
   const resolveAgent = (member: string): DshAgentLike | undefined => {
     if (currentAgent) return currentAgent as DshAgentLike;
-    const registry = ctx.agents;
+    const registry = agents;
     const initiator = typeof registry?.currentInitiator === 'function' ? registry.currentInitiator() : undefined;
     if (initiator) return initiator;
-    report(member, '拿不到当前 agent（未跟踪到 agent/created 且 ctx.agents.currentInitiator() 为空）⇒ 未发送');
+    report(member, '拿不到当前 agent（未跟踪到 agent/created 且 agents.currentInitiator() 为空）⇒ 未发送');
     return undefined;
   };
 
@@ -504,24 +538,24 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     );
   };
   /**
-   * `setSessionName(title)` → `ctx.sessionTitle.rename(session, title)`。
+   * `setSessionName(title)` → `sessionTitleService.rename(session, title)`。
    *
-   * 前置：① `ctx.sessionTitle` 服务已加载（`@deepseek-ai/dsh-session-title`）；
+   * 前置：① `sessionTitleService` 服务已加载（`@deepseek-ai/dsh-session-title`）；
    * ② 能拿到**当前会话对象** —— 优先用 `session/created` 跟踪到的那个，
    * 否则在"当前只有一个会话"时用它（多会话时**不猜**，直接上报）。
    * 拿不到就显式上报（不静默丢弃）。
    */
   const setSessionName = (title: string): void => {
     ledger.use('setSessionName');
-    const titles = ctx.sessionTitle as { rename?: (session: unknown, title: string) => unknown } | undefined;
+    const titles = sessionTitleService as { rename?: (session: unknown, title: string) => unknown } | undefined;
     if (typeof titles?.rename !== 'function') {
-      report('setSessionName', 'ctx.sessionTitle 服务未加载（@deepseek-ai/dsh-session-title）⇒ 无法设置会话名');
+      report('setSessionName', 'sessionTitleService 服务未加载（@deepseek-ai/dsh-session-title）⇒ 无法设置会话名');
       return;
     }
     let session = currentSession;
     if (!session) {
-      const sessions = ctx.sessions as { list?: () => readonly unknown[] } | undefined;
-      const list = typeof sessions?.list === 'function' ? sessions.list() : undefined;
+      const sessionStore = sessions as { list?: () => readonly unknown[] } | undefined;
+      const list = typeof sessionStore?.list === 'function' ? sessionStore.list() : undefined;
       if (Array.isArray(list) && list.length === 1) session = list[0];
     }
     if (!session) {
@@ -530,9 +564,9 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     }
     try {
       titles.rename(session, String(title));
-      ledger.declare('setSessionName', 'degraded', '映射到 ctx.sessionTitle.rename(当前会话, 标题)；会话对象来自 session/created 跟踪');
+      ledger.declare('setSessionName', 'degraded', '映射到 sessionTitleService.rename(当前会话, 标题)；会话对象来自 session/created 跟踪');
     } catch (error) {
-      report('setSessionName', `ctx.sessionTitle.rename 抛错：${error instanceof Error ? error.message : String(error)}`);
+      report('setSessionName', `sessionTitleService.rename 抛错：${error instanceof Error ? error.message : String(error)}`);
     }
   };
 

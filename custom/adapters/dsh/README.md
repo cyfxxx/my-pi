@@ -65,10 +65,10 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 17 条检查（A1–A17）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 19 条检查（A1–A19）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）、**会话枚举**（A16）、**流帧翻译**（A17）。
-实测结果：**17 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）、**会话枚举**（A16）、**流帧翻译**（A17）、**按插件装载产物**（A18）、**注册定义是编译产物**（A19）。
+实测结果：**19 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
 **7 直接 / 11 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
@@ -233,3 +233,21 @@ pi 的 `message_update` 处理器读 `event.assistantMessageEvent.{type,delta}`�
 `toolcall_end` 需要 pi 的 `ToolCall` 对象。另按契约更正三条映射 note：`message_end` 其实**可用**
 （`assistant/message` 的 data 含 `message`/`usage`，桥接层已摊平）；`turn_end` 的差异是字段名与内容
 （`turn` vs `turnIndex`、无 `message`/`toolResults`）⇒ 该处理器应改从 `assistant/message` 累积用量。
+
+## ★ Host 级真跑抓到的两个致命问题（2026-10-18）
+
+本地 19 项 spike 全绿也**没**抓到这两条 —— 它们只在"真实 DSH profile"里才会炸：
+
+1. **`inject` 约束**：cordis 里**未 `inject` 就访问 `ctx.commands` 会抛**
+   `Error: cannot get property "commands" without inject`，插件**不激活**
+   （`dsh: warning: 1 entry did not activate`）。修：服务统一经 `getDshService()`
+   （先 `ctx.get()`、再属性读，两路都 try/catch）取；插件 `inject` 仍只声明真正必需的 `tools`。
+2. **工具定义必须编译**：`ctx.tools.register()` 要的是 **`defineTool(options)` 的产物**
+   （逐属性 spec → 模型侧 JSON Schema）。直接注册原始 spec ⇒ provider 拒掉**每一个请求**：
+   `Invalid schema for function 'admin_get_config': schema must be a JSON Schema of 'type: "object"', got 'type: null'`。
+   修：新增 `DshFacadeOptions.compileTool` 注入点（`dsh/plugin/entry.ts` 注入 `defineTool`）；
+   缺编译器时**显式上报**。回归守门：spike **A18**（走 cordis loader 装载产物）＋ **A19**
+   （`schemas()` 里每个工具的 `parameters.type === 'object'`）。
+
+**教训**：只比对"注册成功 / 能执行"是不够的 —— 还要比对**注册结果本身的形状**（A19），
+以及**按宿主的装载方式装载**（A18），而不是我们自己的 `apply(ctx)` 便捷路径。

@@ -30,7 +30,11 @@
  *   A16 **会话枚举真跑**（`listDshSessions`）：真实 `SessionStore` 建两个会话并追加 user/message，
  *      列表应给出 id / `dsh-session:` 稳定键 / cwd / 消息数 / 首条消息 / 按修改时间倒序
  *   A17 **流帧翻译真跑**（`agent/assistant-stream`）：真实 cordis 派发一个 `chunk` 帧（契约形状），
- *      pi 的 `message_update` 处理器应收到 `assistantMessageEvent`；`usage` 帧则应"不调处理器 + 上报" 
+ *      pi 的 `message_update` 处理器应收到 `assistantMessageEvent`；`usage` 帧则应"不调处理器 + 上报"
+ *   A18 **按插件装载产物**（走 cordis loader，而不是直接调 `apply`）：能捕获"服务访问受 `inject` 约束"
+ *      这类**只在真实 Host 里才炸**的问题（2026-10-18 Host 冒烟实测：未 inject 就访问 `ctx.tools` 会抛）
+ *   A19 **注册结果必须是编译产物**：`ctx.tools.register()` 要的是 `defineTool(options)` 的结果；
+ *      直接注册原始 spec 会让真实 provider 拒掉每个请求（Host 冒烟实测 `got 'type: null'`）
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -646,6 +650,80 @@ async function main(): Promise<void> {
     a17 = { id: 'A17', ok: 'skip', detail: `流帧翻译不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a17);
+
+  // ── A18：按插件装载产物（cordis loader 路径；捕获 inject 约束类问题）────────
+  let a18: Check = { id: 'A18', ok: false, detail: '未执行' };
+  try {
+    const pluginModule = (await import('../plugin/dist/my-pi-plugin.mjs')) as unknown as {
+      name?: string;
+      inject?: readonly string[];
+      apply?: (...args: readonly unknown[]) => unknown;
+      default?: unknown;
+    };
+    const pCtx = new Context();
+    pCtx.plugin(SystemPrompt);
+    pCtx.plugin(ToolRuntime);
+    await tick();
+    const registered: string[] = [];
+    const registry = pCtx.tools as unknown as { register: (d: { name: string }) => unknown };
+    const original = registry.register.bind(pCtx.tools);
+    registry.register = (def) => {
+      registered.push(def.name);
+      return original(def as never);
+    };
+    const activationErrors: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      const text = args.map(String).join(' ');
+      if (text.includes('did not activate') || text.includes('cannot get property')) activationErrors.push(text.slice(0, 120));
+      originalWarn(...args);
+    };
+    // ★ 关键差异：这里是"把产物当插件交给 cordis 装载"（inject 生效、服务访问受约束），
+    //   而不是像其它检查那样直接 `apply(ctx)` —— 后者永远绕过了 inject 检查。
+    pCtx.plugin({ name: pluginModule.name, inject: pluginModule.inject, apply: pluginModule.apply } as never);
+    await tick(300);
+    console.warn = originalWarn;
+    const ok = registered.length > 20 && activationErrors.length === 0;
+    a18 = {
+      id: 'A18',
+      ok,
+      detail: `插件装载后注册工具 ${registered.length} 个；激活期错误 ${activationErrors.length} 条${activationErrors.length ? ' ⇒ ' + activationErrors[0] : ''}`,
+    };
+  } catch (error) {
+    a18 = { id: 'A18', ok: false, detail: `插件装载抛错：${(error as Error).message.slice(0, 120)}` };
+  }
+  checks.push(a18);
+
+  // ── A19：注册定义必须是编译产物（parameters 是 JSON Schema，不是逐属性 spec）────
+  let a19: Check = { id: 'A19', ok: false, detail: '未执行' };
+  try {
+    const d19 = new Context();
+    d19.plugin(SystemPrompt);
+    d19.plugin(ToolRuntime);
+    await tick();
+    // 用**产物**装载（与真实 Host 同路径），它内部应注入 defineTool 编译器
+    const pluginModule = (await import('../plugin/dist/my-pi-plugin.mjs')) as unknown as {
+      name?: string;
+      inject?: readonly string[];
+      apply?: (...args: readonly unknown[]) => unknown;
+    };
+    d19.plugin({ name: pluginModule.name, inject: pluginModule.inject, apply: pluginModule.apply } as never);
+    await tick(400);
+    const schemas = (d19.tools as unknown as {
+      schemas: () => Array<{ name: string; parameters?: { type?: unknown } }>;
+    }).schemas();
+    const bad = schemas.filter((s) => s.parameters?.type !== 'object');
+    const admin = schemas.find((s) => s.name === 'admin_get_config');
+    const ok = schemas.length > 20 && bad.length === 0 && admin?.parameters?.type === 'object';
+    a19 = {
+      id: 'A19',
+      ok,
+      detail: `注册 ${schemas.length} 个工具；parameters.type!=="object" 的有 ${bad.length} 个${bad.length ? ' ⇒ ' + bad.slice(0, 3).map((s) => s.name).join(',') : ''}；admin_get_config.type=${String(admin?.parameters?.type)}`,
+    };
+  } catch (error) {
+    a19 = { id: 'A19', ok: false, detail: `编译产物检查抛错：${(error as Error).message.slice(0, 120)}` };
+  }
+  checks.push(a19);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

@@ -68,10 +68,15 @@ async function measure() {
   for (const name of [...names].sort()) {
     const def = ctx.tools.get(name);
     if (!def) throw new Error(`注册表里找不到 ${name}`);
+    // ★ 2026-10-18：`defineTool` 编译后，注册表里的 `parameters` **已经是**模型侧 JSON Schema
+    //   （`{type:'object', properties:{…}}`）。此前它还是逐属性 spec，所以这里要编译；
+    //   现在按形状判断，两种都兼容（否则会把已编译的 schema 再当 spec 编译成垃圾）。
+    const raw = def.parameters;
+    const looksCompiled = typeof raw === 'object' && raw !== null && raw.type === 'object';
     const declaration = {
       name: def.name,
       description: def.description,
-      parameters: parameterSchemaSpecToJsonSchema(def.parameters),
+      parameters: looksCompiled ? raw : parameterSchemaSpecToJsonSchema(raw),
       ...(def.deferLoading ? { deferLoading: true } : {}),
     };
     perTool[name] = Buffer.byteLength(JSON.stringify(declaration));

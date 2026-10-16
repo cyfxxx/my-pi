@@ -14,6 +14,8 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { defineTool } from '@deepseek-ai/dsh-tools';
+
 import bootstrap from '../../custom/bootstrap';
 import { apply as applyFacade, inject, name } from '../../custom/adapters/dsh/plugin';
 import { registerMyPiSystemPrompt } from '../../custom/adapters/dsh/system-prompt';
@@ -61,6 +63,9 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
   if (!process.env.PI_CODING_AGENT_DIR) process.env.PI_CODING_AGENT_DIR = resolve(root, 'portable/agent');
   if (!process.env.PI_MEMORY_DIR) process.env.PI_MEMORY_DIR = resolve(root, 'portable/memory');
   const facade = applyFacade(ctx, {
+    // ★ 必须注入：`ctx.tools.register()` 要的是 `defineTool(options)` 的**编译产物**
+    //   （spec → 模型侧 JSON Schema）；不注入会被真实 provider 拒掉每个请求。
+    compileTool: defineTool as never,
     ...(config.facade ?? {}),
     features: [
       (api) => {

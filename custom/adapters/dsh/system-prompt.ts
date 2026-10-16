@@ -21,6 +21,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { getDshService } from './service';
 import type { DshContext, DshDisposer, DshSystemPromptService } from './types';
 
 /** 无等价物/降级的上报通道 */
@@ -99,7 +100,7 @@ export function registerMyPiSystemPrompt(
   const report = options.report ?? defaultReporter;
   if (options.disabled) return () => undefined;
 
-  const service = ctx.systemPrompt as DshSystemPromptService | undefined;
+  const service = getDshService<DshSystemPromptService>(ctx, 'systemPrompt');
   if (!service || typeof service.section !== 'function') {
     report('systemPrompt', 'DSH 未加载提示词服务（@deepseek-ai/dsh-system-prompt）⇒ APPEND_SYSTEM.md 无法注入');
     return () => undefined;

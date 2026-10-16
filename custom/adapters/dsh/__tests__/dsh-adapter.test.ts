@@ -514,6 +514,32 @@ describe('会话事件桥（session/event 的真实签名与负载）', () => {
   });
 });
 
+describe('工具必须注册**编译产物**（defineTool；Host 冒烟实测的致命 bug）', () => {
+  it('提供 compileTool 时：注册的是编译结果，不是原始 options', () => {
+    const fake = makeFakeDsh();
+    const compiled: unknown[] = [];
+    const compileTool = (options: unknown) => {
+      const o = options as { name: string; parameters: Record<string, unknown> };
+      const out = { ...o, parameters: { type: 'object', properties: o.parameters } };
+      compiled.push(out);
+      return out;
+    };
+    const facade = createDshExtensionApi(fake.ctx, { compileTool });
+    facade.api.registerTool(samplePiTool() as never);
+    expect(compiled).toHaveLength(1);
+    expect(fake.tools[0]).toBe(compiled[0]); // 注册的是编译产物本身
+    expect((fake.tools[0]?.parameters as { type?: string }).type).toBe('object');
+  });
+
+  it('**不提供** compileTool 时显式上报（否则真实 provider 会拒掉每个请求）', () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    facade.api.registerTool(samplePiTool() as never);
+    expect(reports.some((r) => r.startsWith('registerTool.compile') && r.includes('type object'))).toBe(true);
+  });
+});
+
 describe('工具清单与会话名（2026-10-17 新增落点）', () => {
   it('getActiveTools/getAllTools 落到 ctx.tools.schemas()（状态 degraded，不再报 unsupported）', () => {
     const fake = makeFakeDsh();

@@ -30,6 +30,19 @@ for arg in "$@"; do case "$arg" in --no-smoke) NO_SMOKE=1 ;; *) echo "用法: $0
 [ -x "$ESBUILD" ] || { echo "❌ 缺少 esbuild（$ESBUILD）" >&2; exit 2; }
 mkdir -p "$OUT_DIR"
 
+# 本地产物里现在会 import `@deepseek-ai/dsh-tools`（为了 `defineTool` 编译，见 dsh/plugin/entry.ts）。
+# Node 从**产物所在目录**向上找 node_modules ⇒ 需要仓库根可见这些包（真实部署由宿主提供，这里是本地等价物）。
+DSH_PKGS="$ROOT/dsh/spike/node_modules/@deepseek-ai"
+if [ -d "$DSH_PKGS" ]; then
+  mkdir -p "$ROOT/node_modules/@deepseek-ai"
+  for pkg in "$DSH_PKGS"/*; do
+    [ -d "$pkg" ] || continue
+    name="$(basename "$pkg")"
+    [ -e "$ROOT/node_modules/@deepseek-ai/$name" ] || ln -sfn "$pkg" "$ROOT/node_modules/@deepseek-ai/$name"
+  done
+  echo "✓ 已确保宿主包在仓库根可见（node_modules/@deepseek-ai/*，本地等价物）"
+fi
+
 echo "=== 构建 DSH 插件产物 ==="
 "$ESBUILD" "$ROOT/dsh/plugin/entry.ts" \
   --bundle --platform=node --format=esm --target=node22 \

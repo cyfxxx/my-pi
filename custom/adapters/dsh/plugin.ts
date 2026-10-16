@@ -37,15 +37,23 @@ export const inject = ['tools'];
 export interface MyPiDshConfig {
   /** 已迁移的特性注册函数（`(api: ExtensionAPI) => void`） */
   readonly features?: readonly ((api: unknown) => void)[];
-  /** 外观层选项（上报通道、hasUI、cwd、事件落点覆盖…） */
+  /** 外观层选项（上报通道、hasUI、cwd、事件落点覆盖、**defineTool 编译器**…） */
   readonly facade?: DshFacadeOptions;
+  /**
+   * DSH 的 `defineTool` 编译器。**建议必传**：不传会注册未编译定义，
+   * 真实 provider 会以 "schema must be a JSON Schema of type object" 拒掉所有请求（Host 冒烟实测）。
+   */
+  readonly compileTool?: DshFacadeOptions['compileTool'];
 }
 
 /**
  * 插件入口。返回 facade（含 `dispose()` 与 `surfaceReport()`），便于调用方在测试/HMR 里收尾。
  */
 export function apply(ctx: DshContext, config: MyPiDshConfig = {}): DshFacade {
-  const facade = createDshExtensionApi(ctx, config.facade ?? {});
+  const facade = createDshExtensionApi(ctx, {
+    ...(config.compileTool ? { compileTool: config.compileTool } : {}),
+    ...(config.facade ?? {}),
+  });
   for (const register of config.features ?? []) {
     try {
       register(facade.api);
