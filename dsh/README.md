@@ -158,6 +158,19 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 的只读护栏很可能就在钩子里，从工具数量上看不出来）。现在冲突**就地隔离**（只跳过冲突项并点名上报），
 "到底少了什么"由这一行列清（口径见 `custom/adapters/dsh/facade.ts` 的 `registrationSummary()`）。
 
+### 场景测试（P6③）：两实例隔离已有 DSH 版
+
+```bash
+MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-isolation.sh   # 默认 SKIP（跑两次真实模型）
+```
+
+换底座后**旧的绿色不能继承**：pi 侧 `scripts/test-scenario-*.mjs` 断言的是 pi 的进程/状态语义，
+DSH 的 Host/Session 语义不同 ⇒ 场景必须**重写**。已重写的第一个（两实例隔离）问的是仍然成立的问题：
+两实例各自隔离 `DSH_HOME`、但**共用同一个仓库状态**（`portable/`）会不会串。实测：两实例并发退出码 0、
+各 28 行插件日志、A 答「甲」/B 答「乙」（各自服务自己的 prompt）、会话 id 不同、用量各写各的且
+**仓库默认台账行数未变**、无脏目录。模式切换与会话切换仍待重写（前者依赖命令执行、后者在 DSH 上
+"切换前否决"本就没有落点）。
+
 ### 类型守门：`dsh/` 有自己的 tsconfig
 
 官方 `tsc -p custom/` **不收 `dsh/**`** ⇒ 这里长期只过 esbuild/tsx（**不做类型检查**），错误会一直积累。
