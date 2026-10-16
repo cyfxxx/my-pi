@@ -54,7 +54,7 @@
 - [bug-044](patterns/bug-044.md): **把依赖 `this` 的方法「取下来」再调用 ⇒ 静默返回 undefined，打穿整条重启链**（本分支自己造成的真实回归） + DSH 换基座时新增了 `sessionKeyOf()` 统一"这是哪个会话"的键，内部写成了 `const f = ctx.sessionManager.getSessionFile; f()` —— 而 pi 的实现是 `getSessionFile() { return this.sessionFile; }`（`vendor/pi/packages/coding-agent/src/core/session-manager.ts:1156-1158`），**解绑后 `this` 是 undefined** ⇒ 抛 TypeError ⇒ **被同一函数里的 try/catch 吞掉** ⇒ 返回 `undefined`。后果不是小错：模式记录键成了 undefined（`modes-sessions.json` 恒为 `{}`）、重启请求的 `targetSession` 也变 undefined ⇒ `/mode roleplay` 不再真的换档重启。**单元测试全绿**（我的 fake 用的是箭头函数、不依赖 `this` ⇒ 测试把 bug 当成了契约） + **已修**：改为闭包调用（`() => sm?.getSessionFile?.()`）保住接收者，并在注释里写明"必须方法形式调用"与事故出处；新增反向探针单测（用真实现那样依赖 `this` 的类）⇒ 该写法以后会被立刻抓住。★ 教训：**fake 用箭头函数会把"依赖 this 的方法"这类 bug 保护起来** —— fake 应尽量模仿真实实现的形状（结节见 `docs/design/CODING-TRAPS.md` #15）
 - [bug-045](patterns/bug-045.md): **"记录被否提案"的机制实际不生效** + `record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledger.mjs` 会用 `git log + DECISIONS.md` 把它**整个重新生成**（rejected 是从 `DECISIONS.md` 按标题标记抽取的）⇒ 手写的记录在下一次重建时**静默消失**。最毒的是它**打印"✓ 已记录"**，而且约定守门在台账漂移时会**提示你去跑 `--update`** —— 那正是抹掉记录的那一步 + **已修（2026-10-16）**：`--reject` 改为按抽取器认得的格式**追加到 `DECISIONS.md`（事实来源）**，随后自动跑 `gen-changes-ledger --update`，并**自检**这条真的进了台账（进不去就 exit 1 并给原因，不许"打印成功、实际没记上"）。顺带把"理由"里重复的"不采用："前缀去掉、同时保证理由行仍含标记词。本次据此**耐久地**登记了 8 条被否提案（`pnpm.overrides` 别名方案、写死让位名单、`mypi_subagent` 改名、plan 直接让位、诊断报"入桶 yes/no"、箭头函数 fake、`ln -sfn` 整目录软链、vendored packs 一并改名）。结节见 `docs/design/CODING-TRAPS.md` #16
 
-## 被否提案（15 条，来源：`docs/CHANGES.jsonl` 的 rejected）
+## 被否提案（16 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 
 > 判据第 ② 条：**成功与失败都记**。这些是"试过但被否"的提案，留着是为了**不被重复提出**。
 
@@ -73,6 +73,7 @@
 - [rej-2baf31](patterns/rej-2baf31.md): [2026-10-16] ✗ 不采用：写 sessionKeyOf 的单测时用箭头函数 fake（{getSessionFile: () => '…'}） + **理由（不采用）**：不采用：箭头函数不依赖 this，会把「方法被解绑调用」这类 bug 保护起来——实际就这么漏掉了一次真回归（留出集 33/33 → 11/33）；fake 必须模仿真实实现形状（getSessionFile() { return this.x }） + 未实施（被否）
 - [rej-0df654](patterns/rej-0df654.md): [2026-10-16] ✗ 不采用：用 ln -sfn 整体软链整个 @scope 目录来补宿主包 + **理由（不采用）**：不采用：目标已是真目录时链接会建到目录里面（@scope/@scope → SRC），症状是「补了却还是找不到」；改为逐包补并跳过已存在项 + 未实施（被否）
 - [rej-1ee288](patterns/rej-1ee288.md): [2026-10-16] ✗ 不采用：把 vendored packs 里所有 web_search 表述一并改成 searxng + **理由（不采用）**：不采用：packs/ 是上游技能包（有各自同步与链接/结构守门），本地改名不该制造与上游的漂移；只改本仓自己维护的 packs/README.md，其余三处保留并逐条登记后果 + 未实施（被否）
+- [rej-150cbe](patterns/rej-150cbe.md): [2026-10-16] ✗ 不采用：为每个 my-pi agent 自动注册一个宿主 subagent 工具实例（具名委派 = 按目录动态加载 dsh-tool-subagent） + **理由（不采用）**：暂不采用（技术上可行）：它会把每个 agent 变成**模型可见工具** ⇒ 工具面与 token 成本上升，并改变模型可见行为；本项目对工具面有预算纪律、宿主也刻意保持精简。改为登记为**可选部署特性**（需要时按显式配置开关实现，路径写在能力审计 §7 DR-2） + 未实施（被否）
 
 ## 反复失败的错误指纹（1 条，来源：`portable/memory/logs/error-fingerprints.jsonl`）
 

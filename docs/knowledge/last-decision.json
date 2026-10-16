@@ -1,5 +1,9 @@
 {
-  "create_patterns": [],
+  "create_patterns": [
+    {
+      "name": "rej-150cbe"
+    }
+  ],
   "update_patterns": [],
   "update_index": true
 }

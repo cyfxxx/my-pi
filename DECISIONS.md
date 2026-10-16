@@ -6193,3 +6193,8 @@ Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sher
 试过在 spike 里单独建 root agent，loop 需要完整组合（模型路由等）⇒ 报 `no agent factory registered`，留给真 Host/交互客户端；
 ② `input.transform` 属**潜伏能力**（本仓 4 个 `input` 处理器全是观察者，无人返回改写）；
 ③ 合成用量的 `cost` 是占位 0（DSH `TokenUsage` 不含定价；当前无 feature 读它）。
+
+### [2026-10-16] ✗ 不采用：为每个 my-pi agent 自动注册一个宿主 subagent 工具实例（具名委派 = 按目录动态加载 dsh-tool-subagent）
+
+**理由（不采用）**：暂不采用（技术上可行）：它会把每个 agent 变成**模型可见工具** ⇒ 工具面与 token 成本上升，并改变模型可见行为；本项目对工具面有预算纪律、宿主也刻意保持精简。改为登记为**可选部署特性**（需要时按显式配置开关实现，路径写在能力审计 §7 DR-2）
+**证据**：宿主支持每实例 persona/工具权限（dsh-tool-subagent/README.zh.md：toolName 每实例须不同）；但 subagent 工具无 agent/preset 参数 ⇒ 具名只能靠工具名承载

@@ -90,11 +90,11 @@ PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh
 
 | 项 | 分诊结论 | 依据 / 依赖 |
 |---|---|---|
-| **DR-1** chain 模式（`{previous}`） | ✅ **不需要移植** | 宿主自带 `workflow`（模型写 JS **扇出** subagent，支持 phases/结构化结果/前后台）且在 headless profile 里**已启用** ⇒ 覆盖了"顺序链"；差别只是宿主建议小规模委派用普通 `subagent` 调用（`dsh-tool-workflow/README.zh.md`） |
+| **DR-1** chain 模式（`{previous}`） | ✅ **不需要移植**（真 Host 实测模型可见工具里含 `workflow`） | 宿主自带 `workflow`（模型写 JS **扇出** subagent，支持 phases/结构化结果/前后台）且在 headless profile 里**已启用** ⇒ 覆盖了"顺序链"；差别只是宿主建议小规模委派用普通 `subagent` 调用（`dsh-tool-workflow/README.zh.md`） |
 | **DR-5** Termux 并发降级（8→2） | 🟡 **部分恢复**（读+报警+片段） | 契约核实 `Volatile<number>` **只有 `get()`**、值只由其拥有者更新 ⇒ 插件**改不动**；改为只读核对 + 移动端超限**明确报警**并给部署层覆盖片段。真 Host：桌面 `=8 保持默认`、`TERMUX_VERSION=1` 打出警告与片段。✗ 运行期自动压到 2 **做不到** |
-| **DR-2** 目录扫描式 agent 定义 | ⏳ 待重设计（机制已查清） | 宿主支持**每实例 persona/工具权限**的 subagent 工具实例，`AgentPresetRegistry.register()` 也能编程注册预设；但 `subagent` 工具**没有 agent/preset 参数** ⇒ "这次委派用哪个具名 agent"表达不出来。要恢复需**按目录动态生成 patch 条目**（静态 YAML 做不到）或宿主加参数 |
+| **DR-2** 目录扫描式 agent 定义 | ⏳ 待重设计（**已决定不做默认启用**） | 宿主支持**每实例 persona/工具权限**的 subagent 工具实例，`AgentPresetRegistry.register()` 也能编程注册预设；但 `subagent` 工具**没有 agent/preset 参数** ⇒ "这次委派用哪个具名 agent"表达不出来。**可行路径**：插件装载时按目录为每个具名 agent 加载一个宿主 subagent 工具实例（`toolName=<agent 名>` + persona + 工具权限），由**工具名**承载身份，顺带给 DR-4 提供可靠的映射键。**默认不做**：每个 agent 都变成模型可见工具 ⇒ 工具面/成本上升且改变模型行为 ⇒ 记为可选部署特性 |
 | **DR-3** 逐任务 `cwd` | ⏳ 待重设计（宿主缺参数） | 已核实宿主 `subagent` 参数只有 `prompt/description/provider/model/reasoning_effort/run_in_background`；替代：任务里显式 `cd` |
-| **DR-4** 进程外投递 CLI | ⏳ 待重设计（依赖宿主侧通道） | 宿主只有**模型侧** `send_message`；进程外投递需要宿主侧可远程访问的投递 API（`dsh-api-*`/typert 属客户端-宿主层）⇒ 需部署层集成 |
+| **DR-4** 进程外投递 CLI | ⏳ 待重设计（**与 DR-2 同一依赖**） | 三条路已查清：① 宿主**进程内**有可编程投递 API `ctx.subagents.sendMessage(sender, targetId, content, {signal})`（限**直接父子**、`sender` 须是那个活 Agent）⇒ 插件做"文件收件箱→投递"桥**可行**；② 但需要 `agent 名 → 子会话 id` 的映射，而宿主只用 "sessionId + 自由文本 description"、**没有具名维度**（= DR-2 缺的同一个东西）；③ 出宿主进程只有客户端-宿主 API（`typertGateway`+Client `ctx.remote`），而 **headless profile 只有 gateway 服务、没有入站传输层**（传输在 web profile） |
 | 真 agent（loop 驱动）层语义 | ⏳ 待装置 | `steer` 在 step 边界被消费、真 agent 下命令执行；spike 里单独建 root agent 报 `no agent factory registered`（loop 需完整组合：模型路由等） |
 | `input.transform` | 潜伏能力（**已测无消费者**） | 4 个 `input` 处理器全是观察者、无人返回改写（逐个读过） |
 | `turn_end` 的 `toolResults` | 潜伏缺口（**已测无消费者**） | `grep -rn "toolResults" custom/features` 无命中 ⇒ 目前没人读它（哪天有 feature 读，再按会话日志合成） |
