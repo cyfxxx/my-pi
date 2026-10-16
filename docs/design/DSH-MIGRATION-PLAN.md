@@ -205,14 +205,17 @@ pi 侧的 11 个补丁是"底座替换"的账；换到 DSH 后**没有"能不能
    （规范化并上报）；③ 返回值形态（pi 返回 void → `CommandResult`，抛错映射为 `{kind:'error'}`）。
    另外 pi 的 `getArgumentCompletions` 在 DSH **无对应**（`input` 只有 `hint`/`attachments`）✗。
    实测：spike **A10** 用真实命令服务验通（`find()` 命中、`rawInput` 原文透传、会话身份注入、抛错映射）；
-   ✗ `commands.execute(agent, line, …)` 需要**真 agent**，属 Host 级，未验；
+   ~~✗ `commands.execute(agent, line, …)` 需要真 agent，未验~~ **已验（2026-10-18，spike A22）**：
+   真实命令服务 + 真实 Session + 最小 agent 对象下真的调用了我们的处理器（`rawInput` 前导空格保留、
+   会话身份注入、抛错 ⇒ `{kind:'error'}`、未知命令 ⇒ `undefined`）；✗ 仅"loop 驱动的真 agent"那层仍留待 Host/客户端；
 2. 快捷键在**内核无对应**（属客户端层）⇒ 4 处可能需要"不迁移"或改用 DSH 客户端方案；
 3. 事件 `@mode` 注解的**实际驱动方**未逐个回源确认（映射表按注解口径）；
 4. ~~`session/event` 观察是"提交后"⇒ 需要决策的钩子（如 `input` 改写）只能用**步级瀑布**（`agent/pre-step`）~~
    **契约级已确证（2026-10-15）**：`agent/pre-step` 是 waterfall，判定形状
    `PreStepDecision = {kind:'reject'} | {kind:'enter', messages: UserMessage[], startsRequestSeries?: true}`
    （`dsh-agent/lib/types/runtime-types.d.ts:92-99`，事件签名 `:304`）⇒ pi 的 `input` **可以**翻译为
-   "替换进入该 step 的消息数组"；✗ 仍未做**运行时**验证（需要 agent + LLM，属 Host 级，见 P5②）；
+   "替换进入该 step 的消息数组"；✗ 仍未做**运行时**验证（需要 agent + LLM）—— 但按 §5.5 的补测，
+   该路径目前**没有活消费者**（4 个 `input` 处理器全是观察者）⇒ 记为潜伏能力；
 5. ~~完整 profile / Host 级运行**未做**~~ **已做（2026-10-18，获用户显式授权）**：真 profile + 真模型跑通四类路径 ——
    ① 插件加载与钩子触发（退出码 0、插件日志 28 行、模型回「收到」）；② **工具调用**（强制调 `memory_stats` ⇒
    会话日志记到 `tool/call name=memory_stats`，`tool/result` 内容正是 my-pi 的输出）；③ **回合用量**（见 #18-v，
@@ -231,4 +234,5 @@ pi 侧的 11 个补丁是"底座替换"的账；换到 DSH 后**没有"能不能
 7. 三块同名冲突能力的**对照审计**（含"未查到"清单与检索面）见
    [`DSH-DUPLICATE-CAPABILITY-AUDIT.md`](DSH-DUPLICATE-CAPABILITY-AUDIT.md)；**处置策略已决策并落地**
    （实测 #18-x：改名 `searxng` / `subagent` 让位 / `plan` 让位命令但保留护栏），
-   让位代价逐条登记在该文档 **§7（DR-1…DR-7）**——属**待重设计**，不是"已完成"。
+   让位代价逐条登记在该文档 **§7**：**DR-1…DR-5（subagent 的 chain/目录扫描式 agent 定义/逐任务 `cwd`/
+   进程外投递/Termux 并发降级）属"待重设计"**（需要你先定方向），**DR-6/DR-7 已解决**（命令换名 `mypi-plan`）。
