@@ -268,3 +268,20 @@ MY_PI_DSH_TRACE_EVENTS=1 …   # 每收到一条会话事件打一行；turn/end
 
 回归守门：spike **A20**（真实 `SessionStore` + 兄弟子 ctx 拓扑 + 注册**两条** `turn_end`
 ⇒ 两条都必须拿到同一份用量）；单测里也有对应的多订阅者与"跨会话不串账"反向探针。
+
+## ★ 同名冲突必须**就地隔离**（Host 冒烟实测：冒泡会连带丢注册）
+
+DSH 原生占用了 `web_search`（工具）、`subagent`（工具）、`plan`（命令）。DSH 对同名注册**抛错**，
+而那个错如果冒泡，会被 `registerAll` 的"每特性 try/catch"接住 ⇒ **该特性排在冲突之后的注册全部被跳过**：
+
+| 特性 | 连带损失（修前实测） |
+|---|---|
+| `web-search` | 冲突在第 1 个 `registerTool`（`web_search`）⇒ 第 2 个 `fetch_url` **没注册** |
+| `subagent` | 工具先注册、钩子在后 ⇒ 2 个钩子**没注册** |
+| `plan-mode` | 4 个工具 + 命令 + 3 个钩子：命令冲突 ⇒ **3 个钩子没注册**（只读护栏很可能就在其中） |
+
+⇒ `facade.registerTool`/`registerCommand` 各自 try/catch，**只跳过冲突的那一个**并点名上报
+（`registerTool.duplicate:<名>`）；`registrationSummary()` 给出"成功工具/命令 + 跳过项 + 钩子清单"，
+由 `MY_PI_DSH_TRACE_EVENTS=1` 打成一行 ⇒ 少了什么**可量**。
+修后真 Host：`工具 52 个、命令 9 个；同名冲突跳过 3 个；钩子 18 个`，`⚠️ 注册功能失败` 0 条。
+✗ 冲突本身的**策略**（让位原生 / 改前缀 / 挂 per-agent）仍待产品决策。

@@ -88,6 +88,18 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
       report: (member, detail) => console.warn(`[my-pi-dsh] ${member}：${detail}`),
     }),
   );
+  // 诊断汇总（`MY_PI_DSH_TRACE_EVENTS=1` 才打）：把"到底注册成功了多少 / 哪些因同名冲突被跳过"
+  // 变成**可核对的一行**。为什么需要：DSH 原生会占用同名工具/命令，而"跳过"如果不可见，
+  // 就变成静默少能力（2026-10-18 Host 冒烟实测过连带损失，见 custom/adapters/dsh/facade.ts）。
+  if (process.env.MY_PI_DSH_TRACE_EVENTS === '1') {
+    const summary = facade.registrationSummary();
+    console.log(
+      `[my-pi-dsh] trace 注册汇总：工具 ${summary.tools.length} 个、命令 ${summary.commands.length} 个；`
+        + `同名冲突跳过 ${summary.skippedDuplicates.length} 个`
+        + `${summary.skippedDuplicates.length > 0 ? `（${summary.skippedDuplicates.join(', ')}）` : ''}；`
+        + `钩子 ${summary.hooks.length} 个（${summary.hooks.join(', ')}）`,
+    );
+  }
   return facade;
 }
 

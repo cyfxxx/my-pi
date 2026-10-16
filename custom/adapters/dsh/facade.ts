@@ -88,13 +88,47 @@ export interface DshFacadeOptions {
   readonly compileTool?: DshDefineTool;
 }
 
+/** 注册汇总（诊断用；见 `DshFacade.registrationSummary`） */
+export interface RegistrationSummary {
+  /** 成功注册进 DSH 的工具名（按注册顺序） */
+  readonly tools: readonly string[];
+  /** 成功注册进 DSH 的命令名（规范化后、按注册顺序） */
+  readonly commands: readonly string[];
+  /**
+   * 因**同名冲突**被跳过的名字（`工具:web_search` / `命令:plan` 形式）。
+   * 为什么单独记：DSH 原生已占用这些名字，而"跳过"必须是**可见**的（不然就是静默少能力）。
+   */
+  readonly skippedDuplicates: readonly string[];
+  /**
+   * 真正订阅成功的 pi 事件名（去重）。
+   * 为什么单独记：同名冲突原先会让冲突之后的注册（**含钩子**）全部丢失 —— 而"钩子少了几条"
+   * 从工具数量上看不出来（plan-mode 的只读护栏就在钩子里）⇒ 必须可量。
+   */
+  readonly hooks: readonly string[];
+}
+
 export interface DshFacade {
   /** 传给 `custom/bootstrap.ts` 的 pi 形状 API */
   readonly api: ExtensionAPI;
   /** 注册出来的 disposer（工具/事件/命令），用于卸载或 HMR */
-  readonly disposers: readonly DshDisposer[];
+  /**
+   * 注册出来的 disposer（工具/事件/命令），用于卸载或 HMR。
+   *
+   * ★ 数组类型是**可变**的（属性本身只读）：插件入口在 facade 建好后会继续挂自己那条 disposer
+   *   （`dsh/plugin/entry.ts` 的 system-prompt 注册）。原先标成 `readonly DshDisposer[]` 会让那段代码
+   *   **类型检查失败**，而 `dsh/` 长期不在官方 tsc 覆盖内（只过 esbuild/tsx，不做类型检查）⇒
+   *   这个错一直没被发现（2026-10-18 手工 typecheck 才暴露，见 `dsh/README.md`）。
+   */
+  readonly disposers: DshDisposer[];
   /** 成员可用性报告（**只含被调用过的成员**，便于一眼看出"哪些面真的被用到了"） */
   surfaceReport(): readonly SurfaceEntry[];
+  /**
+   * 注册汇总：到底成功注册了哪些工具/命令、哪些因同名冲突被跳过。
+   *
+   * 为什么需要：同名冲突原先会**连带丢掉该特性后面的注册**（见 registerTool 里的注释），
+   * 而"少注册了哪些"必须可**量**（真 Host 上 grep 日志即可核对），不能靠读代码推。
+   */
+  registrationSummary(): RegistrationSummary;
   dispose(): void;
 }
 
@@ -221,6 +255,12 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
    * 打开后每收到一条会话事件就打一行，能把"没到 / 到了但没识别 / 识别了但处理器没跑"三者分开。
    */
   const traceSessionEvents = process.env.MY_PI_DSH_TRACE_EVENTS === '1';
+  /** 注册汇总的记账（成功项 + 同名冲突跳过项；见 `registrationSummary()`） */
+  const registeredTools: string[] = [];
+  const registeredCommands: string[] = [];
+  const skippedDuplicates: string[] = [];
+  /** 真正订阅成功的 pi 事件名（去重；用于核对"哪些钩子真的活着"） */
+  const registeredHooks = new Set<string>();
   /**
    * 从 `session/event` 的实参里取会话 id（第一参就是 Session；见 A13 实测的 `(session, event)`）。
    * 用途：把用量桶按会话隔离 —— 另一个会话的回合号会**重新从 1 开始**，不隔离必然串账。
@@ -260,7 +300,22 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       );
     }
     const registered = options.compileTool ? options.compileTool(payload) : payload;
-    disposers.push(tools.register(registered as never));
+    try {
+      disposers.push(tools.register(registered as never));
+      registeredTools.push(definition.name);
+    } catch (error) {
+      // ★ 同名冲突（DSH 原生已占用）**不能**让它冒泡：冒泡会被 registerAll 的"每特性 try/catch"抓住，
+      //   于是该特性**排在后面的**注册**全部被跳过**。2026-10-18 Host 冒烟实测的连带损失：
+      //   `web-search` 因此丢了 `fetch_url`、`subagent` 与 `plan-mode` 因此丢了各自的钩子
+      //   （plan-mode 的钩子很可能就是只读护栏）⇒ 冲突的影响面远大于"少一个同名工具"。
+      //   这里只跳过**这一个**，并把冲突如实点名上报（不静默）。
+      skippedDuplicates.push(`工具:${definition.name}`);
+      report(
+        `registerTool.duplicate:${definition.name}`,
+        `工具 "${definition.name}" 注册失败：${error instanceof Error ? error.message : String(error)}`
+          + ' ⇒ 只跳过这一个（其余注册继续）；DSH 原生同名工具优先，要保留 my-pi 版本需改名或挂 per-agent',
+      );
+    }
   };
 
   // ── 钩子 ───────────────────────────────────────────────────────────────────
@@ -304,6 +359,7 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       );
       ledger.use(`on(${event})`);
       disposers.push(ctx.on(target, listener));
+      registeredHooks.add(event);
       return;
     }
     // session-event：只能订阅追加流，再按 event.type 派发（**提交后**，观察型）
@@ -313,6 +369,7 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
       `→ session/event 里 type=${target}（追加流：提交后观察、**不可否决**）${mapping.degradedNote ? `；${mapping.degradedNote}` : ''}`,
     );
     ledger.use(`on(${event})`);
+    registeredHooks.add(event);
     disposers.push(
       ctx.on('session/event', (...args: readonly unknown[]) => {
         // ★ 2026-10-17 修：`session/event` 的真实签名是 `(session, event)`（scoped）
@@ -370,12 +427,17 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
         }
         const data = typeof envelope.data === 'object' && envelope.data !== null ? (envelope.data as Record<string, unknown>) : {};
         // 记录**摊平后**的形状（`{type, turn, step, message, usage, …}`），与交给 pi 处理器的形状一致
-        const before = turnUsage.size();
-        turnUsage.record(sessionIdOf(args), { ...envelope, ...data });
+        const sessionId = sessionIdOf(args);
+        turnUsage.record(sessionId, { ...envelope, ...data });
         if (traceSessionEvents) {
+          // ★ 报"桶内调用数"而不是"入桶 yes/no"：同一回合的**第二个** step 不会让桶数增加，
+          //   原先那种写法会把"已记录（并入已有桶）"打印成"没入桶"，**诊断本身在说谎**
+          //   （2026-10-18 实跑就看到了 `入桶=no` 而该回合确实累积了 2 次调用）。
+          //   `read` 是只读的（不清桶），拿它当探针是安全的。
+          const probe = turnUsage.read(sessionId, typeof data.turn === 'number' ? data.turn : undefined);
           console.log(
             `[dsh-facade] trace session/event type=assistant/message turn=${String(data.turn)} `
-              + `usage=${data.usage ? 'yes' : 'no'} 入桶=${turnUsage.size() > before ? 'yes' : 'no'}`,
+              + `usage=${data.usage ? 'yes' : 'no'} 桶内调用数=${probe ? probe.usageCalls : '(未入桶)'}`,
           );
         }
         return undefined;
@@ -448,7 +510,19 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
         }
       },
     };
-    disposers.push(runtime.register(dshDefinition));
+    try {
+      disposers.push(runtime.register(dshDefinition));
+      registeredCommands.push(normalized);
+    } catch (error) {
+      // 与 registerTool 同一条纪律：同名命令冲突只跳过这一个，不让它冒泡拖垮该特性其余注册
+      //（Host 实测：plan-mode 的 3 个钩子排在 registerCommand('plan') 之后 ⇒ 冒泡就全丢）
+      skippedDuplicates.push(`命令:${normalized}`);
+      report(
+        `registerCommand.duplicate:${normalized}`,
+        `命令 "${normalized}" 注册失败：${error instanceof Error ? error.message : String(error)}`
+          + ' ⇒ 只跳过这一个（其余注册继续）；DSH 原生同名命令优先',
+      );
+    }
   };
   const registerShortcut = (): void => {
     ledger.use('registerShortcut');
@@ -666,6 +740,12 @@ export function createDshExtensionApi(ctx: DshContext, options: DshFacadeOptions
     api,
     disposers,
     surfaceReport: () => ledger.snapshot(),
+    registrationSummary: () => ({
+      tools: [...registeredTools],
+      commands: [...registeredCommands],
+      skippedDuplicates: [...skippedDuplicates],
+      hooks: [...registeredHooks],
+    }),
     dispose: () => {
       if (disposed) return;
       disposed = true;

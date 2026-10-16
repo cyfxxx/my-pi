@@ -666,6 +666,65 @@ describe('工具必须注册**编译产物**（defineTool；Host 冒烟实测的
   });
 });
 
+describe('同名冲突必须**就地隔离**（Host 冒烟实测：冒泡会连带丢掉该特性后面的注册）', () => {
+  /** 让第 n 次注册抛"已注册"（模拟 DSH 的 NamedEntries.duplicateError） */
+  function makeDuplicateAt(fake: FakeDsh, names: readonly string[]) {
+    const register = (fake.ctx.tools as { register: (d: { name: string }) => () => void }).register;
+    (fake.ctx.tools as { register: unknown }).register = (definition: { name: string }) => {
+      if (names.includes(definition.name)) throw new Error(`tool "${definition.name}" is already registered`);
+      return register(definition);
+    };
+  }
+
+  it('★ 一个工具同名冲突 ⇒ 只跳过它，**后面注册的工具照常进注册表**', () => {
+    const fake = makeFakeDsh();
+    const reports: string[] = [];
+    makeDuplicateAt(fake, ['web_search']);
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    // 模拟 web-search 特性真实的注册顺序：web_search（冲突）→ fetch_url（必须仍然注册成功）
+    facade.api.registerTool({ ...samplePiTool(), name: 'web_search' } as never);
+    facade.api.registerTool({ ...samplePiTool(), name: 'fetch_url' } as never);
+    expect(fake.tools.map((t) => t.name)).toEqual(['fetch_url']);
+    // 冲突必须点名上报（不静默）
+    expect(reports.some((r) => r.startsWith('registerTool.duplicate:web_search') && r.includes('already registered'))).toBe(true);
+    // 注册汇总必须可量（真 Host 上就靠这行核对"到底少了什么"）
+    expect(facade.registrationSummary()).toEqual({
+      tools: ['fetch_url'],
+      commands: [],
+      skippedDuplicates: ['工具:web_search'],
+      hooks: [],
+    });
+  });
+
+  it('★ 命令同名冲突同理：不冒泡（Host 实测 plan-mode 的 3 个钩子排在命令注册之后）', () => {
+    const fake = makeFakeDsh({ withCommands: true });
+    const reports: string[] = [];
+    const register = (fake.ctx as unknown as { commands: { register: (d: { name: string }) => () => void } }).commands.register;
+    (fake.ctx as unknown as { commands: { register: unknown } }).commands.register = (definition: { name: string }) => {
+      if (definition.name === 'plan') throw new Error('command "plan" is already registered');
+      return register(definition);
+    };
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    expect(() => facade.api.registerCommand('plan' as never, { description: '计划模式' } as never)).not.toThrow();
+    facade.api.registerCommand('memory' as never, { description: '记忆' } as never);
+    expect(fake.commands.map((c) => c.name)).toEqual(['memory']);
+    expect(reports.some((r) => r.startsWith('registerCommand.duplicate:plan'))).toBe(true);
+    expect(facade.registrationSummary().skippedDuplicates).toEqual(['命令:plan']);
+  });
+
+  it('★ 反向探针：非同名错误也**不**吞（注册表故障必须冒泡，别被当成"冲突"掩盖）', () => {
+    const fake = makeFakeDsh();
+    (fake.ctx.tools as { register: unknown }).register = () => {
+      throw new Error('registry exploded');
+    };
+    const reports: string[] = [];
+    const facade = createDshExtensionApi(fake.ctx, { onUnsupported: (m, d) => reports.push(`${m} :: ${d}`) });
+    facade.api.registerTool(samplePiTool() as never);
+    // 仍要上报（不静默），但报文里要带真实错误文本，便于区分"冲突"与"真故障"
+    expect(reports.some((r) => r.includes('registry exploded'))).toBe(true);
+  });
+});
+
 describe('工具清单与会话名（2026-10-17 新增落点）', () => {
   it('getActiveTools/getAllTools 落到 ctx.tools.schemas()（状态 degraded，不再报 unsupported）', () => {
     const fake = makeFakeDsh();

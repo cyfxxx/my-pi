@@ -124,6 +124,24 @@
   （单测 `usage-accumulator.test.ts` + 真包 spike **A20**）。
 - 台账：[`docs/BUG-REPLAYS.md`](../BUG-REPLAYS.md) #40。
 
+## 12. 上游"注册冲突"错误直接冒泡 ⇒ **连带丢掉该特性后面的一切注册**（且数量上看不出来）
+
+- **症状**：真实宿主里某些能力就是没有，而**日志只说了一个冲突**。2026-10-18 DSH 换基座实测：
+  `ctx.tools.register()` 抛 `tool "web_search" is already registered`，冒泡被"每特性 try/catch"接住 ⇒
+  `web-search` 特性**排在后面的** `fetch_url` 没注册、`subagent`/`plan-mode` 的钩子（plan-mode 的
+  只读护栏很可能就在里面）全没注册，而日志只有 3 行"注册功能失败"。
+- **为什么容易漏**：`registerAll` 的"每特性隔离"看起来是**健壮**的（"一个特性失败不拖垮其余"），
+  于是没人去想"**特性内部**也会被截断"；而且少的是**钩子**，从工具数量上完全看不出来 ⇒
+  必须专门把"已注册清单"（含钩子）打出来才能发现。
+- **判据（改法）**：边界层里凡是"名字冲突"这类**可预期**的上游拒绝，就地 try/catch **只跳过该项**
+  并点名上报（`registerTool.duplicate:<名>`）；同时提供**注册汇总**（成功项 + 跳过项 + 钩子清单），
+  让"到底少了什么"可量。
+- **反向探针**：① 让第 n 次注册抛"已注册"，断言**后面的注册仍然成功**；② 让注册抛**非冲突**错误，
+  断言错误文本仍被上报（别把真故障也当成"冲突"吞掉）；③ 真 Host 上 grep 汇总行核对数量。
+- 实现与守门：`custom/adapters/dsh/facade.ts`（`registerTool`/`registerCommand` 的就地隔离 +
+  `registrationSummary()`）、单测 `dsh-adapter.test.ts`、诊断开关 `MY_PI_DSH_TRACE_EVENTS=1`。
+- 台账：[`docs/BUG-REPLAYS.md`](../BUG-REPLAYS.md) #41。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

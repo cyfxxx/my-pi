@@ -1,0 +1,32 @@
+{
+  "//": "dsh/ 的独立类型检查配置（2026-10-18 新增）。为什么需要单独一份：官方的 `tsc -p custom/`",
+  "//2": "只覆盖 custom/**（无 include 时按 tsconfig 所在目录收文件），而 dsh/ 的入口与 spike 长期",
+  "//3": "只过 esbuild/tsx（**不做类型检查**）⇒ 类型错误会一直积累。实测抓到 dsh/plugin/entry.ts",
+  "//4": "里 `facade.disposers.push(...)` 与 `readonly DshDisposer[]` 冲突这类错误。",
+  "//5": "为什么不在 golden-tasks 里无条件跑：spike 的 @deepseek-ai/* 依赖是 `scripts/dsh-spike.sh`",
+  "//6": "按需安装的，没装时这里会报 Cannot find module（那是环境缺失，不是代码错误）⇒ 由",
+  "//7": "`scripts/check-conventions.sh` 的 K 段做**条件**调用（依赖在才跑，否则明确跳过）。",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "paths": {
+      "@earendil-works/pi-coding-agent": ["../vendor/pi/packages/coding-agent/dist/index.d.ts"],
+      "@earendil-works/pi-coding-agent/*": ["../vendor/pi/packages/coding-agent/dist/*.d.ts"],
+      "@earendil-works/pi-ai": ["../vendor/pi/packages/ai/dist/index.d.ts"],
+      "@earendil-works/pi-ai/*": ["../vendor/pi/packages/ai/dist/*.d.ts", "../vendor/pi/packages/ai/dist/providers/*.d.ts"],
+      "@earendil-works/pi-agent-core": ["../vendor/pi/packages/agent/dist/index.d.ts"],
+      "@earendil-works/pi-agent-core/*": ["../vendor/pi/packages/agent/dist/*.d.ts"],
+      "@earendil-works/pi-tui": ["../vendor/pi/packages/tui/dist/index.d.ts"],
+      "@earendil-works/pi-tui/*": ["../vendor/pi/packages/tui/dist/*.d.ts"]
+    }
+  },
+  "//8": "range 只收 plugin/：spike.ts 是**故意**松散的类型探针（往真实 API 传裸字符串、用 1 个参数调",
+  "//9": "helper、import 无声明的构建产物），给 spike 补一堆 cast 换不到任何安全性 ⇒ 不纳入守门。",
+  "include": ["plugin/**/*.ts"]
+}

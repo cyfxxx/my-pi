@@ -143,5 +143,26 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 其余可调：`MY_PI_HOST_PROMPT`（换任务）、`MY_PI_HOST_HOME`（换隔离 home）、`MY_PI_HOST_LOG_DIR`、
 `MY_PI_HOST_CREDENTIALS`（换凭据文件）、`PI_USAGE_DIAG_FILE`（用量落盘位置，避免写进仓库记忆库）。
 
+### 真 Host 实测的"注册汇总"（`MY_PI_DSH_TRACE_EVENTS=1`）
+
+```
+[my-pi-dsh] trace 注册汇总：工具 52 个、命令 9 个；同名冲突跳过 3 个
+             （工具:web_search, 命令:plan, 工具:subagent）；钩子 18 个（…）
+```
+
+★ 这一行是**必需**的，不是锦上添花：DSH 原生占用了 `web_search` / `subagent` / `plan` 三个名字，
+而"同名冲突"原先会**冒泡**，被 `registerAll` 的"每特性 try/catch"接住 ⇒ **该特性排在后面的注册
+全部被跳过**（实测：`web-search` 丢了 `fetch_url`，`subagent`/`plan-mode` 丢了钩子 —— 而 plan-mode
+的只读护栏很可能就在钩子里，从工具数量上看不出来）。现在冲突**就地隔离**（只跳过冲突项并点名上报），
+"到底少了什么"由这一行列清（口径见 `custom/adapters/dsh/facade.ts` 的 `registrationSummary()`）。
+
+### 类型守门：`dsh/` 有自己的 tsconfig
+
+官方 `tsc -p custom/` **不收 `dsh/**`** ⇒ 这里长期只过 esbuild/tsx（**不做类型检查**），错误会一直积累。
+`dsh/tsconfig.json` + `scripts/check-conventions.sh` 的 **K 段**（条件：装了 spike 依赖才跑）补上这一环 ——
+它当场抓到 `dsh/plugin/entry.ts` 里两处既有类型错（`facade.disposers.push(...)` 与
+`readonly DshDisposer[]` 冲突），而那两行**每次插件启动都要跑**。spike.ts 刻意**不**纳入：它是类型探针，
+故意往真实 API 传裸值，补一堆 `as` 换不到安全性。
+
 ✗ 待产品决策：Host 里 **3 个特性与 DSH 原生同名**（`web_search` / `plan` 命令 / `subagent`）注册失败，
 需在"让位 DSH 原生 / 改 my-pi 前缀 / 挂 per-agent"之间选一个。

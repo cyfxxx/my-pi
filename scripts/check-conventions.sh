@@ -370,6 +370,23 @@ else
   note "DSH 侧基线跳过（缺 dsh/spike/node_modules 或 dsh/plugin/dist 产物；跑 bash scripts/dsh-build.sh 与 scripts/dsh-spike.sh 后自动生效）"
 fi
 
+# ── K. dsh/plugin 的类型检查（条件：DSH 包在才跑，否则跳过）──
+# ★ 为什么需要单独一段：官方的 `tsc -p custom/` 只收 custom/**（无 include ⇒ 按 tsconfig 所在
+#   目录收文件）⇒ `dsh/` 长期只过 esbuild/tsx（**不做类型检查**），类型错误会一直积累。
+#   2026-10-18 手工 typecheck 就抓到 `facade.disposers.push(...)` 与 `readonly DshDisposer[]`
+#   冲突（两处）——那正是插件入口每次启动都要跑的一行。
+# ★ 为什么条件跑：`dsh/plugin/entry.ts` 会 import `@deepseek-ai/*`，而那是 `dsh-spike.sh`
+#   按需安装的；没装时报的是 `Cannot find module`（环境缺失，不是代码错误）⇒ 明确跳过。
+if [ -d dsh/spike/node_modules/@deepseek-ai ]; then
+  if npx tsc -p dsh/ >/tmp/dsh-tsc.out 2>&1; then
+    ok "dsh/plugin 类型检查通过（dsh/tsconfig.json）"
+  else
+    bad "dsh/plugin 类型检查失败（见 /tmp/dsh-tsc.out；跑 npx tsc -p dsh/ 复现）"
+  fi
+else
+  note "dsh/plugin 类型检查跳过（缺 dsh/spike/node_modules/@deepseek-ai；跑 bash scripts/dsh-spike.sh 后自动生效）"
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "🎉 约定守门全部通过"
