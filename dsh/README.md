@@ -110,3 +110,26 @@ pi 的 `APPEND_SYSTEM.md` 在 DSH 上**没有等价约定** —— 它只有 `Sy
 4. 纯 node 从**已安装位置**加载并 apply ⇒ 实测 **54 个工具 / 0 个特性失败 / `getAllTools()` 一致** ✓。
 
 ✗ profile 级 overrides 的写法（`pnpm.overrides` 指向 shim 包）尚未在真实 profile 里跑过（Host 级）。
+
+## Host 级验证（2026-10-18，已跑通）
+
+```bash
+MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据/额度/内存，需显式 opt-in
+```
+
+隔离 `DSH_HOME`（凭据只临时拷一份 600，退出即删）→ 从内置 `headless` 模板建 profile → 叠加本仓 patch
+→ 真实启动一次最小任务。**实测结果：退出码 0、插件日志 28 行、钩子在真 Host 里触发、模型回了「收到」** ✓。
+
+★ 这一跑抓出并修掉了两个**本地 19 项 spike 全绿也没抓到**的致命问题（详见
+[`../docs/design/DSH-MIGRATION-PLAN.md`](../docs/design/DSH-MIGRATION-PLAN.md) 实测 #18-t）：
+
+1. **`inject` 约束**：未 `inject` 就访问 `ctx.commands` 会抛错且插件**不激活** ⇒ 服务统一经
+   `getDshService()`（先 `ctx.get()` 再属性读，两路都 try/catch）取；
+2. **工具定义必须 `defineTool()` 编译**：直接注册原始 spec ⇒ provider 拒掉**每一个请求**
+   （`got 'type: null'`）⇒ 新增 `DshFacadeOptions.compileTool` 注入点（插件入口注入 `defineTool`）。
+
+回归守门：spike **A18**（按 cordis loader 装载产物）＋ **A19**（`schemas()` 里每个工具的
+`parameters.type === 'object'`）。
+
+✗ 待产品决策：Host 里 **3 个特性与 DSH 原生同名**（`web_search` / `plan` 命令 / `subagent`）注册失败，
+需在"让位 DSH 原生 / 改 my-pi 前缀 / 挂 per-agent"之间选一个。
