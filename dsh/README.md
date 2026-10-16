@@ -161,7 +161,8 @@ MY_PI_HOST_SMOKE=1 bash scripts/dsh-host-smoke.sh   # 默认 SKIP：会用凭据
 ### 场景测试（P6③）：两实例隔离已有 DSH 版
 
 ```bash
-MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-isolation.sh   # 默认 SKIP（跑两次真实模型）
+MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-isolation.sh     # 两实例隔离（并发跑两次真实模型）
+MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-session-resume.sh # 会话续接（--session-id 收养，跑两轮）
 ```
 
 换底座后**旧的绿色不能继承**：pi 侧 `scripts/test-scenario-*.mjs` 断言的是 pi 的进程/状态语义，
@@ -170,6 +171,12 @@ DSH 的 Host/Session 语义不同 ⇒ 场景必须**重写**。已重写的第�
 各 28 行插件日志、A 答「甲」/B 答「乙」（各自服务自己的 prompt）、会话 id 不同、用量各写各的且
 **仓库默认台账行数未变**、无脏目录。模式切换与会话切换仍待重写（前者依赖命令执行、后者在 DSH 上
 "切换前否决"本就没有落点）。
+
+已重写的第二个（会话续接）问的是 DSH 侧的对应能力：它没有 pi 那套 `newSession/switchSession`，
+但有 `--session-id <id>` **收养**已持久化会话继续跑。实测：两轮报出的 sessionId 相同、会话目录数不变
+（是收养而不是新开）、续接的会话里我们的插件仍在位、第二轮答出了第一轮让它"记住"的词（历史被带上）。
+✗ 明确**不**验"切换前可否决"——DSH 上该语义没有落点（钩子映射 `session_before_switch` 行）；
+只剩**模式切换**待重写（依赖命令执行，而 `commands.execute()` 需要客户端/真 agent）。
 
 ### 类型守门：`dsh/` 有自己的 tsconfig
 
