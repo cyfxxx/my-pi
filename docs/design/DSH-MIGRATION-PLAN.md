@@ -133,6 +133,28 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 | 补丁可应用性（`check-patches-behavior.mjs`） | 11 个 pi 补丁 | 补丁目标是 pi 的 TUI ⇒ 多数**不迁移**，改为"DSH 侧不需要"的书面结论 |
 | 便携运行时（`PORTABLE-LINUX.md`） | 与底座无关 | **可直接复用**（Node/CPython/服务都进仓库 ✓） |
 
+### 3.1 覆盖度总表（2026-10-17 收口快照）
+
+一句话：**核心面已全部有落点或"有理由的不支持"**；剩下的是 **Host 级验证**、**客户端层能力**与**两处功能重设计**。
+
+| 面 | 规模 | 状态 | 证据（可复跑） | 剩余 ✗ |
+|---|---|---|---|---|
+| **工具** | 59 定义 / `full` 生效 54 | ✓ 全部注册进真实注册表并可执行 | spike A2/A3/A9、`dsh-baseline --tools`（25,761 B） | 依赖 `voice`/`link` 的模式需显式启用 |
+| **钩子（事件）** | 19 个事件（①9 / ②10 / ③0） | ✓ 映射齐；桥接台账 **7 支持 / 11 降级 / 0 无等价** | spike A4/A5（pre-execute 观察+拦截）、**A13**（session/event 真跑）、**A14**（post-execute 替换）、A11（会话生命周期）、A9 台账 | 字段名翻译（`turn/end`、`message_update`）；两处功能重设计（暖前缀、转录改写） |
+| **命令** | 14 处 | ✓ 契约已读 + 映射已实现（名称规范化/必填 description/`CommandResult`） | spike **A10**（真实 `dsh-commands`：find 命中、rawInput 透传、抛错映射） | 参数补全无对应 ✗；`commands.execute()` 需真 agent |
+| **快捷键** | 4 处 | ✗ 不支持（属**客户端层**） | 映射文档 §7.2（客户端 UI 服务） | 要等价能力得写 DSH 客户端插件 |
+| **消息渲染器** | — | ✗ 不支持（同上，且与 `sendMessage` 的 customType 同族） | 同上 | 同上 |
+| **消息投递** | 3 处 | ✓/部分：`sendUserMessage` → `followup`/`steer`；`sendMessage` 只投文本并上报丢失字段；`appendEntry` **显式不做** | spike **A15**（真实 cordis 派发 `agent/created` ⇒ 投递 2 次、UserMessage 形状正确） | 真实 agent 上的唤醒/转向语义；`appendEntry` 需先声明日志类型 |
+| **会话身份** | 9+6 处（生命周期） | ✓ 身份由 `session/created` 跟踪；键收拢到 `session-key.ts` | spike **A11**（`Session.create→enter→announce` 与 disposer ⇒ 两个处理器各 1 次、身份一致） | `--session <文件>` 式续接无对应 |
+| **会话枚举** | `session-adapter` | ✗ 当前走 pi shim（返回空表） | `SessionStore.list()` / `ctx.sessionQuery` **存在**（已读契约） | **可做**：换成 `ctx.sessions.list()`（下一轮候选） |
+| **thinking 档位** | 1 处 | 部分：级别→档位**纯映射**已实现（只降不升） | 单测 7 项；`agent/request` + `reasoningEffort`（`call-config.d.ts:19`） | 真正替换配置需模型路由 |
+| **注入面（系统提示词）** | 1 | ✓ `APPEND_SYSTEM.md` 注册为提示段（order 2500，实测在末尾） | 基线 `dsh/baseline/system-prompt.json` + 反证（改源文件 ⇒ exit 1）；`check-conventions` J 段 | — |
+| **工具面基线** | 1 | ✓ 25,761 B / sha256 | `dsh/baseline/tool-surface.json` + 反证；J 段守门 | — |
+| **补丁账** | 11 | ✓ 收敛为 **0 个需移植**（§4.2） | 逐条依据 | `010`/`011` 的检索面未穷尽 |
+| **打包/接线** | 1 | ✓ 产物 + profile 组合 + 正式安装 | `dsh-build`/`dsh-smoke-profile`/`dsh-package`；A9 全量 | profile 级 `pnpm.overrides` 未在真 profile 跑过 |
+| **场景测试** | 3 场景 | ✗ 未重建（依赖 Host apparatus） | — | 模式切换/两实例隔离/会话切换 |
+| **Host 级启动** | — | ✗ **未做**（需凭据 + 内存 + 不打扰在跑的 GUI） | — | **重大决策，等授权** |
+
 ### 4.1 已重建（本轮）
 
 | 基线 | 产物 | 生成 / 守门命令 | 反证（证明守门真的会咬） |
