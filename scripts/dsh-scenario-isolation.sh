@@ -79,7 +79,13 @@ mkdir -p "$HOME_A" "$HOME_B" "$LOG_DIR"
 install -m 600 "$CREDS" "$HOME_A/.credentials.yaml"
 install -m 600 "$CREDS" "$HOME_B/.credentials.yaml"
 cleanup() { rm -f "$HOME_A/.credentials.yaml" "$HOME_B/.credentials.yaml"; }
-trap cleanup EXIT
+# ★ 凭据副本必须清理干净（明文，不能留在 /tmp）：实测确实遇到过残留
+#   （`/tmp/my-pi-dsh-home/.credentials.yaml`，来自更早一次被**取消**的作业）。
+#   这里把 INT/TERM/HUP 一并接上做**防御性**加固 —— 但要说清：**残留的确切成因没有复现**
+#   （对照探针里 SIGTERM 下 `trap ... EXIT` 与 `trap ... EXIT INT TERM HUP` **都会**清理），
+#   所以别把这条写成"它修掉了那次残留"。另外脚本开头本来就会 `rm -rf "$HOME_DIR"`，
+#   同一个 home 再跑一次也会把旧副本带走。
+trap cleanup EXIT INT TERM HUP
 
 # 仓库默认用量台账的行数（场景跑完必须**没变**：两个实例都写自己的文件）
 REPO_DIAG_BEFORE="$(wc -l < "$REPO_DIAG" 2>/dev/null || echo 0)"

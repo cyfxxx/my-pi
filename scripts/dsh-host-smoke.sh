@@ -74,7 +74,13 @@ mkdir -p "$HOME_DIR"
 install -m 600 "$CREDS" "$HOME_DIR/.credentials.yaml"
 # 退出时一定删掉凭据副本（不留明文在 /tmp）
 cleanup() { rm -f "$HOME_DIR/.credentials.yaml"; }
-trap cleanup EXIT
+# ★ 凭据副本必须清理干净（明文，不能留在 /tmp）：实测确实遇到过残留
+#   （`/tmp/my-pi-dsh-home/.credentials.yaml`，来自更早一次被**取消**的作业）。
+#   这里把 INT/TERM/HUP 一并接上做**防御性**加固 —— 但要说清：**残留的确切成因没有复现**
+#   （对照探针里 SIGTERM 下 `trap ... EXIT` 与 `trap ... EXIT INT TERM HUP` **都会**清理），
+#   所以别把这条写成"它修掉了那次残留"。另外脚本开头本来就会 `rm -rf "$HOME_DIR"`，
+#   同一个 home 再跑一次也会把旧副本带走。
+trap cleanup EXIT INT TERM HUP
 
 echo "=== ② 建 profile + 组合我们的 patch ==="
 DSH_HOME="$HOME_DIR" timeout 300 node "$DSH_BIN" --profile "$PROFILE" --from-default-profile "$TEMPLATE" --dump-config >"$LOG_DIR/dsh-host-base.txt" 2>&1 || {
