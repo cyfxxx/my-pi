@@ -27,6 +27,8 @@
  *      返回 `{content}` 时**真的替换**注册表返回的内容块
  *   A15 **消息投递接线**（`sendUserMessage` → `agent.followup/steer`）：经真实 cordis 派发
  *      `agent/created`（契约负载 `{agent}`），外观层应解析出当前 agent 并投递**契约形状的 UserMessage**
+ *   A16 **会话枚举真跑**（`listDshSessions`）：真实 `SessionStore` 建两个会话并追加 user/message，
+ *      列表应给出 id / `dsh-session:` 稳定键 / cwd / 消息数 / 首条消息 / 按修改时间倒序
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -36,6 +38,7 @@ import SystemPrompt, { joinContextSections, renderContextSections } from '@deeps
 import ToolRuntime from '@deepseek-ai/dsh-tools';
 
 import { createDshExtensionApi } from '../../custom/adapters/dsh/facade';
+import { listDshSessions } from '../../custom/adapters/dsh/session-list';
 import type { DshContext } from '../../custom/adapters/dsh/types';
 // ★ 走**真实的** pi 侧适配器把内部定义编译成 pi 形状，再交给 DSH 外观层 ——
 //   这正是运行期的调用链（feature → tool-adapter → facade → DSH），不是"直接调 facade"的理想路径。
@@ -520,6 +523,85 @@ async function main(): Promise<void> {
     a15 = { id: 'A15', ok: 'skip', detail: `消息投递接线不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a15);
+
+  // ── A16：会话枚举真跑（listDshSessions 读真实 SessionStore）──────────────────
+  let a16: Check = { id: 'A16', ok: 'skip', detail: '会话服务不可用' };
+  try {
+    const sessionModule = (await import('@deepseek-ai/dsh-session')) as unknown as {
+      SessionStore?: unknown;
+      Session?: {
+        create: (
+          id: string,
+          seed?: unknown,
+          header?: { cwd: string; version: number; id: string; createdAt: number; isSeeded: boolean },
+        ) => { id: string; append: (type: string, data: unknown, intent?: unknown) => unknown };
+      };
+    };
+    if (!sessionModule.SessionStore || !sessionModule.Session) throw new Error('dsh-session 未导出所需类型');
+    const lCtx = new Context();
+    lCtx.plugin(sessionModule.SessionStore as never);
+    await tick();
+    const store = (lCtx as unknown as {
+      sessions: { enter: (s: unknown) => () => void; announce: (s: unknown) => void };
+    }).sessions;
+
+    const makeSession = (id: string, cwd: string, text: string): unknown => {
+      const session = sessionModule.Session!.create(id, undefined, {
+        cwd,
+        version: 4,
+        id,
+        createdAt: Date.now(),
+        isSeeded: false,
+      });
+      store.enter(session);
+      store.announce(session);
+      session.append(
+        'user/message',
+        { id: `${id}-m1`, role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } },
+        { surfaceOp: 'append' },
+      );
+      return session;
+    };
+    makeSession('a16-one', '/work/one', '第一条：整理 packs 目录');
+    await tick(30);
+    makeSession('a16-two', '/work/two', '第二条：切到 DSH 底座');
+
+    const listed = listDshSessions(lCtx as unknown as DshContext);
+    const rows = listed.success ? listed.data : [];
+    // 注入路径（features 走的是 session-adapter.listSessions）：验证注入后行为一致 + cwd 过滤
+    const adapterModule = (await import('../../custom/adapters/session-adapter')) as unknown as {
+      setSessionLister: (lister: ((cwd?: string) => Promise<unknown>) | undefined) => void;
+      listSessions: (cwd?: string) => Promise<{ success: boolean; data?: unknown[]; error?: string }>;
+    };
+    adapterModule.setSessionLister(async (cwd?: string) => {
+      const r = listDshSessions(lCtx as unknown as DshContext, cwd);
+      return r.success ? { success: true, data: r.data } : { success: false, error: r.error };
+    });
+    const viaAdapter = await adapterModule.listSessions('/work/one');
+    adapterModule.setSessionLister(undefined);
+    const one = rows.find((r) => r.id === 'a16-one');
+    const two = rows.find((r) => r.id === 'a16-two');
+    const ok =
+      listed.success &&
+      rows.length === 2 &&
+      one?.path === 'dsh-session:a16-one' &&
+      one?.cwd === '/work/one' &&
+      one?.messageCount === 1 &&
+      one?.firstMessage === '第一条：整理 packs 目录' &&
+      one?.name === '第一条：整理 packs 目录' &&
+      two?.cwd === '/work/two' &&
+      rows[0]?.id === 'a16-two' && // 后建/后写 ⇒ 排在前（modifiedMs 倒序）
+      viaAdapter.success === true &&
+      viaAdapter.data?.length === 1; // cwd 过滤生效
+    a16 = {
+      id: 'A16',
+      ok,
+      detail: `列出 ${rows.length} 行（顺序 ${rows.map((r) => r.id).join(' > ')}）；a16-one: cwd=${one?.cwd} path=${one?.path} 消息数=${one?.messageCount} 首条=${JSON.stringify(one?.firstMessage)}；经 session-adapter 注入后 cwd=/work/one 过滤得 ${viaAdapter.data?.length ?? 'n/a'} 行`,
+    };
+  } catch (error) {
+    a16 = { id: 'A16', ok: 'skip', detail: `会话枚举不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a16);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url';
 import bootstrap from '../../custom/bootstrap';
 import { apply as applyFacade, inject, name } from '../../custom/adapters/dsh/plugin';
 import { registerMyPiSystemPrompt } from '../../custom/adapters/dsh/system-prompt';
+import { listDshSessions } from '../../custom/adapters/dsh/session-list';
+import { setSessionLister } from '../../custom/adapters/session-adapter';
 import type { DshContext } from '../../custom/adapters/dsh/types';
 import type { DshFacade } from '../../custom/adapters/dsh/facade';
 
@@ -68,6 +70,13 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
   });
   // 静态 system 注入（pi 的 APPEND_SYSTEM.md 语义）——不接这一步，那段指令在 DSH 上根本不会出现，
   // 而且**不会报错**；disposer 交给 facade 统一回收。
+  // 会话枚举：把底座实现注入 session-adapter（pi 路径不变；不注入的话 DSH 上会走 pi shim 返回空表）
+  setSessionLister(async (cwd?: string) => {
+    const listed = listDshSessions(ctx, cwd);
+    return listed.success ? { success: true, data: listed.data } : { success: false, error: listed.error };
+  });
+  facade.disposers.push(() => setSessionLister(undefined));
+
   facade.disposers.push(
     registerMyPiSystemPrompt(ctx, {
       root,

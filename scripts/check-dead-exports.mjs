@@ -120,6 +120,16 @@ const files = walk(SCAN_DIR);
 const code = new Map();
 for (const f of files) code.set(f, stripComments(readFileSync(f, 'utf-8')));
 
+// 引用面：除了 custom/，还要看 dsh/（DSH 插件入口/产物侧脚本）——否则"在 dsh/ 接线"会被误判成死导出。
+// 只加引用面、不加声明面：声明仍然只认 custom/ 里的导出。
+const REF_FILES = [join(ROOT, 'dsh')];
+for (const dir of REF_FILES) {
+  if (!existsSync(dir)) continue;
+  for (const f of walk(dir)) {
+    if (f.endsWith('.ts') || f.endsWith('.mjs')) code.set(f, stripComments(readFileSync(f, 'utf-8')));
+  }
+}
+
 const declared = new Map(); // name -> file (first declaration)
 const declaredCount = new Map();
 for (const [f, src] of code) {

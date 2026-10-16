@@ -31,3 +31,9 @@ export {
   type ReasoningEffortLike,
   type ThinkingLevel,
 } from './thinking-level';
+export {
+  listDshSessions,
+  toDshSessionRow,
+  type DshSessionListResult,
+  type DshSessionRow,
+} from './session-list';

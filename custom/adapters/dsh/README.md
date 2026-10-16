@@ -65,10 +65,10 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 15 条检查（A1–A15）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 16 条检查（A1–A16）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）。
-实测结果：**15 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）、**会话枚举**（A16）。
+实测结果：**16 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
 **7 直接 / 11 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
@@ -199,3 +199,18 @@ pi 的 `input` 处理器返回 `{action:'continue'|'transform'|'handled'}`，DSH
 ✗ 仍有**字段名差异**（不是触发问题）：`turn/end` 的 data 只有 `{turn,reason}`（pi 读 `event.message`）、
 `message_update` 的 pi 字段是 `assistantMessageEvent` 而 DSH 是**有序帧** ⇒ 这类要字段翻译或改处理器，
 已在映射表逐条标注。
+
+### 会话枚举（2026-10-17 换成底座实现）
+
+原先 `custom/adapters/session-adapter.ts` 只走 pi 的 `SessionManager`；在 DSH 上那两条由 shim 返回 `[]`
+⇒ "列出/选择会话"会**安静地显示为空** ✗。现在：
+
+- `custom/adapters/dsh/session-list.ts`：读 `ctx.sessions.list()`，行内容取自 `Session` 契约
+  （`id`、`header.cwd`、`header.createdAt`、`ownEvents()` 里的 `{type,time,data}`）；
+  `path` 填 **`dsh-session:<id>` 稳定键**（DSH 会话**没有磁盘路径**，别当路径用）；
+  名称优先 `ctx.sessionTitle.get()`，否则用首条用户消息截断兜底；
+  **服务缺失时 `success:false` + 原因**（不返回空表假装"没有会话"）。
+- `session-adapter` 新增 `setSessionLister()` 注入点（**pi 路径零改动**），由 `dsh/plugin/entry.ts`
+  在 `apply()` 时注入、dispose 时还原。
+- 验证：spike **A16**（真实 `SessionStore`：2 个会话、cwd/消息数/首条消息/名称、按修改时间倒序、
+  注入路径 + cwd 过滤）＋ 单测 7 项。

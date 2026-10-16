@@ -66,7 +66,32 @@ export interface ListSessionsResult {
  * 返回结构化结果，包含成功状态、数据或错误信息。
  * 调用方可据此区分“正常无会话”与“发生真实错误”。
  */
+/**
+ * 可注入的"底座 lister"：DSH 侧把 `listDshSessions` 注进来，pi 侧不用注入（走下面的默认实现）。
+ *
+ * 为什么需要注入：本文件在**运行时** import pi 的 `SessionManager`（这是"只有 adapters 接触底座"
+ * 的约定）；换底座后要么改这里、要么让底座把实现送进来。选后者：pi 路径零改动，
+ * DSH 侧由 `dsh/plugin/entry.ts` 注入 `ctx.sessions.list()` 的实现。
+ */
+export type SessionLister = (cwd?: string) => Promise<ListSessionsResult>;
+
+let injectedLister: SessionLister | undefined;
+
+/** 注入底座 lister（DSH 侧用）；传 `undefined` 恢复 pi 默认实现 */
+export function setSessionLister(lister: SessionLister | undefined): void {
+  injectedLister = lister;
+}
+
 export async function listSessions(cwd?: string): Promise<ListSessionsResult> {
+  if (injectedLister) {
+    try {
+      return await injectedLister(cwd);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to list sessions (injected lister):', msg);
+      return { success: false, error: msg };
+    }
+  }
   try {
     const list = cwd ? await SessionManager.list(cwd) : await SessionManager.listAll();
     const data = (list as PiSessionInfo[]).map(toRow);
