@@ -115,7 +115,7 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     dsh: ['turn/end', 'agent/turn-stopping'],
     via: 'session-event',
     note: '3 处；需要"让回合继续"时 DSH 的 turn-stopping 比 pi 更强（可 steer）',
-    degradedNote: '负载字段名不同：DSH 日志事件是 `{type,seq,time,data}`（桥接层已把 `data` 摊平到顶层），但 `turn/end` 的 data 只有 `{turn,reason}`，**没有** pi 的 `message` ⇒ 读 `event.message` 的处理器会拿到 undefined，需要字段翻译或改处理器',
+    degradedNote: '负载差异（2026-10-17 按契约核对）：pi 的 `turn_end` 带 `{turnIndex, message, toolResults, …}`，而 DSH 的 `turn/end` data 只有 `{turn, reason}`（连回合号字段名都不同：turn vs turnIndex）⇒ 读 `event.message.usage` 的处理器拿不到东西；正解是**改处理器从 `assistant/message` 累积用量**，而不是等 turn/end 带过来',
   },
   {
     pi: 'session_compact',
@@ -173,7 +173,7 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     dsh: ['agent/assistant-stream'],
     via: 'cordis',
     status: 'degraded',
-    degradedNote: '负载字段名不同：pi 是 `{assistantMessageEvent:{type,delta}}`，DSH 的 agent/assistant-stream 是**有序帧**（`{type:start|chunk|...}`）⇒ 读 pi 字段的处理器会拿到 undefined，需要字段翻译或改处理器',
+    degradedNote: '桥接层已做**流帧翻译**（`translateStreamFrame`：text-delta→text_delta、reasoning-delta→thinking_delta、tool-call-delta→toolcall_delta、block-start/end→*_start/*_end）；✗ 不可表达：`partial`（累积消息）帧里没有（置 undefined 并上报）、usage/finish 帧无对应变体、toolcall_end 需要 pi 的 ToolCall 形状 ⇒ 这些**显式上报**',
     note: '1 处；助手流式增量（DSH 是有序帧 + 结束帧）',
   },
   {
@@ -194,10 +194,10 @@ export const PI_TO_DSH_EVENTS: readonly DshEventMapping[] = [
     pi: 'message_end',
     tier: 'direct',
     dsh: ['assistant/message'],
-    status: 'degraded',
-    degradedNote: '负载字段名不同：pi 读 `event.message`，DSH 的日志事件把内容放在 `data`（桥接层已摊平 `data`，但名字不一定叫 message）⇒ 需要按 DSH 字段名核对后再定',
     via: 'session-event',
-    note: '1 处；"一条助手消息定稿"是日志类型，走 session/event；也可用 agent/assistant-stream 的结束帧',
+    note: '1 处；DSH 的 `assistant/message` data 是 `{turn, step, message, stream, usage?, interrupted?}`，桥接层把 data 摊平到顶层 ⇒ pi 读的 `event.message`/`event.usage` **直接可用**（2026-10-17 按契约核对更正）',
+    status: 'degraded',
+    degradedNote: '仍是 degraded 而非 supported：DSH 这条是**日志事件**（提交后观察、不可否决）',
   },
 ];
 

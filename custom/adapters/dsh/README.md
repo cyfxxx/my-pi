@@ -65,10 +65,10 @@ bash scripts/dsh-spike.sh            # 装 DSH 包（dsh/spike/node_modules，gi
 bash scripts/dsh-spike.sh --no-install
 ```
 
-spike 的 16 条检查（A1–A16）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
+spike 的 17 条检查（A1–A17）覆盖：真实服务启动、工具注册、真实执行、观察者钩子不打断流水线、
 **拦截钩子真的拦住**、真实特性注册与执行、负向（未登记事件抛错）、**全量 bootstrap**（真实 `custom/bootstrap.ts` 的 12 个特性）、
-**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）、**会话枚举**（A16）。
-实测结果：**16 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
+**pi 形状命令 → 真实命令服务**（A10）、**会话生命周期真跑**（A11）、**动态上下文落点**（A12）、**会话事件桥**（A13）、**工具结果替换**（A14）、**消息投递接线**（A15）、**会话枚举**（A16）、**流帧翻译**（A17）。
+实测结果：**17 通过 / 0 失败 / 0 跳过**（A7 真实 `web_search` 打出 27–37 条结果；
 A9 在**别名到本仓 shim**（即零 pi 依赖）下注册 **54 个工具、0 个特性失败**，并打印钩子桥接台账
 **7 直接 / 11 降级 / 0 无等价**；A10 用真实 `@deepseek-ai/dsh-commands` 验通 `find()` 命中、
 `rawInput` 原文透传、会话身份注入与抛错映射）。
@@ -214,3 +214,22 @@ pi 的 `input` 处理器返回 `{action:'continue'|'transform'|'handled'}`，DSH
   在 `apply()` 时注入、dispose 时还原。
 - 验证：spike **A16**（真实 `SessionStore`：2 个会话、cwd/消息数/首条消息/名称、按修改时间倒序、
   注入路径 + cwd 过滤）＋ 单测 7 项。
+
+### 流式增量：帧 → `assistantMessageEvent`（2026-10-17）
+
+pi 的 `message_update` 处理器读 `event.assistantMessageEvent.{type,delta}`，而 DSH 的
+`agent/assistant-stream` 给的是**有序帧** `{type:'chunk', chunk:{type:'text-delta',…}}`
+⇒ 不翻译处理器**看不到任何增量**（静默失效）。`hooks.ts` 的 `translateStreamFrame` 做映射：
+
+| DSH `StreamChunk` | pi `AssistantMessageEvent` |
+|---|---|
+| `text-delta` | `text_delta` |
+| `reasoning-delta` | `thinking_delta` |
+| `tool-call-delta` | `toolcall_delta`（`argumentsDelta` → `delta`） |
+| `block-start`（text/reasoning/tool） | `text_start` / `thinking_start` / `toolcall_start` |
+| `block-end`（text/reasoning） | `text_end` / `thinking_end` |
+
+✗ **不可表达（逐条上报，不静默）**：`partial`（累积消息）帧里没有；`usage`/`finish` 帧没有对应变体；
+`toolcall_end` 需要 pi 的 `ToolCall` 对象。另按契约更正三条映射 note：`message_end` 其实**可用**
+（`assistant/message` 的 data 含 `message`/`usage`，桥接层已摊平）；`turn_end` 的差异是字段名与内容
+（`turn` vs `turnIndex`、无 `message`/`toolResults`）⇒ 该处理器应改从 `assistant/message` 累积用量。

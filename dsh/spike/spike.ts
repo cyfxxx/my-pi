@@ -29,6 +29,8 @@
  *      `agent/created`（契约负载 `{agent}`），外观层应解析出当前 agent 并投递**契约形状的 UserMessage**
  *   A16 **会话枚举真跑**（`listDshSessions`）：真实 `SessionStore` 建两个会话并追加 user/message，
  *      列表应给出 id / `dsh-session:` 稳定键 / cwd / 消息数 / 首条消息 / 按修改时间倒序
+ *   A17 **流帧翻译真跑**（`agent/assistant-stream`）：真实 cordis 派发一个 `chunk` 帧（契约形状），
+ *      pi 的 `message_update` 处理器应收到 `assistantMessageEvent`；`usage` 帧则应"不调处理器 + 上报" 
  *
  * 用法：`bash scripts/dsh-spike.sh`（自动装 `dsh/spike/node_modules`，用仓库自带 tsx 运行）
  */
@@ -602,6 +604,48 @@ async function main(): Promise<void> {
     a16 = { id: 'A16', ok: 'skip', detail: `会话枚举不可用：${(error as Error).message.slice(0, 90)}` };
   }
   checks.push(a16);
+
+  // ── A17：流帧翻译真跑（agent/assistant-stream → assistantMessageEvent）────────
+  let a17: Check = { id: 'A17', ok: false, detail: '未执行' };
+  try {
+    const sCtx = new Context();
+    sCtx.plugin(SystemPrompt);
+    sCtx.plugin(ToolRuntime);
+    await tick();
+    const reports: string[] = [];
+    const sFacade = createDshExtensionApi(sCtx as unknown as DshContext, {
+      onUnsupported: (member) => reports.push(member),
+    });
+    const deltas: unknown[] = [];
+    sFacade.api.on('message_update' as never, ((event: unknown) => {
+      deltas.push((event as { assistantMessageEvent?: unknown }).assistantMessageEvent);
+      return undefined;
+    }) as never);
+
+    const emit = (frame: unknown): void => {
+      (sCtx as unknown as { emit: (n: string, p: unknown) => void }).emit('agent/assistant-stream', { agent: { id: 'a17' }, frame });
+    };
+    emit({ type: 'chunk', attemptId: 'att', revision: 1, index: 0, time: 1, chunk: { type: 'text-delta', index: 0, text: '真实派发' } });
+    await tick(60);
+    emit({ type: 'chunk', attemptId: 'att', revision: 1, index: 1, time: 2, chunk: { type: 'usage', usage: { input: 1 } } });
+    await tick(60);
+
+    const first = deltas[0] as { type?: string; delta?: string } | undefined;
+    const ok =
+      deltas.length === 1 &&
+      first?.type === 'text_delta' &&
+      first?.delta === '真实派发' &&
+      reports.includes('hook.message_update.frame');
+    a17 = {
+      id: 'A17',
+      ok,
+      detail: `chunk(text-delta) ⇒ 处理器收到 ${deltas.length} 次（type=${String(first?.type)} delta=${JSON.stringify(first?.delta)}）；usage 帧 ⇒ 上报 ${reports.filter((r) => r === 'hook.message_update.frame').length} 次且未调处理器`,
+    };
+    sFacade.dispose();
+  } catch (error) {
+    a17 = { id: 'A17', ok: 'skip', detail: `流帧翻译不可用：${(error as Error).message.slice(0, 90)}` };
+  }
+  checks.push(a17);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

@@ -14,6 +14,7 @@ import { PI_TO_DSH_EVENTS, assertEventsMapped, mappingSummary, resolveDshEvent }
 import { createDshExtensionApi } from '../facade';
 import {
   dedupeByTurn,
+  translateStreamFrame,
   deriveSessionInfo,
   idleOnly,
   inputTextFromPayload,
@@ -356,6 +357,59 @@ describe('会话身份派生（DSH 没有会话文件路径）', () => {
       sessionManager?: { getSessionId?: () => string | undefined };
     };
     expect(viaAgent.sessionManager?.getSessionId?.()).toBe('sess-8');
+  });
+});
+
+describe('流帧翻译（agent/assistant-stream → pi 的 assistantMessageEvent）', () => {
+  const chunkFrame = (chunk: unknown) => ({ type: 'chunk', attemptId: 'a1', revision: 1, index: 0, time: 1, chunk });
+
+  it('text-delta / reasoning-delta / tool-call-delta 各自映射到 pi 变体，并提示 partial 丢失', () => {
+    const text = translateStreamFrame(chunkFrame({ type: 'text-delta', index: 2, text: '你好' }));
+    expect(text.event).toMatchObject({ type: 'text_delta', contentIndex: 2, delta: '你好' });
+    expect(text.note).toContain('partial');
+
+    const thinking = translateStreamFrame(chunkFrame({ type: 'reasoning-delta', index: 0, text: '想' }));
+    expect(thinking.event).toMatchObject({ type: 'thinking_delta', delta: '想' });
+
+    const tool = translateStreamFrame(chunkFrame({ type: 'tool-call-delta', index: 1, argumentsDelta: '{"a"' }));
+    expect(tool.event).toMatchObject({ type: 'toolcall_delta', contentIndex: 1, delta: '{"a"' });
+  });
+
+  it('block-start / block-end 按块类型映射', () => {
+    expect(translateStreamFrame(chunkFrame({ type: 'block-start', index: 0, blockType: 'text' })).event).toMatchObject({ type: 'text_start' });
+    expect(translateStreamFrame(chunkFrame({ type: 'block-start', index: 1, blockType: 'reasoning' })).event).toMatchObject({ type: 'thinking_start' });
+    expect(translateStreamFrame(chunkFrame({ type: 'block-end', index: 0, block: { type: 'text', text: '完' } })).event).toMatchObject({
+      type: 'text_end',
+      content: '完',
+    });
+    // toolcall_end 需要 pi 的 ToolCall 形状 ⇒ 不猜，显式上报
+    const toolEnd = translateStreamFrame(chunkFrame({ type: 'block-end', index: 2, block: { type: 'tool-call' } }));
+    expect(toolEnd.event).toBeUndefined();
+    expect(toolEnd.unsupported).toContain('ToolCall');
+  });
+
+  it('usage / finish / start / end 帧没有对应变体 ⇒ 显式上报而不是静默丢', () => {
+    expect(translateStreamFrame(chunkFrame({ type: 'usage', usage: { input: 1 } })).unsupported).toContain('usage');
+    expect(translateStreamFrame(chunkFrame({ type: 'finish', reason: 'stop' })).unsupported).toContain('finish');
+    expect(translateStreamFrame({ type: 'start' }).unsupported).toContain('start');
+    expect(translateStreamFrame({ type: 'end' }).unsupported).toContain('end');
+    expect(translateStreamFrame(undefined).unsupported).toBeDefined();
+  });
+
+  it('经桥接层：message_update 处理器拿到翻译后的 assistantMessageEvent', async () => {
+    const seen: unknown[] = [];
+    const listener = makeDshListener(
+      'message_update',
+      (event) => {
+        seen.push((event as { assistantMessageEvent?: unknown }).assistantMessageEvent);
+        return undefined;
+      },
+      { report: () => undefined },
+    );
+    const next = vi.fn().mockResolvedValue(undefined);
+    await listener({ agent: { id: 'a' }, frame: chunkFrame({ type: 'text-delta', index: 0, text: '增量' }) }, next);
+    expect(seen[0]).toMatchObject({ type: 'text_delta', delta: '增量' });
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });
 

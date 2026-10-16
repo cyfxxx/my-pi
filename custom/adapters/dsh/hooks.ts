@@ -303,6 +303,20 @@ export function makeDshListener(piEvent: string, handler: PiHookHandler, bridge:
       return next ? next() : undefined;
     }
 
+    if (piEvent === 'message_update') {
+      // `agent/assistant-stream` 的负载是 `{agent, frame}`；pi 需要 `{assistantMessageEvent}` ⇒ 翻译
+      const payload = typeof first === 'object' && first !== null ? (first as { frame?: unknown }) : undefined;
+      const translated = translateStreamFrame(payload?.frame);
+      if (translated.unsupported) report('hook.message_update.frame', translated.unsupported);
+      if (translated.note) report('hook.message_update.partial', translated.note);
+      if (!translated.event) return next ? next() : undefined;
+      const decision = await handler({ type: 'message_update', assistantMessageEvent: translated.event }, piContext);
+      if (decision !== undefined && decision !== null) {
+        report(`hook.${piEvent}.decision`, '该事件的返回值在本层还没有翻译规则（可能是拦截语义）⇒ 本次按"不干预"处理');
+      }
+      return next ? next() : undefined;
+    }
+
     // 其余事件：先按观察者语义调用处理器，然后**必须**按 waterfall/emit 语义收尾
     const decision = await handler(first, piContext);
     if (decision !== undefined && decision !== null) {
@@ -359,6 +373,70 @@ export function inputTextFromPayload(payload: unknown): string {
     if (texts.length > 0) return texts.join('\n');
   }
   return '';
+}
+
+/**
+ * DSH 的 `StreamChunk`（`dsh-llm/lib/types/types.d.ts:417-447`）
+ * → pi 的 `AssistantMessageEvent`（`vendor/pi/packages/ai/src/types.ts:801-817`）。
+ *
+ * 为什么要翻译：pi 的 `message_update` 处理器读 `event.assistantMessageEvent.{type,delta}`，
+ * 而 DSH 的 `agent/assistant-stream` 给的是**有序帧** `{type:'chunk', chunk:{type:'text-delta',…}}`
+ * ⇒ 不翻译的话处理器**看不到任何增量**（静默失效）。
+ *
+ * ✗ 已知不可表达：pi 的每个变体都带 `partial`（累积中的消息），DSH 的帧里**没有**它
+ * ⇒ `partial` 置 `undefined` 并上报；`usage`/`finish` 帧没有等价的 `AssistantMessageEvent` 变体，同样上报。
+ */
+export interface FrameTranslation {
+  readonly event?: Record<string, unknown>;
+  /** 无法翻译时的原因（调用方上报用）；能翻译时为 undefined */
+  readonly unsupported?: string;
+  /** 能翻译但丢了字段时的提示（例如 `partial`） */
+  readonly note?: string;
+}
+
+export function translateStreamFrame(frame: unknown): FrameTranslation {
+  const f = typeof frame === 'object' && frame !== null ? (frame as { type?: unknown; chunk?: unknown }) : undefined;
+  const chunk = typeof f?.chunk === 'object' && f.chunk !== null ? (f.chunk as Record<string, unknown>) : undefined;
+  if (!chunk) {
+    // start / end 帧：pi 的 start 变体需要 partial（拿不到），end 帧的 outcome 也不是 pi 的 done/error
+    return { unsupported: `帧类型 ${String(f?.type ?? '未知')} 没有等价的 AssistantMessageEvent（缺 partial/outcome 语义）` };
+  }
+  const index = typeof chunk.index === 'number' ? chunk.index : 0;
+  const chunkType = String(chunk.type ?? '');
+  const lost = 'partial（累积中的消息）在 DSH 的帧里不存在 ⇒ 置 undefined';
+  switch (chunkType) {
+    case 'text-delta':
+      return { event: { type: 'text_delta', contentIndex: index, delta: String(chunk.text ?? ''), partial: undefined }, note: lost };
+    case 'reasoning-delta':
+      return { event: { type: 'thinking_delta', contentIndex: index, delta: String(chunk.text ?? ''), partial: undefined }, note: lost };
+    case 'tool-call-delta':
+      return {
+        event: { type: 'toolcall_delta', contentIndex: index, delta: String(chunk.argumentsDelta ?? ''), partial: undefined },
+        note: lost,
+      };
+    case 'block-start': {
+      const blockType = String(chunk.blockType ?? '');
+      const mapped = blockType === 'text' ? 'text_start' : blockType === 'reasoning' ? 'thinking_start' : blockType.includes('tool') ? 'toolcall_start' : undefined;
+      if (!mapped) return { unsupported: `block-start 的 blockType=${blockType} 没有对应的 start 变体` };
+      return { event: { type: mapped, contentIndex: index, partial: undefined }, note: lost };
+    }
+    case 'block-end': {
+      const block = typeof chunk.block === 'object' && chunk.block !== null ? (chunk.block as Record<string, unknown>) : undefined;
+      const blockType = String(block?.type ?? '');
+      if (blockType === 'text') return { event: { type: 'text_end', contentIndex: index, content: String(block?.text ?? ''), partial: undefined }, note: lost };
+      if (blockType === 'reasoning') {
+        return { event: { type: 'thinking_end', contentIndex: index, content: String(block?.text ?? ''), partial: undefined }, note: lost };
+      }
+      // toolcall_end 需要完整的 ToolCall 对象；DSH 的 block 形状不同 ⇒ 不猜
+      return { unsupported: `block-end 的 block.type=${blockType} 需要 pi 的 ToolCall 形状，未做映射` };
+    }
+    case 'usage':
+      return { unsupported: 'usage 帧在 pi 的 AssistantMessageEvent 里没有对应变体（用量由 message_end/turn_end 携带）' };
+    case 'finish':
+      return { unsupported: 'finish 帧对应 pi 的 done/error 变体，但两者都需要完整 message/error ⇒ 未做映射' };
+    default:
+      return { unsupported: `未知 StreamChunk 类型 ${chunkType}` };
+  }
 }
 
 /** 映射表的落点类型（供 facade 判断是否需要包 session/event 信封） */
