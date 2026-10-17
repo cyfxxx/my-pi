@@ -30,6 +30,21 @@
 #     maxActiveSubagents: 2
 #     maxDepth: 1
 
+# ── （可选）具名 agent 工具：**默认关闭**（能力审计 DR-2）───────────────────────────────
+# 打开后，`<agent dir>/agents/*.md` 与 `<cwd>/.pi/agents/*.md` 里的每个 agent 会变成一个
+# **模型可见工具**（工具名 = 规范化后的 agent 名），携带它的 persona 与工具权限
+# （只读 agent 自动限到 read/grep/find/ls）。代价：工具面变大、token 变贵 ⇒ 默认关。
+# ★ 注意：`- id:` 形式会**整体替换**该条目 config ⇒ 要保留上面的 `root` 等字段就一起写全。
+# 临时启用（不改文件）：MY_PI_DSH_EXTRA_PATCH=/tmp/na.patch.yml ./my-pi.sh web
+#
+# - id: my-pi
+#   config:
+#     namedAgents:
+#       enabled: true
+#       maxTools: 3            # 上限（默认 6）；超出的逐条报"跳过原因"
+#       scope: both            # user | project | both
+#       provider: spawn        # 宿主 subagent 提供方
+#
 - insert:
     - id: my-pi
       name: "../plugin/dist/my-pi-plugin.mjs"

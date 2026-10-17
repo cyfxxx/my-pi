@@ -6,7 +6,7 @@
 > 每页四件事：是什么 / 根因 / **确切命令序列** / **含确切语法的解法**；篇幅 **10–30 行**；只记可泛化的。
 > **本产物不自动进模型上下文、不改任何运行时行为**，只供人审阅。
 
-## 失败模式（45 条，来源：`docs/BUG-REPLAYS.md`）
+## 失败模式（46 条，来源：`docs/BUG-REPLAYS.md`）
 
 - [bug-001](patterns/bug-001.md): 切了模式、重启后没生效 + `modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` + `check-conventions`（状态不入库）+ 状态体检 `modes-legacy-current`；模式状态已迁到 gitignored 的 `modes-sessions.json`
 - [bug-002](patterns/bug-002.md): 模式解析"第 3 轮工厂执行后漂回 full" + `PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 + `mode-switch.test.ts` 的三轮回归 + `resolveStartupMode()` 单一写入点
@@ -53,6 +53,7 @@
 - [bug-043](patterns/bug-043.md): **打包形态冒烟自 2026-10-18 起静默失效**（连带暴露 `ln -sfn` 的目录语义坑） + `dsh-package.sh` 把 tgz 装到**独立目录**再从那里加载，而 `entry.ts` 那天为 `defineTool` 编译新增了宿主 import `@deepseek-ai/dsh-tools` ⇒ 独立目录里没有宿主包，脚本开始以 `ERR_MODULE_NOT_FOUND: @deepseek-ai/dsh-tools` 失败。它**不在任何自动门禁里**（重、要装包），所以从当天到被发现一直是坏的 —— 典型的"没跑过的守门等于没有守门"。修的过程中又撞上第二个坑：`npm install` 因 peerDependency 先建了**真目录** `node_modules/@deepseek-ai/`，而 `ln -sfn "$SRC" "$D/node_modules/@deepseek-ai"` 会把链接建到**目录里面**（`@deepseek-ai/@deepseek-ai → SRC`）⇒ 症状是"补了宿主包还是找不到" + **已修**：宿主包**逐包**补链接（跳过已存在项，与 `dsh-build.sh` 同做法）；并把"产物不得含 `@earendil-works/*` import"的**零成本断言**加进构建冒烟（`smoke-built.mjs`）⇒ 自包含性从此每次构建都被检查（灵敏度已验：不带 `--alias` 构建时该断言命中 3 处）。结节见 `docs/design/CODING-TRAPS.md` #14
 - [bug-044](patterns/bug-044.md): **把依赖 `this` 的方法「取下来」再调用 ⇒ 静默返回 undefined，打穿整条重启链**（本分支自己造成的真实回归） + DSH 换基座时新增了 `sessionKeyOf()` 统一"这是哪个会话"的键，内部写成了 `const f = ctx.sessionManager.getSessionFile; f()` —— 而 pi 的实现是 `getSessionFile() { return this.sessionFile; }`（`vendor/pi/packages/coding-agent/src/core/session-manager.ts:1156-1158`），**解绑后 `this` 是 undefined** ⇒ 抛 TypeError ⇒ **被同一函数里的 try/catch 吞掉** ⇒ 返回 `undefined`。后果不是小错：模式记录键成了 undefined（`modes-sessions.json` 恒为 `{}`）、重启请求的 `targetSession` 也变 undefined ⇒ `/mode roleplay` 不再真的换档重启。**单元测试全绿**（我的 fake 用的是箭头函数、不依赖 `this` ⇒ 测试把 bug 当成了契约） + **已修**：改为闭包调用（`() => sm?.getSessionFile?.()`）保住接收者，并在注释里写明"必须方法形式调用"与事故出处；新增反向探针单测（用真实现那样依赖 `this` 的类）⇒ 该写法以后会被立刻抓住。★ 教训：**fake 用箭头函数会把"依赖 this 的方法"这类 bug 保护起来** —— fake 应尽量模仿真实实现的形状（结节见 `docs/design/CODING-TRAPS.md` #15）
 - [bug-045](patterns/bug-045.md): **"记录被否提案"的机制实际不生效** + `record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledger.mjs` 会用 `git log + DECISIONS.md` 把它**整个重新生成**（rejected 是从 `DECISIONS.md` 按标题标记抽取的）⇒ 手写的记录在下一次重建时**静默消失**。最毒的是它**打印"✓ 已记录"**，而且约定守门在台账漂移时会**提示你去跑 `--update`** —— 那正是抹掉记录的那一步 + **已修（2026-10-16）**：`--reject` 改为按抽取器认得的格式**追加到 `DECISIONS.md`（事实来源）**，随后自动跑 `gen-changes-ledger --update`，并**自检**这条真的进了台账（进不去就 exit 1 并给原因，不许"打印成功、实际没记上"）。顺带把"理由"里重复的"不采用："前缀去掉、同时保证理由行仍含标记词。本次据此**耐久地**登记了 8 条被否提案（`pnpm.overrides` 别名方案、写死让位名单、`mypi_subagent` 改名、plan 直接让位、诊断报"入桶 yes/no"、箭头函数 fake、`ln -sfn` 整目录软链、vendored packs 一并改名）。结节见 `docs/design/CODING-TRAPS.md` #16
+- [bug-046](patterns/bug-046.md): **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归） + 为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `async`，结果**经 cordis 装载**后 `tools.schemas()` 返回 **0 个**（facade 自己的汇总仍说 54），而直接 `await apply(ctx)` 又正常 54 + **已修**：`apply` 恢复同步；宿主的 `dsh-tool-subagent` 模块改在**模块加载期**用顶层 `await` + `try/catch` 取好（取不到 = null，打开具名 agent 开关时逐条报失败，不影响其余能力）。结节见 `docs/design/CODING-TRAPS.md` #19
 
 ## 被否提案（16 条，来源：`docs/CHANGES.jsonl` 的 rejected）
 

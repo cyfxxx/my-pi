@@ -21,6 +21,7 @@
 #   MY_PI_DSH_CREDENTIALS=…  凭据来源（默认 ~/.dsh/.credentials.yaml）
 #   MY_PI_DSH_PORT=…         web 默认端口（默认 3099；3080 是正在跑的 GUI，刻意避开）
 #   MY_PI_DSH_HOST=…         强制指定 dsh 可执行文件（排障用）
+#   MY_PI_DSH_EXTRA_PATCH=…  追加覆盖层（`:` 分隔多个）；例：打开可选的"具名 agent 工具"
 #   MY_PI_DSH_TRACE_EVENTS=1 打开事件 trace + 末尾一行注册汇总
 set -uo pipefail
 
@@ -90,6 +91,14 @@ fi
 
 # ── ⑤ profile：每种模式一个（模板不同），建过一次就复用 ─────────────────────
 PATCH="$ROOT/dsh/profile/my-pi.patch.yml"
+# 追加覆盖层（部署层加配置的正当入口；例如 /tmp/na.patch.yml 打开具名 agent 工具）
+EXTRA_PATCH_ARGS=()
+if [ -n "${MY_PI_DSH_EXTRA_PATCH:-}" ]; then
+  IFS=':' read -r -a _extra <<< "$MY_PI_DSH_EXTRA_PATCH"
+  for _p in "${_extra[@]}"; do
+    [ -n "$_p" ] && EXTRA_PATCH_ARGS+=(--patch "$_p")
+  done
+fi
 ensure_profile() { # $1=profile 名  $2=模板名
   local name="$1" template="$2"
   if [ ! -d "$HOME_DIR/profiles/$name" ]; then
@@ -112,7 +121,7 @@ case "$MODE" in
   web)
     PORT_DEFAULT="${MY_PI_DSH_PORT:-3099}"
     ensure_profile mypi-web web
-    ARGS=(--profile mypi-web --patch "$PATCH")
+    ARGS=(--profile mypi-web --patch "$PATCH" "${EXTRA_PATCH_ARGS[@]}")
     has_flag --port "$@" || ARGS+=(--port "$PORT_DEFAULT")
     has_flag --no-open "$@" || ARGS+=(--no-open)
     echo "  → http://127.0.0.1:${PORT_DEFAULT}/ （浏览器打开这个地址）"
@@ -120,11 +129,11 @@ case "$MODE" in
     ;;
   headless)
     ensure_profile mypi-headless headless
-    exec "$DSH_BIN" --profile mypi-headless --patch "$PATCH" "$@"
+    exec "$DSH_BIN" --profile mypi-headless --patch "$PATCH" "${EXTRA_PATCH_ARGS[@]}" "$@"
     ;;
   acp)
     ensure_profile mypi-acp acp
-    exec "$DSH_BIN" --profile mypi-acp --patch "$PATCH" "$@"
+    exec "$DSH_BIN" --profile mypi-acp --patch "$PATCH" "${EXTRA_PATCH_ARGS[@]}" "$@"
     ;;
   *) die "未知模式：$MODE（可用 web | headless | acp）" ;;
 esac

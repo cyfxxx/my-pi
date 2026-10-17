@@ -503,7 +503,7 @@
 - `PROGRESS.md` · packs 全量整理：补回 1 个被静默吞掉的上游文件 + 结构约定升格为守门（2026-10-15） · - 用户："查看 packs 目录，做一下整理和优化"。先做全量只读体检（体积/追踪面/147 个 SKILL.md 的 frontmatter/许可/空目录/跨包重复/索引登记/引用可达性）， · 数字: 147 个 / 2 个 / 13 个 / 17 个 · 证据: cab634bd
 - `PROGRESS.md` · Linux 完全便携化：运行时装进仓库、随项目移动（2026-10-15） · - 用户："之前在 windows 上实现了完全便携化……现在继续优化便携化能力，实现在 Linux 环境中的完全便携化，所有项目相关内容全部集中在一起，不分散不依赖系统环境。 · 数字: 28.83 MB / 12 秒 / 6.5 MB / 29 个
 
-## 缺陷回放（45 条）
+## 缺陷回放（46 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -550,8 +550,9 @@
 - `docs/BUG-REPLAYS.md` · #43 **打包形态冒烟自 2026-10-18 起静默失效**（连带暴露 `ln -sfn` 的目录语义坑）：`dsh-package.sh` 把 tgz 装到**独立目录**再从那里加载，而 `entry.ts` 那天为 `define · 失败栈：`Cannot find package '@deepseek-ai/dsh-tools' imported from /tmp/my-pi-plugin-install/node_modules/my-pi-dsh-plugin/
 - `docs/BUG-REPLAYS.md` · #44 **把依赖 `this` 的方法「取下来」再调用 ⇒ 静默返回 undefined，打穿整条重启链**（本分支自己造成的真实回归）：DSH 换基座时新增了 `sessionKeyOf()` 统一"这是哪个会话"的键，内部写成了 `c · 留出集（`PI_GOLDEN_SCENARIO=1`）从 **33/33 掉到 11/33（模式切换）与 8/33（两实例隔离）**，失败点集中在"没触发真重拉/`targetSession=undefined`/`modes-sessio · 证据: npx vitest run custom/features/mode/__tests__/session-key.test.ts
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
+- `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（230 条）
+## 设计文档（232 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -589,6 +590,8 @@
 - `docs/design/CODING-TRAPS.md` · 16. 把**派生产物**当事实来源写 ⇒ 记录被生成器静默覆盖（还打印"已记录"） · - **症状**：`record-change.mjs --reject` 打印"✓ 已记录被否的提案"，但**下一次**重建台账时那条记录消失。 · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/design/CODING-TRAPS.md` · 17. `pkill -f <pattern>` 会匹配到**你自己的命令行** ⇒ 自杀 · - **症状**：命令返回 `[killed by signal: SIGTERM]`，后续语句一条没跑（比如本该删凭据的 `rm` 没执行）。
 - `docs/design/CODING-TRAPS.md` · 18. 把"症状汇总表"当病因：`Missing services` 不是根因 · - **症状**：`dsh` 启动失败，输出一张 `Plugin / Missing services` 表（`connection` 缺 `webRuntime`、
+- `docs/design/CODING-TRAPS.md` · 19. 把插件 `apply` 改成 `async` ⇒ 工具在全局工具面**看不见** · - **症状**：`apply` 改成 `async` 后，插件自己的 `apply` 里 `ctx.tools.register()` 明明都执行了 · 数字: 54 个 / 0 个
+- `docs/design/CODING-TRAPS.md` · 20. "注册调用成功" ≠ "工具面可见"：缺注入会**静默不激活** · - **症状（同一件事的两次误判）**： · 数字: 2 个 / 0 个
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
