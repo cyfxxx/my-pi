@@ -6225,3 +6225,30 @@ Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sher
 
 **✗ 如实登记**：`tui` 分支只是把 `case` 里 `shift` 一下就落回原 pi 路径（代码未改），**未在无 TTY 环境实跑**；
 本机 DSH 版本**没有 TUI 模板**（模板只有 acp/headless/sdk/sdk-minimal/web），所以 "tui" 就是 pi 基座那个终端界面。
+
+### [2026-10-17] ★ 合并到 main：DSH 成为**实验性第二底座**（`v1.3.0-dsh` 为回滚点）
+
+**决策（用户批准后执行）**：把 `feat/base-switch-dsh`（69 提交 / 110 文件 / +10,886 −94）以
+**快进方式**并入 `main`（`main` 是分支祖先 ⇒ 无冲突、无 merge commit），并打标签 `v1.3.0-dsh`。
+
+**为什么不拆成独立项目**（依据见提交历史与本条）：
+1. 架构原本就为双底座设计（`features` 不 import 基座、只有 `adapters/**` 允许），且 `main` 里早有
+   `docs/design/BASE-SWITCH-DSH.md` 的换基座评估 ⇒ 这是**既定方向的执行**，不是旁支；
+2. 92% 的插入是**新增文件**，对 pi 侧共享代码只有约 120 行（一个改名 + 一次会话键抽取 + 一个增量注入点）；
+3. 拆分会制造两份 `custom/features/**`（223 个 TS）与两套上游（pi + DSH）的**重复维护**，
+   正好放大本项目最痛的"计数/文档漂移"；
+4. main 未动过 ⇒ 零冲突风险，合并后的树与验收时**逐字节相同**。
+
+**合并前的验收（全部在分支 HEAD 上跑过）**：`PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh`
+⇒ 全绿，含留出集：模式切换 **33/33**、两实例隔离 **33/33**、会话切换 **18/18**。
+
+**合并后复验**：`./my-pi.sh --version` → `1.2.0`（pi TUI 路径未变）；
+`scripts/dsh-runtime.sh status` → 仓内宿主 `0.2.0-rc.2`、解析命中仓内；`./my-pi.sh headless "…"` → 回「收到」；
+约定守门 A–L 全绿、便携性守门（含 P6）全绿、`tsc -p custom/` 与 `-p dsh/` 0 错。
+
+**定位（写清楚，避免以后误解）**：
+- **默认行为不变**：`./my-pi.sh` 仍是 pi TUI；
+- **DSH 是实验性第二底座**：`./my-pi.sh web|headless|acp` 才走 DSH，且需一次性装仓内宿主
+  （`runtime/<平台>/ext/dsh`，523 MB，gitignored ⇒ fresh clone 不带宽体）；
+- **回滚**：`git checkout v1.3.0-dsh` 或 `git revert -m 1`（本次是快进 ⇒ 回滚即把 main 指回 `eda6d1405`）；
+- **DSH 仍是 RC**（`0.2.0-rc.2`）：接口变动只需改 `custom/adapters/dsh/types.ts` 与 `DSH_VERSION` 两处。

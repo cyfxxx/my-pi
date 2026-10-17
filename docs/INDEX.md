@@ -5,7 +5,7 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（252 条）
+## 决策台账（253 条）
 
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
@@ -259,6 +259,7 @@
 - `DECISIONS.md` · [2026-10-16] ★ DSH 换基座迁移收口：阶段 P0–P6 全部完成（同名冲突处置 / 产物自包含 / 守门扩到 J·K·L 段） · **结论**：分支 `feat/base-switch-dsh` 上，my-pi 的底座从 pi 迁到 DSH 已收口；`main` 全程未动。 · 数字: 3 B / 4 个
 - `DECISIONS.md` · [2026-10-16] ✗ 不采用：为每个 my-pi agent 自动注册一个宿主 subagent 工具实例（具名委派 = 按目录动态加载 dsh-tool-subagent） · **理由（不采用）**：暂不采用（技术上可行）：它会把每个 agent 变成**模型可见工具** ⇒ 工具面与 token 成本上升，并改变模型可见行为；本项目对工具面有预算纪律、宿主也刻意保持精简。改为登记为**可选部署特性**（需要时按
 - `DECISIONS.md` · [2026-10-17] ★ DSH 宿主进仓内 + `my-pi.sh` 一条指令双底座（tui / web / headless） · **问题**：`dsh` CLI 原先只活在 npm 的 npx 缓存（`~/.npm/_npx/<hash>/`，523 MB）里 —— 那是**仓外**、 · 数字: 523 MB / 0 次 · 证据: bash scripts/dsh-launch.sh --print-host
+- `DECISIONS.md` · [2026-10-17] ★ 合并到 main：DSH 成为**实验性第二底座**（`v1.3.0-dsh` 为回滚点） · **决策（用户批准后执行）**：把 `feat/base-switch-dsh`（69 提交 / 110 文件 / +10,886 −94）以 · 数字: 92% / 223 个 / 523 MB · 证据: eda6d1405
 
 ## 进度记录（239 条）
 
