@@ -178,8 +178,62 @@ else
   if node scripts/test-scenario-session-switch.mjs >/tmp/golden-scenario-switch.log 2>&1; then pass "$(tail -1 /tmp/golden-scenario-switch.log)"; else fail "会话切换场景（见 /tmp/golden-scenario-switch.log）"; tail -20 /tmp/golden-scenario-switch.log; fi
 fi
 
+step "22. DSH 场景（改动范围感知：改了 DSH 面就必跑；无凭据/无宿主明确 SKIP）"
+# 为什么单独一步：`./my-pi.sh web|headless` 这条链（插件装载、钩子、用量、命令、steer 语义）只有真 Host 能测，
+# 而它**不属于** pi 侧的留出集。此前三个 DSH 场景脚本全是 opt-in ⇒ 改了 `custom/adapters/dsh/**` 也不会红。
+# 现在按**改动面**决定：触及 DSH 面就自动跑（各打一份日志）；否则明确说明"为什么没跑"，不假装通过。
+dsh_changed_files() {
+  local base=""
+  # ① **未提交**的改动也算（否则"改到一半跑 golden"会误判为"没触及 DSH 面"而静默跳过）
+  git diff --name-only HEAD 2>/dev/null || true            # 工作区 vs HEAD
+  git diff --cached --name-only 2>/dev/null || true        # 暂存区
+  git ls-files --others --exclude-standard 2>/dev/null || true   # 未跟踪
+  # ② 已提交但还没推的（pre-push 环境里 @{push} 就是远端旧点）
+  base="$(git rev-parse --verify --quiet '@{push}' 2>/dev/null || true)"
+  if [ -n "$base" ]; then git diff --name-only "$base"..HEAD 2>/dev/null; return 0; fi
+  base="$(git merge-base origin/main HEAD 2>/dev/null || true)"
+  if [ -n "$base" ]; then git diff --name-only "$base"..HEAD 2>/dev/null; return 0; fi
+  git diff --name-only HEAD~1..HEAD 2>/dev/null || true
+}
+DSH_CHANGED="$(dsh_changed_files | grep -E '^(custom/adapters/dsh/|dsh/|custom/bootstrap\.ts|scripts/dsh-)' || true)"
+DSH_HOST_BIN="$(bash scripts/dsh-runtime.sh path 2>/dev/null || true)"
+DSH_CREDS=""
+[ -f "${MY_PI_DSH_CREDENTIALS:-$HOME/.dsh/.credentials.yaml}" ] && DSH_CREDS="${MY_PI_DSH_CREDENTIALS:-$HOME/.dsh/.credentials.yaml}"
+[ -z "$DSH_CREDS" ] && [ -f "$PWD/portable/dsh/.credentials.yaml" ] && DSH_CREDS="$PWD/portable/dsh/.credentials.yaml"
+if [ "$FAST" = "1" ]; then
+  skip "DSH 场景（--fast 跳过）"
+elif [ "${MY_PI_GOLDEN_DSH_SCENARIOS:-0}" = "1" ]; then
+  RUN_DSH=1
+elif [ -n "$DSH_CHANGED" ]; then
+  RUN_DSH=1
+else
+  RUN_DSH=0
+  skip "DSH 场景（本次改动未触及 DSH 面：$(echo "$DSH_CHANGED" | head -1 | cut -c1-40)；强制跑设 MY_PI_GOLDEN_DSH_SCENARIOS=1）"
+fi
+if [ "${RUN_DSH:-0}" = "1" ]; then
+  if [ -z "$DSH_HOST_BIN" ] || [ ! -x "$DSH_HOST_BIN/.bin/dsh" ]; then
+    skip "DSH 场景（仓内宿主未安装：bash scripts/dsh-runtime.sh install --from-npx）"
+  elif [ -z "$DSH_CREDS" ]; then
+    skip "DSH 场景（找不到凭据：MY_PI_DSH_CREDENTIALS=… 或 ~/.dsh/.credentials.yaml）"
+  else
+    echo "  · 触发原因：$(echo "$DSH_CHANGED" | head -3 | tr '\n' ' ')"
+    DSH_FAIL=0
+    for sc in isolation session-resume mode; do
+      if MY_PI_HOST_SMOKE=1 MY_PI_DSH_CREDENTIALS="$DSH_CREDS" \
+        bash "scripts/dsh-scenario-$sc.sh" >"/tmp/golden-dsh-$sc.log" 2>&1; then
+        pass "DSH 场景/$sc（$(grep -aoE '🎉[^（]*' "/tmp/golden-dsh-$sc.log" | head -1 | sed 's/🎉 //')️）"
+      else
+        DSH_FAIL=1
+        fail "DSH 场景/$sc（见 /tmp/golden-dsh-$sc.log）"
+        tail -12 "/tmp/golden-dsh-$sc.log"
+      fi
+    done
+    [ "$DSH_FAIL" = "0" ] && pass "DSH 三个场景全过（隔离/续接/模式）"
+  fi
+fi
+
 if [ "$SMOKE" = "1" ]; then
-  step "22. 无头会话冒烟"
+  step "23. 无头会话冒烟"
   # 断言"一次性运行必须自己退出"。此前这里容忍挂起，注释写成"已知 headless 现象"——
   # 2026-10-01 查明真因：autopilot 的 session_start 在**无头会话**里也启动调度器并立刻
   # 跑 `runDueTasks`，于是逾期的每日任务（每个都是一次完整子代理会话、数分钟）被凭空触发，

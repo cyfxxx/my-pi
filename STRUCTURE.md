@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 82 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
+├── scripts/             # 84 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -99,7 +99,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 
 ### `scripts/`
 （另有 `docs/CHANGES.jsonl` 改动台账：由 pre-push 追加、由约定守门校验格式）
-共 82 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 84 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
@@ -120,6 +120,12 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
   宿主**仓内优先**（没有才退系统/npx，且对"非便携"明确告警）；`DSH_HOME` 默认 `<repo>/portable/dsh`（gitignored，绝不碰 `~/.dsh`）；
   缺产物现建、仓库根 `@deepseek-ai/*` 始终重指到当前宿主；凭据 600 拷进仓内 home；每种模式建一次 profile；
   `--print-host` 只报告解析结果（零副作用，供便携性守门做行为判定）
+- `dsh-gc.sh`：**仓内 DSH home 的增长治理**（`status|prune [--keep-sessions N] [--max-age-days D] [--yes]`）：
+  只动 `<repo>/portable/dsh` 下的 `sessions/**` 与 `logs/**`（**不碰**宿主/产物/profiles），默认 dry-run，
+  带路径逃逸防护；会话保留最近 10 个且 30 天内用过的不删，启动日志保留 14 天
+- `dsh-inbox.mjs`：**外部进程给正在跑的会话投递消息**（`post --session <id> --text "…" [--steer]`/`list`/`tail`）：
+  只写收件箱文件（`<dir>/<sessionId>.inbox.jsonl`，一行一条 `{ts,seq,text,deliverAs}`），
+  真正投递由插件的 `inbox.enabled` 桥完成（与 `subagent-inbox.mjs` 的"存取归脚本、投递归进程内"分工一致）
 - `check-portability.sh`：**便携性守门**（接在 `check-conventions.sh` **I 段**）：P1 生产代码不得把仓外绝对路径当默认落点（注释除外）、P2 `runtime/` 必须被忽略且不得入库、P3 装了仓内 runtime 时解析必须落在仓内 + 三个缓存必须在仓内、P4 制品清单 sha256 必须是 64 位十六进制、P5 运行时符号链接不得带 `0001` 污染尾巴
 - `test-portability-move.sh`：**真实搬移测试**（按需，约 5–10 分钟，不进 pre-commit）：整树复制到 `/tmp/my-pi-moved-<pid>`，用最小环境（`PATH=<git>:/usr/bin:/bin`、不提供 node/python）验证 `my-pi.sh --version` 用的是新路径的 node、便携 python + 站点包可导入、`portable-runtime.sh verify` 全绿、SearXNG 在新路径能真实搜出结果、并扫描旧路径残留
 - `check-packs-structure.mjs`：**packs 结构守门**（2026-10-15 新增，七条规则 R1–R7：包根须有 SKILL.md 或登记为细节层/vendored 入口别名、每个 SKILL.md 的 frontmatter 须有 name+description 且 description 不带日期、包根须有"使用后经验沉淀"段或 EXPERIENCE.md、包名须登记进 `packs/INDEX.md`+`README.md`、**packs 下不得有未跟踪/未跟踪且被忽略的文件**（兜住"git add 被 .gitignore 静默吞掉上游已跟踪文件"这类静默丢失）、`drafts/` 命名口径、README 里"已落地 N 个"计数须等于实测）。起因：同年全量体检抓到 README 计数 13 vs 实测 17，以及 reverse-skill 同步时静默丢了 `reports/…` 与 `docs/plans/…` 两个上游已跟踪文件）
@@ -139,7 +145,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `web-terminal.sh`：浏览器终端启动器（在 pty 里拉起 `my-pi.sh`，起 HTTP/WS 服务；只绑回环），见 [custom/web-terminal/README.md](custom/web-terminal/README.md)
 - `test-web-terminal.mjs`：web-terminal 的进程级守门（鉴权/栅栏/穿越/WS 双向/resize/孤儿会话回收），零 LLM 消耗；缺 `script`/`stty` 时显式 SKIP
 - `test-usage-metrics.mjs`：成本度量口径守门（46 项；合成数据驱动 `daily-health.mjs`，锁定命中率取自每轮用量而非工具级台账、前缀前端变更/首段分叉/冷启动/工具声明体积/**回合内 bash 调用分布**会告警），零 LLM 消耗
-- `golden-tasks.sh`：行为防退化基准 **21 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围/**运行时状态不变量**/**模式切换场景**/**两实例隔离场景**/**会话切换场景**；`--fast` 跳过 tsc+vitest 与真实场景，`--smoke` 追加无头冒烟＝第 22 步；第 19/20/21 步三个真实场景默认跳过，`PI_GOLDEN_SCENARIO=1` 开启；第 19/20 步是**验收留出集**（开发期间不看其结果），第 21 步是 2026-10-14 那次改动的开发期检查、留出集价值已对该改动消耗——纪律见 [scripts/README.md](scripts/README.md)）
+- `golden-tasks.sh`：行为防退化基准 **22 步**（隔离/注册面/死导出/类型/单测/补丁/补丁行为/注入面/文档/supervisor/定时任务提示词/浏览器终端/用量度量/约定守门/书籍框架/私钥引导包/pre-push 门禁范围/**运行时状态不变量**/**模式切换场景**/**两实例隔离场景**/**会话切换场景**/**DSH 场景**（范围感知）；`--fast` 跳过 tsc+vitest 与真实场景，`--smoke` 追加无头冒烟＝第 23 步；第 19/20/22 步三个真实场景默认跳过，`PI_GOLDEN_SCENARIO=1` 开启；第 19/20 步是**验收留出集**（开发期间不看其结果），第 23 步是 2026-10-14 那次改动的开发期检查、留出集价值已对该改动消耗——纪律见 [scripts/README.md](scripts/README.md)）
 - `patch-playwright-core.mjs`：Termux 下把 playwright-core 的 linux 平台分支扩展至 android（幂等）
 - `setup-external.sh`：可选外部服务/依赖（tmux / SearXNG 原生或容器 / whisper 指引 / fd-rg shim）
 - `searxng-config.sh`：生成 SearXNG `settings.yml`（禁用不可达引擎、bing 指向 cn.bing.com；`--force/--probe`）

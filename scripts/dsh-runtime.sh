@@ -12,6 +12,8 @@
 #                                         # 没有任何绝对符号链接；网络不好时首选这条）
 #   bash scripts/dsh-runtime.sh verify     # 校验：可执行、版本对得上、能 resolve 自己的 bin
 #   bash scripts/dsh-runtime.sh status     # 只报告：装没装 / 版本 / 落点 / 解析来源
+#   bash scripts/dsh-runtime.sh doctor     # 体检：版本漂移 / 产物 / 解析来源 / home 占用 / 凭据 / profile
+#                                          #（有❌则退出码 1；换 DSH 版本前后各跑一次）
 #   bash scripts/dsh-runtime.sh path       # 打印仓内宿主 node_modules 的路径（给别的脚本用）
 #
 # 解析顺序（**仓内优先**，与主分支 node/python 的策略一致）：
@@ -162,10 +164,75 @@ require.resolve('@deepseek-ai/dsh/lib/bin.js');
   return 1
 }
 
+# ── doctor：把"换版本/换机器后该看的"一次看全（有❌则退出码 1）──────────────
+cmd_doctor() {
+  local fail=0
+  echo "=== DSH 体检 ==="
+
+  # ① 宿主版本 vs 钉死
+  local pin have
+  pin="$DSH_VERSION"
+  if [ -x "$(host_bin)" ]; then
+    have="$("$(host_bin)" --version 2>/dev/null | tr -d '[:space:]')"
+    if [ "$have" = "$pin" ]; then
+      echo "  ✓ 宿主版本与钉死一致（$pin）"
+    else
+      echo "  ❌ 宿主版本 $have ≠ 钉死的 $pin ⇒ bash scripts/dsh-runtime.sh install（升级先读 docs/operations/DSH-UPGRADE.md）"
+      fail=1
+    fi
+  else
+    echo "  ❌ 仓内宿主未安装 ⇒ bash scripts/dsh-runtime.sh install --from-npx"
+    fail=1
+  fi
+
+  # ② 解析来源（便携性）
+  local resolved tag
+  resolved="$(bash "$ROOT/scripts/dsh-launch.sh" --print-host 2>/dev/null || true)"
+  tag="${resolved%%$'\t'*}"
+  case "$tag" in
+    vendored) echo "  ✓ 启动器解析命中仓内宿主（完全便携）" ;;
+    none|"")  echo "  ❌ 启动器找不到任何 dsh" ; fail=1 ;;
+    *)        echo "  ⚠️ 启动器解析到 $tag（非便携：建议装仓内宿主）" ;;
+  esac
+
+  # ③ 产物（缺失时首次启动会现建；这里只提示）
+  local artifact="$ROOT/dsh/plugin/dist/my-pi-plugin.mjs"
+  if [ -f "$artifact" ]; then
+    echo "  ✓ 插件产物存在（$(du -h "$artifact" | cut -f1)）"
+  else
+    echo "  ⚠️ 插件产物不存在（首次启动会自动构建，或先跑 bash scripts/dsh-build.sh）"
+  fi
+
+  # ④ 仓内 home 占用 + 回收提示
+  local home_dir="${MY_PI_DSH_HOME:-$ROOT/portable/dsh}"
+  if [ -d "$home_dir" ]; then
+    echo "  ✓ 仓内 home：$home_dir（$(du -sh "$home_dir" 2>/dev/null | cut -f1)）⇒ 大了跑 bash scripts/dsh-gc.sh prune"
+    if [ -f "$home_dir/.credentials.yaml" ]; then
+      local mode; mode="$(stat -c '%a' "$home_dir/.credentials.yaml" 2>/dev/null || echo '?')"
+      if [ "$mode" = "600" ]; then echo "  ✓ 凭据存在且权限 600"
+      else echo "  ❌ 凭据权限是 $mode（应为 600）"; fail=1; fi
+    else
+      echo "  ⚠️ 仓内 home 没有凭据（首次请求会失败；用 MY_PI_DSH_CREDENTIALS=… 指定来源）"
+    fi
+    local profiles; profiles="$(ls -1 "$home_dir/profiles" 2>/dev/null | grep -c . || true)"
+    echo "  · profile：$profiles 个（$(ls -1 "$home_dir/profiles" 2>/dev/null | tr '\n' ' ')）"
+  else
+    echo "  · 还没有仓内 home（首次启动会自动建）"
+  fi
+
+  # ⑤ 三个 DSH 场景脚本的开关状态（避免"以为跑了其实跳过了"）
+  echo "  · 场景脚本默认 SKIP；跑：MY_PI_HOST_SMOKE=1 bash scripts/dsh-scenario-*.sh"
+
+  [ "$fail" = "0" ] && { echo "🎉 DSH 体检通过"; return 0; }
+  echo "❌ DSH 体检发现问题（见上）"
+  return 1
+}
+
 case "${1:-status}" in
   install) cmd_install "${2:-}" ;;
   verify)  cmd_verify ;;
   status)  cmd_status ;;
+  doctor)  cmd_doctor ;;
   path)    host_modules ;;
-  *) echo "用法: $0 {install|verify|status|path}" >&2; exit 2 ;;
+  *) echo "用法: $0 {install|verify|status|doctor|path}" >&2; exit 2 ;;
 esac

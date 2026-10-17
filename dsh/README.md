@@ -9,6 +9,29 @@
 | **适配层**（机制） | [`custom/adapters/dsh/`](../custom/adapters/dsh/README.md) | 把 DSH 的 `Context` 包装成 pi 形状 API（工具/钩子/命令/快捷键），features 一行不改 |
 | **交付层**（本目录） | `dsh/plugin/`、`dsh/profile/` | 把适配层 + 全部特性打成**可安装产物**，并给出能被真实 `dsh` launcher 接受的 profile 覆盖层 |
 
+## 可选：会话收件箱桥（默认关闭）——外部进程给正在跑的会话发消息
+
+```bash
+# 1) 打开（patch 里给 config；或用 MY_PI_DSH_EXTRA_PATCH=… 临时启用）
+#    - id: my-pi
+#      config:
+#        inbox: { enabled: true, dir: /tmp/inbox-e2e, intervalMs: 400 }
+# 2) 外部进程投递（别的终端/定时任务/脚本都行）
+node scripts/dsh-inbox.mjs post --session <会话 id> --text "……" --steer
+node scripts/dsh-inbox.mjs list          # 看有哪些收件箱、待投递多少
+node scripts/dsh-inbox.mjs tail --session <id>
+```
+
+- `--steer` = 插到**下一个 step 边界**；缺省 = 新回合（`followup`）。两条语义都在 spike A25 运行时验过。
+- 文件格式：`<dir>/<sessionId>.inbox.jsonl` 一行一条 `{ts,seq,text,deliverAs}`；`seq` 单调递增，
+  桥只投 `seq > consumed`，**投递成功才推进** `state.json`（幂等、可重放；断开期间不丢）。
+- **默认关闭**：它会周期读文件、并把文件内容变成用户消息 ⇒ 必须显式开启。
+- 真 Host 实测：3 条外部投递全部 `steer` 送达、state 推进到 `{"consumed":3}`、会话记录里出现插话文本。
+
+✗ **它投递的是"当前会话"，不是"子代理中途通信"**：宿主没有"子会话 ↔ 发起它的工具调用/名字"的可靠关联
+（`subagent/start` 的负载只有 `{runId, provider, id, local}`）⇒ 子代理级投递需要宿主补关联，或另造一条
+自己调 `ctx.subagents.start()` 的委派工具。见能力审计 DR-4。
+
 ## 可选：具名 agent 工具（默认关闭，DR-2）
 
 my-pi 的"具名专员"（`scout` / `worker` / `reviewer` + 你自己的 agent md）在 DSH 上**默认不暴露**：
@@ -30,6 +53,8 @@ MY_PI_DSH_EXTRA_PATCH=/tmp/na.patch.yml ./my-pi.sh web     # /tmp/na.patch.yml �
 ✗ 不覆盖：`chain`/`{previous}`（宿主 `workflow` 工具已覆盖）。
 
 ## 一条指令启动（`my-pi.sh` 分流）
+
+> 换 DSH 版本时照 [`../docs/operations/DSH-UPGRADE.md`](../docs/operations/DSH-UPGRADE.md)（含漂移演练）。
 
 ```bash
 ./my-pi.sh              # TUI（pi 基座，主分支行为不变）

@@ -23,6 +23,9 @@ import { listDshSessions } from '../../custom/adapters/dsh/session-list';
 import { auditSubagentCapacity } from '../../custom/adapters/dsh/subagent-capacity';
 import { planNamedAgentTools, registerNamedAgentTools } from '../../custom/adapters/dsh/named-agents';
 import { discoverAgents } from '../../custom/features/subagent/core/agents';
+import { startSessionInboxBridge } from '../../custom/adapters/dsh/session-inbox';
+import * as nodeFs from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import { setSessionLister } from '../../custom/adapters/session-adapter';
 import type { DshContext } from '../../custom/adapters/dsh/types';
 import { getDshService } from '../../custom/adapters/dsh/service';
@@ -63,6 +66,24 @@ export interface MyPiPluginConfig {
    * 为什么默认关：每多一个 agent 就多一个模型可见工具 ⇒ 工具面/token 成本上升、模型选择变噪。
    * 本项目对工具面有预算纪律 ⇒ 必须显式打开，并用 `maxTools` 限总量；**跳过的每一条都会打原因**。
    */
+  /**
+   * **会话收件箱桥**（可选项，**默认关闭**）：让**外部进程**给正在跑的会话投递消息。
+   *
+   * 外部进程往 `<dir>/<sessionId>.inbox.jsonl` 追加 `{"seq":N,"text":"…","deliverAs":"steer"|"followup"}`，
+   * 插件把它投递给该会话的**活 agent**（`steer` = 插到下一个 step 边界；缺省 `followup` = 新回合）。
+   * 用 `node scripts/dsh-inbox.mjs post --session <id> --text "…"` 写入。
+   *
+   * 为什么默认关：它会周期读文件并把文件内容变成用户消息 ⇒ 必须显式开启（还要配合 file 权限）。
+   * ✗ 它投递的是**当前会话**，不是"子代理中途通信"（宿主没有"子会话↔发起它的工具"的可靠关联，
+   * 见 `custom/adapters/dsh/session-inbox.ts` 顶部说明）。
+   */
+  readonly inbox?: {
+    readonly enabled?: boolean;
+    /** 收件箱目录（默认 `<PI_MEMORY_DIR>/inbox`） */
+    readonly dir?: string;
+    /** 轮询间隔（默认 1500ms） */
+    readonly intervalMs?: number;
+  };
   readonly namedAgents?: {
     /** 打开开关（`true` 才注册；缺省/`false` = 完全不碰工具面） */
     readonly enabled?: boolean;
@@ -157,6 +178,28 @@ export function apply(ctx: DshContext, config: MyPiPluginConfig = {}): DshFacade
     else console.log(line);
   } catch (error) {
     console.warn(`[my-pi-dsh] subagent 并发核对失败（不影响启动）：${String(error)}`);
+  }
+
+  // ── 可选项：会话收件箱桥（**默认关闭**）：外部进程 → 活会话 ─────────────────────
+  if (config.inbox?.enabled) {
+    try {
+      const inboxDir = config.inbox.dir
+        ? resolvePath(config.inbox.dir)
+        : resolvePath(process.env.PI_MEMORY_DIR ?? resolve(root, 'portable/memory'), 'inbox');
+      const bridge = startSessionInboxBridge(
+        ctx as unknown as { on?: (e: string, l: (...a: readonly unknown[]) => unknown) => (() => void) | void },
+        nodeFs as unknown as Parameters<typeof startSessionInboxBridge>[1],
+        {
+          dir: inboxDir,
+          intervalMs: config.inbox.intervalMs ?? 1500,
+          report: (m) => console.log(`[my-pi-dsh] ${m}`),
+        },
+      );
+      console.log(`[my-pi-dsh] 会话收件箱已开启：${inboxDir}（间隔 ${config.inbox.intervalMs ?? 1500}ms；用 node scripts/dsh-inbox.mjs post --session <id> --text "…" 投递）`);
+      facade.disposers.push(() => bridge.stop());
+    } catch (error) {
+      console.warn(`[my-pi-dsh] 会话收件箱启动失败（不影响启动）：${String(error)}`);
+    }
   }
 
   // ── 可选项：具名 agent → 宿主 subagent 工具实例（**默认关闭**，DR-2）──────────────

@@ -5,7 +5,7 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（254 条）
+## 决策台账（255 条）
 
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
@@ -261,6 +261,7 @@
 - `DECISIONS.md` · [2026-10-17] ★ DSH 宿主进仓内 + `my-pi.sh` 一条指令双底座（tui / web / headless） · **问题**：`dsh` CLI 原先只活在 npm 的 npx 缓存（`~/.npm/_npx/<hash>/`，523 MB）里 —— 那是**仓外**、 · 数字: 523 MB / 0 次 · 证据: bash scripts/dsh-launch.sh --print-host
 - `DECISIONS.md` · [2026-10-17] ★ 合并到 main：DSH 成为**实验性第二底座**（`v1.3.0-dsh` 为回滚点） · **决策（用户批准后执行）**：把 `feat/base-switch-dsh`（69 提交 / 110 文件 / +10,886 −94）以 · 数字: 92% / 223 个 / 523 MB · 证据: eda6d1405
 - `DECISIONS.md` · [2026-10-17] ★ DR-2 落地：具名 agent 成为**可选能力**（默认关闭），并用"行为验证"取代"调用即成功" · **决策**：能力审计里 DR-2（目录扫描式 agent 定义 ⇒ 宿主上的具名委派）按"**可选部署特性**"实现，**默认关闭**。 · 数字: 0 个 / 2 个
+- `DECISIONS.md` · [2026-10-17] ★ 收口四项：home 治理 / DSH 体检 + 升级 runbook / 范围感知的 DSH 守门 / DR-4 部分恢复 · **① `portable/dsh` 增长治理**：新增 `scripts/dsh-gc.sh`（`status|prune`）。只动 `portable/dsh/{sessions,logs}`， · 数字: 10 个 / 30 天 / 14 天 / 14 个
 
 ## 进度记录（239 条）
 
@@ -606,7 +607,7 @@
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 4. 汇总：三块全部让位时会真正丢失什么 · - **`web_search`**：① 无 key/自建 SearXNG 端点；② 免配置 Bing 降级；③ 模型可控 `maxResults`；④ `max_length`。
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 5. 明确的"未查到"清单（附检索面） · - DSH：搜索的**时间范围过滤 / 分页 / cookie**（检索面：`dsh-tool-web`、`dsh-web` 的 schema 与
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 6. 决策（**2026-10-18 已定**） · **命令名重映射（为什么只给命令做）**：工具名对**模型**可见，改名会改变模型行为 ⇒ 工具冲突只能 · 数字: 3 个 / 2 个 / 10 个 / 1 个
-- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 7. 待重设计项（登记，**不静默丢**） · 让位/改名的代价逐条登记如下。每项都是"my-pi 有、宿主没有"，需要重设计才能回到 DSH 上。
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 7. 待重设计项（登记，**不静默丢**） · 让位/改名的代价逐条登记如下。每项都是"my-pi 有、宿主没有"，需要重设计才能回到 DSH 上。 · 数字: 3 条
 - `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 相关 · - 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](design/DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v；决策记录 #18-x
 - `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 1. 第一步：my-pi 的钩子归类（实测，非估算） · grep 命令（可复跑）： · 数字: 55 个 / 53 个 / 2 个 / 18 个
@@ -624,7 +625,7 @@ node / node scripts/check-md-tables.mjs && / node scripts/check-dead-exports.mjs
 node
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 3. 部署与运行形态 · **日常用就一条指令**（仓内便携，见 `DECISIONS.md` 2026-10-17）： · 数字: 764 KB / 53 个 / 10 个 / 1 个 · 证据: bash scripts/dsh-runtime.sh install
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 4. 关键实测结论（每条都有可复跑证据） · 数字: 3 条 / 0 条
-- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 5. 剩余缺口（**不假装已完成**） · 数字: 4 个
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 5. 剩余缺口（**不假装已完成**） · 数字: 3 条 / 4 个
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 6. 经验与陷阱（本次新增）
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 7. 交接提示 · - 合并状态：**已并入 `main`**（快进，合并点 `dcdc3dfe2`，标签 `v1.3.0-dsh`）；原分支 `feat/base-switch-dsh` · 证据: dcdc3dfe2
 - `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个

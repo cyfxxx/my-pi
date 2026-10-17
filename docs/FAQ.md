@@ -302,8 +302,9 @@ TTL 笔记另有自动回收（`notes.json`）。
 npm run check                 # 隔离边界验证
 npx tsc --noEmit -p custom/   # 类型检查
 npx vitest run                # 单元测试
-npm run golden                # 行为防退化基准（21 步；--fast 仅结构守门，--smoke 加无头冒烟；
-                              # 第 19/20/21 步三个真实场景（模式切换 / 两实例隔离 / 会话切换）默认跳过，PI_GOLDEN_SCENARIO=1 开启；
+npm run golden                # 行为防退化基准（22 步；--fast 仅结构守门，--smoke 加无头冒烟；
+                              # 第 19/20/21 步三个 pi 侧真实场景（模式切换 / 两实例隔离 / 会话切换）默认跳过，PI_GOLDEN_SCENARIO=1 开启；
+# 第 22 步 DSH 场景按改动范围自动触发（改 custom/adapters/dsh/**、dsh/**、custom/bootstrap.ts、scripts/dsh-* 时必跑）；
                               # 其中第 19/20 步是**验收留出集**：开发期间不看其结果，只在验收时跑（纪律见 scripts/README.md））
 bash scripts/install-hooks.sh # 启用 git 钩子（提交前自动跑上述快检）
 ```

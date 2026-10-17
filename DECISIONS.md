@@ -6276,3 +6276,32 @@ Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sher
 
 **✗ 未覆盖（如实登记）**：`chain`/`{previous}` 不在本能力内（宿主 `workflow` 已覆盖，DR-1）；
 `model` 只在 `provider/model` 形态透传；DR-3（逐任务 `cwd`）与 DR-4（进程外投递）仍需宿主侧能力。
+
+### [2026-10-17] ★ 收口四项：home 治理 / DSH 体检 + 升级 runbook / 范围感知的 DSH 守门 / DR-4 部分恢复
+
+**① `portable/dsh` 增长治理**：新增 `scripts/dsh-gc.sh`（`status|prune`）。只动 `portable/dsh/{sessions,logs}`，
+**不碰**宿主/产物/profiles；默认 dry-run + 路径逃逸防护（解析后必须仍在 `portable/dsh` 内）。
+保留策略：会话留最近 10 个且 30 天内用过的不删，启动日志留 14 天。实测：14 个会话里 3 个 40 天前的被列待删、保留 11 个；
+安全边界也被实测（把边界一起改掉时**正确拒绝**）。
+
+**② DSH 体检 + 升级 runbook**：`dsh-runtime.sh` 新增 `doctor`（版本漂移/解析来源/产物/home 占用/凭据权限/profile，
+有❌则退出码 1）；新增 `docs/operations/DSH-UPGRADE.md`。**版本面核准为 3 处钉死**
+（`DSH_VERSION`、spike 的 11 个包、plugin 的 cordis peer）+ **1 处形状钉死**（`types.ts`），
+推翻了"两处"的旧说法。**真漂移演练**：把 `DSH_VERSION` 改成 `9.9.9-rc.0` ⇒ doctor 报 ❌（退出码 1）；改回 ⇒ 🎉。
+
+**③ 范围感知的 DSH 守门**：golden 新增**第 22 步**（`--smoke` 的无头冒烟顺延为第 23 步）。判据：
+改动触及 `custom/adapters/dsh/**`、`dsh/**`、`custom/bootstrap.ts`、`scripts/dsh-*`（**含未提交改动**）⇒
+自动跑三个 DSH 场景；也可 `MY_PI_GOLDEN_DSH_SCENARIOS=1` 强制；无宿主/无凭据**明确 SKIP**。
+此前三个场景全是 opt-in ⇒ 改了适配层也不会红。
+
+**④ DR-4 部分恢复（当前会话收件箱）**：`scripts/dsh-inbox.mjs`（外部写文件）+ 插件桥 `session-inbox.ts`
+（`inbox.enabled`，默认关）：外部进程投递 → 该会话**活 agent**，`steer`/`followup`，`seq`+state 幂等可重放，
+坏行跳过并计数、失败不推进 state。单测 **9 项**；**真 Host 实测** 3 条外部投递全部 `steer` 送达、
+state 推进到 `{"consumed":3}`、会话记录出现插话文本。
+✗ **子代理中途投递仍未做**：宿主 `subagent/start` 只带 `{runId, provider, id, local}`，**没有"子会话↔发起它的工具"**的
+可靠关联（`description` 只在创建参数里）；要做得先补该关联或另造一条自己调 `ctx.subagents.start()` 的委派工具
+（会与宿主 `subagent` 重复，暂不做）。
+
+**✗ 另一条如实登记**：Host 级"中途投递"的 E2E 曾想用"bash sleep 8"撑窗口，**失败于本地沙箱**
+（无 bubblewrap/Landlock ⇒ `workspace-write` 被拒；`danger-full-access` 需审批而本会话审批关闭）⇒
+改用"连续三次工具调用"撑出时间窗完成验证。这条沙箱约束是环境事实，与插件无关。
