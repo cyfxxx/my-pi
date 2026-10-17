@@ -1,0 +1,10 @@
+{
+  "name": "mypi-assistant",
+  "private": true,
+  "type": "module",
+  "description": "拼接式私人助手：DSH 运行时为脊柱，pi-ai 作模型层，pi-tui 作终端渲染层",
+  "dependencies": {
+    "@earendil-works/pi-tui": "^1.3.0",
+    "ws": "^8.22.0"
+  }
+}

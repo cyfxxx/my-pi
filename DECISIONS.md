@@ -2,6 +2,60 @@
 
 ## 格式
 
+### [2026-10-19] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座）
+
+**问题（用户提出）**：现有路线是「选一个上游底座 + 持续修补」，而选底座后期仍要修修补补；
+能否不绑定某一个项目，按需拼接三个常用 agent 项目（opencode / pi / deepseek-harness）的能力。
+
+**诊断（关键判断 ✓）**：修修补补的来源不是「有底座」，而是**改别人的内部结构维持兼容**。
+本仓现状即证据：`node_modules/@earendil-works/pi-coding-agent` 与 `pi-tui` 实为本仓写的 shim
+（`my-pi-dsh-shim-*` ✓），另有注入面基线哈希、`session-key` 补丁 —— 三处都是「内部结构镜像」，
+上游一动就得跟着动 ✗。
+
+**决定（✓）**：拼接只允许发生在三类**声明过的接缝**上；**脊柱唯一**。
+- **A 插件 API**：目标运行时自声明的扩展点（DSH 的 cordis 插件/服务/工具注册）。
+- **B 线上协议**：进程/网络边界上的文档化协议（`/api`、`/api/remote.mux`、SDK JSON-RPC、ACP、MCP）。
+- **C 独立库**：无运行时假设的纯库（pi-ai 模型调用、pi-tui 渲染）。
+规则外的一切（读内部结构、复制状态机、改上游源码）**一律不许进门**。
+
+**为什么脊柱必须唯一（✓ 论证）**：`agent loop ↔ session log ↔ tools ↔ permissions` 是不可分单元；
+两份日志 = 两个事实源 ⇒ 每个功能都要写两遍一致性逻辑。故「多底座并存」被**明确否决** ✗。
+
+**拼装结果（✓ 实测）**：
+| 能力 | 来源 | 接缝 |
+|---|---|---|
+| 会话/工具/权限/持久化 | DSH 运行时 `0.2.0-rc.2`（vendored） | 宿主本身 |
+| 在线模型 | `dsh-llm-deepseek` + 凭据 | A |
+| 本地模型 | `dsh-llm-pi-ai` → `@earendil-works/pi-ai` `0.87.1`（`api: openai-completions` + `baseURL`） | A + C |
+| 终端界面 | `@earendil-works/pi-tui` `1.3.0` | C |
+| Web 界面 | DSH 自带 React GUI（零改动） | 上游自带 |
+| 两端同步 | 同一宿主上的两个 `/api` 客户端 | B |
+
+**★ 关键事实（推翻「适配层又多一层」的担心 ✓）**：pi-ai **不是本仓粘上去的** ——
+DSH 上游 `dsh-llm-pi-ai` 的 `dependencies` 里本就写着 `@earendil-works/pi-ai ^0.87.1` ✓；
+我们只写了一段 `providers` YAML。pi-tui 的 `dependencies` 只有 `marked` + `get-east-asian-width` ✓。
+
+**实测（`assistant/scripts/verify-m1.sh`，干净状态一次全绿 ✓）**：
+① 本机 OpenAI 兼容端点就绪 ✓；② 宿主起在 3099（隔离 home，未打扰 3080）✓；
+③ 终端前端在**真实 pty** 里对话成功（`回复含「我是本地模型」= True` ✓）；
+④ 两个独立客户端对同一会话的直播流**逐字相同**（`a == b == "我是本地模型，在你机器上跑。"` ✓）；
+⑤ 本地路线**真的**打到本机端点（服务端日志 `mockHits=6` ✓）。
+
+**新分支新增（✓）**：`assistant/src/transport.mjs`（`/api` 原生客户端：token→cookie、一元 RPC、
+WS 逻辑流）、`assistant/src/tui.mjs`（pi-tui 渲染）、`assistant/scripts/mypi.sh`（`tui|web|status|stop`）、
+`assistant/scripts/verify-m1.sh`（四项验收）、`assistant/spike/{mock-openai.mjs,local-provider.patch.yml}`、
+`assistant/test/`（pty 驱动 / 双客户端同步 / 本地路线）、`docs/design/PRIVATE-ASSISTANT.md`。
+
+**踩到的坑（已修 ✓）**：网关的 RPC 载荷必须是 `{args:{…}}` 且每个方法参数名各自不同
+（`session/create` 是 `request`、`session/list` 是 `_request`）✗→✓；hand-declared 的 pi-ai 路线
+**没有环境变量兜底**，缺 `apiKeyEnv` 时报 `No API key for provider: local` ✗→✓；
+校验脚本曾因**旧的 mock 进程占着端口**而假绿（新进程 EADDRINUSE、旧进程写别的日志）✗→✓；
+宿主没起来时看到的是「缺少服务」表，真因是 **EADDRINUSE**（CODING-TRAPS #18 再次命中 ✓）。
+
+**✗ 未核实 / 未做**：① 浏览器端人工确认（只证了协议层同步，没做浏览器自动化）；
+② opencode 作为外部 agent（ACP/MCP）接入；③ 我们自己的工具插件挂进宿主（M1 下一层）；
+④ 工具调用可视化/审批/命令面板；⑤ 只验 Linux arm64 + Node 22 + DSH rc.2 + pi-tui 1.3.0。
+
 ### [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓
 
 **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓；

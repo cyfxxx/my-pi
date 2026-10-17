@@ -1,0 +1,16 @@
+# 本地模型路由：一条 hand-declared 的 pi-ai 路线，指向本机的 OpenAI 兼容端点。
+# 它不是"另一个底座"，而是宿主 llm 服务的一个适配器路线 —— 与在线路线并存、按会话选择。
+- id: llm-pi-ai
+  config:
+    providers:
+      local:
+        api: openai-completions
+        baseURL: http://127.0.0.1:11435/v1
+        # 本地端点也要一把（任意）钥匙：pi-ai 的每条路线都声明 auth，
+        # 无钥匙的 hand-declared 路线不会去猜环境变量 —— 显式给一个引用即可。
+        apiKeyEnv: LOCAL_MOCK_KEY
+        models:
+          - id: mock-local
+            name: Mock Local
+            contextWindow: 8192
+            maxTokens: 2048

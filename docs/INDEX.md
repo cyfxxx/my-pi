@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（255 条）
+## 决策台账（256 条）
 
+- `DECISIONS.md` · [2026-10-19] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座） · **问题（用户提出）**：现有路线是「选一个上游底座 + 持续修补」，而选底座后期仍要修修补补；
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
 - `DECISIONS.md` · [2026-10-11] ★ 更正：`daily-review` **已经跑了且成功** ✓（我先前"自 10-10 起从未再跑"**被现实推翻** ✗✓） · **实测（`tasks.json` 字段 diff vs `daily-health` ✓）**：`daily-review` 现在 `lastResult=**success**` ✓、 · 数字: 4 个 / 5 个
@@ -554,7 +555,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（234 条）
+## 设计文档（242 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -677,6 +678,14 @@ node
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 二、审计清单逐条结论（含证据） · ### 1. 上下文里留的是句柄还是只有一句"已归档"？→ **是句柄，但缺摘录** · 数字: 4 个 / 2 次 / 1 个 / 0 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 三、决策提案（**均不改默认**，等用户点头） · **建议顺序**：先 **P3-D**（拿到可观测数据）→ 再决定要不要 **P3-A/B**（它们都是"改句柄内容"， · 数字: 0 次 / 2 次
 - `docs/design/OBSERVATION-PACK-AUDIT.md` · 四、本次审计的实测数字（能力地板之外的"效率指标"） · - 归档目录：**563 文件 / 3.4MB**（说明归档在真实使用中活跃，不是死代码）； · 数字: 3.4MB / 2 次 / 4 个 / 0 次
+- `docs/design/PRIVATE-ASSISTANT.md` · 1. 结论先说 · **能拼，但只能拼在「声明过的接缝」上，并且脊柱必须唯一。**
+- `docs/design/PRIVATE-ASSISTANT.md` · 2. 为什么脊柱必须唯一 · `agent loop ↔ session log ↔ tools ↔ permissions` 是一个**不可分单元**：循环的每一步都要把
+- `docs/design/PRIVATE-ASSISTANT.md` · 3. 拼装表 · ### 为什么这不叫「又包了一层」 · 数字: 6 次
+- `docs/design/PRIVATE-ASSISTANT.md` · 4. 结构 · assistant/
+- `docs/design/PRIVATE-ASSISTANT.md` · 5. M1 验收（可重复执行） · `assistant/scripts/verify-m1.sh` 在干净状态下的实测输出：
+- `docs/design/PRIVATE-ASSISTANT.md` · 6. 明确不做 · 1. **不把别的产品的 agent loop 拉进同一进程**（opencode / pi 的 loop）：两个事实源。
+- `docs/design/PRIVATE-ASSISTANT.md` · 7. opencode / pi 各自怎么用 · - **pi**：`pi-ai` 已经是模型层（经 `dsh-llm-pi-ai`）；`pi-tui` 是终端渲染层。两个都是**库级**使用，
+- `docs/design/PRIVATE-ASSISTANT.md` · 8. 已知边界 · - 只验过：Linux arm64 / Node 22 / DSH `0.2.0-rc.2` / pi-tui `1.3.0`。
 - `docs/design/SCHEDULER-FAILURES.md` · 结论（一句话） · **保留日志里的 50 条失败全部是同一个签名** —— `getPiInvocation` 把 **vitest worker 入口**当 pi 启动 ✗ · 数字: 50 条 / 1 小时 / 50%
 - `docs/design/SCHEDULER-FAILURES.md` · 1. 证据一：50/50 失败是同一个签名 ✓ · 按任务（每任务**保留最近 10 份** ✓）： · 证据: e7e2f169
 - `docs/design/SCHEDULER-FAILURES.md` · stdout (pi JSONL) · (empty)
