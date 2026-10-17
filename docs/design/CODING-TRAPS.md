@@ -258,6 +258,17 @@
 - 实测对照：会话请求里出现 `reviewer, scout`（工具面确实可见）时，我的自检因读得太早报"可见 0 个" ⇒
   一条"假阴性告警"和一条"假阳性成功"本质是同一个错：**不看行为、只看调用**。
 
+## 21. 改了 `custom/**` 只跑 `tsc -p dsh/` ⇒ 漏检
+
+- **症状**：本地以为类型没问题，`git push` 被 pre-push 的 golden 拦住：`❌ tsc（见 /tmp/golden-tsc.log）`。
+- **根因**：仓里有两个**独立的** tsconfig 工程 —— `custom/` 与 `dsh/`（后者只覆盖 `dsh/plugin/**`）。
+  测试文件在 `custom/adapters/dsh/__tests__/` 里，却只被 `tsc -p custom/` 覆盖。
+- **判据**：改完任何文件，**两个都跑**：
+  `npx tsc -p custom/ --noEmit && npx tsc -p dsh/`；
+  只在 `dsh/plugin/**` 改动时才可以只跑后者。
+- 附：`readonly T[]` 上不能 `push`（本次真实报错 `TS2339: Property 'push' does not exist on type 'readonly string[][]'`）——
+  局部累加器别标 readonly。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
