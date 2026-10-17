@@ -1,6 +1,6 @@
 # DSH 换基座 · 迁移结项与交接
 
-**一句话**：分支 `feat/base-switch-dsh` 上，my-pi 的底座从 pi 迁到 DSH 已收口（阶段 P0–P6 全部完成，`main` 全程未动）。
+**一句话**：my-pi 的底座已从 pi 扩到"pi + DSH 双底座"，并**已合并进 `main`**（快进合并，`dcdc3dfe2`；标签 **`v1.3.0-dsh`** 为回滚点）。DSH 定位为**实验性第二底座**：默认仍是 pi TUI，`./my-pi.sh web|headless|acp` 才走 DSH。
 证据、缺口与"怎么复跑"都在本文；深入细节见
 [`DSH-MIGRATION-PLAN.md`](DSH-MIGRATION-PLAN.md)（计划 + 实测 #18-a…18-ac）、
 [`DSH-HOOK-MAPPING.md`](DSH-HOOK-MAPPING.md)（19 个事件档位）、
@@ -130,7 +130,8 @@ bash scripts/dsh-runtime.sh install --from-npx   # 只第一次：把 DSH 宿主
 
 ## 7. 交接提示
 
-- 分支状态：`feat/base-switch-dsh` = origin；`main` 未动；本文写作时的 HEAD 见 `git log -1`。
+- 合并状态：**已并入 `main`**（快进，合并点 `dcdc3dfe2`，标签 `v1.3.0-dsh`）；原分支 `feat/base-switch-dsh`
+  保留作二次回滚保险（确认稳定后可删）。DSH 是实验性第二底座，默认行为仍是 pi。
 - **纪律**：不 force-push；不改 `main`；不绕守门（禁 `--no-verify`）；不降阈值/不抬预算；
   留出集**只在验收时看**（开发期不要用它做"平时会变红"的守门）。
 - **最容易踩的两处**：

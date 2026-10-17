@@ -551,7 +551,7 @@
 - `docs/BUG-REPLAYS.md` · #44 **把依赖 `this` 的方法「取下来」再调用 ⇒ 静默返回 undefined，打穿整条重启链**（本分支自己造成的真实回归）：DSH 换基座时新增了 `sessionKeyOf()` 统一"这是哪个会话"的键，内部写成了 `c · 留出集（`PI_GOLDEN_SCENARIO=1`）从 **33/33 掉到 11/33（模式切换）与 8/33（两实例隔离）**，失败点集中在"没触发真重拉/`targetSession=undefined`/`modes-sessio · 证据: npx vitest run custom/features/mode/__tests__/session-key.test.ts
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 
-## 设计文档（228 条）
+## 设计文档（230 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -587,6 +587,8 @@
 - `docs/design/CODING-TRAPS.md` · 14. `ln -sfn <源> <目标>` 在"目标已是**真目录**"时会把链接建到**它里面** · - **症状**：`ln -sfn "$SRC" "$D/node_modules/@scope"` 之后，`$D/node_modules/@scope/pkg` **依然找不到**
 - `docs/design/CODING-TRAPS.md` · 15. 把依赖 `this` 的方法"取下来"再调用 ⇒ 静默 undefined；而**箭头函数 fake 会把这个 bug 保护起来** · - **症状**：`const f = ctx.sessionManager.getSessionFile; f()` 在 `this` 依赖型方法上**抛 TypeError**， · 数字: 6 条
 - `docs/design/CODING-TRAPS.md` · 16. 把**派生产物**当事实来源写 ⇒ 记录被生成器静默覆盖（还打印"已记录"） · - **症状**：`record-change.mjs --reject` 打印"✓ 已记录被否的提案"，但**下一次**重建台账时那条记录消失。 · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
+- `docs/design/CODING-TRAPS.md` · 17. `pkill -f <pattern>` 会匹配到**你自己的命令行** ⇒ 自杀 · - **症状**：命令返回 `[killed by signal: SIGTERM]`，后续语句一条没跑（比如本该删凭据的 `rm` 没执行）。
+- `docs/design/CODING-TRAPS.md` · 18. 把"症状汇总表"当病因：`Missing services` 不是根因 · - **症状**：`dsh` 启动失败，输出一张 `Plugin / Missing services` 表（`connection` 缺 `webRuntime`、
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
@@ -619,11 +621,11 @@ node
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 4. 关键实测结论（每条都有可复跑证据） · 数字: 3 条 / 0 条
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 5. 剩余缺口（**不假装已完成**） · 数字: 4 个
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 6. 经验与陷阱（本次新增）
-- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 7. 交接提示 · - 分支状态：`feat/base-switch-dsh` = origin；`main` 未动；本文写作时的 HEAD 见 `git log -1`。
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 7. 交接提示 · - 合并状态：**已并入 `main`**（快进，合并点 `dcdc3dfe2`，标签 `v1.3.0-dsh`）；原分支 `feat/base-switch-dsh` · 证据: dcdc3dfe2
 - `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒 / 18 个
 - `docs/design/DSH-MIGRATION-PLAN.md` · 2. 迁移面（本仓实测口径） · ### 2.1 四个原语与 DSH 的对应（登记表） · 数字: 18 个
-- `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > ✅ **2026-10-18 更新**：P5 的完整 Host 验证**已获用户授权并跑通**（隔离 `DSH_HOME`、不动 `~/.dsh`、 · 数字: 19 个 / 100% / 3 个 / 758 B · 证据: npx vitest run custom/adapters/dsh
+- `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > ✅ **2026-10-18 更新**：P5 的完整 Host 验证**已获用户授权并跑通**（隔离 `DSH_HOME`、不动 `~/.dsh`、 · 数字: 19 个 / 100% / 3 个 / 758 B · 证据: dcdc3dfe2 / npx vitest run custom/adapters/dsh
 - `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个 / 53 个 / 758 B / 19 个 · 证据: bash scripts/dsh-baseline.sh --tools / bash scripts/dsh-baseline.sh --prompt
 - `docs/design/DSH-MIGRATION-PLAN.md` · 5. 未核实（✗，本轮开工时如实登记） · 1. ~~`@deepseek-ai/dsh-commands` 的命令契约**未读**~~ **已补读并实测（2026-10-16）**： · 数字: 4 个 / 223 个
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），

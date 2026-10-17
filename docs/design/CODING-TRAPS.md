@@ -208,6 +208,29 @@
   要改就改它们的源，或改生成器。
 - 台账：`docs/BUG-REPLAYS.md` #45。
 
+## 17. `pkill -f <pattern>` 会匹配到**你自己的命令行** ⇒ 自杀
+
+- **症状**：命令返回 `[killed by signal: SIGTERM]`，后续语句一条没跑（比如本该删凭据的 `rm` 没执行）。
+- **根因**：`pkill -f`/`pgrep -f` 匹配的是**整条命令行**，而你"正在敲的那条命令"里就含这个 pattern。
+  实际事故（2026-10-17）：`pkill -f "profile mypi.*--port 3099"` 把自己的 shell 杀了，
+  导致清理步骤中断、隔离 home 里的凭据副本没删掉（事后手工补删）。
+- **判据（改法）**：① 用字符类打断自匹配：`pgrep -f "[e]xt/dsh/node_modules/.bin/dsh"`；
+  ② 或先 `pgrep` 看 PID、再按 PID `kill`；③ 或按端口 `fuser -k 3099/tcp`；
+  ④ 杀完**必须复验**（端口/进程），别假设清理成功。
+- **同类**：`grep` 自己的输出、`ps | grep`（不带 `[]` 技巧时的经典坑）。
+
+## 18. 把"症状汇总表"当病因：`Missing services` 不是根因
+
+- **症状**：`dsh` 启动失败，输出一张 `Plugin / Missing services` 表（`connection` 缺 `webRuntime`、
+  `webServer` 缺 `session-controller`…），看起来像"宿主包不全/版本不对"。
+- **真实原因**（本次）：`EADDRINUSE: 127.0.0.1:3099` —— 上一轮的实例还占着端口，
+  一串依赖 `webServer/connection` 的插件因此没激活，于是被**汇总成"缺服务"**。
+- **判据（改法）**：先看 `DSH_HOME/logs/startup-*.log` 里的 `Failed plugins (...)` 那一段的**第一条 cause**：
+  `grep -aiE "EADDRINUSE|Failed plugins|MODULE_NOT_FOUND" logs/startup-*.log | head`。
+  端口/权限/网络这类"外部条件"失败，会被健康检查**二次表述**成依赖缺失 —— 别对着症状表改依赖。
+- **同类提醒**：`dsh --dump-config` 打印的是**配置文档**（连 `!!js` 表达式都原样打出），
+  **不是**解析后的运行时值 ⇒ 不能用它证明"配置生效"（要看运行时真值就写一行读回日志，或在 Host 里实测）。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

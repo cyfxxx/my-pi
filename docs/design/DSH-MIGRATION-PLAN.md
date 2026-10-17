@@ -1,4 +1,4 @@
-# DSH 换基座：执行计划（分支 `feat/base-switch-dsh`）
+# DSH 换基座：执行计划（**已合并进 `main`**，合并点 `dcdc3dfe2`，标签 `v1.3.0-dsh`）
 
 > 前置分析：[`BASE-SWITCH-DSH.md`](BASE-SWITCH-DSH.md)（可行性 + spike 实测）、
 > [`DSH-HOOK-MAPPING.md`](DSH-HOOK-MAPPING.md)（18 个钩子的逐类映射）。
@@ -125,7 +125,7 @@ getThinkingLevel  setThinkingLevel  sendMessage  sendUserMessage  appendEntry  s
 
 | 阶段 | 交付 | 验收（可复跑） | 状态 |
 |---|---|---|---|
-| **P0 计划** | 本文 + 分支 | 分支存在、main 未动 | ✓ |
+| **P0 计划** | 本文 + 分支 | （P0 当时）分支存在、main 未动 | ✓（**后续已合并**：`dcdc3dfe2` + 标签 `v1.3.0-dsh`） |
 | **P1 映射层** | `custom/adapters/dsh/{events,tool,hooks}.ts` | `npx vitest run custom/adapters/dsh` 全绿；19 个事件 100% 有档位（①9/②10/③0） | ✓ **适配层单测 123 项通过**（含映射表完整性、工具载荷、waterfall 纪律、用量桥、命令换名、streamingBehavior 派生等反向探针） |
 | **P2 外观层** | `custom/adapters/dsh/facade.ts` | 单测：注册工具、`on` 桥接、waterfall 纪律、unsupported 显式上报 | ✓ |
 | **P3 真实 spike** | `dsh/spike/**` + `scripts/dsh-spike.sh` | 真实 `@deepseek-ai/*`（`0.2.0-rc.2` + cordis 4.0.4）：注册的工具**被真实注册表调用**、事件**真触发**、拦截**真生效**、产物**按 loader 装载**、`commands.execute()` **真调用我们的处理器** | ✓ **22/22 通过**（A1–A22） |
