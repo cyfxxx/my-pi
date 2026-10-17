@@ -615,7 +615,7 @@ node / node scripts/check-md-tables.mjs && / node scripts/check-dead-exports.mjs
 node
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 3. 部署与运行形态 · - **产物**：`bash scripts/dsh-build.sh` → `dsh/plugin/dist/my-pi-plugin.mjs`（gitignored，约 764 KB）， · 数字: 764 KB / 53 个 / 10 个 / 1 个
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 4. 关键实测结论（每条都有可复跑证据） · 数字: 3 条 / 0 条
-- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 5. 剩余缺口（**不假装已完成**） · 数字: 4 个
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 5. 剩余缺口（**不假装已完成**） · 数字: 6 个 / 4 个
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 6. 经验与陷阱（本次新增）
 - `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 7. 交接提示 · - 分支状态：`feat/base-switch-dsh` = origin；`main` 未动；本文写作时的 HEAD 见 `git log -1`。
 - `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
