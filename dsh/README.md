@@ -9,6 +9,26 @@
 | **适配层**（机制） | [`custom/adapters/dsh/`](../custom/adapters/dsh/README.md) | 把 DSH 的 `Context` 包装成 pi 形状 API（工具/钩子/命令/快捷键），features 一行不改 |
 | **交付层**（本目录） | `dsh/plugin/`、`dsh/profile/` | 把适配层 + 全部特性打成**可安装产物**，并给出能被真实 `dsh` launcher 接受的 profile 覆盖层 |
 
+## 可选：具名 agent 工具（默认关闭，DR-2）
+
+my-pi 的"具名专员"（`scout` / `worker` / `reviewer` + 你自己的 agent md）在 DSH 上**默认不暴露**：
+宿主的 `subagent` 工具没有 agent 参数，而每多一个具名 agent 就要多一个**模型可见工具**（工具面/token 成本）。
+需要时才打开（`dsh/profile/my-pi.patch.yml` 里有注释片段）：
+
+```bash
+MY_PI_DSH_EXTRA_PATCH=/tmp/na.patch.yml ./my-pi.sh web     # /tmp/na.patch.yml 写 namedAgents.enabled: true
+```
+
+打开后启动日志会有一行**行为验证**过的汇总：
+
+```
+[my-pi-dsh] 具名 agent 工具：**工具面可见** 2 个（reviewer, scout）｜注册调用成功=2｜发现范围=both
+```
+
+映射规则：`persona` ← md 正文；只读 agent ⇒ `toolFilter.allow=[read,grep,find,ls]`；显式 `tools` ⇒ 用它的 allow 列表；
+`model` 只在形如 `provider/model` 时才透传（裸名字宁可不传，用宿主默认）。撞名/非法名/空人设/超上限都会**逐条报原因**。
+✗ 不覆盖：`chain`/`{previous}`（宿主 `workflow` 工具已覆盖）。
+
 ## 一条指令启动（`my-pi.sh` 分流）
 
 ```bash
