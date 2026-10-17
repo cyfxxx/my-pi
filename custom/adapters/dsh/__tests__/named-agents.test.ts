@@ -154,7 +154,7 @@ describe('registerNamedAgentTools', () => {
 
   it('可用 options.inject 覆盖服务清单（宿主 API 变了也不必改调用点）', () => {
     const innerPlugin = vi.fn();
-    const seenDeps: readonly string[][] = [];
+    const seenDeps: string[][] = [];
     const inject = vi.fn((deps: readonly string[], cb: (child: unknown) => void) => {
       seenDeps.push([...deps]);
       cb({ plugin: innerPlugin });
