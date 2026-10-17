@@ -6252,3 +6252,27 @@ Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sher
   （`runtime/<平台>/ext/dsh`，523 MB，gitignored ⇒ fresh clone 不带宽体）；
 - **回滚**：`git checkout v1.3.0-dsh` 或 `git revert -m 1`（本次是快进 ⇒ 回滚即把 main 指回 `eda6d1405`）；
 - **DSH 仍是 RC**（`0.2.0-rc.2`）：接口变动只需改 `custom/adapters/dsh/types.ts` 与 `DSH_VERSION` 两处。
+
+### [2026-10-17] ★ DR-2 落地：具名 agent 成为**可选能力**（默认关闭），并用"行为验证"取代"调用即成功"
+
+**决策**：能力审计里 DR-2（目录扫描式 agent 定义 ⇒ 宿主上的具名委派）按"**可选部署特性**"实现，**默认关闭**。
+
+- 机制：每个 agent 装一个宿主 `dsh-tool-subagent` 实例，`toolName` = 规范化 agent 名，携带 `persona`
+  与 `toolFilter`（只读 agent ⇒ `read/grep/find/ls`）。工具名承载"这次委派给谁"，顺带给 DR-4 提供映射键。
+- 默认关闭的理由不变：每多一个 agent 就是多一个**模型可见工具** ⇒ 工具面/token 成本、模型选择噪；
+  本项目对工具面有预算纪律 ⇒ 显式开关 + `maxTools` 上限 + 跳过项逐条上报。
+- 开关：插件配置 `namedAgents{enabled,scope,maxTools,provider,toolNamePrefix,personaMaxChars}`；
+  patch 里给了注释片段，临时启用可用 `MY_PI_DSH_EXTRA_PATCH=…`（`dsh-launch.sh` 新增的环境入口）。
+
+**两条硬教训（已进 CODING-TRAPS #19/#20、BUG-REPLAYS #46）**：
+1. **`apply` 不能 async**：async 后经 cordis 装载，工具在全局 `tools.schemas()` 里**看不见**（54→0；
+   直接 `await apply` 又正常）。⇒ 宿主模块在模块加载期用顶层 `await`+try/catch 取好，`apply` 保持同步。
+2. **"注册调用成功" ≠ "工具面可见"**：宿主工具插件自己 inject 四个服务，直接 `ctx.plugin()` 会**静默不激活**；
+   改走 `ctx.inject(…, child => child.plugin(…))` 后，可见性自检又因 inject 回调**异步落地**而误报"可见 0 个"。
+   ⇒ 上报必须**行为验证（schemas 前后对比）+ 延后一拍**，并把两个数字分开报、不一致就告警。
+
+**实测**：开关打开 ⇒ `工具面可见 2 个（reviewer, scout）｜注册调用成功=2`，会话请求里真出现 `reviewer, scout`；
+关闭 ⇒ 该日志一行不打、工具面保持 53。单测 14 项、全量 vitest 1315、spike 26/26、tsc×2 与各守门全绿。
+
+**✗ 未覆盖（如实登记）**：`chain`/`{previous}` 不在本能力内（宿主 `workflow` 已覆盖，DR-1）；
+`model` 只在 `provider/model` 形态透传；DR-3（逐任务 `cwd`）与 DR-4（进程外投递）仍需宿主侧能力。
