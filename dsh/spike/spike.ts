@@ -52,6 +52,10 @@
  */
 
 import { Context } from '@deepseek-ai/cordis';
+import Llm, { LlmAdapter } from '@deepseek-ai/dsh-llm';
+import SessionProjection from '@deepseek-ai/dsh-session-projection';
+import AgentPlugin from '@deepseek-ai/dsh-agent';
+import AgentLoop from '@deepseek-ai/dsh-agent-loop';
 import SystemPrompt, { joinContextSections, renderContextSections } from '@deepseek-ai/dsh-system-prompt';
 import ToolRuntime from '@deepseek-ai/dsh-tools';
 
@@ -1018,6 +1022,180 @@ async function main(): Promise<void> {
     a23 = { id: 'A23', ok: 'skip', detail: `并发核对检查不可用：${(error as Error).message.slice(0, 120)}` };
   }
   checks.push(a23);
+
+  // ── A24–A26：**真 agent（loop 驱动）+ 假模型** 装置 ──────────────────────────────────
+  //
+  // 为什么要搭这个装置：项目里最后两条 ✗ 都是"需要真 agent 才能验"的运行时语义
+  //   （`steer` 到底在哪个边界被消费、真 agent 下 `commands.execute()` 会不会真跑到我们的处理器）。
+  // 装置要点（此前试搭失败的原因）：`dsh-agent-loop` 的
+  //   `static inject = ["agents","sessions","llm","tools","systemPrompt","sessionProjections"]`
+  // 缺任一服务它**不激活**（于是 `agents.setFactory` 从不被调用，报 `no agent factory registered`）。
+  // `LlmAdapter` 的抽象面只有一个方法 `stream()`，其余都有默认实现 ⇒ 假模型很小。
+  let a24: Check = { id: 'A24', ok: false, detail: '未执行' };
+  let a25: Check = { id: 'A25', ok: false, detail: '未执行' };
+  let a26: Check = { id: 'A26', ok: false, detail: '未执行' };
+  try {
+    const timeline: string[] = [];
+    const splices: string[] = [];
+    const modelCalls: number[] = [];
+    const safeCall = (fn: () => string | undefined): string | undefined => {
+      try {
+        return fn();
+      } catch {
+        return undefined;
+      }
+    };
+    // 这两个包在 spike 里一直是**动态导入**（早期为了"装不上就跳过"），这里保持一致
+    const commandsModule = (await import('@deepseek-ai/dsh-commands')) as unknown as { default?: unknown };
+    const sessionModule = (await import('@deepseek-ai/dsh-session')) as unknown as { default?: unknown };
+    class ScriptedAdapter extends LlmAdapter {
+      // 第 1 次：先说一句，再发一个**不存在的工具**调用 ⇒ 循环执行工具（失败也算）后进入第 2 步；
+      // 第 2 次：直接给最终文本。这样"多步回合"完全由我们掌控，不依赖任何 provider/沙箱。
+      async *stream(): AsyncIterable<never> {
+        const n = modelCalls.length;
+        modelCalls.push(n);
+        if (n === 0) {
+          yield { type: 'block-start', index: 0, blockType: 'text' } as never;
+          yield { type: 'text-delta', index: 0, text: '我先查一下' } as never;
+          yield { type: 'block-end', index: 0, block: { type: 'text', text: '我先查一下' } } as never;
+          yield { type: 'block-start', index: 1, blockType: 'tool-call' } as never;
+          yield {
+            type: 'tool-call-delta', index: 1, id: 'call-1', name: 'no_such_tool', argumentsDelta: '{}',
+          } as never;
+          yield {
+            type: 'block-end', index: 1,
+            block: { type: 'tool-call', id: 'call-1', name: 'no_such_tool', arguments: {} },
+          } as never;
+          yield { type: 'finish', reason: 'tool_calls' } as never;
+          return;
+        }
+        await tick(150);
+        yield { type: 'block-start', index: 0, blockType: 'text' } as never;
+        yield { type: 'text-delta', index: 0, text: `第 ${n + 1} 步完成` } as never;
+        yield { type: 'block-end', index: 0, block: { type: 'text', text: `第 ${n + 1} 步完成` } } as never;
+        yield { type: 'finish', reason: 'stop' } as never;
+      }
+    }
+
+    const liveCtx = new Context();
+    const liveEntries: Array<[unknown, unknown]> = [
+      [SystemPrompt, undefined],
+      [ToolRuntime, undefined],
+      [Llm, undefined],
+      [sessionModule.default, undefined],
+      [SessionProjection, undefined],
+      [commandsModule.default, undefined],
+      [AgentPlugin, undefined],
+      [AgentLoop, { agents: [] }],
+    ];
+    for (const [plugin, config] of liveEntries) liveCtx.plugin(plugin as never, config as never);
+    await tick(600);
+    (liveCtx as unknown as { llm: { registerAdapter: (p: string[], a: unknown) => void } }).llm.registerAdapter(
+      ['fake'],
+      new ScriptedAdapter(),
+    );
+
+    // 顺手把**我们的外观层**接到这个真 ctx 上，用来验"真 agent 下的命令执行"
+    const liveFacade = createDshExtensionApi(liveCtx as never, {
+      hasUI: false,
+      cwd: process.cwd(),
+      compileTool: (tool: unknown) => tool,
+    } as never);
+    let commandSawSession: string | undefined;
+    (liveFacade.api as unknown as { registerCommand: (n: string, d: unknown) => void }).registerCommand(
+      'spike-live-cmd',
+      {
+        description: 'spike：真 agent 下执行命令',
+        handler: (_args: string, commandCtx: unknown) => {
+          commandSawSession = safeCall(() =>
+            (commandCtx as { sessionManager?: { getSessionId?: () => string } })?.sessionManager?.getSessionId?.(),
+          );
+        },
+      } as never,
+    );
+
+    const liveAgents = (liveCtx as unknown as { agents: { create: (o: unknown) => Promise<unknown> } }).agents;
+    const handle = (await liveAgents.create({
+      sessionId: 'spike-live-1',
+      meta: { cwd: process.cwd() },
+      agentOptions: { provider: 'fake', model: 'fake-1' },
+    })) as { agent: { followup: (m: unknown) => void; steer: (m: unknown) => void; whenIdle: () => Promise<void> } };
+
+    liveCtx.on('session/event', (_s: unknown, event: { type?: string; data?: { target?: string; id?: string } }) => {
+      const type = event?.type ?? '';
+      if (type === 'agent/inbox/spliced') splices.push(String(event.data?.target));
+      if (type === 'step/start' || type === 'step/end' || type === 'user/message') {
+        timeline.push(type === 'user/message' ? `user/message:${String(event.data?.id ?? '')}` : type);
+      }
+      return undefined;
+    });
+
+    const userMessage = (text: string, id: string) => ({ id, role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } });
+    handle.agent.followup(userMessage('开始', 'u1') as never);
+    await tick(60);
+    handle.agent.steer(userMessage('转向：改成查日志', 'u2') as never);
+    await handle.agent.whenIdle();
+
+    // A24：真 agent + 假模型能跑完一个**多步**回合
+    // ★ 期望值别写死成 2：steer 在边界被消费时**会合法地多推进一步**（本次实测 3 步 / 3 次调用）。
+    //   这里要证明的是"多步回合真的跑起来了"，不是"步数恰好等于几"。
+    const stepStarts = timeline.filter((t) => t === 'step/start').length;
+    const a24Ok =
+      modelCalls.length >= 2
+      && stepStarts >= 2
+      && timeline.includes('step/end')
+      && timeline.includes('user/message:u1');
+    a24 = {
+      id: 'A24',
+      ok: a24Ok,
+      detail: `真 agent 跑完一个**多步**回合：模型被调 ${modelCalls.length} 次、step/start×${stepStarts}、`
+        + `step/end 出现=${timeline.includes('step/end')}、followup 作为 u1 送达=${timeline.includes('user/message:u1')}`
+        + ` （步数 ≥2 即达标；steer 会合法地多推进 1 步）`,
+    };
+
+    // A25：`steer` 落进 `next-step`，并在**下一个 step 边界**被消费（成为该步的 user 消息）
+    const step1End = timeline.indexOf('step/end');
+    const u2Index = timeline.indexOf('user/message:u2');
+    const a25Ok =
+      splices.includes('next-step')
+      && splices.includes('next-turn')
+      && u2Index > step1End
+      && step1End >= 0
+      && timeline.slice(0, step1End).includes('user/message:u1');
+    a25 = {
+      id: 'A25',
+      ok: a25Ok,
+      detail: `收件箱写入=${JSON.stringify(splices)}（followup→next-turn、steer→next-step）；时间线=${JSON.stringify(timeline)}`
+        + ` ⇒ steer 在**第 1 步结束之后**作为独立的 user 消息被消费=${u2Index > step1End && step1End >= 0}`,
+    };
+
+    // A26：真 agent 下 `commands.execute()` 真的调到我们的处理器，且会话身份是**活的那个**
+    const liveCommands = (liveCtx as unknown as {
+      commands: { execute: (a: unknown, l: string, at: unknown[], s: AbortSignal) => Promise<unknown> };
+    }).commands;
+    const executed = (await liveCommands.execute(
+      handle.agent,
+      '/spike-live-cmd 甲 乙',
+      [],
+      new AbortController().signal,
+    )) as { kind?: string; result?: { kind?: string } };
+    // ★ 注意嵌套：真实返回是 `{commandId, result:{kind:'success'}}`（A22 里也是读 `result.kind`）
+    const resultKind = executed?.result?.kind ?? executed?.kind;
+    a26 = {
+      id: 'A26',
+      ok: resultKind === 'success' && commandSawSession === 'spike-live-1',
+      detail: `commands.execute(真 agent) ⇒ result.kind=${String(resultKind)}（期望 success）；`
+        + `处理器看到的会话=${String(commandSawSession)}（期望 spike-live-1）`,
+    };
+  } catch (error) {
+    const detail = `真 agent 装置不可用：${(error as Error).message.slice(0, 200)}`;
+    a24 = { id: 'A24', ok: 'skip', detail };
+    a25 = { id: 'A25', ok: 'skip', detail };
+    a26 = { id: 'A26', ok: 'skip', detail };
+  }
+  checks.push(a24);
+  checks.push(a25);
+  checks.push(a26);
 
   // ── 输出（含"哪些 pi 面没有等价物"的清单，不藏缺口）────────────────────────
   console.log('=== DSH 换基座 spike（真实 @deepseek-ai 包）===');

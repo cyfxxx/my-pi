@@ -80,8 +80,8 @@ PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh
 | 同名冲突**冒泡会连带丢掉该特性后面的注册**（含钩子） | 计划 #18-u；`BUG-REPLAYS` #41；spike A18/A21 |
 | 回合用量：一条 `turn/end` 触发**多条**桥接 ⇒ 累积器必须"只读不销毁"、按**会话+回合**分桶 | 计划 #18-v；spike A20 |
 | `input` 的 `streamingBehavior` 可从 `agent/inbox/spliced.target` 派生 | 计划 #18-z（真 Host 降级上报 3 条 → 0 条） |
-| `commands.execute()` 真的会调用我们注册的处理器 | 计划 #18-ac；spike A22 |
-| `sendUserMessage` 映射与 DSH 实现一致（`followup→next-turn`、`steer→next-step`） | 计划 #18-ab（读 `dsh-agent-loop/lib/index.js:798-811`） |
+| `commands.execute()` 真的会调用我们注册的处理器（**并在真 loop 下复验**：处理器看到的正是那个活会话） | 计划 #18-ac / #18-af；spike A22 / A26 |
+| `sendUserMessage` 映射与 DSH 实现一致，**且运行时核实**：`steer` 落 `next-step`、在多步回合的**边界**被消费成独立 user 消息 | 计划 #18-ab（实现级：`dsh-agent-loop/lib/index.js:798-811`）+ #18-af（运行时：spike A25 的时间线） |
 | 产物自包含 ⇒ 不再需要 profile 级 `pnpm.overrides` | 计划 #18-aa（搬走别名后真 Host 仍 0 解析失败） |
 | **前缀缓存（第一成本杠杆）在 DSH 上成立**：每步只付增量、其余走 `cacheRead`，且**跨会话/跨 `--session-id` 续接**都命中 | 计划 #18-ad（真 Host 会话日志的 `usage` 逐条对比） |
 | 移动端并发：宿主 `maxActiveSubagents` 是 `Volatile`（只有拥有者可写）⇒ 插件**读出来 + 超限报警 + 给部署片段** | 计划 #18-ae；spike A23；真 Host 两分支日志 |
@@ -95,7 +95,7 @@ PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh
 | **DR-2** 目录扫描式 agent 定义 | ⏳ 待重设计（**已决定不做默认启用**） | 宿主支持**每实例 persona/工具权限**的 subagent 工具实例，`AgentPresetRegistry.register()` 也能编程注册预设；但 `subagent` 工具**没有 agent/preset 参数** ⇒ "这次委派用哪个具名 agent"表达不出来。**可行路径**：插件装载时按目录为每个具名 agent 加载一个宿主 subagent 工具实例（`toolName=<agent 名>` + persona + 工具权限），由**工具名**承载身份，顺带给 DR-4 提供可靠的映射键。**默认不做**：每个 agent 都变成模型可见工具 ⇒ 工具面/成本上升且改变模型行为 ⇒ 记为可选部署特性 |
 | **DR-3** 逐任务 `cwd` | ⏳ 待重设计（宿主缺参数） | 已核实宿主 `subagent` 参数只有 `prompt/description/provider/model/reasoning_effort/run_in_background`；替代：任务里显式 `cd` |
 | **DR-4** 进程外投递 CLI | ⏳ 待重设计（**与 DR-2 同一依赖**） | 三条路已查清：① 宿主**进程内**有可编程投递 API `ctx.subagents.sendMessage(sender, targetId, content, {signal})`（限**直接父子**、`sender` 须是那个活 Agent）⇒ 插件做"文件收件箱→投递"桥**可行**；② 但需要 `agent 名 → 子会话 id` 的映射，而宿主只用 "sessionId + 自由文本 description"、**没有具名维度**（= DR-2 缺的同一个东西）；③ 出宿主进程只有客户端-宿主 API（`typertGateway`+Client `ctx.remote`），而 **headless profile 只有 gateway 服务、没有入站传输层**（传输在 web profile） |
-| 真 agent（loop 驱动）层语义 | ⏳ 待装置（**阻塞点已定位，可做**） | `steer` 在 step 边界被消费、真 agent 下命令执行。失败原因已查清：`dsh-agent-loop` 的 `static inject = ["agents","sessions","llm","tools","systemPrompt","sessionProjections"]`，缺任一服务它就不激活 ⇒ `agents.setFactory` 从不被调用（我第一次试搭时缺 `sessionProjections`）。⇒ 最小装置 = 这 6 个服务 + 一个 `LlmAdapter` 假实现（抽象面：`providerInfo`/`models`/流式），**属投入而非阻塞** |
+| 真 agent（loop 驱动）层语义 | ✅ **已验（运行时）** | 装置已搭成（spike A24–A26）：真 loop + 真 session/tools/commands/projections + **脚本化假模型**（`LlmAdapter` 抽象面只有 `stream()`）。A25 证明 `steer` 落 `next-step` 且在第 1 步结束后被消费成独立 user 消息；A26 证明真 agent 下 `commands.execute()` ⇒ `result.kind=success` 且处理器看到活会话。✗ 边界如实标注：模型是**脚本化假模型**（不是真 provider），所以"真 provider 的流式细节/重试"仍不在本装置覆盖范围内 |
 | `input.transform` | 潜伏能力（**已测无消费者**） | 4 个 `input` 处理器全是观察者、无人返回改写（逐个读过） |
 | `turn_end` 的 `toolResults` | 潜伏缺口（**已测无消费者**） | `grep -rn "toolResults" custom/features` 无命中 ⇒ 目前没人读它（哪天有 feature 读，再按会话日志合成） |
 | 合成用量的 `cost` | 已知占位（**已测无消费者**） | DSH `TokenUsage` 不含定价；`grep` 确认无 feature 读 `usage.cost` |
