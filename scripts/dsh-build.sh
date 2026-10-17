@@ -29,22 +29,67 @@ OUT_DIR="$ROOT/dsh/plugin/dist"
 OUT="$OUT_DIR/my-pi-plugin.mjs"
 ESBUILD="$ROOT/node_modules/.bin/esbuild"
 NO_SMOKE=0
-for arg in "$@"; do case "$arg" in --no-smoke) NO_SMOKE=1 ;; *) echo "用法: $0 [--no-smoke]" >&2; exit 2 ;; esac; done
+LINK_HOST=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-smoke) NO_SMOKE=1; shift ;;
+    # --link-host <node_modules 路径>：只把仓库根的 @deepseek-ai/* 等价物指向**这个宿主**，不构建。
+    # 为什么需要：产物的宿主包是 external ⇒ 解析靠仓库根别名；**换宿主（npx → 仓内）后别名必须重指**，
+    # 否则仍解析到旧宿主（便携化就白做了）。给 scripts/dsh-launch.sh 用。
+    --link-host) LINK_HOST="${2:-}"; shift 2 ;;
+    *) echo "用法: $0 [--no-smoke] [--link-host <node_modules>]" >&2; exit 2 ;;
+  esac
+done
 
 [ -x "$ESBUILD" ] || { echo "❌ 缺少 esbuild（$ESBUILD）" >&2; exit 2; }
 mkdir -p "$OUT_DIR"
 
 # 本地产物里现在会 import `@deepseek-ai/dsh-tools`（为了 `defineTool` 编译，见 dsh/plugin/entry.ts）。
 # Node 从**产物所在目录**向上找 node_modules ⇒ 需要仓库根可见这些包（真实部署由宿主提供，这里是本地等价物）。
-DSH_PKGS="$ROOT/dsh/spike/node_modules/@deepseek-ai"
-if [ -d "$DSH_PKGS" ]; then
+#
+# 宿主来源优先级（与脚本 dsh-runtime.sh 一致）：**仓内** runtime/<平台>/ext/dsh 优先；
+# 没有才退回 spike 自己的安装（早期做法）。`--link-host` 则强制指向调用方给的宿主。
+link_host_packages() { # $1 = 提供 @deepseek-ai/* 的 node_modules 路径
+  local modules="$1" pkg name
+  local dsh_pkgs="$modules/@deepseek-ai"
+  [ -d "$dsh_pkgs" ] || return 1
   mkdir -p "$ROOT/node_modules/@deepseek-ai"
-  for pkg in "$DSH_PKGS"/*; do
+  for pkg in "$dsh_pkgs"/*; do
     [ -d "$pkg" ] || continue
     name="$(basename "$pkg")"
-    [ -e "$ROOT/node_modules/@deepseek-ai/$name" ] || ln -sfn "$pkg" "$ROOT/node_modules/@deepseek-ai/$name"
+    # ★ 逐包重建（不是整体软链）：`ln -sfn SRC D` 在 D 已是真目录时会把链接建到目录**里面**
+    #   （本仓真实事故，见 CODING-TRAPS #14）。已存在的符号链接允许替换，真目录则跳过并提示。
+    if [ -L "$ROOT/node_modules/@deepseek-ai/$name" ]; then
+      ln -sfn "$pkg" "$ROOT/node_modules/@deepseek-ai/$name"
+    elif [ -e "$ROOT/node_modules/@deepseek-ai/$name" ]; then
+      : # 真目录（例如 npm 装过）⇒ 不覆盖
+    else
+      ln -sfn "$pkg" "$ROOT/node_modules/@deepseek-ai/$name"
+    fi
   done
-  echo "✓ 已确保宿主包在仓库根可见（node_modules/@deepseek-ai/*，本地等价物）"
+  return 0
+}
+
+if [ -n "$LINK_HOST" ]; then
+  link_host_packages "$LINK_HOST" || { echo "❌ $LINK_HOST 下没有 @deepseek-ai/*" >&2; exit 2; }
+  echo "✓ 已把仓库根 @deepseek-ai/* 指向：$LINK_HOST"
+  exit 0
+fi
+
+# ★ 平台串必须走 lib-portable.sh 的映射：`uname -m` 在 ARM 上给 `aarch64`，而仓内目录是 `linux-arm64`
+#   （手搓一次就错一次 —— 这正是"解析收敛一处"的意义）。
+if [ -z "${MY_PI_PLATFORM:-}" ] && [ -f "$ROOT/scripts/lib-portable.sh" ]; then
+  # shellcheck source=scripts/lib-portable.sh
+  . "$ROOT/scripts/lib-portable.sh"
+fi
+VENDORED_MODULES="$ROOT/runtime/${MY_PI_PLATFORM:-$(pi_platform 2>/dev/null || echo unknown)}/ext/dsh/node_modules"
+if [ -d "$VENDORED_MODULES/@deepseek-ai" ]; then
+  link_host_packages "$VENDORED_MODULES" && echo "✓ 宿主包可见（指向**仓内**宿主 runtime/<平台>/ext/dsh）"
+else
+  DSH_PKGS="$ROOT/dsh/spike/node_modules/@deepseek-ai"
+  if [ -d "$DSH_PKGS" ]; then
+    link_host_packages "$(dirname "$DSH_PKGS")" && echo "✓ 宿主包可见（指向 spike 的安装；建议 bash scripts/dsh-runtime.sh install 进仓内）"
+  fi
 fi
 
 echo "=== 构建 DSH 插件产物 ==="

@@ -6,6 +6,19 @@ set -e
 
 MY_PI_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# ── 一条指令，两种底座 ───────────────────────────────────────────────────────
+#   bash my-pi.sh                → **TUI**（pi 基座，默认行为，与主分支一致）
+#   bash my-pi.sh tui [args…]    → 同上（显式写法）
+#   bash my-pi.sh web [--port N] → **Web UI**（DSH 基座；默认端口 3099，避开正在跑的 3080）
+#   bash my-pi.sh headless "任务" → DSH 基座一次性执行
+#   bash my-pi.sh acp [args…]    → DSH 基座 ACP（编辑器/客户端用）
+# DSH 路径的宿主/状态/产物解析全在 scripts/dsh-launch.sh 里（仓内优先 + 便携）。
+case "${1:-}" in
+  tui)      shift ;;
+  web|headless|acp)
+    exec bash "$MY_PI_ROOT/scripts/dsh-launch.sh" "$@" ;;
+esac
+
 # ── 便携运行时（单一事实来源）──────────────────────────────────────────────
 # `lib-portable.sh` 负责：平台判定、把仓内 Node/Python 前置进 PATH、把 npm/pip 缓存与
 # pycache 指到仓库内。**不装也能跑**（退回系统 node/python3），但"完全便携"要靠

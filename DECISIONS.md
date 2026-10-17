@@ -6198,3 +6198,30 @@ Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sher
 
 **理由（不采用）**：暂不采用（技术上可行）：它会把每个 agent 变成**模型可见工具** ⇒ 工具面与 token 成本上升，并改变模型可见行为；本项目对工具面有预算纪律、宿主也刻意保持精简。改为登记为**可选部署特性**（需要时按显式配置开关实现，路径写在能力审计 §7 DR-2）
 **证据**：宿主支持每实例 persona/工具权限（dsh-tool-subagent/README.zh.md：toolName 每实例须不同）；但 subagent 工具无 agent/preset 参数 ⇒ 具名只能靠工具名承载
+
+### [2026-10-17] ★ DSH 宿主进仓内 + `my-pi.sh` 一条指令双底座（tui / web / headless）
+
+**问题**：`dsh` CLI 原先只活在 npm 的 npx 缓存（`~/.npm/_npx/<hash>/`，523 MB）里 —— 那是**仓外**、
+会被 `npm cache clean` 清掉、换机器就没有；启动还要手搓一串环境变量与 profile。等于"换基座后反而不能一条指令用"。
+
+**决策**：
+1. **宿主进仓内** `runtime/<平台>/ext/dsh/`（gitignored），由 `scripts/dsh-runtime.sh` 装：与主分支
+   `runtime/<平台>/`（node/python 等）**同一套便携约定**，由 `check-portability.sh` 新增的 **P6** 守。
+   版本钉死 `DSH_VERSION=0.2.0-rc.2`（与产物的 external 宿主包必须同版本）。
+2. `install` 两条通道：registry（带重试）与 `--from-npx`（从已有完整 npx 安装 `cp -a` 搬运，
+   **禁止 `cp -al`**；搬后自检"零绝对符号链接" ⇒ 搬完仍自包含）。本机 registry 的 tarball 会 ETIMEDOUT，
+   `--from-npx` 是对此的正解，不是绕过。
+3. **一条指令**：`my-pi.sh` 只加一个 `case` 分流 —— `tui`（默认，pi 基座，行为不变）/ `web` / `headless` / `acp`；
+   DSH 三条派到 `scripts/dsh-launch.sh`。
+4. **状态也在仓内**：`DSH_HOME` 默认 `<repo>/portable/dsh`（gitignored），**绝不碰 `~/.dsh`**（正在跑的 GUI 的 home）；
+   凭据从 `$MY_PI_DSH_CREDENTIALS` 或 `~/.dsh/.credentials.yaml` **拷一份 600** 进仓内 home（一次性，之后就用仓内那份）。
+5. **解析仓内优先**：宿主 `runtime/.../ext/dsh` → 系统 `dsh` → npx（**并对"非便携"明确告警**，不静默）。
+   仓库根 `@deepseek-ai/*` 由 `dsh-build.sh --link-host` 始终重指到当前宿主（`ln -sfn` 逐包建，防 CODING-TRAPS #14）。
+
+**实测（本机 linux-arm64）**：`dsh-runtime.sh install --from-npx` → 523 MB、版本 `0.2.0-rc.2`、入口可解析、
+**零绝对符号链接**；`./my-pi.sh web` → HTTP 401（Web UI 起来了）、注册汇总 **工具 54 / 命令 10（含 `mypi-plan`）/ 冲突 0 / 钩子 18**、
+启动日志里 **`_npx` 痕迹 0 次**；`./my-pi.sh headless "回答两个字：收到"` → 回「收到」、rc=0；
+`MY_PI_DSH_HOME=<空目录> bash scripts/dsh-launch.sh --print-host` → `vendored` 且**零副作用**。
+
+**✗ 如实登记**：`tui` 分支只是把 `case` 里 `shift` 一下就落回原 pi 路径（代码未改），**未在无 TTY 环境实跑**；
+本机 DSH 版本**没有 TUI 模板**（模板只有 acp/headless/sdk/sdk-minimal/web），所以 "tui" 就是 pi 基座那个终端界面。

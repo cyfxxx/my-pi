@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 80 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
+├── scripts/             # 82 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -99,7 +99,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 
 ### `scripts/`
 （另有 `docs/CHANGES.jsonl` 改动台账：由 pre-push 追加、由约定守门校验格式）
-共 80 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 82 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
@@ -113,6 +113,13 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `check-packs-links.mjs`：**packs 内部 Markdown 相对链接守门**（既有 `check-doc-links.mjs` 有意排除 `packs/`；本脚本按 vendored 布局判定，口径与上游 `verify-doc-links.py` 一致：只查相对链接、跳过围栏代码、命中集合 = git 跟踪文件∪目录；反证探针：注入一条断链 ⇒ exit 1 并点名 `md:行 -> 目标`）
 - `lib-portable.sh`：**便携运行时的单一事实来源**（2026-10-15 新增）：平台判定（`pi_platform`）、运行时目录（`pi_runtime_root`/`pi_ext_dir`/`pi_py_site`）、Node 解析（`pi_resolve_node`：`MY_PI_NODE` → 仓内 `<repo>/runtime/<平台>/node` → 旧扁平 `runtime/node` → 同级历史布局 → PATH，且必须版本达标）、Python 解析（便携 CPython → 系统 python3）、便携环境导出（`pi_portable_env`：把仓内 node/python 前置进 PATH、npm/pip 缓存与 pycache **强制**指到仓内）、服务私有 HOME/XDG/TMP（`pi_service_env`）、venv 自愈（`pi_py_repair_venv`）。解析点从"三份拷贝"收敛到这一处（此前的漂移缺陷见 [docs/operations/BUILD-PORTABILITY.md](docs/operations/BUILD-PORTABILITY.md) §4.3）
 - `portable-runtime.sh`：**把运行时装进仓库**（`status|node|python|deps [profile…]|searxng|repair|env|verify|all`）：按 `scripts/portable-artifacts.txt` 的清单**校验 sha256 后**解包官方 Node / python-build-standalone / SearXNG 源码，把 pack 依赖 `pip install --target` 进 `<repo>/runtime/<平台>/ext/py/site-packages`；`repair` 从已校验缓存重解包（FUSE 符号链接污染时自愈）；`verify` 逐条自证（版本/落点/导入/缓存/忽略规则/无污染链接）
+- `dsh-runtime.sh`：**把 DSH 宿主装进仓内**（`install [--from-npx]|verify|status|path`）：装到 `runtime/<平台>/ext/dsh/`
+  （gitignored，与 node/python 同一套便携约定），版本钉死 `DSH_VERSION`；`--from-npx` 从已有的完整 npx 安装搬运（不联网；
+  搬运后自检"零绝对符号链接"⇒ 真便携）；`verify` 校验可执行/版本/入口可解析
+- `dsh-launch.sh`：**一条指令启动 my-pi（DSH 基座）**（`web [--port N]|headless "任务"|acp`）：仓库根 `my-pi.sh` 按第一个参数分流到这里。
+  宿主**仓内优先**（没有才退系统/npx，且对"非便携"明确告警）；`DSH_HOME` 默认 `<repo>/portable/dsh`（gitignored，绝不碰 `~/.dsh`）；
+  缺产物现建、仓库根 `@deepseek-ai/*` 始终重指到当前宿主；凭据 600 拷进仓内 home；每种模式建一次 profile；
+  `--print-host` 只报告解析结果（零副作用，供便携性守门做行为判定）
 - `check-portability.sh`：**便携性守门**（接在 `check-conventions.sh` **I 段**）：P1 生产代码不得把仓外绝对路径当默认落点（注释除外）、P2 `runtime/` 必须被忽略且不得入库、P3 装了仓内 runtime 时解析必须落在仓内 + 三个缓存必须在仓内、P4 制品清单 sha256 必须是 64 位十六进制、P5 运行时符号链接不得带 `0001` 污染尾巴
 - `test-portability-move.sh`：**真实搬移测试**（按需，约 5–10 分钟，不进 pre-commit）：整树复制到 `/tmp/my-pi-moved-<pid>`，用最小环境（`PATH=<git>:/usr/bin:/bin`、不提供 node/python）验证 `my-pi.sh --version` 用的是新路径的 node、便携 python + 站点包可导入、`portable-runtime.sh verify` 全绿、SearXNG 在新路径能真实搜出结果、并扫描旧路径残留
 - `check-packs-structure.mjs`：**packs 结构守门**（2026-10-15 新增，七条规则 R1–R7：包根须有 SKILL.md 或登记为细节层/vendored 入口别名、每个 SKILL.md 的 frontmatter 须有 name+description 且 description 不带日期、包根须有"使用后经验沉淀"段或 EXPERIENCE.md、包名须登记进 `packs/INDEX.md`+`README.md`、**packs 下不得有未跟踪/未跟踪且被忽略的文件**（兜住"git add 被 .gitignore 静默吞掉上游已跟踪文件"这类静默丢失）、`drafts/` 命名口径、README 里"已落地 N 个"计数须等于实测）。起因：同年全量体检抓到 README 计数 13 vs 实测 17，以及 reverse-skill 同步时静默丢了 `reports/…` 与 `docs/plans/…` 两个上游已跟踪文件）

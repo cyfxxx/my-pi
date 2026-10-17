@@ -58,6 +58,20 @@ PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh
 
 ## 3. 部署与运行形态
 
+**日常用就一条指令**（仓内便携，见 `DECISIONS.md` 2026-10-17）：
+
+```bash
+bash scripts/dsh-runtime.sh install --from-npx   # 只第一次：把 DSH 宿主装进 runtime/<平台>/ext/dsh/
+./my-pi.sh                 # TUI（pi 基座，行为与主分支一致）
+./my-pi.sh web             # Web UI（DSH 基座；默认 3099，避开 3080）
+./my-pi.sh headless "任务"  # DSH 基座一次性执行
+```
+
+宿主**仓内优先**（否则退系统 `dsh`，最后才是 npx 并明确告警）；`DSH_HOME` 默认 `<repo>/portable/dsh`（gitignored，
+**绝不碰 `~/.dsh`**）；凭据 600 拷进仓内 home；产物缺就现建；仓库根 `@deepseek-ai/*` 始终重指到当前宿主。
+守门：`check-portability.sh` 的 **P6** 用行为证明"解析命中仓内 + `portable/dsh/` 不入库 + 版本单源"。
+
+
 - **产物**：`bash scripts/dsh-build.sh` → `dsh/plugin/dist/my-pi-plugin.mjs`（gitignored，约 764 KB），
   由 `dsh/profile/my-pi.patch.yml` 以 `insert:` 挂进 profile（`id: my-pi`）。
 - **自包含**：`@earendil-works/pi-*` 已在构建期被 `--alias` 改写并打进产物；

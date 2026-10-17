@@ -9,6 +9,28 @@
 | **适配层**（机制） | [`custom/adapters/dsh/`](../custom/adapters/dsh/README.md) | 把 DSH 的 `Context` 包装成 pi 形状 API（工具/钩子/命令/快捷键），features 一行不改 |
 | **交付层**（本目录） | `dsh/plugin/`、`dsh/profile/` | 把适配层 + 全部特性打成**可安装产物**，并给出能被真实 `dsh` launcher 接受的 profile 覆盖层 |
 
+## 一条指令启动（`my-pi.sh` 分流）
+
+```bash
+./my-pi.sh              # TUI（pi 基座，主分支行为不变）
+./my-pi.sh tui [args]   # 同上（显式）
+./my-pi.sh web [--port N] [--no-open]   # Web UI（DSH 基座；默认 3099，避开 3080）
+./my-pi.sh headless "任务…"              # DSH 基座一次性执行
+./my-pi.sh acp [args…]                   # DSH 基座 ACP
+```
+
+**完全是仓内便携的**（与主分支的 node/python 同一套约定）：
+
+| 面 | 落点 | 说明 |
+|---|---|---|
+| DSH 宿主 | `runtime/<平台>/ext/dsh/`（gitignored） | `bash scripts/dsh-runtime.sh install --from-npx` 装一次；版本钉死 `0.2.0-rc.2`；**仓内优先**，没有才退系统 `dsh`/npx（并对"非便携"明确告警） |
+| 状态（会话/日志/凭据） | `portable/dsh/`（gitignored） | `DSH_HOME` 默认指这里，**绝不碰 `~/.dsh`**（那是正在跑的 GUI 的 home）；凭据 600 拷入 |
+| 产物 | `dsh/plugin/dist/my-pi-plugin.mjs`（gitignored） | 缺就现建；仓库根 `@deepseek-ai/*` 始终重指到当前宿主 |
+| profile | `portable/dsh/profiles/mypi-{web,headless,acp}` | 每种模式建一次（模板不同），复用 |
+
+诊断：`MY_PI_DSH_TRACE_EVENTS=1 ./my-pi.sh web` → 末尾一行注册汇总（工具/命令/同名冲突/钩子）。
+排障：`bash scripts/dsh-runtime.sh status`、`bash scripts/dsh-launch.sh --print-host`（零副作用）。
+
 ## 目录
 
 ```

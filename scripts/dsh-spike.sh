@@ -34,6 +34,49 @@ echo "=== DSH spike 准备（$SPIKE_DIR）==="
 # ★ 判据是"**package.json 里声明的每一个依赖**是否都在 node_modules 里"，不是只看 dsh-tools：
 #   原先只看 dsh-tools 存在就跳过安装 ⇒ **往 package.json 里加依赖不会生效**（实测：加了
 #   dsh-agent / dsh-agent-loop / dsh-llm 后仍显示"依赖已就绪"，直到手工 npm install 才发现）。
+# ★ 离线通道：仓内宿主（runtime/<平台>/ext/dsh）里就有 spike 需要的全部 `@deepseek-ai/*`
+#   ⇒ 有它就把这些包**逐包链**进 dsh/spike/node_modules，**完全不联网**。
+#   （这正是"完全便携化"的一部分：换机器/断网也能跑完全部守门。）
+HOST_MODULES="$(bash "$ROOT/scripts/dsh-runtime.sh" path 2>/dev/null || true)"
+LINKED_FROM_HOST=0
+if [ -n "$HOST_MODULES" ] && [ -d "$HOST_MODULES/@deepseek-ai" ]; then
+  if node -e '
+const fs = require("fs");
+const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const host = process.argv[2];
+process.exit(Object.keys(p.dependencies ?? {}).every((d) => fs.existsSync(`${host}/${d}`)) ? 0 : 1);
+' "$SPIKE_DIR/package.json" "$HOST_MODULES" 2>/dev/null; then
+    mkdir -p "$SPIKE_DIR/node_modules/@deepseek-ai"
+    linked=0
+    already=0
+    for pkg in "$HOST_MODULES"/@deepseek-ai/*; do
+      [ -d "$pkg" ] || continue
+      name="$(basename "$pkg")"
+      # 只链 spike 真正声明需要的（别把宿主整棵镜像进来）
+      if node -e 'const p=require(process.argv[1]);process.exit(Object.hasOwn(p.dependencies??{}, process.argv[2])?0:1)' \
+          "$SPIKE_DIR/package.json" "@deepseek-ai/$name" 2>/dev/null; then
+        # 只补**缺失**的（已有真目录不覆盖：那是之前 npm 装好的）；已有软链则重指到仓内宿主
+        if [ -L "$SPIKE_DIR/node_modules/@deepseek-ai/$name" ]; then
+          ln -sfn "$pkg" "$SPIKE_DIR/node_modules/@deepseek-ai/$name"
+          linked=$((linked + 1))
+        elif [ ! -e "$SPIKE_DIR/node_modules/@deepseek-ai/$name" ]; then
+          ln -sfn "$pkg" "$SPIKE_DIR/node_modules/@deepseek-ai/$name"
+          linked=$((linked + 1))
+        else
+          already=$((already + 1))
+        fi
+      fi
+    done
+    LINKED_FROM_HOST=1
+    LINKED_COUNT="$linked"
+    if [ "$linked" -gt 0 ]; then
+      echo "✓ 从**仓内宿主**链入 $linked 个缺失包（其余 $already 个用已装好的）⇒ 离线可用"
+    else
+      echo "✓ spike 依赖已完整（$already 个，均已安装；仓内宿主也可作离线后备）"
+    fi
+  fi
+fi
+
 MISSING_DEPS="$(node -e '
 const fs = require("fs");
 const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
@@ -54,7 +97,11 @@ if [ -n "${MISSING_DEPS:-}" ]; then
     exit 2
   fi
 else
-  echo "✓ 依赖已就绪（跳过安装）"
+  if [ "${LINKED_COUNT:-0}" -gt 0 ]; then
+    echo "✓ 依赖已就绪（其中 $LINKED_COUNT 个来自仓内宿主，离线）"
+  else
+    echo "✓ 依赖已就绪（跳过安装）"
+  fi
 fi
 
 # ── pi 包别名：默认用**本仓 shim**（证明"没有 pi 包也能加载全部特性"）──────────

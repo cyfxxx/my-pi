@@ -117,8 +117,14 @@ bash scripts/build.sh
 # 2. 体检并自动修复缺口（依赖/vendor/补丁/dist/自愈缓存/shim）
 bash scripts/doctor.sh --fix
 
-# 3. 使用构建后的版本
-./my-pi.sh
+# 3. 使用构建后的版本（一条指令，两种底座）
+./my-pi.sh                 # 默认 = TUI（pi 基座）
+./my-pi.sh tui             # 同上，显式写法
+./my-pi.sh web             # Web UI（DSH 基座，默认端口 3099，避开正在跑的 3080）
+./my-pi.sh headless "任务"  # DSH 基座一次性执行并打印结果
+#    ★ DSH 宿主也是**仓内便携**的：先跑一次
+#      bash scripts/dsh-runtime.sh install --from-npx
+#      （装到 runtime/<平台>/ext/dsh/，之后不再依赖 npx 缓存；状态/凭据都在仓内 portable/dsh/）
 
 # 4. 查看版本
 ./my-pi.sh --version
