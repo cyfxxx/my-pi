@@ -269,6 +269,17 @@
 - 附：`readonly T[]` 上不能 `push`（本次真实报错 `TS2339: Property 'push' does not exist on type 'readonly string[][]'`）——
   局部累加器别标 readonly。
 
+## 22. 改了插件入口只跑 `tsc` 不重建产物 ⇒ 新配置"不生效"、日志也不出现
+
+- **症状**：给 `dsh/plugin/entry.ts` 加了可选项（`inbox.enabled`），`tsc -p dsh/` 通过、composed config 里
+  也确认 `inbox.enabled: true`（`--dump-config` 能看到），但真 Host 启动日志里**没有**"会话收件箱已开启"那一行，
+  行为完全像"开关没生效"。
+- **真因**：宿主加载的是**构建产物** `dsh/plugin/dist/my-pi-plugin.mjs`，而我改了源码只跑类型检查、**没重建产物**
+  ⇒ 跑的还是旧代码。查证只要 10 秒：比 `stat` 一下 `entry.ts` 与 `dist/*.mjs` 的 mtime。
+- **判据（改法）**：改 `dsh/plugin/**` 或 `custom/adapters/dsh/**` 之后，**必须** `bash scripts/dsh-build.sh`
+  （真 Host / spike A18-A21 / 打包冒烟用的都是产物）；只跑 `tsc` 只能证明"类型对"。
+- **同类**：`--dump-config` 证明的是"配置组合对了"，**不是**"插件读到了它"——两者之间还隔着"产物是否最新"。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

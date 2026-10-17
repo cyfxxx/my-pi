@@ -221,7 +221,8 @@ if [ "${RUN_DSH:-0}" = "1" ]; then
     for sc in isolation session-resume mode; do
       if MY_PI_HOST_SMOKE=1 MY_PI_DSH_CREDENTIALS="$DSH_CREDS" \
         bash "scripts/dsh-scenario-$sc.sh" >"/tmp/golden-dsh-$sc.log" 2>&1; then
-        pass "DSH 场景/$sc（$(grep -aoE '🎉[^（]*' "/tmp/golden-dsh-$sc.log" | head -1 | sed 's/🎉 //')️）"
+        # 取日志最后一条 🎉 行的正文（去掉开头的 emoji 与空白；别用 sed 截，会留下变体选择符）
+        pass "DSH 场景/$sc（$(grep -ao '🎉 .*' "/tmp/golden-dsh-$sc.log" | tail -1 | sed 's/^🎉 //; s/[[:space:]]*$//' | cut -c1-60)）"
       else
         DSH_FAIL=1
         fail "DSH 场景/$sc（见 /tmp/golden-dsh-$sc.log）"
