@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（258 条）
+## 决策台账（259 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ 拼接方案定稿（待确认）：DSH 当供应商，**内核可改面积只有 4 个包** · **用户决定（本轮）**：先记录、不开工；并追问"完全定制的代价"与"减轻将来改内核代价的措施"。 · 数字: 289 个 / 4 个 / 6 条
 - `DECISIONS.md` · [2026-10-18] ★ 拼接分支现状归档：**"新前端 + 旧适配层"**，并查清本地模型的上下文默认值会直接失效 · **为什么记这条**：分支已经能跑（M1 五项全绿），但它的实际构成与最初的构想有实质差距； · 数字: 10%
 - `DECISIONS.md` · [2026-10-18] ★ **拼接架构补上「自写插件工具」这一层：工具注册一次，两端共享**（M1 收口） · **做了什么（✓）**：`assistant/plugin/entry.ts` —— 一个**独立**的 DSH 插件（只依赖宿主提供的
 - `DECISIONS.md` · [2026-10-18] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座） · **问题（用户提出）**：现有路线是「选一个上游底座 + 持续修补」，而选底座后期仍要修修补补；
@@ -557,8 +558,19 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（248 条）
+## 设计文档（259 条）
 
+- `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
+- `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
+- `docs/design/ASSISTANT-PLAN.md` · 3. 模型层：DSH 相比 pi 的增量 · **事实**：`@deepseek-ai/dsh-llm-pi-ai` 依赖 `@earendil-works/pi-ai ^0.87.1`——DSH 的多 provider 能力用的就是 pi 的引擎。
+- `docs/design/ASSISTANT-PLAN.md` · 4. 用了 DSH 的什么；升级怎么"选择性合并" · **升级的三层含义**：
+- `docs/design/ASSISTANT-PLAN.md` · 5. "一切皆插件"的证据 · 1. **CLI 自己就是组合**：`dsh` 启动 = profile bundle 列表 + patch 层；`dsh-web-app` 自带 standard/ptc/minimal/cordis 四套 preset。 · 数字: 1 个
+- `docs/design/ASSISTANT-PLAN.md` · 6. 定制五档与"真内核"面积 · **关键发现**：很多"看起来像内核"的东西其实是 L3 接缝——**压缩**（`dsh-compaction` 接缝 + `-basic` 实现）、**权限/沙箱策略**、**会话格式**（`session-format` + v0→v4 · 数字: 3 个 / 289 个 / 4 个
+- `docs/design/ASSISTANT-PLAN.md` · 7. 完全定制的代价 · **一句话**：完全定制的真正代价不是代码量，而是**"接管生态"或"丢掉 Web"二选一**。 · 数字: 289 个
+- `docs/design/ASSISTANT-PLAN.md` · 8. 减轻"将来改内核"代价的措施（按杠杆排序） · 1. **产品状态自有化（最重要）**：记忆、笔记、配置、模型路由、日程，全部用**我们自己的文件格式**放在仓库里，不塞进 DSH 的数据结构。换脊柱时数据不丢。
+- `docs/design/ASSISTANT-PLAN.md` · 9. 不变量依赖清单（初始）
+- `docs/design/ASSISTANT-PLAN.md` · 10. 里程碑（待确认后执行）
+- `docs/design/ASSISTANT-PLAN.md` · 11. 待确认 · 1. 本方案是否作为执行蓝本；
 - `docs/design/ASSISTANT-STATUS.md` · 1. 现在实际跑的七层 · **必须直说的一点**：第 3 层还在。`mypi.sh` 借的是 `scripts/dsh-launch.sh`，而它默认挂 `my-pi.patch.yml` · 数字: 12 个
 - `docs/design/ASSISTANT-STATUS.md` · 2. 对照最初的构想
 - `docs/design/ASSISTANT-STATUS.md` · 3. 待解决的问题（按代价排序） · 1. **旧适配层去留**（最大）：留 facade ⇒ 54 工具里大半是"把 pi 能力翻译到 DSH"＝继续修修补补； · 数字: 12 个 / 523 MB

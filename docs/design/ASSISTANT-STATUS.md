@@ -1,7 +1,7 @@
 # 拼接分支现状：跑的是什么、离构想差多少、本地模型该怎么管上下文
 
 > 记录时间：2026-10-18。分支 `feat/private-assistant`（基于合并后的 `4453d3965`，与回退后的 `main` 不同线）。
-> 本文是**现状快照**，不是目标；目标与接缝规则见 [PRIVATE-ASSISTANT.md](PRIVATE-ASSISTANT.md)。
+> 本文是**现状快照**，不是目标；目标见 [ASSISTANT-PLAN.md](ASSISTANT-PLAN.md)，接缝规则见 [PRIVATE-ASSISTANT.md](PRIVATE-ASSISTANT.md)。
 
 ## 1. 现在实际跑的七层
 

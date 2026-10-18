@@ -2,6 +2,44 @@
 
 ## 格式
 
+### [2026-10-18] ★ 拼接方案定稿（待确认）：DSH 当供应商，**内核可改面积只有 4 个包**
+
+**用户决定（本轮）**：先记录、不开工；并追问"完全定制的代价"与"减轻将来改内核代价的措施"。
+
+**方案（`docs/design/ASSISTANT-PLAN.md`，唯一落点）**：
+脊柱 = DSH 的 loop/会话/权限/Web（pinned `0.2.0-rc.2`，vendored）；模型层 = `llm-deepseek` + `llm-pi-ai`
+（后者依赖 pi-ai 0.87.1 ⇒ 等于已借 pi 的引擎）；终端 = 社区 `@deepseek-harness-tui/dsh-tui` 0.16.1
+（peer 覆盖 `0.2.0-rc.2`，bundle 插件）作日常/备用，自研 183 行客户端作"保证能用的回退 + 验收探针"；
+Web 只做"去入口 + 品牌"；opencode 只当外部 agent（延后）。
+
+**升级模型（✓ 三层说清）**：① **版本层锁步**——peer 是精确版本，不能逐包挑，升级=整组换；
+② **能力层可选**——profile 挂哪些插件=合并哪些能力，新功能默认不进来；③ **代码层解耦**——不读内部结构，
+升级只需跑 `verify`。真想逐行挑上游 ⇒ 必须 fork（289 包），不划算。
+
+**"一切皆插件"的证据（✓ 按包名实测）**：CLI 自身=profile 组合（`dsh-web-app` 自带 4 套 preset）；
+**接口包与实现包成对**（`dsh-llm←-deepseek/-pi-ai`、`dsh-sandbox←-local/-windows-acl/-policy`、
+`dsh-session-persistence←-jsonl`、`dsh-compaction←-basic/-image-offload/-tool-result-pruner`、
+`dsh-subagent←in-process/fork/spawn`、`dsh-fs/-jobs/-spill/-credentials/-attachment←-local`）；
+`inject` 决定插件是否激活；我们的工具 72 行/1 import。
+
+**★ 关键发现（降低对"改内核"的恐惧）**：很多"看起来像内核"的东西其实是 **L3 接缝**——
+压缩、权限/沙箱策略、会话格式（`session-format` + v0→v4 迁移插件）、子代理驱动、持久化、任一 provider。
+⇒ **真正的 L4 面积不是 289 个包，而是 4 个包**：`agent(-loop)`、`session`（append-only）、`llm`（请求深冻结）、
+`api-gateway`（协议）。
+
+**完全定制的代价（✗ 如实）**：真正代价不是代码量，而是**"接管生态"或"丢掉 Web"二选一**——
+fork 后 289 包归你、每版 rebase；改一条 loop 语义通常跨 `agent-loop`+`session`+`compaction`，约 1–2 人周/项；
+请求深冻结/日志 append-only 是设计约束不是 bug；换 loop 就失去 DSH Web（除非重实现宿主 API）；
+外加 cordis/typert/client 模块的学习成本。
+
+**减轻措施（✓ 按杠杆排序，已写进文档）**：① **产品状态自有化**（记忆/笔记/配置/路由/日程用我们自己的
+文件格式，换脊柱不丢数据）；② **不变量依赖清单**（6 条，触碰即判定 L4/L5）；③ **patch 而非 fork**
+（自标记可重放，升级重放失败即显式停）；④ **契约测试即产品定义**（verify 覆盖会话/工具/压缩/审批/恢复/切模型）；
+⑤ **接缝预算 + import 守门**（只允许 `entry.ts` 一处、≤900 行）；⑥ **协议边界薄适配**（≤300 行事件翻译，
+不镜像内部结构）；⑦ **升级演练**（每年换一个接缝实现，保持替换能力不生锈）；⑧ **决策记录**。
+
+**✗ 未做**：方案未获确认，**未开工**；M0–M3 里程碑只有验收条件没有执行。
+
 ### [2026-10-18] ★ 拼接分支现状归档：**"新前端 + 旧适配层"**，并查清本地模型的上下文默认值会直接失效
 
 **为什么记这条**：分支已经能跑（M1 五项全绿），但它的实际构成与最初的构想有实质差距；
