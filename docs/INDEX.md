@@ -5,8 +5,10 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（267 条）
+## 决策台账（269 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ 记忆 P2：检索改为 BM25 + 质量分 + MMR（原项目口径），并补上排序断言 · **用户指示**：先记录压缩改造计划，然后继续记忆 P2。 · 数字: 30 天
+- `DECISIONS.md` · [2026-10-18] ★ 压缩改造计划：**两阶段压缩**，用户意图走确定性通道（方案 B） · **用户判断**：实际使用中"用户的输入"很重要，压缩时应**单独处理**——先整合、分析，再压缩，尽可能保留完整意图。 · 数字: 0 次 / 2 天 / 50 轮
 - `DECISIONS.md` · [2026-10-18] ★ 记忆迁移 P1：**scheme 对齐原项目**并保住 127 条历史（自我优化闭环不破） · **用户强调（本轮）**：自我优化系统是原项目最重要的独有功能，还包含技能使用优化、信息记录与自动化； · 数字: 128 条 / 97 条 / 76% / 63 KB
 - `DECISIONS.md` · [2026-10-18] ★ 功能回填③：长期记忆 —— 注入面查清（`agent/pre-step` 末尾追加），并证明**前缀稳定** · **先答"怎么写进去"（✓ 读代码确认）**：DSH 的 `dsh-time-context` 就是官方样板—— · 数字: 12 条
 - `DECISIONS.md` · [2026-10-18] ★ 功能回填②：tmux（5 工具，前缀保护）+ 记忆注入的缓存结论（**不能进 system prompt**） · **tmux（✓ 完成）**：DSH 只有只读的 `tmux-context`，没有驱动 ⇒ 按"简单档"自己补 · 数字: 5 个 / 83 次 / 61.1% / 39%
@@ -566,7 +568,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（266 条）
+## 设计文档（272 条）
 
 - `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
 - `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
@@ -628,6 +630,12 @@
 - `docs/design/CODING-TRAPS.md` · 22. 改了插件入口只跑 `tsc` 不重建产物 ⇒ 新配置"不生效"、日志也不出现 · - **症状**：给 `dsh/plugin/entry.ts` 加了可选项（`inbox.enabled`），`tsc -p dsh/` 通过、composed config 里 · 数字: 10 秒
 - `docs/design/CODING-TRAPS.md` · 23. 插件的**最近 package.json 有 `name` 却缺 `version`** ⇒ 每个 DeepSeek 请求都失败，报错却指向"请求扩展" · - **症状**：挂了一个新插件（哪怕 `apply()` 是空函数），在线模型（DeepSeek）**每一轮**都回
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
+- `docs/design/COMPACTION-INTENT.md` · 1. 现状（读代码得出） · ⇒ 意图**被要求保留**，但没有**结构性保留**：换小模型/摘要被截断时，旧意图会走形。
+- `docs/design/COMPACTION-INTENT.md` · 2. 两阶段设计 · 阶段一（机器，0 次模型调用） · 数字: 0 次
+- `docs/design/COMPACTION-INTENT.md` · 3. 用户原话保留策略（已定：方案 B） · - **逐字保留"有信息量"的用户消息**；纯推进语（继续/好的/嗯/重试…）过滤掉；
+- `docs/design/COMPACTION-INTENT.md` · 4. 落地顺序 · ②失败可**一行回滚**：profile 里换回 `compaction-basic` 即可（实现是同一条接缝的两个后端）。 · 数字: 2 天
+- `docs/design/COMPACTION-INTENT.md` · 5. 验收断言（比"摘要看着不错"硬） · 造 50 轮会话、每轮带一个不同意图，触发压缩后断言： · 数字: 50 轮
+- `docs/design/COMPACTION-INTENT.md` · 6. 风险 · 1. **体积**：账本会挤占摘要预算 → 必须有上限与折叠（这也是"先整合再压缩"的原因）；
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
 - `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次
@@ -746,7 +754,7 @@ node
 - `docs/design/SELF-OPTIMIZATION.md` · 2. 迁移契约（不变量，改动前必须三思） · 1. **schema 不换**：`entries.json` 保持原字段（`category/title/content/tags/confidence/source/recurrence/createdAt/updatedAt/acce · 数字: 127 条 / 61.1%
 - `docs/design/SELF-OPTIMIZATION.md` · 3. 数据现状（迁移前实测） · ⚠️ 只看"工具调用次数"会得出"记忆没人用"的错误结论（`memory_store` 只有 2 次）——**记忆的引擎是脚本自动入库**，不产生工具调用。 · 数字: 128 条 / 76% / 19 条 / 63 KB
 - `docs/design/SELF-OPTIMIZATION.md` · 4. P1（已完成） · - `assistant/memory/store.ts`：与原项目同 schema 的存储（原子写）、`scrubSecrets`、三级去重合并、环境可见性、自动互链、评分与**token 预算注入**。 · 数字: 128 条 / 1 条 / 39 条
-- `docs/design/SELF-OPTIMIZATION.md` · 5. P2 / P3（待做） · - **P2**：检索升级为 BM25 + 质量分 + MMR + 会话轮转（原 `recall/retrieval.ts` 267 行）；会话摘要（`summaries.json`）。 · 数字: 2 次
+- `docs/design/SELF-OPTIMIZATION.md` · 5. P2 / P3（待做） · - **P2（检索已完成）**：`assistant/memory/retrieval.ts` —— BM25（标题加权 ×2、k1=1.2、b=0.75） · 数字: 30 天 / 63KB / 2 次
 - `docs/design/SOL-PI-BORROW.md` · 0. 全局纪律（每一项都必须满足，不是可选项） · 来自 SoL-Pi 的做法，也是我们这几轮已经在用的：
 - `docs/design/SOL-PI-BORROW.md` · 1. 自主推进的边界（用户已去休息，这条最重要） · **可以直接做**：
 - `docs/design/SOL-PI-BORROW.md` · P1 目标完成语义：区分 verified / declared / advisory ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：P 族发现——"Separate verified, declared, and advisory completion modes"、

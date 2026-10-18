@@ -52,7 +52,10 @@
 
 ## 5. P2 / P3（待做）
 
-- **P2**：检索升级为 BM25 + 质量分 + MMR + 会话轮转（原 `recall/retrieval.ts` 267 行）；会话摘要（`summaries.json`）。
+- **P2（检索已完成）**：`assistant/memory/retrieval.ts` —— BM25（标题加权 ×2、k1=1.2、b=0.75）
+  × 质量分（置信度 + 复现次数 + 30 天半衰期）→ MMR（λ=0.7）去重；环境过滤在候选阶段完成。
+  断言：`test/retrieval.mjs` 五条（稀有词 idf、标题命中优先、近似重复不占前两位、高置信排前、termux 不外泄）。
+  **仍未做**：会话摘要（`summaries.json` 63KB，需要摘要生成链）与"按会话轮转"（原项目按 session 分桶）。
 - **P3**：
   - 自动入库脚本：`knowledge-ingest`（95 行）+ `memory-store`（164 行）；
   - 治理：`memory-lifecycle`（83 行，只读候选报告）+ `lesson-miner`（121 行，读 `interventions.jsonl`）；

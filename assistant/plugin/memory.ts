@@ -3,12 +3,12 @@
  * 真正的语义（去重合并、脱敏、环境可见性）在 `../memory/store.ts`。
  */
 import { join } from 'node:path';
+import { searchWithScores } from '../memory/retrieval';
 import {
   currentEnv,
   loadStore,
   renderInjection as renderInjectionBlock,
   saveStore,
-  searchEntries,
   stats as storeStats,
   storeEntry,
   type MemoryCategory,
@@ -71,7 +71,8 @@ export function remember(config: MemoryConfig, args: StoreArgs): string {
 }
 
 export function recall(config: MemoryConfig, query: string, limit = 5): MemoryEntry[] {
-  return searchEntries(readStore(config), query, limit, config.env);
+  // BM25（标题加权）× 质量分 → MMR 去重；比原来的"命中计数"更抗长条目稀释与近似重复。
+  return searchWithScores(readStore(config), query, { limit, env: config.env }).map((hit) => hit.entry);
 }
 
 export function formatHit(entry: MemoryEntry): string {

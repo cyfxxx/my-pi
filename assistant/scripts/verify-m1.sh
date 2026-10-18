@@ -105,14 +105,17 @@ else
   echo "- SKIP：本机没有 tmux"
 fi
 
-say "⑪ 记忆库完整性（迁移保真：schema/条数/字段/环境）"
+say "⑪ 记忆检索排序（BM25 + 质量分 + MMR + 环境过滤）"
+timeout 30 node test/retrieval.mjs || fail=1
+
+say "⑫ 记忆库完整性（迁移保真：schema/条数/字段/环境）"
 timeout 30 node test/memory-store.mjs || fail=1
 
-say "⑫ 长期记忆（工具 + append-only 注入 + 前缀稳定）"
+say "⑬ 长期记忆（工具 + append-only 注入 + 前缀稳定）"
 rm -f "$MYPI_MEMORY_FILE"
 timeout 150 node test/memory.mjs "$URL" "$MOCK_LOG" "$MYPI_MEMORY_FILE" || fail=1
 
-say "⑬ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
+say "⑭ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
 timeout 60 node -e "
 import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
   const c = await new HostClient({ url: process.argv[1] }).connect();
@@ -122,5 +125,5 @@ import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
 });" "$URL" && echo "✓ 默认模型已复原为 online" || { echo "✗ 复原失败"; fail=1; }
 
 say "结果"
-if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（13 项）"; else echo "❌ 有红项（见上）"; fi
+if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（14 项）"; else echo "❌ 有红项（见上）"; fi
 exit "$fail"
