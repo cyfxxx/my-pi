@@ -246,7 +246,13 @@
 - **功能回填 ④：记忆 P1（✅ schema 对齐 + 迁移 127 条）**——见 [`SELF-OPTIMIZATION.md`](SELF-OPTIMIZATION.md)：
   存储改为与原项目同 schema、三级去重、脱敏、环境可见性、token 预算注入；128 条历史迁入仓库内 `assistant/memory/`。
   **P2/P3 待做**：BM25/MMR 检索、会话摘要、自动入库脚本、生命周期治理、教训挖掘、用量统计、autopilot。
-- **未做**：M0.5 裁体积（暂缓）、M0.6 品牌（暂缓）、TUI 更换、Windows。
+- **M1 社区 TUI（✅ 验证通过，可接入）**：`@deepseek-harness-tui/dsh-tui@0.16.1` 在 **DSH 0.2.0-rc.2** 上真跑通了：
+  装进独立 profile（`dsh plugin --profile dsh-tui add …`，需要 pnpm），pty 里能起界面
+  （输入框「说点什么」、状态栏 `deepseek-flash · Max`、`▸ DSH · dsh-core v0.2.0-rc.2`）。
+  我们的接法：`assistant/scripts/setup-tui.sh` 安装并**把本仓插件挂进 TUI profile**（记忆/tmux/搜索都可用），
+  TUI 与 Web 用**同一个 DSH_HOME** ⇒ 会话互通、随时接续；`mypi.sh tui` 自动优先社区 TUI（`MYPI_TUI=builtin` 可回退）。
+  verify 第⑰步是可 SKIP 的集成断言（未安装时明确 SKIP）。
+- **未做**：M0.5 裁体积（暂缓）、M0.6 品牌（暂缓）、Windows。
 
 ### 记忆注入会不会打穿前缀缓存？——会，如果注入方式错了
 

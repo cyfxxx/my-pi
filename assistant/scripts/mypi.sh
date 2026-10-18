@@ -20,6 +20,10 @@ ensure_host() {
 
 case "$cmd" in
   tui)
+    TUI_BIN="$DSH_HOME/profiles/dsh-tui/node_modules/@deepseek-harness-tui/dsh-tui/bin/dsh-tui.js"
+    if [ -f "$TUI_BIN" ] && [ "${MYPI_TUI:-community}" = "community" ]; then
+      exec node "$TUI_BIN" "$@"
+    fi
     ensure_host
     exec node bin/tui.mjs "$("${launcher[@]}" url)"
     ;;

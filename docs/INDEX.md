@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（273 条）
+## 决策台账（274 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ M1 社区 TUI：**在 DSH 0.2.0-rc.2 上真跑通**，并做成"共享 DSH_HOME"的接入 · **验证（✓ 真机 pty）**：`@deepseek-harness-tui/dsh-tui@0.16.1`
 - `DECISIONS.md` · [2026-10-18] ★ Termux 探针落地（一条命令回答"这台机器能不能跑"），并发现**本机就是 PRoot** · **实现（✓）**：`assistant/scripts/probe-termux.sh`（`--quick` 只体检）+ `docs/operations/TERMUX-PROBE.md`（判读表）。
 - `DECISIONS.md` · [2026-10-18] ★ 记录闭环最小版：工具用量统计（只看名字/耗时/成败，不记参数） · **实现（✓）**：`assistant/plugin/stats.ts` + `entry.ts` 接线。
 - `DECISIONS.md` · [2026-10-18] ★ 压缩两阶段改造第①步：意图账本落地（逐字 · 过滤推进语 · 折叠重复 · 预算内注入） · **实现（✓）**：`assistant/memory/intent.ts` + `plugin/entry.ts` 接线。

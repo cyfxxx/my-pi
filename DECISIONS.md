@@ -2,6 +2,30 @@
 
 ## 格式
 
+### [2026-10-18] ★ M1 社区 TUI：**在 DSH 0.2.0-rc.2 上真跑通**，并做成"共享 DSH_HOME"的接入
+
+**验证（✓ 真机 pty）**：`@deepseek-harness-tui/dsh-tui@0.16.1`
+- 用仓内 `dsh plugin --profile dsh-tui add …` 装进**独立 profile**（需要 `pnpm`，已装 12.14.0）；
+- pty 里启动成功：渲染出输入框「说点什么，或输入 / 看命令…」、状态栏 `deepseek-flash · Max`、
+  `▸ DSH · dsh-core v0.2.0-rc.2`、`dsh-tui v0.16.1`；
+- `--dump-config` 显示 47 行 TUI 层 + 本仓 `mypi-assistant` 已挂载。
+
+**接入方式（✓）**：`assistant/scripts/setup-tui.sh`
+1. 装包到 `$DSH_HOME/profiles/dsh-tui`；
+2. 往该 profile 的 `cordis.patch.yml` 插入 `mypi-assistant`（记忆/tmux/搜索在 TUI 里同样可用）；
+3. TUI 与 Web **共用同一个 DSH_HOME** ⇒ 会话互通（"随时接续"落地）。
+`mypi.sh tui` 现在优先社区 TUI，`MYPI_TUI=builtin` 回退到我们的 pi-tui 客户端。
+
+**踩坑（✗→✓）**：
+- `dsh plugin` 缺 `pnpm` 直接失败（报 `pnpm was not found`）——装 pnpm 后正常；
+- profile 模板的 `cordis.patch.yml` 初始是「注释 + `[]`」，直接 `cat >>` 会把 YAML 弄坏
+  （`end of the stream or a document separator is expected`）——脚本改成先删 `[]` 行再追加；
+- 包的 `bin` 是"双态启动器"：全局副本委托 `$DSH_HOME/profiles/dsh-tui` 里的副本，所以 profile 名必须是 `dsh-tui`。
+
+**验证收口**：`test/tui-community.sh`（未安装则 SKIP）+ verify 扩到 **18 项全绿**。
+
+**✗ 未做**：TUI 侧的功能面差异盘点、TUI 里跑通一次真实对话（需要模型凭证）。
+
 ### [2026-10-18] ★ Termux 探针落地（一条命令回答"这台机器能不能跑"），并发现**本机就是 PRoot**
 
 **实现（✓）**：`assistant/scripts/probe-termux.sh`（`--quick` 只体检）+ `docs/operations/TERMUX-PROBE.md`（判读表）。
