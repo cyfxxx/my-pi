@@ -135,8 +135,64 @@
 | **M3 Windows** | 等有实机（DSH 原生支持 pwsh/ACL；主线有 `run-my-pi.ps1` 经验） | 启动 + 一轮端到端 |
 | **功能回填** | 暂不做（用户决定）。DSH 原生顶 `plan-mode`/`subagent`/`context`/`mode` 的人设部分 | — |
 
-## 11. 待确认
+## 11. 升级影响清单（每次 DSH 升级真正要动的东西）
 
-1. 本方案是否作为执行蓝本；
-2. M0 是否包含"品牌插件"（我建议包含，约 150 行）；
-3. 是否把本文压在 `docs/design/` 并作为后续决策的依据。
+**结论**：绝大多数升级零改动；真要改，只落在 6 个文件里（合计约 700–900 行）。
+
+| 我们的东西 | 行数 | 什么会让它坏 | 改哪里 |
+|---|---|---|---|
+| profile 组合（patch YAML） | ~40 行 YAML | 条目 id/name 改名、bundle 名变化、**被配置项的 schema 变化**（`compaction-basic.modelPolicies`、`llm-pi-ai.providers`…） | 改 YAML（最高频） |
+| `plugin/entry.ts` | 72 | `defineTool` 签名、`tools.register` 契约、参数 DSL | 单文件小改 |
+| `src/transport.mjs` | 126 | RPC 信封、路由路径、token→cookie、mux 帧格式、**事件名/形状** | 单文件，10–50 行 |
+| `src/tui.mjs` | 183 | 只在 pi-tui 或事件形状变化时 | 极少动 |
+| `host/`（M0 后自包含） | ~100 | CLI 参数、profile 布局、**带 token 的 URL 格式**、`DSH_HOME` 布局 | 单文件 |
+| 品牌/UI 插件 | ~150 | 客户端模块 API（`dsh.client.inject`、`ctx.remote`、client store） | 单文件，中等 |
+| 我们的数据（记忆/笔记/配置/路由） | — | **状态自有化 ⇒ 永远不受影响** | 0 |
+
+**`verify` 不在清单里**：它是判据。它红了说明上面某处坏了；若为了让断言变绿而改断言，那是改产品定义，必须单独决策。
+
+### 三种升级情形
+
+| 情形 | 典型内容 | 要做什么 | rc 期频率（估计） |
+|---|---|---|---|
+| A 补丁级 | 内部实现、未挂载的包、文档 | 换版本 + 跑 verify，全绿即结束 | 多数 |
+| B 契约级 | 插件 API / 配置 schema / 线协议 / client 模块 | 改上表 1–3 个文件 + 确认对应断言 | 每 2–3 版一次 |
+| C 内核语义级 | 回合边界、请求冻结、日志格式、协议版本 | 进入 L4：patch 或放弃该需求 | 少见，分水岭 |
+
+### 升级税分级（定制方式决定成本）
+
+配置/组合 **低** ＜ 自己的插件 **低** ＜ 品牌/UI 客户端插件 **中** ＜ 协议客户端 **中** ＜ patch 上游 **高** ＜ fork **极高**；
+把状态存进 DSH 结构 **高**；依赖内部结构（shim/类型镜像/注入基线）**极高**——旧仓的病根就在最后一级。
+
+### 六步升级流程
+
+1. 改 pin（`DSH_VERSION` + 整组依赖，lockstep）；
+2. 重装/重 vendor（连带原生平台包）；
+3. **快照 diff**：升级前后各存一份 `--dump-config`（当前 web profile 挂 **183 条**），diff 出改名/移除/新增；
+4. 跑 `verify`；
+5. 按接缝定位修复：配置错→YAML；协议错→transport；插件错→entry；UI 错→品牌插件；
+6. 记录 + 回滚点；verify 红就回滚版本，**不在产品里打补丁**。
+
+## 12. 执行流程（M0，待确认后开工）
+
+**顺序按"风险从低到高"排，每步都以 verify 断言收口。**
+
+| 步 | 动作 | 涉及文件 | 验收（会红的断言） | 回滚 |
+|---|---|---|---|---|
+| **M0.0 基线** | 打 tag `pre-m0`；存 `--dump-config` 快照到 `assistant/baseline/`；跑一次现有 verify 记下绿色基线 | — | 快照有 183 条；verify 现状全绿 | 回到 tag |
+| **M0.1 自包含宿主** | 新写 `assistant/host/launch.mjs`：解析 vendored dsh、建/复用 profile、叠加 patch、提取带 token 的 URL、端口/home 管理；`mypi.sh` 改调它 | `assistant/host/**`、`scripts/mypi.sh` | 干净 home 上 `mypi.sh web` 能起宿主并打印 URL；**不再引用** `scripts/dsh-launch.sh` | 保留旧脚本，切回一行 |
+| **M0.2 摘 facade** | profile 只挂 `dsh-base` + `web-app` + 我们的插件；不再叠加 `dsh/profile/my-pi.patch.yml` | `assistant/host/**`、`plugin/mount.patch.yml` | `--dump-config` **无** `my-pi` 条目；工具面**无** `web_search`/`mypy_*` 等旧名；`mypi_note` 仍在 | 加回 patch |
+| **M0.3 两条模型路由** | patch 增加 `llm-pi-ai.providers.local`；`/model` 或 `mypi model` 切换（注意 `selectModel` 会写回默认模型） | `assistant/profile/*.yml`、`plugin/**` | 在线一轮（mock 零调用）+ 本地一轮（mock 命中） | 去掉 provider 段 |
+| **M0.4 验收扩展 + 守门** | verify 增加：无 facade、工具面清单、品牌（若已做）；约定守门加 import 预算（只允许 `entry.ts`、≤2 包、≤900 行） | `scripts/verify-m1.sh`、`scripts/check-conventions.sh` | 新断言全绿；故意引入一处越界 import 时守门能红 | 删断言 |
+| **M0.5 裁体积**（可选） | 不挂 `office-to-pdf` + `client-ui-sidebar-documentpreview`；确认 `skill-office` 无依赖后，从 vendor 删 `libreoffice-kit-wasm`（**146 MB**） | profile、vendor 目录 | dump-config 无这些条目；页面仍可用；体积 523 → ~380 MB | 恢复 vendor |
+| **M0.6 品牌**（风险最高，单独收口） | 若有配置项先改配置；否则写一个 client 插件替换 `brand-official` | `assistant/client/brand/**` | 页面标题/侧栏显示我们的名字 | 换回官方 brand |
+
+**M0 不做**：功能回填（memory/tmux/autopilot/searxng 暂缺）、TUI 更换、Windows。
+
+**M1/M2 沿用第 10 节**；M0 完成后立刻做 M1（TUI 插件验证），因为它是"备用界面"的可行性前提。
+
+## 13. 待确认
+
+1. 本方案作为执行蓝本；
+2. 执行顺序：M0.0 → M0.4 先做核心，**M0.5/M0.6 放到 M1 之后**（避免体积/品牌这类长尾拖住主线）；
+3. 开工第一步 = M0.0 基线快照。
