@@ -10,7 +10,8 @@ const turns = Number(process.argv[3] ?? 40);
 if (!url) throw new Error('用法：node test/compaction.mjs "<宿主地址>" [轮数]');
 
 const client = await new HostClient({ url }).connect();
-const created = await client.call('session/create', { request: { cwd: process.cwd() } });
+const preset = process.env.MYPI_AGENT_PRESET;
+const created = await client.call('session/create', { request: { cwd: process.cwd(), ...(preset ? { agentPreset: preset } : {}) } });
 const sessionId = created.value.sessionId;
 await client.call('session/selectModel', { request: { sessionId, provider: 'local', model: 'mock-local' } });
 

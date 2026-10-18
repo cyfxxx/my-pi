@@ -40,7 +40,10 @@ export class AssistantTui {
     this.#refreshHeader();
     this.#setStatus(dim('正在创建会话…'));
     try {
-      const created = await this.client.call('session/create', { request: { cwd: process.cwd() } });
+      const preset = process.env.MYPI_AGENT_PRESET;
+      const created = await this.client.call('session/create', {
+        request: { cwd: process.cwd(), ...(preset ? { agentPreset: preset } : {}) },
+      });
       this.sessionId = created.value.sessionId;
       // 可选：指定路线/模型（不改配置、只改本会话）。缺省用宿主的默认模型。
       const provider = process.env.MYPI_PROVIDER;

@@ -107,6 +107,8 @@ function patchArgs() {
   const args = ['--patch', join(ASSISTANT, 'profile', 'mypi.patch.yml')];
   // 过渡期开关：M0.1 用它证明"换启动器后行为与旧路径一致"，M0.2 之后不再需要。
   if (flag('--with-facade')) args.push('--patch', join(REPO, 'dsh', 'profile', 'my-pi.patch.yml'));
+  // 本地瘦身：用一个更小的 agent preset（工具面由 preset 决定，这是 DSH 的正式机制）。
+  if (process.env.MYPI_LEAN_TOOLS === '1') args.push('--patch', join(ASSISTANT, 'profile', 'local-preset.patch.yml'));
   // 兼容旧环境变量名（verify 与文档里用的是 MY_PI_DSH_EXTRA_PATCH）
   const extras = process.env.MYPI_EXTRA_PATCH ?? process.env.MY_PI_DSH_EXTRA_PATCH ?? '';
   for (const extra of extras.split(':').filter(Boolean)) args.push('--patch', extra);

@@ -194,9 +194,19 @@
 - M0.2 摘 facade：工具面 **80 → 27**；消失 53 个（`admin_*`/`autopilot_*`/`browser_*`/`ctx_*`/memory/mode/plan/tmux/voice/link 等），保留 DSH 原生（含 `web_search`、`subagent`、`goal/jobs`）+ `mypi_note`。
 - M0.3 路由：`profile/local-provider.patch.yml`（从 spike 移入产品面）；`bin/model.mjs` + `mypi.sh model online|local`（`selectModel` 会写回 profile 默认模型，实测生效，落盘有秒级延迟）。
 - M0.4 验收/守门：verify 新增第 ⑦ 步「断奶断言」（工具面上限 40、无旧前缀、`mypi_note` 在）；`check-conventions` M 段新增**接缝预算**（宿主 import 只允许 `plugin/entry.ts`；行数 ≤ 900，当前 567）。
-- **M0.3b 本地档位（部分完成）**：`profile/local-compaction.patch.yml` 已落（`headroomTokens: 1024`、`thresholdRatio: 0.55`、
-  `retainTokens: 600`、`maxTokens: 1024`），但**行为判据未通过**——连续 40 轮长回复后没有可观测的 `compaction/*` 事件。
-  实测投影暴露了更关键的事实：
+- **M0.3b 本地档位（✅ 完成）**：结论是「**先瘦工具面，再谈压缩**」，两者都已落地并验证：
+  - `profile/local-preset.patch.yml`：自定义 agent preset `local`（只挂 fs/bash/web + 压缩组）。
+    工具面 **27 → 8**（bash/edit/read/read_image/write/web_fetch/web_search/mypi_note），
+    `toolsTokens` **5201 → 1423**，`systemTokens` **1442 → 1022** ⇒ 固定开销 **6643 → 2445**（8K 窗口的 81% → 30%）。
+  - 压缩预算**必须内联在 preset 的那一份 `compaction-basic` 里**（顶层 `- id: compaction-basic` 的 patch 到不了 preset 实例，
+    这是实测踩到的）；内联 `headroomTokens: 1024 / thresholdRatio: 0.55 / retainTokens: 600 / maxTokens: 1024` 后，
+    50 轮长回复**观测到 3 次** `compaction/start → summary → end`（先前同一条件 0 次，`messageTokens` 一路涨到 5906 也不压）。
+  - 判据脚本：`bash assistant/scripts/verify-local-compaction.sh`（慢，约 2 分钟，不并入主 verify）。
+  - `MYPI_LEAN_TOOLS=1`（host 追加 preset patch）+ `MYPI_AGENT_PRESET=local`（会话创建时选它；TUI 已支持）。
+  - 踩到的 preset 约束（写给自己）：preset 里的插件是**完整配置**（无默认值，`fs-search` 少一个字段就报错）；
+    分组要 `name: cordis:group` + `isolate` realms（如 `compaction: true`），否则报 "Preset services require isolate realms"。
+
+  早前用默认配置测得的关键事实（保留作对照）：
 
   ```
   contextWindow: 8192

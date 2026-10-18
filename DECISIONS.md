@@ -2,6 +2,34 @@
 
 ## 格式
 
+### [2026-10-18] ★ M0.3b 收口：本地窗口靠 **agent preset 瘦身**（工具面 5201→1423）+ 压缩内联预算（0→3 次压缩）
+
+**用户批准继续执行 M0**；目标含 M0.3b（本地压缩档位），上一轮只落了配置、行为判据未过。
+
+**关键认知（✓ 实测修正）**：本地小窗口的**第一杠杆是工具面，不是压缩参数**。
+`session/projections.contextBreakdown` 实测：标准 preset `system 1442 / tools 5201`（27 工具）；
+自定义 `local` preset（只挂 `tool-fs`/`tool-bash`/`tool-web` + 压缩组）⇒ `system 1022 / tools 1423`（8 工具：
+bash/edit/read/read_image/write/web_fetch/web_search + 我们的 `mypi_note`，后者因顶层挂载而自动可见）。
+⇒ 固定开销 **6643 → 2445**（8K 窗口的 81% → 30%）。
+
+**为什么用 preset 而不是 disable 工具**：试过 `- id: tool-todo` + `disabled: true`（extra patch 与 profile patch 两种写法），
+`--dump-config` 无差异、工具仍在（✗ 无效）。DSH 让"工具面"由 **agent preset 的插件组合**决定 —— 这是正式机制，用它。
+
+**压缩必须内联进 preset**（✗→✓ 的关键）：顶层 `- id: compaction-basic` 的 patch **到不了** preset 里的那一份实例
+（所以上一轮 40 轮零压缩）。把 `headroomTokens: 1024 / thresholdRatio: 0.55 / retainTokens: 600 / maxTokens: 1024`
+**内联到 preset 的 `compaction-basic`** 后：50 轮长回复观测到 **3 次** `compaction/start → summary → end`；
+同条件未内联时 0 次、`messageTokens` 一路涨到 5906 也不压。
+
+**preset 的三条硬约束（踩过，写给自己）**：① 插件配置是**完整**的（无默认值——`tool-fs-search` 少一个字段就 invalid）；
+② 分组要 `name: cordis:group` + `isolate` realms（`compaction: true`、`toolResultPruner: true`），否则
+"Preset services require isolate realms"；③ 组内每个插件行都必须有 `name`。
+
+**用法与验收**：`MYPI_LEAN_TOOLS=1`（host 追加 `profile/local-preset.patch.yml`）+ `MYPI_AGENT_PRESET=local`
+（会话创建时选 preset；TUI 已支持）。判据脚本 `assistant/scripts/verify-local-compaction.sh`（约 2 分钟，不并入主 verify）；
+主 verify 仍 **9 项全绿**。
+
+**✗ 仍未做**：M0.5 裁体积（523→~380MB）、M0.6 品牌、M1 社区 TUI、M2 Termux、功能回填。
+
 ### [2026-10-18] ★ M0.3b 实测：本地小窗口的**第一杠杆是工具面，不是压缩策略**（5201/8192 tokens）
 
 **做了什么**：新增 `assistant/profile/local-compaction.patch.yml`（本地路由的压缩档位：
