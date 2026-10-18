@@ -1,0 +1,13 @@
+# 本地模型的上下文档位：与在线路由共用同一套压缩服务，只换预算参数。
+# 背景（实测）：compaction-basic 默认 headroomTokens=65536，8K/32K 窗口下 pressureBudget<0
+# ⇒ 抛 TargetPressureConfigError ⇒ 被 catch 后只 warn 一次、永不压缩。
+- id: compaction-basic
+  config:
+    thresholdRatio: 0.6
+    modelPolicies:
+      - provider: local
+        model: mock-local
+        thresholdRatio: 0.55
+        headroomTokens: 1024
+        retainTokens: 600
+        maxTokens: 1024

@@ -4,6 +4,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PIDFILE="$ROOT/.run/mock.pid"
 LOG="${2:-$ROOT/.spike/mock-requests.log}"
+REPLY="${3:-我是本地模型，在你机器上跑。}"
 case "${1:-start}" in
   stop)
     [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
@@ -12,7 +13,7 @@ case "${1:-start}" in
   start)
     [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null && sleep 0.5
     : >"$LOG"
-    setsid node "$ROOT/spike/mock-openai.mjs" 11435 "$LOG" "我是本地模型，在你机器上跑。" \
+    setsid node "$ROOT/spike/mock-openai.mjs" 11435 "$LOG" "$REPLY" \
       >"$ROOT/.spike/mock.out" 2>&1 < /dev/null &
     echo $! >"$PIDFILE"
     sleep 1

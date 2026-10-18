@@ -2,6 +2,34 @@
 
 ## 格式
 
+### [2026-10-18] ★ M0.3b 实测：本地小窗口的**第一杠杆是工具面，不是压缩策略**（5201/8192 tokens）
+
+**做了什么**：新增 `assistant/profile/local-compaction.patch.yml`（本地路由的压缩档位：
+`headroomTokens: 1024`、`thresholdRatio: 0.55`、`retainTokens: 600`、`maxTokens: 1024`）与
+`assistant/test/compaction.mjs`（连灌 N 轮、收 `compaction/*` 事件）。
+
+**结果（✗ 行为判据未过）**：40 轮长回复后**没有**任何 `compaction/*` 事件。
+转而读会话投影（`session/projections`），得到决定性数据：
+
+```
+contextWindow: 8192
+contextBreakdown: { systemTokens: 1442, toolsTokens: 5201, messageTokens: 4844 }
+contextPressure:  { pressureTokens: 12, projectedTokens: 113, contextWindow: 8192 }
+★ 工具声明面 5201 tokens ⇒ 占 8K 窗口 63%（这还是摘掉 facade 后的 27 个工具）
+★ 再加 system 1442 ⇒ 固定开销 6643 / 8192（81%）
+```
+
+**结论（✓ 认知更新）**：本地小窗口下，**压缩策略是第二杠杆，第一杠杆是工具面**。
+可行动作（下一轮）：① 给本地模式一个**更瘦的 profile**（只挂 read/write/edit/bash/grep/glob 等）；
+② 或走 DSH 的 `deferLoading`（延迟加载工具，按需暴露）；③ 压缩档位保留，作为第二道闸。
+
+**另一个可疑点（✗ 待核实）**：`messageTokens` 与实际产出对不上——40 轮×约 370 字，`sessionStats.outputTokens=14800`，
+投影却只有 4844。计量对中文疑似按 ~3 字符/token 估 ⇒ **偏乐观**："压力表看着安全，实际可能已超窗"。
+下一轮用"真实窗口 + 真实中文长度"做一次校准实验，再决定要不要自建计量。
+
+**为什么这条重要**：它把"本地模式"的答案从"改压缩参数"修正为"先砍工具面、再谈压缩"——
+与我们摘 facade（80→27）的方向一致，但说明 27 个工具**仍不够瘦**。
+
 ### [2026-10-18] ★ M0 断奶执行：自包含宿主 + 摘掉 facade（工具面 **80 → 27**）+ 接缝预算守门
 
 **用户批准执行 M0**（先记录后开工；按 `docs/design/ASSISTANT-PLAN.md` §12 的流程）。

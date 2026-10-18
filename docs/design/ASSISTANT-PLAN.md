@@ -194,7 +194,21 @@
 - M0.2 摘 facade：工具面 **80 → 27**；消失 53 个（`admin_*`/`autopilot_*`/`browser_*`/`ctx_*`/memory/mode/plan/tmux/voice/link 等），保留 DSH 原生（含 `web_search`、`subagent`、`goal/jobs`）+ `mypi_note`。
 - M0.3 路由：`profile/local-provider.patch.yml`（从 spike 移入产品面）；`bin/model.mjs` + `mypi.sh model online|local`（`selectModel` 会写回 profile 默认模型，实测生效，落盘有秒级延迟）。
 - M0.4 验收/守门：verify 新增第 ⑦ 步「断奶断言」（工具面上限 40、无旧前缀、`mypi_note` 在）；`check-conventions` M 段新增**接缝预算**（宿主 import 只允许 `plugin/entry.ts`；行数 ≤ 900，当前 567）。
-- **未做**：M0.3b 本地压缩档位、M0.5 裁体积、M0.6 品牌、功能回填、TUI 更换、Windows。
+- **M0.3b 本地档位（部分完成）**：`profile/local-compaction.patch.yml` 已落（`headroomTokens: 1024`、`thresholdRatio: 0.55`、
+  `retainTokens: 600`、`maxTokens: 1024`），但**行为判据未通过**——连续 40 轮长回复后没有可观测的 `compaction/*` 事件。
+  实测投影暴露了更关键的事实：
+
+  ```
+  contextWindow: 8192
+  contextBreakdown: { systemTokens: 1442, toolsTokens: 5201, messageTokens: 4844 }
+  ```
+
+  ⇒ **工具声明面 5201 tokens，占 8K 窗口的 63%**（这还是摘掉 facade 后的 27 个工具）；system 1442 ⇒ 固定开销 6643/8192。
+  ⇒ 本地小窗口的第一杠杆**不是压缩策略，是工具面**：要给本地模式一个更瘦的 profile（只挂 read/write/edit/bash/grep/glob 之类），
+  或走 DSH 的延迟加载（`deferLoading`）。压缩档位是第二杠杆。
+  ⇒ 另：`messageTokens` 与实际输出对不上（40 轮×370 字，`sessionStats.outputTokens=14800`，但投影只有 4844）——
+  计量对中文疑似按 ~3 字符/token 估，**偏乐观**；这意味着"压力表看着安全，实际可能已经超窗"。**待进一步核实（✗）**。
+- **未做**：M0.5 裁体积、M0.6 品牌、功能回填、TUI 更换、Windows。
 
 **M1/M2 沿用第 10 节**；M0 完成后立刻做 M1（TUI 插件验证），因为它是"备用界面"的可行性前提。
 
