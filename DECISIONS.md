@@ -2,6 +2,35 @@
 
 ## 格式
 
+### [2026-10-18] ★ M0 断奶执行：自包含宿主 + 摘掉 facade（工具面 **80 → 27**）+ 接缝预算守门
+
+**用户批准执行 M0**（先记录后开工；按 `docs/design/ASSISTANT-PLAN.md` §12 的流程）。
+
+**M0.0 基线**（✓）：tag `pre-m0`；`assistant/baseline/` 存了 `mounts-before.txt`（185 条，含 facade）、
+`verify-before.txt`（9 项全绿）、`tools-with-facade.txt`（80）。
+
+**M0.1 自包含宿主**（✓ 实测）：新增 `assistant/host/launch.mjs`（start/stop/status/url/path/profile），
+自己完成"找 vendored dsh → 建/复用 profile → 拷凭据 600 → 叠 patch → 起进程 → 抓 token URL → pid 文件"；
+`scripts/mypi.sh` 改调它。**与旧路径的对照**：用 `--with-facade` 复跑 9 项验收**全绿**（证明换启动器不改行为），
+随后默认不挂 facade。修掉两个自己引入的缺陷：build 步骤里的行续接被写成 `\\`（`--platform=node: command not found`）；
+launcher 只认新环境变量名 `MYPI_EXTRA_PATCH`，而 verify 用的是旧名 `MY_PI_DSH_EXTRA_PATCH`（已兼容两者）。
+
+**M0.2 摘 facade**（✓ 实测）：工具面 **80 → 27**；消失 **53 个**（`admin_*`/`autopilot_policy|status`/`browser_*`/
+`ctx_*`/`memory_*`/`mode_*`/`plan_*`/`tmux_*`/`voice_*`/`link_*` 等）；保留 DSH 原生 27 个（含 `web_search`、
+`subagent`、`goal/jobs`、`workflow`）+ `mypi_note`。
+**★ 一个需要记住的细节**：`web_search` **仍在**（DSH 原生那个），丢的是"searxng 私有实例"这个**后端**，不是搜索能力。
+
+**M0.3 两条路由 + 切换**（✓）：`profile/local-provider.patch.yml`（产品面，从 `spike/` 移入）；
+新增 `bin/model.mjs` + `mypi.sh model online|local`。实测：切 local ⇒ profile 的 `agent-default-model` 变
+`local/mock-local`；切 online ⇒ 变 `deepseek-official/deepseek-flash`（**落盘有秒级延迟**，读太快会看到旧值）。
+
+**M0.4 验收与守门**（✓）：verify 增加第 ⑦ 步「断奶断言」（工具面上限 40 / 无旧前缀 / `mypi_note` 在），
+现共 **9 项全绿**；`check-conventions` M 段新增**接缝预算**：① `assistant/{src,bin,host}` 不得 import
+`@deepseek-ai/*`（只允许 `plugin/entry.ts`）② 接缝行数 ≤ 900（当前 **571**）。
+
+**✗ 未做（下一轮）**：M0.3b 本地压缩档位（`compaction-basic.modelPolicies` + 8K 窗口判据）、M0.5 裁体积
+（523→~380MB，`libreoffice-kit-wasm` 146MB）、M0.6 品牌、功能回填、TUI 更换、Windows。
+
 ### [2026-10-18] ★ 记录"每次 DSH 升级要动什么"+"M0 执行流程"（仍未开工）
 
 **用户要求**：把升级影响与完整流程记下来，然后确认流程准备开工。

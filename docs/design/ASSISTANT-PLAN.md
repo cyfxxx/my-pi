@@ -129,7 +129,7 @@
 
 | | 内容 | 验收 |
 |---|---|---|
-| **M0 断奶** | 宿主启动搬进 `assistant/host/`；摘掉 my-pi facade；profile 裁剪；品牌插件；两条模型路由 + 命令切换 | 工具面无旧工具名；在线/本地各一轮；干净 home 一条指令起；品牌生效；import 守门通过 |
+| **M0 断奶** | ✅ **已执行**：宿主启动搬进 `assistant/host/launch.mjs`；摘掉 my-pi facade；两条模型路由 + `mypi model` 切换；verify 扩到 9 项；接缝预算守门。✗ 未含品牌（M0.6 后置） | ✅ 工具面 **80 → 27**（无旧工具名、`mypi_note` 在）；在线/本地各一轮；干净 home 一条指令起；接缝 567 行 ≤ 900 |
 | **M1 TUI** | 社区 bundle 装独立 profile，验证共存与"接续" | TUI 起得来/能对话；TUI 建会话 Web 可见、Web 继续后 TUI 能恢复；冲突如实记录 |
 | **M2 Termux** | 探针脚本（libc/flock/landlock/内存/启动/一轮对话）+ PRoot 上验证 | 能启动、一轮对话、会话落盘、降级项逐条记录 |
 | **M3 Windows** | 等有实机（DSH 原生支持 pwsh/ACL；主线有 `run-my-pi.ps1` 经验） | 启动 + 一轮端到端 |
@@ -187,7 +187,14 @@
 | **M0.5 裁体积**（可选） | 不挂 `office-to-pdf` + `client-ui-sidebar-documentpreview`；确认 `skill-office` 无依赖后，从 vendor 删 `libreoffice-kit-wasm`（**146 MB**） | profile、vendor 目录 | dump-config 无这些条目；页面仍可用；体积 523 → ~380 MB | 恢复 vendor |
 | **M0.6 品牌**（风险最高，单独收口） | 若有配置项先改配置；否则写一个 client 插件替换 `brand-official` | `assistant/client/brand/**` | 页面标题/侧栏显示我们的名字 | 换回官方 brand |
 
-**M0 不做**：功能回填（memory/tmux/autopilot/searxng 暂缺）、TUI 更换、Windows。
+**M0 执行结果（2026-10-18）**：
+
+- M0.0 基线：tag `pre-m0`；`baseline/mounts-before.txt`（185 条，含 facade）；`baseline/verify-before.txt`；工具面快照 `baseline/tools-with-facade.txt`（80）。
+- M0.1 自包含：`assistant/host/launch.mjs`（start/stop/status/url/path/profile；vendored 优先、建 profile、拷凭据 600、抓 token URL、pid 文件）；`mypi.sh` 改调它；**不再引用 `scripts/dsh-launch.sh`**。过渡开关 `--with-facade` 用于对照，M0.2 后默认不挂。
+- M0.2 摘 facade：工具面 **80 → 27**；消失 53 个（`admin_*`/`autopilot_*`/`browser_*`/`ctx_*`/memory/mode/plan/tmux/voice/link 等），保留 DSH 原生（含 `web_search`、`subagent`、`goal/jobs`）+ `mypi_note`。
+- M0.3 路由：`profile/local-provider.patch.yml`（从 spike 移入产品面）；`bin/model.mjs` + `mypi.sh model online|local`（`selectModel` 会写回 profile 默认模型，实测生效，落盘有秒级延迟）。
+- M0.4 验收/守门：verify 新增第 ⑦ 步「断奶断言」（工具面上限 40、无旧前缀、`mypi_note` 在）；`check-conventions` M 段新增**接缝预算**（宿主 import 只允许 `plugin/entry.ts`；行数 ≤ 900，当前 567）。
+- **未做**：M0.3b 本地压缩档位、M0.5 裁体积、M0.6 品牌、功能回填、TUI 更换、Windows。
 
 **M1/M2 沿用第 10 节**；M0 完成后立刻做 M1（TUI 插件验证），因为它是"备用界面"的可行性前提。
 

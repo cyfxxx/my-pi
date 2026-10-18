@@ -424,10 +424,25 @@ if [ -f assistant/tsconfig.json ] && [ -d node_modules/@deepseek-ai ]; then
   fi
   if node --check assistant/src/transport.mjs >/dev/null 2>&1 \
      && node --check assistant/src/tui.mjs >/dev/null 2>&1 \
+     && node --check assistant/host/launch.mjs >/dev/null 2>&1 \
      && node --check assistant/spike/mock-openai.mjs >/dev/null 2>&1; then
     ok "assistant 的 .mjs 语法检查通过"
   else
     bad "assistant 的 .mjs 有语法错误（node --check 复现）"
+  fi
+  # ★ 接缝预算：宿主只允许在 plugin/entry.ts 里被 import（这是"可替换性"的可回归度量）。
+  stray="$(grep -rl "@deepseek-ai/" assistant/src assistant/bin assistant/host 2>/dev/null | tr '\n' ' ')"
+  if [ -z "$stray" ]; then
+    ok "接缝预算：宿主 import 只出现在 plugin/entry.ts"
+  else
+    bad "接缝预算被突破：这些文件 import 了 @deepseek-ai/* ⇒ $stray"
+  fi
+  # 行数预算：超出即报警（不是警告后继续）。
+  seam_lines="$(cat assistant/src/*.mjs assistant/bin/*.mjs assistant/host/*.mjs 2>/dev/null | wc -l)"
+  if [ "$seam_lines" -le 900 ]; then
+    ok "接缝行数 $seam_lines ≤ 900"
+  else
+    bad "接缝行数 $seam_lines 超过预算 900（新增的耦合要给出理由并显式抬预算）"
   fi
 else
   note "assistant 静态守门跳过（缺 assistant/tsconfig.json 或 node_modules/@deepseek-ai）"

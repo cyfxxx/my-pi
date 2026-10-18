@@ -8,6 +8,7 @@
 
 ```bash
 assistant/scripts/mypi.sh          # 终端界面（默认）
+assistant/scripts/mypi.sh model local   # 把默认模型切到本地路线（online 切回）
 assistant/scripts/mypi.sh web      # 打印浏览器地址（同一宿主、同一会话）
 assistant/scripts/mypi.sh status   # 宿主是否在跑
 assistant/scripts/mypi.sh stop
@@ -15,6 +16,9 @@ assistant/scripts/mypi.sh stop
 
 宿主默认是**仓内 vendored DSH**（`runtime/<平台>/ext/dsh`，完全便携），home 在
 `assistant/.run/home`，端口 `3099`（避开正在跑的 GUI `3080`）。可用 `MYPI_PORT` / `MYPI_HOME` 覆盖。
+
+启动器自包含：`host/launch.mjs`（`start/stop/status/url/path/profile`），**不再依赖** `scripts/dsh-launch.sh`。
+**默认不挂旧 my-pi 适配层**（工具面 27 个：DSH 原生 + `mypi_note`）；对照实验可用 `MYPI_WITH_FACADE=1`。
 
 **我们自己的插件默认挂上**（`plugin/dist/plugin.mjs`，注册工具 `mypi_note`）。要跑"裸宿主"对比：
 `MYPI_NO_PLUGIN=1 assistant/scripts/mypi.sh`。插件改了要先重建：
@@ -42,7 +46,7 @@ MYPI_PROVIDER=local MYPI_MODEL=mock-local assistant/scripts/mypi.sh
 > 也就是说"给这个会话换模型"等于"把默认模型也换了"。`verify-m1.sh` 最后一步会把它复原成在线，
 > 手工切过模型后若想回到在线，用同样的调用选回 `deepseek-official/deepseek-flash`。
 
-`spike/local-provider.patch.yml` 是「本地路线」的样板（指向一个假的 OpenAI 兼容端点），
+`profile/local-provider.patch.yml` 是「本地路线」的样板（指向一个假的 OpenAI 兼容端点），
 把 `baseURL` 换成 `http://127.0.0.1:11434/v1` 就是 Ollama。
 
 ## 可执行验收

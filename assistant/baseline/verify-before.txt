@@ -1,0 +1,20 @@
+=== ③ 终端前端（真实 pty） ===
+TUI 退出码检查：回复含「我是本地模型」= True
+
+=== ④ 两端同步 ===
+{"sessionId":"session-08e1cd60-f45d-4094-86fc-e33b3933543e","a":"我是本地模型，在你机器上跑。","b":"我是本地模型，在你机器上跑。","same":true}
+
+=== ⑤ 本地模型路线 ===
+{"sessionId":"session-e86b2735-b835-4e0d-928a-04c19435798c","reply":"我是本地模型，在你机器上跑。","mockHits":6,"ok":true}
+
+=== ⑥ 自写插件工具（工具面 + 真执行 + 结果回灌） ===
+{"sessionId":"session-f783aaef-ac92-470b-9bbd-3c3b2cc885db","toolFaceSeen":true,"toolResultSeen":true,"toolEvents":["tool/call","tool/result"],"wroteNote":true,"reply":"记住啦。"}
+
+=== ⑦ Web 前端（同一宿主的 SPA） ===
+✓ Web 入口 200 且挂载了 SPA
+
+=== ⑧ 复原默认模型（用例选过本地，会把 profile 默认改掉） ===
+✓ 默认模型已复原为 online
+
+=== 结果 ===
+🎉 M1 五项全过

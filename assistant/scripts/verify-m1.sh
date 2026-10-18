@@ -12,7 +12,7 @@ PORT="${MYPI_PORT:-3099}"
 HOME_DIR="$ROOT/.run/home"
 MOCK_LOG="$ROOT/.run/mock-requests.log"
 export MYPI_HOME="$HOME_DIR" MYPI_PORT="$PORT"
-export MY_PI_DSH_EXTRA_PATCH="$ROOT/spike/local-provider.patch.yml"   # 插件由 mypi.sh 默认挂上
+export MY_PI_DSH_EXTRA_PATCH="$ROOT/profile/local-provider.patch.yml"   # 插件由 mypi.sh 默认挂上
 export LOCAL_MOCK_KEY="sk-local-dummy"
 export MYPI_NOTES_FILE="$ROOT/.run/notes.md"
 
@@ -22,7 +22,7 @@ say() { printf '\n=== %s ===\n' "$1"; }
 say "⓪ 插件产物"
 if [ ! -f "$ROOT/plugin/dist/plugin.mjs" ]; then
   echo "→ 构建 assistant/plugin（缺产物）"
-  ( cd "$ROOT/.." && node_modules/.bin/esbuild assistant/plugin/entry.ts --bundle --format=esm \\
+  ( cd "$ROOT/.." && node_modules/.bin/esbuild assistant/plugin/entry.ts --bundle --format=esm \
       --platform=node --packages=external --outfile=assistant/plugin/dist/plugin.mjs --log-level=warning ) \
     || { echo "✗ 插件构建失败"; exit 1; }
 fi
@@ -39,8 +39,9 @@ node spike/mock-openai.mjs 11435 "$MOCK_LOG" "我是本地模型，在你机器�
 MOCK_PID=$!
 cleanup() {
   kill "$MOCK_PID" 2>/dev/null
-  # 只清掉本脚本起的宿主（锚定 node + profile 名，避免匹配到调用者自己的命令行）
-  local pids; pids=$(pgrep -f "^node .*--profile mypi-web" || true)
+  node "$ROOT/host/launch.mjs" stop >/dev/null 2>&1 || true
+  # 兜底：清掉任何以我们 profile 名起的宿主
+  local pids; pids=$(pgrep -f "^node .*--profile mypi" || true)
   [ -n "$pids" ] && kill $pids 2>/dev/null
 }
 trap cleanup EXIT
@@ -51,11 +52,12 @@ echo "✓ 端点就绪"
 
 say "② 宿主"
 # 先清掉占着端口的旧宿主：否则新进程起不来，只会看到一堆"缺少服务"（假象，真因是 EADDRINUSE）
-pids=$(pgrep -f "^node .*--profile mypi-web" || true)
+node "$ROOT/host/launch.mjs" stop >/dev/null 2>&1 || true
+pids=$(pgrep -f "^node .*--profile mypi" || true)
 [ -n "$pids" ] && kill $pids 2>/dev/null
 for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && sleep 0.5 || break; done
 rm -f .run/url
-setsid bash scripts/mypi.sh web >.run/verify-host.out 2>&1 &
+MYPI_WITH_FACADE="${MYPI_WITH_FACADE:-}" setsid bash scripts/mypi.sh web >.run/verify-host.out 2>&1 &
 for _ in $(seq 1 240); do [ -s .run/url ] && break; sleep 0.5; done
 URL="$(cat .run/url 2>/dev/null || true)"
 [ -n "$URL" ] && echo "✓ 宿主就绪（$PORT）" || { echo "✗ 宿主没起来"; tail -5 .run/host.log; exit 1; }
@@ -74,7 +76,10 @@ say "⑥ 自写插件工具（工具面 + 真执行 + 结果回灌）"
 : >"$MYPI_NOTES_FILE" 2>/dev/null || true
 timeout 90 node test/plugin-tool.mjs "$URL" "$MOCK_LOG" "$MYPI_NOTES_FILE" || fail=1
 
-say "⑦ Web 前端（同一宿主的 SPA）"
+say "⑦ 断奶断言（无 facade + 工具面上限）"
+timeout 90 node test/no-facade.mjs "$URL" "$MOCK_LOG" 40 || fail=1
+
+say "⑧ Web 前端（同一宿主的 SPA）"
 rm -f .run/cookies.txt
 WEB_CODE="$(curl -sL -c .run/cookies.txt -o .run/web.html -w '%{http_code}' "$URL")"
 if [ "$WEB_CODE" = "200" ] && grep -q 'id="root"' .run/web.html; then
@@ -83,7 +88,7 @@ else
   echo "✗ Web 入口异常（HTTP $WEB_CODE）"; fail=1
 fi
 
-say "⑧ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
+say "⑨ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
 timeout 60 node -e "
 import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
   const c = await new HostClient({ url: process.argv[1] }).connect();
@@ -93,5 +98,5 @@ import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
 });" "$URL" && echo "✓ 默认模型已复原为 online" || { echo "✗ 复原失败"; fail=1; }
 
 say "结果"
-if [ "$fail" -eq 0 ]; then echo "🎉 M1 五项全过"; else echo "❌ 有红项（见上）"; fi
+if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（9 项）"; else echo "❌ 有红项（见上）"; fi
 exit "$fail"
