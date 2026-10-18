@@ -42,6 +42,7 @@ const server = createServer(async (req, res) => {
       .join('\n');
     const wantsNote = /笔记|记一条|note/i.test(userText);
     const wantsSearch = /搜索|搜一下|search/i.test(userText);
+    const wantsTmux = /tmux/i.test(userText);
     appendFileSync(
       LOG,
       `${new Date().toISOString()}\tmodel=${parsed.model}\tmessages=${parsed.messages?.length}\ttools=${tools.length}`
@@ -54,7 +55,25 @@ const server = createServer(async (req, res) => {
     const created = Math.floor(Date.now() / 1000);
     const base = { id, object: 'chat.completion.chunk', created, model: parsed.model ?? 'mock-local' };
     sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
-    if (!toolResult && wantsSearch && toolNames.includes('web_search')) {
+    if (!toolResult && wantsTmux && toolNames.includes('tmux_run')) {
+      sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
+      sse(res, {
+        ...base,
+        choices: [{
+          index: 0,
+          delta: {
+            tool_calls: [{
+              index: 0,
+              id: 'call_mock_tmux',
+              type: 'function',
+              function: { name: 'tmux_run', arguments: JSON.stringify({ name: 'demo', command: 'echo hi; sleep 30' }) },
+            }],
+          },
+          finish_reason: null,
+        }],
+      });
+      sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 } });
+    } else if (!toolResult && wantsSearch && toolNames.includes('web_search')) {
       sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
       sse(res, {
         ...base,

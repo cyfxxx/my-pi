@@ -11,6 +11,16 @@ import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { createSearxngProvider, resolveSearxngConfig } from './searxng';
+import {
+  hasTmux,
+  listSessions,
+  normalizeName,
+  readSession,
+  resolveTmuxConfig,
+  runSession,
+  sendKeys,
+  stopSession,
+} from './tmux';
 
 export const name = 'mypi-assistant';
 
@@ -49,6 +59,27 @@ function notesPath(): string {
   return join(dirname(new URL(import.meta.url).pathname), '..', '..', '.run', 'notes.md');
 }
 
+/** 统一形状：一行文本输出，减少五个 tmux 工具的样板。 */
+function stringTool(
+  name: string,
+  description: string,
+  parameters: Record<string, { type: 'string' | 'number' | 'boolean'; description?: string }>,
+  run: (args: Record<string, unknown>) => string,
+): unknown {
+  return defineTool({
+    name,
+    description,
+    parameters,
+    output: {
+      schema: { type: 'string' },
+      render: (_args: unknown, value: unknown): { type: 'text'; text: string }[] => [
+        { type: 'text', text: typeof value === 'string' ? value : String(value) },
+      ],
+    },
+    execute: async (args: unknown): Promise<string> => run((args ?? {}) as Record<string, unknown>),
+  });
+}
+
 export function apply(ctx: HostContext): void {
   const tools = toolsOf(ctx);
   // 搜索接缝：把 SearXNG 注册成 `ctx.web` 的 provider（官方扩展点，不 fork）。
@@ -57,6 +88,51 @@ export function apply(ctx: HostContext): void {
   ctx.inject?.(['web'], (child) => {
     child.web.registerSearchProvider(createSearxngProvider(searxng));
   });
+
+  // tmux：只认 `MYPI_TMUX_PREFIX`（默认 mypi-）前缀的会话，避免误杀用户自己的会话。
+  const tmux = resolveTmuxConfig();
+  const guard = (): void => {
+    if (!hasTmux(tmux)) throw new Error('tmux 不在 PATH 里（装一个，或设 MYPI_TMUX_BIN 指向可执行文件）');
+  };
+  tools.register(stringTool('tmux_run', '在后台 tmux 会话里跑一条命令（会话名前缀 mypi-），返回会话名。', {
+    command: { type: 'string', description: '要执行的 shell 命令' },
+    name: { type: 'string', description: '（可选）会话名后缀，默认自动用命令前缀' },
+    cwd: { type: 'string', description: '（可选）工作目录' },
+  }, (args) => {
+    guard();
+    const name = normalizeName(tmux, typeof args.name === 'string' && args.name.trim() ? args.name : `run-${Date.now().toString(36)}`);
+    return runSession(tmux, name, String(args.command ?? ''), typeof args.cwd === 'string' ? args.cwd : undefined);
+  }));
+  tools.register(stringTool('tmux_status', '列出本插件创建的 tmux 会话（只列 mypi- 前缀）。', {}, () => {
+    guard();
+    const sessions = listSessions(tmux);
+    if (sessions.length === 0) return '没有本插件创建的 tmux 会话';
+    return sessions.map((s) => `${s.name}	窗口 ${s.windows}	创建于 ${s.created}`).join('\n');
+  }));
+  tools.register(stringTool('tmux_read', '读取某个 tmux 会话最近的输出（默认 80 行）。', {
+    name: { type: 'string', description: '会话名（可省略前缀）' },
+    lines: { type: 'number', description: '（可选）读取行数，默认 80' },
+  }, (args) => {
+    guard();
+    const name = normalizeName(tmux, String(args.name ?? ''));
+    return readSession(tmux, name, Number(args.lines ?? 80));
+  }));
+  tools.register(stringTool('tmux_send', '向 tmux 会话发送文本（可选回车）。', {
+    name: { type: 'string', description: '会话名（可省略前缀）' },
+    text: { type: 'string', description: '要发送的文本' },
+    enter: { type: 'boolean', description: '（可选）发送后回车，默认 true' },
+  }, (args) => {
+    guard();
+    const name = normalizeName(tmux, String(args.name ?? ''));
+    return sendKeys(tmux, name, String(args.text ?? ''), args.enter !== false);
+  }));
+  tools.register(stringTool('tmux_stop', '结束某个 tmux 会话（只允许 mypi- 前缀）。', {
+    name: { type: 'string', description: '会话名（可省略前缀）' },
+  }, (args) => {
+    guard();
+    const name = normalizeName(tmux, String(args.name ?? ''));
+    return stopSession(tmux, name);
+  }));
   tools.register(
     defineTool({
       name: 'mypi_note',

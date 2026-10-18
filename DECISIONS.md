@@ -2,6 +2,28 @@
 
 ## 格式
 
+### [2026-10-18] ★ 功能回填②：tmux（5 工具，前缀保护）+ 记忆注入的缓存结论（**不能进 system prompt**）
+
+**tmux（✓ 完成）**：DSH 只有只读的 `tmux-context`，没有驱动 ⇒ 按"简单档"自己补
+`assistant/plugin/tmux.ts` + 5 个工具（`tmux_run/status/read/send/stop`），纯 shell 调用、不碰宿主内部结构；
+只认 `MYPI_TMUX_PREFIX`（默认 `mypi-`）前缀的会话，list/kill 都按前缀过滤，避免误杀用户自己的 tmux。
+verify 第 ⑩ 步真链路：mock 模型调 `tmux_run({name:'demo'})` ⇒ 宿主真的建出 `mypi-demo` ⇒ 收尾清掉；
+没装 tmux 时明确 SKIP。主验收 **11 项全绿**。
+**顺带修了一个假阳性**：断奶断言的"旧工具前缀"正则里含 `tmux_`，把新写的 `tmux_*` 误判成 facade 残留 ⇒ 收窄正则。
+
+**记忆注入与缓存（✓ 结论，实现待做）**：
+1. **DSH 结构事实**：请求头（system prompt + 工具声明）在会话日志里是 **epoch**——`request/header` 只在变化时追加一次，
+   之后请求复用。⇒ **把易变内容放进 system prompt = 每轮新 epoch ⇒ 前缀缓存必然失效**。
+2. **本仓量过一次**（旧 memory 功能记录）：为"只保留最新注入"而每轮移除旧注入，在移除点截断序列，
+   实测注入后 83 次请求命中率 **61.1%**，单次重算 **150K–320K tokens 全价**，占全部未命中 39%。
+   修法是 **append-only**（不移除旧注入，最新块为准，旧块随压缩折叠），代价是每轮几百 token 的 cacheRead（≈1/50 全价）。
+3. **DSH 自己的同类实现**：`dsh-time-context` 注入当前时间也是**追加 durable 消息** + 默认 **10 分钟**节流
+   （`refreshIntervalMs: 0` 才每步注入）——官方对"易变内容"的答案就是这个形状。
+⇒ 我们做 memory 的四条硬约束：**append-only / 不进 system prompt / 内容未变不追加 + 节流 / 旧注入随压缩折叠**。
+✗ 待核实：DSH 里追加"开发者消息"的公开 API（`developer/message` 事件存在，但写入面还没查）。
+
+**✗ 未做**：memory 实现、autopilot 独有部分、M0.5 裁体积（暂缓）、M0.6 品牌（暂缓）、M1 TUI、M2 Termux。
+
 ### [2026-10-18] ★ 功能回填①：网络搜索 —— **DSH 原生不需要额外 API**，但一次搜索=一轮模型调用；改用 SearXNG 接缝
 
 **先回答用户的问题（✓ 核实）**：DSH 的网络搜索**不需要额外 API key**。

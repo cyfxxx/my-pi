@@ -37,7 +37,7 @@ const line = lines.reverse().find((l) => {
   return face.length > 0;
 });
 const tools = line === undefined ? [] : line.split('\ttoolFace=')[1].split('\t')[0].split(',').filter(Boolean);
-const legacy = tools.filter((name) => /^(admin_|autopilot_|browser_|ctx_|memory_|mode_|plan_|tmux_|link_|voice_)/.test(name));
+const legacy = tools.filter((name) => /^(admin_|autopilot_|browser_|ctx_|memory_|mode_|voice_|link_)/.test(name));
 const hasOurs = tools.includes('mypi_note');
 const withinLimit = tools.length > 0 && tools.length <= limit;
 const ok = legacy.length === 0 && hasOurs && withinLimit;

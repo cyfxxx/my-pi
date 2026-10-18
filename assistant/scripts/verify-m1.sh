@@ -97,7 +97,14 @@ fi
 say "⑨ 网络搜索（SearXNG 接缝）"
 timeout 120 node test/web-search.mjs "$URL" "$ROOT/.run/searxng-requests.log" || fail=1
 
-say "⑩ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
+say "⑩ tmux 工具（真链路；没装 tmux 则 SKIP）"
+if command -v tmux >/dev/null 2>&1; then
+  timeout 120 node test/tmux.mjs "$URL" || fail=1
+else
+  echo "- SKIP：本机没有 tmux"
+fi
+
+say "⑪ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
 timeout 60 node -e "
 import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
   const c = await new HostClient({ url: process.argv[1] }).connect();
@@ -107,5 +114,5 @@ import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
 });" "$URL" && echo "✓ 默认模型已复原为 online" || { echo "✗ 复原失败"; fail=1; }
 
 say "结果"
-if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（10 项）"; else echo "❌ 有红项（见上）"; fi
+if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（11 项）"; else echo "❌ 有红项（见上）"; fi
 exit "$fail"

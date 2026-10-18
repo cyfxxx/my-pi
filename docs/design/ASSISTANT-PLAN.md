@@ -228,7 +228,33 @@
   - 端点沿用原项目口径：`SEARXNG_URL`（默认 `http://127.0.0.1:8889`），超时 30s；
   - verify 新增第 ⑨ 步：mock 模型发 `web_search({queries:[…]})` ⇒ mock SearXNG 收到 query ⇒ 工具结果回灌 ⇒ 回复入流
     （`searxngHit:true`）。主验收现 **10 项全绿**。
-- **未做**：M0.5 裁体积（用户决定暂缓）、M0.6 品牌（暂缓）、其余功能回填（tmux/memory/autopilot）、TUI 更换、Windows。
+- **功能回填 ②：tmux（✅ 完成）**——DSH 只有只读的 `tmux-context`，没有驱动，所以按"简单档"自己补：
+  `assistant/plugin/tmux.ts` + 5 个工具（`tmux_run/status/read/send/stop`），只认 `MYPI_TMUX_PREFIX`（默认 `mypi-`）
+  前缀的会话，list/kill 都按前缀过滤，避免误杀用户自己的 tmux。verify 第 ⑩ 步真链路：
+  mock 模型调 `tmux_run({name:'demo'})` ⇒ 宿主真的建出 `mypi-demo` ⇒ 收尾能清掉（没装 tmux 时明确 SKIP）。
+- **记忆注入与缓存命中（✓ 结论已核实，实现待做）**：见下节。
+- **未做**：M0.5 裁体积（用户决定暂缓）、M0.6 品牌（暂缓）、其余功能回填（memory/autopilot）、TUI 更换、Windows。
+
+### 记忆注入会不会打穿前缀缓存？——会，如果注入方式错了
+
+**DSH 的结构事实（✓ 读代码）**：请求头（system prompt + 工具声明）在会话日志里被建模成 **epoch**：
+`request/header` 只在**变化时**追加一次（`reason` 字段），之后请求复用它。⇒ **把易变内容放进 system prompt，
+等于每轮新建一个 epoch ⇒ 前缀缓存必然失效**。
+
+**本仓已经用真金白银量过一次（✓ 旧 memory 功能的记录）**：最初为了"只保留最新一条注入"，每轮移除旧注入再追加，
+结果在**移除点截断消息序列**，该点之后整段前缀缓存失效——实测注入后的 83 次请求命中率仅 **61.1%**，
+单次重算 **150K–320K tokens 全价**，占全部未命中的 39%。修法是 **append-only**：不再移除旧注入，
+模型以最新一块为准，旧注入随压缩折叠。代价是每轮多几百 token 的 cacheRead（≈1/50 全价）。
+
+**DSH 自己的同类实现（✓ 读代码）**：`dsh-time-context` 注入"当前时间"用的也是**追加一条 durable、source-attributed 消息**，
+并且默认 **10 分钟最小间隔**节流（`refreshIntervalMs: 0` 才每步注入）——这就是官方对"易变内容"的答案。
+
+⇒ **我们做 memory 时必须遵守的四条**：
+1. **append-only**：只追加，绝不改写/移除历史消息；
+2. **不进 system prompt**：system prompt 只放稳定内容（否则每轮新 epoch）；
+3. **内容没变就不追加**（去重），并设节流（按轮/按分钟），把 token 成本压在 cacheRead 里；
+4. 旧注入随 compaction 折叠，天然有界。
+   ✗ 待核实：DSH 里追加"开发者消息"的具体 API（`developer/message` 事件已存在，但公开写入面还没查）。
 
 **M1/M2 沿用第 10 节**；M0 完成后立刻做 M1（TUI 插件验证），因为它是"备用界面"的可行性前提。
 
