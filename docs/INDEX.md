@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（257 条）
+## 决策台账（258 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ 拼接分支现状归档：**"新前端 + 旧适配层"**，并查清本地模型的上下文默认值会直接失效 · **为什么记这条**：分支已经能跑（M1 五项全绿），但它的实际构成与最初的构想有实质差距； · 数字: 10%
 - `DECISIONS.md` · [2026-10-18] ★ **拼接架构补上「自写插件工具」这一层：工具注册一次，两端共享**（M1 收口） · **做了什么（✓）**：`assistant/plugin/entry.ts` —— 一个**独立**的 DSH 插件（只依赖宿主提供的
 - `DECISIONS.md` · [2026-10-18] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座） · **问题（用户提出）**：现有路线是「选一个上游底座 + 持续修补」，而选底座后期仍要修修补补；
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
@@ -556,8 +557,13 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（243 条）
+## 设计文档（248 条）
 
+- `docs/design/ASSISTANT-STATUS.md` · 1. 现在实际跑的七层 · **必须直说的一点**：第 3 层还在。`mypi.sh` 借的是 `scripts/dsh-launch.sh`，而它默认挂 `my-pi.patch.yml` · 数字: 12 个
+- `docs/design/ASSISTANT-STATUS.md` · 2. 对照最初的构想
+- `docs/design/ASSISTANT-STATUS.md` · 3. 待解决的问题（按代价排序） · 1. **旧适配层去留**（最大）：留 facade ⇒ 54 工具里大半是"把 pi 能力翻译到 DSH"＝继续修修补补； · 数字: 12 个 / 523 MB
+- `docs/design/ASSISTANT-STATUS.md` · 4. 本地模型：上下文管理不是放宽，是**必须换一套预算** · 直觉是"本地不花钱 ⇒ 上下文可以给更多"。钱确实为 0，但**默认参数在本地会直接让压缩失效**。 · 数字: 10%
+- `docs/design/ASSISTANT-STATUS.md` · 5. 下一步（待用户决定） · 1. 旧适配层：保留（渐进）还是砍掉重写（干净）——决定后续全部工作量。
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · ClamAV：**更正**——之前写"判定不通、不再重复试"是**错的**（2026-10-10 当日推翻） · **正确结论（两次实测并列，都是真的）**：

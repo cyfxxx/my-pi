@@ -1,7 +1,8 @@
 # mypi-assistant（拼接式私人助手）
 
 一个**前端 + 装配层**，不是一个新底座：宿主运行时负责会话/工具/权限/持久化，这里只放
-「第二个前端」和「我们自己的插件」。设计论证见 [`docs/design/PRIVATE-ASSISTANT.md`](../docs/design/PRIVATE-ASSISTANT.md)。
+「第二个前端」和「我们自己的插件」。设计论证见 [`docs/design/PRIVATE-ASSISTANT.md`](../docs/design/PRIVATE-ASSISTANT.md)，
+现状与本地模型上下文预算见 [`docs/design/ASSISTANT-STATUS.md`](../docs/design/ASSISTANT-STATUS.md)。
 
 ## 一条指令
 

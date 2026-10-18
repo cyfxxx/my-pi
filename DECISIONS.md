@@ -2,6 +2,40 @@
 
 ## 格式
 
+### [2026-10-18] ★ 拼接分支现状归档：**"新前端 + 旧适配层"**，并查清本地模型的上下文默认值会直接失效
+
+**为什么记这条**：分支已经能跑（M1 五项全绿），但它的实际构成与最初的构想有实质差距；
+同时"本地模型因为免费、上下文管理是否可以放宽"这个问题有明确答案（**不能，默认值会直接失效**）。
+两者都容易被下一个人误判，故落成文档 + 决策。
+
+**现状（✓ 逐层核对，详见 `docs/design/ASSISTANT-STATUS.md`）**：
+运行时 = vendored DSH；启停 = `scripts/dsh-launch.sh`（**来自已回退的 DSH 线**）；
+插件 = 旧 `my-pi` facade（54 工具）+ 新 `mypi-assistant`（1 工具）；
+前端 = DSH GUI + 自写 pi-tui 客户端；模型 = deepseek（在线）+ pi-ai（本地）。
+⇒ **终端里绝大多数工具仍来自旧 facade**，所以它是"新前端 + 旧适配层"，不是干净拼接；
+且分支**依附**于 `archive/dsh-on-main`（`dsh-launch.sh` / `my-pi.patch.yml` 只在那条线上）。
+
+**构想对照（✓ 结论）**：DSH 插件脊柱 ✅、DSH Web ✅（零改动）；
+pi 的分层 ⚠️ 不采用（cordis 已是分层，再叠一层 = 两套权限模型；且那套是 my-pi 自创）；
+pi 的 TUI ⚠️ 只用渲染库 `pi-tui`（纯库），不用它的 TUI 应用（会拉进第二个 agent loop）；
+opencode 的 TUI ❌ 不接（它是 opencode server 协议的客户端，数据层不同；干净用法是外部 agent over ACP/MCP）。
+
+**本地模型 / 上下文（★ 关键发现，已核实到代码）**：
+`dsh-compaction-basic` 在 `dsh-base` 里**无配置** ⇒ 默认 `headroomTokens = maxTokens = 65536`；
+`pressureBudget = (contextWindow − 预留输出) − headroomTokens`，`<= 0` 即抛 `TargetPressureConfigError`，
+该错误在 `agent/pre-step` 被 catch、**每个目标只 warn 一次**后继续 ⇒ **不压缩**，直到 `CONTEXT_WINDOW_EXCEEDED`。
+8K / 32K 窗口全为负 ⇒ **只有约 70K 以上窗口才受默认策略保护**。
+⇒ 本地模式不是"放宽"，而是必须按窗口配 `modelPolicies`（headroom ≈ 窗口 10%、retainTokens 显式、
+`maxTokens` 降到模型输出上限），并可用 `summarizationProvider/Model` **把压缩交给在线模型**。
+另两点：本地后端 prefix cache 让"稳定前缀、少改写历史"比省钱更重要；
+`token-meter` 对无价格路线 cost=0 ⇒ 以花费为阈值的策略在本地**静默失效**。
+
+**派生**：新增 `docs/design/ASSISTANT-STATUS.md`（七层现状 / 构想对照 / 五个待解问题 / 本地预算表 / 可验证判据）；
+`docs/design/PRIVATE-ASSISTANT.md` 与 `assistant/README.md` 增加指向。
+
+**✗ 未做**：旧适配层去留（待决策）；宿主启动搬进 `assistant/`（自包含）；本地档位配置与它的 4.6 判据验证；
+工具呈现的共享协议；pi 会话格式迁移器。
+
 ### [2026-10-18] ★ **拼接架构补上「自写插件工具」这一层：工具注册一次，两端共享**（M1 收口）
 
 **做了什么（✓）**：`assistant/plugin/entry.ts` —— 一个**独立**的 DSH 插件（只依赖宿主提供的
