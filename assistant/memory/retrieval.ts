@@ -105,6 +105,31 @@ function mmrSelect(candidates: readonly ScoredEntry[], docs: ReadonlyMap<string,
   return selected;
 }
 
+/** 按来源（source）轮转：避免同一会话/同一知识源把整页占满（原项目的"会话轮转"）。 */
+function roundRobinBySource(scored: readonly ScoredEntry[], limit: number): ScoredEntry[] {
+  const buckets = new Map<string, ScoredEntry[]>();
+  for (const candidate of scored) {
+    const key = candidate.entry.source || 'unknown';
+    const list = buckets.get(key);
+    if (list === undefined) buckets.set(key, [candidate]);
+    else list.push(candidate);
+  }
+  const ordered = [...buckets.entries()].sort((a, b) => (b[1][0]?.score ?? 0) - (a[1][0]?.score ?? 0));
+  const out: ScoredEntry[] = [];
+  let progressed = true;
+  while (progressed && out.length < limit) {
+    progressed = false;
+    for (const [, list] of ordered) {
+      const next = list.shift();
+      if (next === undefined) continue;
+      out.push(next);
+      progressed = true;
+      if (out.length >= limit) break;
+    }
+  }
+  return out;
+}
+
 export interface SearchOptions {
   readonly limit?: number;
   readonly env?: string;
@@ -129,5 +154,7 @@ export function searchWithScores(store: MemoryStore, query: string, options: Sea
     .filter((candidate) => candidate.score > 0)
     .sort((a, b) => b.score - a.score);
   const docsById = new Map(docs.map((doc) => [doc.entry.id, doc]));
-  return mmrSelect(scored, docsById, limit, options.lambda ?? DEFAULT_LAMBDA);
+  // 先 MMR 去重（内容不重复），再按来源轮转（广度），最后截到 limit。
+  const deduped = mmrSelect(scored, docsById, Math.max(limit * 3, limit), options.lambda ?? DEFAULT_LAMBDA);
+  return roundRobinBySource(deduped, limit);
 }

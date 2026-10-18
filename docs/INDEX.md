@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（274 条）
+## 决策台账（275 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ P2 收尾：会话摘要（确定性）+ 来源轮转 · **会话摘要（✓）**：`assistant/memory/summaries.ts`，与原项目 `summaries.json` **同 schema** · 数字: 50 条 / 3 条
 - `DECISIONS.md` · [2026-10-18] ★ M1 社区 TUI：**在 DSH 0.2.0-rc.2 上真跑通**，并做成"共享 DSH_HOME"的接入 · **验证（✓ 真机 pty）**：`@deepseek-harness-tui/dsh-tui@0.16.1`
 - `DECISIONS.md` · [2026-10-18] ★ Termux 探针落地（一条命令回答"这台机器能不能跑"），并发现**本机就是 PRoot** · **实现（✓）**：`assistant/scripts/probe-termux.sh`（`--quick` 只体检）+ `docs/operations/TERMUX-PROBE.md`（判读表）。
 - `DECISIONS.md` · [2026-10-18] ★ 记录闭环最小版：工具用量统计（只看名字/耗时/成败，不记参数） · **实现（✓）**：`assistant/plugin/stats.ts` + `entry.ts` 接线。
@@ -760,7 +761,7 @@ node
 - `docs/design/SELF-OPTIMIZATION.md` · 2. 迁移契约（不变量，改动前必须三思） · 1. **schema 不换**：`entries.json` 保持原字段（`category/title/content/tags/confidence/source/recurrence/createdAt/updatedAt/acce · 数字: 127 条 / 61.1%
 - `docs/design/SELF-OPTIMIZATION.md` · 3. 数据现状（迁移前实测） · ⚠️ 只看"工具调用次数"会得出"记忆没人用"的错误结论（`memory_store` 只有 2 次）——**记忆的引擎是脚本自动入库**，不产生工具调用。 · 数字: 128 条 / 76% / 19 条 / 63 KB
 - `docs/design/SELF-OPTIMIZATION.md` · 4. P1（已完成） · - `assistant/memory/store.ts`：与原项目同 schema 的存储（原子写）、`scrubSecrets`、三级去重合并、环境可见性、自动互链、评分与**token 预算注入**。 · 数字: 128 条 / 1 条 / 39 条
-- `docs/design/SELF-OPTIMIZATION.md` · 5. P2 / P3（待做） · - **P2（检索已完成）**：`assistant/memory/retrieval.ts` —— BM25（标题加权 ×2、k1=1.2、b=0.75） · 数字: 30 天 / 63KB / 2 次
+- `docs/design/SELF-OPTIMIZATION.md` · 5. P2 / P3（待做） · - **P2（检索已完成）**：`assistant/memory/retrieval.ts` —— BM25（标题加权 ×2、k1=1.2、b=0.75） · 数字: 30 天 / 50 条 / 63KB / 2 次
 - `docs/design/SOL-PI-BORROW.md` · 0. 全局纪律（每一项都必须满足，不是可选项） · 来自 SoL-Pi 的做法，也是我们这几轮已经在用的：
 - `docs/design/SOL-PI-BORROW.md` · 1. 自主推进的边界（用户已去休息，这条最重要） · **可以直接做**：
 - `docs/design/SOL-PI-BORROW.md` · P1 目标完成语义：区分 verified / declared / advisory ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：P 族发现——"Separate verified, declared, and advisory completion modes"、

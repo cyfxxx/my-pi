@@ -24,6 +24,7 @@ declare module '@deepseek-ai/dsh-llm' {
 import { formatHit, formatStats, recall, remember, renderInjection, resolveMemoryConfig } from './memory';
 import { ledgerFile, readLedger, recordIntent, renderIntentLedger, textOfContent } from '../memory/intent';
 import { createToolTracker, statsFile } from './stats';
+import { loadSummaries, saveSummaries, searchSummaries, upsertSummary } from '../memory/summaries';
 import { createSearxngProvider, resolveSearxngConfig } from './searxng';
 import {
   hasTmux,
@@ -127,14 +128,29 @@ export function apply(ctx: HostContext): void {
       environment: typeof args.environment === 'string' && args.environment.trim() ? args.environment.trim() : undefined,
     });
   }));
-  tools.register(stringTool('memory_search', '按关键词检索长期记忆（标题/内容/标签；带置信度与复现次数加权）。', {
+  tools.register(stringTool('memory_search', '按关键词检索长期记忆（标题/内容/标签；带置信度与复现次数加权）；summaries=true 时附带匹配的会话摘要。', {
     query: { type: 'string', description: '检索词' },
     limit: { type: 'number', description: '（可选）最多几条，默认 5' },
+    summaries: { type: 'boolean', description: '（可选）是否附带会话摘要，默认 false' },
   }, (args) => {
-    const hits = recall(memory, String(args.query ?? ''), Number(args.limit ?? 5));
-    return hits.length === 0 ? '没有匹配的长期记忆' : hits.map(formatHit).join('\n');
+    const query = String(args.query ?? '');
+    const hits = recall(memory, query, Number(args.limit ?? 5));
+    const lines = hits.length === 0 ? ['没有匹配的长期记忆'] : hits.map(formatHit);
+    if (args.summaries === true) {
+      const found = searchSummaries(loadSummaries(summariesFilePath), query, 3);
+      if (found.length > 0) {
+        lines.push('', '相关会话摘要：');
+        for (const summary of found) lines.push(`- ${summary.title}（${summary.ts.slice(0, 10)}）：${summary.fullText.slice(0, 200)}`);
+      }
+    }
+    return lines.join('\n');
   }));
   tools.register(stringTool('memory_stats', '查看长期记忆库的条数、类别与环境分布。', {}, () => formatStats(memory)));
+
+  // 会话摘要（确定性版）：回合结束时按"意图账本 + 最后一条助手回复"落一条，同会话覆盖。
+  const assistantRootForSummaries = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const summariesFilePath = process.env.MYPI_SUMMARIES_FILE ?? join(assistantRootForSummaries, 'memory', 'summaries.json');
+  const lastAssistant = new Map<string, string>();
 
   // 用量记录（记录闭环最小版）：只记工具名/耗时/成败，不记参数与输出。
   const tracker = createToolTracker(statsFile(join(dirname(fileURLToPath(import.meta.url)), '..', '..')));
@@ -147,7 +163,13 @@ export function apply(ctx: HostContext): void {
     const session = args[0] as { id?: unknown } | undefined;
     const event = args[1] as {
       type?: string;
-      data?: { source?: { kind?: string }; content?: unknown; callId?: unknown; name?: unknown; message?: { isError?: boolean } };
+      data?: {
+        source?: { kind?: string };
+        content?: unknown;
+        callId?: unknown;
+        name?: unknown;
+        message?: { isError?: boolean; content?: unknown };
+      };
     } | undefined;
     const sessionIdForStats = typeof session?.id === 'string' ? session.id : '';
     if (event?.type === 'tool/call') {
@@ -161,6 +183,25 @@ export function apply(ctx: HostContext): void {
       const message = event.data?.message as { toolCallId?: unknown; isError?: boolean } | undefined;
       const callId = message?.toolCallId;
       if (typeof callId === 'string') tracker.onResult(sessionIdForStats, callId, message?.isError !== true);
+      return;
+    }
+    if (event?.type === 'assistant/message') {
+      // assistant/message 的正文在 `data.message.content`（与 tool/result 同一包装）。
+      const message = event.data?.message as { content?: unknown } | undefined;
+      const text = textOfContent(message?.content ?? event.data?.content);
+      if (text.trim() !== '' && sessionIdForStats !== '') lastAssistant.set(sessionIdForStats, text);
+      return;
+    }
+    if (event?.type === 'turn/end') {
+      if (sessionIdForStats === '') return;
+      const intents = readLedger(ledgerFile(assistantRootForSummaries, sessionIdForStats)).map((record) => record.text);
+      const store = loadSummaries(summariesFilePath);
+      upsertSummary(store, {
+        sessionId: sessionIdForStats,
+        intents,
+        lastAssistant: lastAssistant.get(sessionIdForStats) ?? '',
+      });
+      saveSummaries(summariesFilePath, store);
       return;
     }
     if (event?.type !== 'user/message') return;

@@ -2,6 +2,25 @@
 
 ## 格式
 
+### [2026-10-18] ★ P2 收尾：会话摘要（确定性）+ 来源轮转
+
+**会话摘要（✓）**：`assistant/memory/summaries.ts`，与原项目 `summaries.json` **同 schema**
+（`{id,sessionId,ts,title,decisions,facts,prefs,lessons,fullText}`）；回合结束 `turn/end` 时按
+"意图账本 + 最后一条助手回复"生成，同会话覆盖、最多 50 条、写入前脱敏；`memory_search summaries=true` 附带匹配摘要。
+**不花模型调用**（`decisions/facts/prefs/lessons` 留空，等后续 LLM 精炼填）。
+
+**来源轮转（✓）**：检索顺序改为 `BM25×质量分 → MMR → 按 source 轮转`，避免同一知识源/同一会话占满整页；
+`test/retrieval.mjs` 新增第⑥条断言（同源 3 条高分不会挤掉另一来源）。
+
+**踩坑（✗→✓）**：
+- `assistant/message` 的正文在 `data.message.content`（与 `tool/result` 同一包装），按 `data.content` 取会是空 → 摘要里"最近回复"永远空；
+- `MYPI_SUMMARIES_FILE` 必须在**宿主启动前**导出（插件在 apply 时读取），第一版在测试步骤里才 export，
+  结果写到了真库 `memory/summaries.json`（已删除该测试污染）。
+
+**验证（✓）**：`test/summaries.mjs` 三条断言；verify 扩到 **19 项全绿**。
+
+**✗ 未做**：压缩第②步（自定义 CompactionEngine）、autopilot 自动化、LLM 精炼摘要。
+
 ### [2026-10-18] ★ M1 社区 TUI：**在 DSH 0.2.0-rc.2 上真跑通**，并做成"共享 DSH_HOME"的接入
 
 **验证（✓ 真机 pty）**：`@deepseek-harness-tui/dsh-tui@0.16.1`

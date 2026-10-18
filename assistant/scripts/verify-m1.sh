@@ -17,6 +17,7 @@ export LOCAL_MOCK_KEY="sk-local-dummy"
 export MYPI_NOTES_FILE="$ROOT/.run/notes.md"
 export SEARXNG_URL="http://127.0.0.1:8899"
 export MYPI_MEMORY_FILE="$ROOT/.run/memory-test.json"
+export MYPI_SUMMARIES_FILE="$ROOT/.run/summaries-test.json"
 
 fail=0
 say() { printf '\n=== %s ===\n' "$1"; }
@@ -127,10 +128,14 @@ say "⑯ 意图账本（逐字保留有信息量的输入、过滤推进语、�
 rm -rf "$ROOT/.run/intents"
 timeout 150 node test/intent.mjs "$URL" "$MOCK_LOG" "$ROOT/.run/intents" || fail=1
 
-say "⑰ 社区 TUI 集成（未安装则 SKIP）"
+say "⑰ 会话摘要（回合结束落摘要 + 检索可带回）"
+rm -f "$ROOT/.run/summaries-test.json"
+timeout 150 node test/summaries.mjs "$URL" "$MYPI_SUMMARIES_FILE" || fail=1
+
+say "⑱ 社区 TUI 集成（未安装则 SKIP）"
 timeout 90 bash test/tui-community.sh || fail=1
 
-say "⑱ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
+say "⑲ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
 timeout 60 node -e "
 import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
   const c = await new HostClient({ url: process.argv[1] }).connect();
@@ -140,5 +145,5 @@ import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
 });" "$URL" && echo "✓ 默认模型已复原为 online" || { echo "✗ 复原失败"; fail=1; }
 
 say "结果"
-if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（18 项）"; else echo "❌ 有红项（见上）"; fi
+if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（19 项）"; else echo "❌ 有红项（见上）"; fi
 exit "$fail"

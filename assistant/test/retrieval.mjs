@@ -43,6 +43,14 @@ const qualityOk = quality[0]?.entry.id === 'q';
 const env = searchWithScores(store, 'playwright', { limit: 10, now, env: 'linux' });
 const envOk = !env.some((h) => h.entry.id === 't');
 
-const ok = rareOk && titleOk && mmrOk && qualityOk && envOk;
-console.log(JSON.stringify({ rareOk, titleOk, mmrOk, qualityOk, envOk, top: dupIds, ok }));
+// ⑥ 来源轮转：同一来源的 3 条高分不应挤掉另一来源
+const multi = { version: 2, entries: [
+  ...Array.from({ length: 3 }, (_, i) => mk(`s${i}`, `同源 ${i}`, 'playwright 浏览器自动化流程', { source: 'source-A', confidence: 1, recurrence: 5 })),
+  mk('other', '别源', 'playwright 浏览器自动化流程的另一种说明', { source: 'source-B', confidence: 0.7, recurrence: 1 }),
+]};
+const rr = searchWithScores(multi, 'playwright', { limit: 3, now, env: 'linux' });
+const roundRobinOk = rr.some((hit) => hit.entry.source === 'source-B');
+
+const ok = rareOk && titleOk && mmrOk && qualityOk && envOk && roundRobinOk;
+console.log(JSON.stringify({ rareOk, titleOk, mmrOk, qualityOk, envOk, roundRobinOk, top: dupIds, ok }));
 process.exit(ok ? 0 : 1);
