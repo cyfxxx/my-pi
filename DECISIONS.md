@@ -2,6 +2,27 @@
 
 ## 格式
 
+### [2026-10-18] ★ 自优化闭环 P3（第一批）：四个 headless 脚本落地，**与插件共用同一套 storeEntry**
+
+**为什么这一步关键**：原项目记忆的 76% 条目来自**自动入库**，而自动入库是脚本、不是工具调用。
+没有这批脚本，"自优化"就只剩手动记两条。
+
+**落地（✓）**：
+- `assistant/scripts/memory-store.ts`：headless 入库（`--json/--file/stdin`、`--source manual|extract|digest|auto`、`--dry-run`）。
+- `assistant/scripts/knowledge-ingest.ts`：知识订阅 md（形如 `- 标题 (url) (日期)` + 缩进摘要）→ 记忆条目，
+  来源 `knowledge-fetch`，重复执行幂等。
+- `assistant/scripts/memory-lifecycle.ts`：**只读**报告，四类候选（淘汰 / 升格 / 垃圾 / 近似重复 jaccard>0.9），
+  明确"只出候选、不自动删"。
+- `assistant/scripts/lesson-miner.ts`：从 `interventions.jsonl`（实测 5 条）挖教训候选，默认只读，`--ingest` 才入库。
+- 四个脚本都 import `assistant/memory/store.ts` 的 `storeEntry` ⇒ **去重/脱敏/环境语义与插件完全一致**（单一事实源）。
+
+**验证（✓ 不需要宿主）**：`test/scripts.mjs` 四条——首写 created、重写 updated（总数不涨）、
+知识入库幂等、生命周期可算、挖掘可入库；verify 扩到 **15 项全绿**。
+**踩到的一个真实行为**：两条内容过短的条目会被"近似合并"（jaccard>0.7）并成一条——写测试时撞到，
+说明短条目去重阈值偏激进；长内容不受影响（已记在测试注释里）。
+
+**✗ 仍未做**：用量统计（工具/子代理/上下文）、autopilot 自动化、会话摘要、按会话轮转、压缩两阶段。
+
 ### [2026-10-18] ★ 记忆 P2：检索改为 BM25 + 质量分 + MMR（原项目口径），并补上排序断言
 
 **用户指示**：先记录压缩改造计划，然后继续记忆 P2。
