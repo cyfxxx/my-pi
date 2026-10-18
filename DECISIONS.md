@@ -2,6 +2,22 @@
 
 ## 格式
 
+### [2026-10-18] ★ Termux 探针落地（一条命令回答"这台机器能不能跑"），并发现**本机就是 PRoot**
+
+**实现（✓）**：`assistant/scripts/probe-termux.sh`（`--quick` 只体检）+ `docs/operations/TERMUX-PROBE.md`（判读表）。
+探针：环境（uname/node/libc/内存/磁盘/git-tmux）→ 找仓内宿主并 `--version` → 用**临时 home** 起一次宿主（端口 3199）
+→ 带 token 请求 Web 首页 → 停宿主并清理。**不写真实数据、不碰正在跑的实例。**
+
+**本机实测（✓ 重要发现）**：`uname` 显示 **`6.17.0-PRoot-Distro`** —— 这台机器本身就是 Termux + PRoot（glibc 2.39），
+所以仓内 vendored Node + glibc 原生 addon **在这台机器上已经验证可跑**（宿主 0.2.0-rc.2、Web 入口 HTTP 200）。
+之前"Termux 有硬风险"的判断要修正为：**PRoot（glibc）可行；Termux 原生（bionic）才需要另做处置**
+（系统 node + 可能缺 musl/原生 addon）。
+
+**踩坑（✗→✓）**：heredoc 里给 `awk` 写 `\"` 转义会让脚本在目标机上直接报 `runaway string constant`；
+改成"内层不再套引号"的写法（`awk '{print $4}'`）才稳。
+
+**✗ 未做**：Termux 原生机型验证（需要用户设备）；M1 社区 TUI；会话摘要；压缩第②步。
+
 ### [2026-10-18] ★ 记录闭环最小版：工具用量统计（只看名字/耗时/成败，不记参数）
 
 **实现（✓）**：`assistant/plugin/stats.ts` + `entry.ts` 接线。
