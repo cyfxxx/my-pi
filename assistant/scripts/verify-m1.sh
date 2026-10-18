@@ -37,7 +37,13 @@ sleep 1
 : >"$MOCK_LOG"
 node spike/mock-openai.mjs 11435 "$MOCK_LOG" "我是本地模型，在你机器上跑。" >.run/mock.log 2>&1 &
 MOCK_PID=$!
-trap 'kill $MOCK_PID 2>/dev/null' EXIT
+cleanup() {
+  kill "$MOCK_PID" 2>/dev/null
+  # 只清掉本脚本起的宿主（锚定 node + profile 名，避免匹配到调用者自己的命令行）
+  local pids; pids=$(pgrep -f "^node .*--profile mypi-web" || true)
+  [ -n "$pids" ] && kill $pids 2>/dev/null
+}
+trap cleanup EXIT
 sleep 1
 curl -sf http://127.0.0.1:11435/v1/models >/dev/null || { echo "✗ 端点没起来"; tail -3 .run/mock.log; exit 1; }
 grep -q "mock openai on" .run/mock.log || { echo "✗ 端口被别的实例占着（日志里没有本进程的启动行）"; exit 1; }
