@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（270 条）
+## 决策台账（271 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ 压缩两阶段改造第①步：意图账本落地（逐字 · 过滤推进语 · 折叠重复 · 预算内注入） · **实现（✓）**：`assistant/memory/intent.ts` + `plugin/entry.ts` 接线。
 - `DECISIONS.md` · [2026-10-18] ★ 自优化闭环 P3（第一批）：四个 headless 脚本落地，**与插件共用同一套 storeEntry** · **为什么这一步关键**：原项目记忆的 76% 条目来自**自动入库**，而自动入库是脚本、不是工具调用。 · 数字: 76% / 5 条
 - `DECISIONS.md` · [2026-10-18] ★ 记忆 P2：检索改为 BM25 + 质量分 + MMR（原项目口径），并补上排序断言 · **用户指示**：先记录压缩改造计划，然后继续记忆 P2。 · 数字: 30 天
 - `DECISIONS.md` · [2026-10-18] ★ 压缩改造计划：**两阶段压缩**，用户意图走确定性通道（方案 B） · **用户判断**：实际使用中"用户的输入"很重要，压缩时应**单独处理**——先整合、分析，再压缩，尽可能保留完整意图。 · 数字: 0 次 / 2 天 / 50 轮
@@ -569,7 +570,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（272 条）
+## 设计文档（273 条）
 
 - `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
 - `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
@@ -636,6 +637,7 @@
 - `docs/design/COMPACTION-INTENT.md` · 3. 用户原话保留策略（已定：方案 B） · - **逐字保留"有信息量"的用户消息**；纯推进语（继续/好的/嗯/重试…）过滤掉；
 - `docs/design/COMPACTION-INTENT.md` · 4. 落地顺序 · ②失败可**一行回滚**：profile 里换回 `compaction-basic` 即可（实现是同一条接缝的两个后端）。 · 数字: 2 天
 - `docs/design/COMPACTION-INTENT.md` · 5. 验收断言（比"摘要看着不错"硬） · 造 50 轮会话、每轮带一个不同意图，触发压缩后断言： · 数字: 50 轮
+- `docs/design/COMPACTION-INTENT.md` · 7. 第①步已落地（2026-10-18） · - `assistant/memory/intent.ts`：`isFiller`（中英推进语）、`textOfContent`、`foldIntent`（jaccard>0.6 折叠、次数+1）、
 - `docs/design/COMPACTION-INTENT.md` · 6. 风险 · 1. **体积**：账本会挤占摘要预算 → 必须有上限与折叠（这也是"先整合再压缩"的原因）；
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条

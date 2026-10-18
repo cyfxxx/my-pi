@@ -18,9 +18,11 @@ import type { ContextFormed } from '@deepseek-ai/dsh-llm';
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
     'mypi-memory': { kind: 'mypi-memory' } & ContextFormed;
+    'mypi-intent': { kind: 'mypi-intent' } & ContextFormed;
   }
 }
 import { formatHit, formatStats, recall, remember, renderInjection, resolveMemoryConfig } from './memory';
+import { ledgerFile, readLedger, recordIntent, renderIntentLedger, textOfContent } from '../memory/intent';
 import { createSearxngProvider, resolveSearxngConfig } from './searxng';
 import {
   hasTmux,
@@ -43,8 +45,8 @@ interface HostContext {
     services: readonly string[],
     callback: (child: { web: { registerSearchProvider: (provider: unknown) => () => void } }) => void,
   ) => unknown;
-  /** 事件订阅（agent/pre-step 是宿主的事件瀑布）。 */
-  on?: (event: string, listener: (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>) => unknown;
+  /** 事件订阅（agent/pre-step 是宿主的事件瀑布；session/event 是会话事件流）。 */
+  on?: (event: string, listener: (...args: readonly unknown[]) => unknown) => unknown;
   [key: string]: unknown;
 }
 
@@ -133,29 +135,50 @@ export function apply(ctx: HostContext): void {
   }));
   tools.register(stringTool('memory_stats', '查看长期记忆库的条数、类别与环境分布。', {}, () => formatStats(memory)));
 
+  // 意图账本：会话级、逐字、过滤纯推进语（压缩两阶段改造的第①步）。
+  const assistantRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const OURS = new Set(['mypi-memory', 'mypi-intent', 'time-context']);
+  // 注意：`session/event` 监听器是 (session, event) 两个位置参数，不是一个对象。
+  ctx.on?.('session/event', (...args) => {
+    const session = args[0] as { id?: unknown } | undefined;
+    const event = args[1] as { type?: string; data?: { source?: { kind?: string }; content?: unknown } } | undefined;
+    if (event?.type !== 'user/message') return;
+    const kind = event.data?.source?.kind;
+    if (typeof kind === 'string' && OURS.has(kind)) return;
+    const sessionId = typeof session?.id === 'string' ? session.id : undefined;
+    if (sessionId === undefined) return;
+    const text = textOfContent(event.data?.content);
+    if (text.trim() === '') return;
+    recordIntent(ledgerFile(assistantRoot, sessionId), text);
+  });
+
   // append-only 注入：只在回合第一步、内容与上次不同时，追加到请求消息末尾（前缀不动 ⇒ 缓存可命中）。
   const lastInjected = new Map<string, string>();
-  ctx.on?.('agent/pre-step', async (payload, next) => {
-    const decision = (await next()) as { kind?: string; messages?: readonly unknown[] };
+  ctx.on?.('agent/pre-step', async (...args) => {
+    const payload = args[0] as { step?: number } | undefined;
+    const next = args[1] as (() => Promise<unknown>) | undefined;
+    const decision = (await next?.()) as { kind?: string; messages?: readonly unknown[] };
     if (decision?.kind === 'reject' || decision?.messages === undefined) return decision;
-    const step = (payload as { step?: number } | undefined)?.step ?? 1;
+    const step = payload?.step ?? 1;
     if (step !== 1) return decision;
     const text = renderInjection(memory);
     if (text === '') return decision;
     const sessionId =
       ((payload as { agent?: { session?: { id?: unknown } } } | undefined)?.agent?.session?.id as string | undefined) ?? 'default';
-    if (lastInjected.get(sessionId) === text) return decision;
-    lastInjected.set(sessionId, text);
-    return {
-      ...decision,
-      messages: [
-        ...decision.messages,
-        createUserMessage({
-          content: [{ type: 'text', text }],
-          source: { kind: 'mypi-memory', form: 'snapshot', sections: [{ name: 'memory', text }] },
-        }),
-      ],
-    };
+    const intent = renderIntentLedger(readLedger(ledgerFile(assistantRoot, sessionId)), Number(process.env.MYPI_INTENT_BUDGET_TOKENS ?? '1000'));
+    const memoryText = text;
+    if (lastInjected.get(sessionId) === memoryText + '\u0000' + intent) return decision;
+    lastInjected.set(sessionId, memoryText + '\u0000' + intent);
+    const memoryMessage = createUserMessage({
+      content: [{ type: 'text', text: memoryText }],
+      source: { kind: 'mypi-memory', form: 'snapshot', sections: [{ name: 'memory', text: memoryText }] },
+    });
+    const intentMessage = createUserMessage({
+      content: [{ type: 'text', text: intent }],
+      source: { kind: 'mypi-intent', form: 'snapshot', sections: [{ name: 'intent', text: intent }] },
+    });
+    const extra: unknown[] = intent === '' ? [memoryMessage] : [memoryMessage, intentMessage];
+    return { ...decision, messages: [...decision.messages, ...extra] };
   });
 
   // tmux：只认 `MYPI_TMUX_PREFIX`（默认 mypi-）前缀的会话，避免误杀用户自己的会话。

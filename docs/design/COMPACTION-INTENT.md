@@ -44,7 +44,7 @@
 
 | 步 | 内容 | 成本 |
 |---|---|---|
-| **①** | `retainTokens` 调大（近期逐字保留更多）+ **意图账本 append-only 注入**（复用已验证的注入通道） | 半天，不换后端 |
+| **①** | `retainTokens` 调大（近期逐字保留更多）+ **意图账本 append-only 注入**（复用已验证的注入通道） | ✅ **已完成**（见 §7） |
 | **②** | 自定义 `CompactionEngine`：选择区间（可复用 basic 逻辑）→ 抽账本 → 只对工作历史做模型摘要 → 提交带账本的 checkpoint | 1–2 天 |
 
 ②失败可**一行回滚**：profile 里换回 `compaction-basic` 即可（实现是同一条接缝的两个后端）。
@@ -58,6 +58,18 @@
 配套：
 - 账本 token 不超上限；
 - 摘要仍满足"比被压缩内容小"的硬约束（若账本过长，先压缩账本自身：去重 → 截断更早条目）。
+
+## 7. 第①步已落地（2026-10-18）
+
+- `assistant/memory/intent.ts`：`isFiller`（中英推进语）、`textOfContent`、`foldIntent`（jaccard>0.6 折叠、次数+1）、
+  `recordIntent`（原子重写）、`renderIntentLedger`（逐字、预算内、从更早的丢起）。
+- `entry.ts`：`session/event` 监听 `user/message`（跳过 `mypi-memory`/`mypi-intent`/`time-context` 三种自有来源），
+  有信息量才记账本；`agent/pre-step` 第一步把账本作为**追加消息**注入（`source.kind='mypi-intent'`），
+  与记忆注入共用"内容未变不追加"的去重键。
+- 账本落点 `assistant/.run/intents/<sessionId>.jsonl`（会话级、gitignored）。
+- 验证：`test/intent.mjs` —— 有信息量逐字进账本、`继续` 不进、重复意图折叠成一条（×N）、请求里带 `[mypi-intent]` 块。
+  verify 扩到 **16 项全绿**。
+- ✗ 未做：第②步（自定义 `CompactionEngine`）；`retainTokens` 的调大还没写进 profile（当前仍用默认值）。
 
 ## 6. 风险
 

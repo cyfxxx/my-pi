@@ -2,6 +2,23 @@
 
 ## 格式
 
+### [2026-10-18] ★ 压缩两阶段改造第①步：意图账本落地（逐字 · 过滤推进语 · 折叠重复 · 预算内注入）
+
+**实现（✓）**：`assistant/memory/intent.ts` + `plugin/entry.ts` 接线。
+- 账本来源：`session/event` 的 `user/message`（**跳过** `mypi-memory`/`mypi-intent`/`time-context` 三种自有来源，避免自吞）；
+- 过滤：中英推进语（继续/好的/嗯/retry/continue…）不记账；
+- 折叠：同一意图（token jaccard>0.6）只留最新措辞、次数 +1；
+- 注入：`agent/pre-step` 第一步把账本作为**追加消息**（`source.kind='mypi-intent'`）注入，与记忆共用"内容未变不追加"的去重键；
+- 落点：`assistant/.run/intents/<sessionId>.jsonl`（会话级、gitignored）。
+
+**踩坑（✗→✓）**：DSH 的 `session/event` 监听器是 **(session, event) 两个位置参数**，不是单个对象——
+我第一版按对象解构，账本永远是空的；改成位置参数后立刻生效。`agent/pre-step` 同理是 `(payload, next)`。
+
+**验证（✓ 真链路）**：`test/intent.mjs` —— 有信息量逐字入账、`继续` 不入、重复意图折叠（×2）、请求里带 `[mypi-intent]` 块；
+verify 扩到 **16 项全绿**。
+
+**✗ 未做**：第②步自定义 `CompactionEngine`；`retainTokens` 调大尚未写进 profile。
+
 ### [2026-10-18] ★ 自优化闭环 P3（第一批）：四个 headless 脚本落地，**与插件共用同一套 storeEntry**
 
 **为什么这一步关键**：原项目记忆的 76% 条目来自**自动入库**，而自动入库是脚本、不是工具调用。
