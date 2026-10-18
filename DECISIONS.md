@@ -2,6 +2,40 @@
 
 ## 格式
 
+### [2026-10-18] ★ **主线回退到 DSH 合并之前**（`main` → `eda6d1405`），迁移经验回灌到主线
+
+**用户决定**：把项目主线回退到合并之前，但**合并过程中的优化与经验不能丢**。
+
+**执行（✓）**：`main` 指回 **`eda6d1405`**（分叉前提交；当时是快进合并 ⇒ 无 merge commit，
+与 2026-10-17 那条记录里写的回滚方式一致）。DSH 那套**一件没删**，三个引用都保留：
+`feat/base-switch-dsh`（69 笔迁移，本地+远端）、标签 `v1.3.0-dsh`（= `dcdc3dfe2`）、
+以及**新增** `archive/dsh-on-main`（= `4453d3965`，含合并后 9 笔收口：GC/doctor/范围感知守门/DR-4 收件箱/具名 agent/陷阱 #22）。
+
+**回灌（✓ 只挑与 DSH 无关的收益）**：
+1. **知识**：`docs/design/CODING-TRAPS.md`（#1–#22）、`docs/BUG-REPLAYS.md`（#39–#46）、
+   `docs/knowledge/**`（46 条失败模式 + 16 条被否提案）、`DECISIONS.md` 全量（决策日志不因回退而删）。
+2. **pi 侧真实修复**：`custom/features/mode/session-key.ts`（解绑 `this` ⇒ 静默 undefined 的真回归）+ 测试；
+   `custom/core/config.ts` 的 `MY_PI_ROOT`/`PI_ROOT` 覆盖；`custom/adapters/session-adapter.ts` 的可注入 lister（pi 路径零改动）。
+3. **命名统一**：`web-search` → `searxng`（私有实例就是 searxng）。
+4. **通用守门**：`scripts/check-md-tables.mjs` + 约定守门 L 段（程序化编辑把表格写断，当时所有守门都放行）。
+5. **约定守门脚本整体回灌**（A–M）：J/K/M 三段按"依赖不在就明确跳过"的既有纪律自动跳过，不假装通过。
+
+**没回灌（✗ 有意留在分支）**：`dsh/`、`custom/adapters/dsh/**`、`scripts/dsh-*`、`my-pi.sh` 的双底座分派、
+golden 第 22 步、`docs/design/DSH-*.md`、`docs/operations/DSH-UPGRADE.md`、`portable/dsh/**` 运行数据
+—— 没有 DSH 宿主它们无法运行，留在 `main` 只会让文档描述一个不存在的底座。
+
+**回退后的树的形状（✓ 实测）**：`STRUCTURE.md` 脚本数 70 → **71**（多 `check-md-tables.mjs`）；
+`docs/INDEX.md` 重新生成（883 条）；`docs/CHANGES.jsonl` 重新生成（change 19 / rejected 16）；
+`docs/knowledge/` 重新编译（46 失败模式 / 16 被否提案）；约定守门 A–M **全绿**。
+
+**为什么这样做而不是直接删分支**：回退**可逆**——`git checkout v1.3.0-dsh` 回到合并点，
+`git checkout archive/dsh-on-main` 回到"合并 + 收口"。分支与标签都在远端，换机器也拿得到。
+
+**✗ 仍未做 / 需注意**：① `feat/private-assistant`（拼接实验）基于合并后的 `4453d3965`，回退后不再是 `main` 的后代
+（它自带完整实现，互不影响）；② 回退点的 `README/FAQ/TROUBLESHOOTING/VISION` 用的是合并前版本
+（描述 pi 单一底座），DSH 相关表述留在分支文档里；③ 回退是**改写已推送的 `main`**（`--force-with-lease`，
+非 fast-forward），远端历史被重写 —— 若有其它克隆需要重新对齐。
+
 ### [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓
 
 **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓；
@@ -6122,3 +6156,186 @@ Node 来自 `~/.local/share/pi-node`、SearXNG 在 `/opt/searxng`、whisper/sher
 
 **证据**：`check-conventions`/`check-portability` 全绿；`portable-runtime.sh verify` 全绿；`test-portability-move.sh` **7/7**（含 SearXNG 在新路径搜出 35 条结果）；`tsc -p custom/` rc=0；`vitest run` 109 文件 / 1166 用例通过。
 **未核实（✗）**：仅本机 `linux-arm64` 实跑；voice 重依赖未端到端；systemd 单元未用 `systemd-analyze` 校验。
+
+### [2026-10-16] ✗ 不采用：部署方案：用 profile 级 pnpm.overrides 把 pi 包 specifier 别名到本仓 shim
+
+**理由（不采用）**：dsh/plugin/package.json 的 files 只发 dist+README，shim 根本不在分发包里 ⇒ 真 profile 装出来解析不到；改为构建期 esbuild --alias 把 shim 打进产物（自包含）
+**证据**：搬走仓库根 node_modules/@earendil-works 后真 Host 仍退出码 0、模块解析失败 0 条（实测 #18-aa）
+
+### [2026-10-16] ✗ 不采用：同名冲突处置：写死一份「让位名单」（宿主占用的名字直接跳过）
+
+**理由（不采用）**：不采用：名单会过期——宿主哪天不再提供同名工具时，我们仍会跳过 ⇒ 静默少能力；改为靠宿主注册表抛同名错就地跳过并点名上报，宿主不提供时自动生效
+**证据**：facade.registerTool/registerCommand 的 try/catch 就地隔离 + registrationSummary()；真 Host 汇总行 工具 53/命令 10/冲突 1/钩子 18
+
+### [2026-10-16] ✗ 不采用：把 my-pi 的 subagent 工具改名保留（如 mypi_subagent）
+
+**理由（不采用）**：不采用：它在 DSH 底座上是跨运行时 spawn pi 子进程，且 context:fork 在 DSH 上已静默降级；宿主原生 subagent 是同进程 spawn/fork 且自带 steer/cancel/list ⇒ 让位更优，my-pi 独有 5 项登记为待重设计
+**证据**：能力审计 §2（dsh-agent-loop/dsh-subagent-*-in-process 对比）；真 Host 汇总行显示 subagent 让位为唯一冲突
+
+### [2026-10-16] ✗ 不采用：让 plan 命令直接让位给宿主的 /plan（只保留护栏与 plan_enter/plan_exit）
+
+**理由（不采用）**：会丢掉用户命令面（resume/todos/plans/clear/help）与 clear/resume 的计划落盘·续跑路径；改为适配层命令名重映射，以 mypi-plan 换名注册（工具名不做此重映射，因为工具名对模型可见）
+**证据**：真 Host 注册汇总：命令 9 → 10（含 mypi-plan）、同名冲突 2 → 1；DshFacadeOptions.commandNameMap
+
+### [2026-10-16] ✗ 不采用：诊断 trace 报「入桶 yes/no」表示会话用量是否记上
+
+**理由（不采用）**：不采用：同一回合的第二个 step 不会让桶数增加 ⇒ 会把「已并入已有桶」打成「没入桶」，诊断自己在说谎；改为报桶内调用数
+**证据**：真 Host trace 实测出现 入桶=no 而该回合确实累积了 2 次调用；修正后报 桶内调用数=2
+
+### [2026-10-16] ✗ 不采用：写 sessionKeyOf 的单测时用箭头函数 fake（{getSessionFile: () => '…'}）
+
+**理由（不采用）**：不采用：箭头函数不依赖 this，会把「方法被解绑调用」这类 bug 保护起来——实际就这么漏掉了一次真回归（留出集 33/33 → 11/33）；fake 必须模仿真实实现形状（getSessionFile() { return this.x }）
+**证据**：BUG-REPLAYS #44：pi 的 SessionManager.getSessionFile() 用 this.sessionFile（session-manager.ts:1156）
+
+### [2026-10-16] ✗ 不采用：用 ln -sfn 整体软链整个 @scope 目录来补宿主包
+
+**理由（不采用）**：不采用：目标已是真目录时链接会建到目录里面（@scope/@scope → SRC），症状是「补了却还是找不到」；改为逐包补并跳过已存在项
+**证据**：BUG-REPLAYS #43：npm install 因 peerDependency 先建了真目录，补链后仍 ERR_MODULE_NOT_FOUND
+
+### [2026-10-16] ✗ 不采用：把 vendored packs 里所有 web_search 表述一并改成 searxng
+
+**理由（不采用）**：不采用：packs/ 是上游技能包（有各自同步与链接/结构守门），本地改名不该制造与上游的漂移；只改本仓自己维护的 packs/README.md，其余三处保留并逐条登记后果
+**证据**：能力审计 §6 的逐文件处置表；check-packs-links 682 md/1238 链接仍绿
+
+### [2026-10-16] ★ DSH 换基座迁移收口：阶段 P0–P6 全部完成（同名冲突处置 / 产物自包含 / 守门扩到 J·K·L 段）
+
+**结论**：分支 `feat/base-switch-dsh` 上，my-pi 的底座从 pi 迁到 DSH 已收口；`main` 全程未动。
+分阶段证据、实测事实与剩余缺口分别归档在
+[`docs/design/DSH-MIGRATION-PLAN.md`](docs/design/DSH-MIGRATION-PLAN.md)（计划 + 实测 #18-a…18-ac + §3.1 覆盖度）、
+[`docs/design/DSH-HOOK-MAPPING.md`](docs/design/DSH-HOOK-MAPPING.md)（19 事件档位）、
+[`docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md`](docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md)（同名冲突审计 + 决策 + DR 清单）。
+
+**关键决策（本次定稿）**：
+1. **features 不改**：只在 `custom/adapters/dsh/**` 提供"看起来像 pi"的外观层，`custom/bootstrap.ts` 一行不改（§0 的策略，本轮验证有效）。
+2. **同名冲突三件分别处置**：工具 `web_search` → **改名 `searxng`** 保留（宿主那个需 DeepSeek 凭据，我们的免 key 可降级，能力不同）；
+   工具 `subagent` → **让位**宿主（宿主是同进程 spawn/fork 且自带 steer/cancel/list，我们那套是跨运行时 spawn pi 且 fork 已降级）；
+   命令 `plan` → **换名注册 `mypi-plan`**（保住子命令面与计划落盘/续跑路径，且不动 feature）。
+3. **改名的边界**：**工具名**对模型可见 ⇒ 改名要走 feature 侧并重过工具声明面基线（`searxng` 因此让总字节**降** 3 B，未抬预算）；
+   **命令名**是用户敲的 ⇒ 允许适配层重映射（`DshFacadeOptions.commandNameMap`，只给命令、不给工具）。
+4. **让位不写死名单**：靠"宿主注册表抛同名错 ⇒ 就地跳过 + 点名上报"，宿主哪天不再提供同名工具时我们的注册自动生效。
+5. **产物自包含**：构建期用 esbuild `--alias:` 把 `@earendil-works/pi-*` 改写成本仓 shim 的路径并**打进产物** ⇒
+   真 profile 不再需要 `pnpm.overrides` 别名（此前包清单不含 shim，那条路走不通）。构建冒烟每次断言这一点。
+6. **不静默降级**：无等价物一律经 `surfaceReport()`/`onUnsupported` 上报；让位的代价逐条登记为 **DR-1…DR-5**（不是"已完成"）。
+7. **守门扩面**：`check-conventions.sh` 从 A–I 扩到 **J**（DSH 双基线条件守门）、**K**（`dsh/plugin` 类型检查，官方 `tsc -p custom/` 不收 `dsh/`）、
+   **L**（Markdown 表体完整性，抓"程序化编辑把表格行写断"）。
+
+**证据（可复跑）**：spike **22/22**（真实 `@deepseek-ai/*` 0.2.0-rc.2 + cordis 4.0.4）；Host 级四类路径（插件加载/工具调用/回合用量/注册汇总）+
+三个 DSH 场景（两实例隔离、会话续接、模式启动期）；**留出集**（`PI_GOLDEN_SCENARIO=1`）模式切换 **33/33**、两实例隔离 **33/33**、会话切换 **18/18**；
+全量 vitest **1294**；`tsc -p custom/` 与 `tsc -p dsh/` 均 0 错；约定守门（A–L）全绿。
+
+**未核实（✗，如实登记）**：① "loop 驱动的真 agent"下的两处运行时语义（`steer` 在 step 边界被消费、真 agent 下 `commands.execute()`）——
+试过在 spike 里单独建 root agent，loop 需要完整组合（模型路由等）⇒ 报 `no agent factory registered`，留给真 Host/交互客户端；
+② `input.transform` 属**潜伏能力**（本仓 4 个 `input` 处理器全是观察者，无人返回改写）；
+③ 合成用量的 `cost` 是占位 0（DSH `TokenUsage` 不含定价；当前无 feature 读它）。
+
+### [2026-10-16] ✗ 不采用：为每个 my-pi agent 自动注册一个宿主 subagent 工具实例（具名委派 = 按目录动态加载 dsh-tool-subagent）
+
+**理由（不采用）**：暂不采用（技术上可行）：它会把每个 agent 变成**模型可见工具** ⇒ 工具面与 token 成本上升，并改变模型可见行为；本项目对工具面有预算纪律、宿主也刻意保持精简。改为登记为**可选部署特性**（需要时按显式配置开关实现，路径写在能力审计 §7 DR-2）
+**证据**：宿主支持每实例 persona/工具权限（dsh-tool-subagent/README.zh.md：toolName 每实例须不同）；但 subagent 工具无 agent/preset 参数 ⇒ 具名只能靠工具名承载
+
+### [2026-10-17] ★ DSH 宿主进仓内 + `my-pi.sh` 一条指令双底座（tui / web / headless）
+
+**问题**：`dsh` CLI 原先只活在 npm 的 npx 缓存（`~/.npm/_npx/<hash>/`，523 MB）里 —— 那是**仓外**、
+会被 `npm cache clean` 清掉、换机器就没有；启动还要手搓一串环境变量与 profile。等于"换基座后反而不能一条指令用"。
+
+**决策**：
+1. **宿主进仓内** `runtime/<平台>/ext/dsh/`（gitignored），由 `scripts/dsh-runtime.sh` 装：与主分支
+   `runtime/<平台>/`（node/python 等）**同一套便携约定**，由 `check-portability.sh` 新增的 **P6** 守。
+   版本钉死 `DSH_VERSION=0.2.0-rc.2`（与产物的 external 宿主包必须同版本）。
+2. `install` 两条通道：registry（带重试）与 `--from-npx`（从已有完整 npx 安装 `cp -a` 搬运，
+   **禁止 `cp -al`**；搬后自检"零绝对符号链接" ⇒ 搬完仍自包含）。本机 registry 的 tarball 会 ETIMEDOUT，
+   `--from-npx` 是对此的正解，不是绕过。
+3. **一条指令**：`my-pi.sh` 只加一个 `case` 分流 —— `tui`（默认，pi 基座，行为不变）/ `web` / `headless` / `acp`；
+   DSH 三条派到 `scripts/dsh-launch.sh`。
+4. **状态也在仓内**：`DSH_HOME` 默认 `<repo>/portable/dsh`（gitignored），**绝不碰 `~/.dsh`**（正在跑的 GUI 的 home）；
+   凭据从 `$MY_PI_DSH_CREDENTIALS` 或 `~/.dsh/.credentials.yaml` **拷一份 600** 进仓内 home（一次性，之后就用仓内那份）。
+5. **解析仓内优先**：宿主 `runtime/.../ext/dsh` → 系统 `dsh` → npx（**并对"非便携"明确告警**，不静默）。
+   仓库根 `@deepseek-ai/*` 由 `dsh-build.sh --link-host` 始终重指到当前宿主（`ln -sfn` 逐包建，防 CODING-TRAPS #14）。
+
+**实测（本机 linux-arm64）**：`dsh-runtime.sh install --from-npx` → 523 MB、版本 `0.2.0-rc.2`、入口可解析、
+**零绝对符号链接**；`./my-pi.sh web` → HTTP 401（Web UI 起来了）、注册汇总 **工具 54 / 命令 10（含 `mypi-plan`）/ 冲突 0 / 钩子 18**、
+启动日志里 **`_npx` 痕迹 0 次**；`./my-pi.sh headless "回答两个字：收到"` → 回「收到」、rc=0；
+`MY_PI_DSH_HOME=<空目录> bash scripts/dsh-launch.sh --print-host` → `vendored` 且**零副作用**。
+
+**✗ 如实登记**：`tui` 分支只是把 `case` 里 `shift` 一下就落回原 pi 路径（代码未改），**未在无 TTY 环境实跑**；
+本机 DSH 版本**没有 TUI 模板**（模板只有 acp/headless/sdk/sdk-minimal/web），所以 "tui" 就是 pi 基座那个终端界面。
+
+### [2026-10-17] ★ 合并到 main：DSH 成为**实验性第二底座**（`v1.3.0-dsh` 为回滚点）
+
+**决策（用户批准后执行）**：把 `feat/base-switch-dsh`（69 提交 / 110 文件 / +10,886 −94）以
+**快进方式**并入 `main`（`main` 是分支祖先 ⇒ 无冲突、无 merge commit），并打标签 `v1.3.0-dsh`。
+
+**为什么不拆成独立项目**（依据见提交历史与本条）：
+1. 架构原本就为双底座设计（`features` 不 import 基座、只有 `adapters/**` 允许），且 `main` 里早有
+   `docs/design/BASE-SWITCH-DSH.md` 的换基座评估 ⇒ 这是**既定方向的执行**，不是旁支；
+2. 92% 的插入是**新增文件**，对 pi 侧共享代码只有约 120 行（一个改名 + 一次会话键抽取 + 一个增量注入点）；
+3. 拆分会制造两份 `custom/features/**`（223 个 TS）与两套上游（pi + DSH）的**重复维护**，
+   正好放大本项目最痛的"计数/文档漂移"；
+4. main 未动过 ⇒ 零冲突风险，合并后的树与验收时**逐字节相同**。
+
+**合并前的验收（全部在分支 HEAD 上跑过）**：`PI_GOLDEN_SCENARIO=1 bash scripts/golden-tasks.sh`
+⇒ 全绿，含留出集：模式切换 **33/33**、两实例隔离 **33/33**、会话切换 **18/18**。
+
+**合并后复验**：`./my-pi.sh --version` → `1.2.0`（pi TUI 路径未变）；
+`scripts/dsh-runtime.sh status` → 仓内宿主 `0.2.0-rc.2`、解析命中仓内；`./my-pi.sh headless "…"` → 回「收到」；
+约定守门 A–L 全绿、便携性守门（含 P6）全绿、`tsc -p custom/` 与 `-p dsh/` 0 错。
+
+**定位（写清楚，避免以后误解）**：
+- **默认行为不变**：`./my-pi.sh` 仍是 pi TUI；
+- **DSH 是实验性第二底座**：`./my-pi.sh web|headless|acp` 才走 DSH，且需一次性装仓内宿主
+  （`runtime/<平台>/ext/dsh`，523 MB，gitignored ⇒ fresh clone 不带宽体）；
+- **回滚**：`git checkout v1.3.0-dsh` 或 `git revert -m 1`（本次是快进 ⇒ 回滚即把 main 指回 `eda6d1405`）；
+- **DSH 仍是 RC**（`0.2.0-rc.2`）：接口变动只需改 `custom/adapters/dsh/types.ts` 与 `DSH_VERSION` 两处。
+
+### [2026-10-17] ★ DR-2 落地：具名 agent 成为**可选能力**（默认关闭），并用"行为验证"取代"调用即成功"
+
+**决策**：能力审计里 DR-2（目录扫描式 agent 定义 ⇒ 宿主上的具名委派）按"**可选部署特性**"实现，**默认关闭**。
+
+- 机制：每个 agent 装一个宿主 `dsh-tool-subagent` 实例，`toolName` = 规范化 agent 名，携带 `persona`
+  与 `toolFilter`（只读 agent ⇒ `read/grep/find/ls`）。工具名承载"这次委派给谁"，顺带给 DR-4 提供映射键。
+- 默认关闭的理由不变：每多一个 agent 就是多一个**模型可见工具** ⇒ 工具面/token 成本、模型选择噪；
+  本项目对工具面有预算纪律 ⇒ 显式开关 + `maxTools` 上限 + 跳过项逐条上报。
+- 开关：插件配置 `namedAgents{enabled,scope,maxTools,provider,toolNamePrefix,personaMaxChars}`；
+  patch 里给了注释片段，临时启用可用 `MY_PI_DSH_EXTRA_PATCH=…`（`dsh-launch.sh` 新增的环境入口）。
+
+**两条硬教训（已进 CODING-TRAPS #19/#20、BUG-REPLAYS #46）**：
+1. **`apply` 不能 async**：async 后经 cordis 装载，工具在全局 `tools.schemas()` 里**看不见**（54→0；
+   直接 `await apply` 又正常）。⇒ 宿主模块在模块加载期用顶层 `await`+try/catch 取好，`apply` 保持同步。
+2. **"注册调用成功" ≠ "工具面可见"**：宿主工具插件自己 inject 四个服务，直接 `ctx.plugin()` 会**静默不激活**；
+   改走 `ctx.inject(…, child => child.plugin(…))` 后，可见性自检又因 inject 回调**异步落地**而误报"可见 0 个"。
+   ⇒ 上报必须**行为验证（schemas 前后对比）+ 延后一拍**，并把两个数字分开报、不一致就告警。
+
+**实测**：开关打开 ⇒ `工具面可见 2 个（reviewer, scout）｜注册调用成功=2`，会话请求里真出现 `reviewer, scout`；
+关闭 ⇒ 该日志一行不打、工具面保持 53。单测 14 项、全量 vitest 1315、spike 26/26、tsc×2 与各守门全绿。
+
+**✗ 未覆盖（如实登记）**：`chain`/`{previous}` 不在本能力内（宿主 `workflow` 已覆盖，DR-1）；
+`model` 只在 `provider/model` 形态透传；DR-3（逐任务 `cwd`）与 DR-4（进程外投递）仍需宿主侧能力。
+
+### [2026-10-17] ★ 收口四项：home 治理 / DSH 体检 + 升级 runbook / 范围感知的 DSH 守门 / DR-4 部分恢复
+
+**① `portable/dsh` 增长治理**：新增 `scripts/dsh-gc.sh`（`status|prune`）。只动 `portable/dsh/{sessions,logs}`，
+**不碰**宿主/产物/profiles；默认 dry-run + 路径逃逸防护（解析后必须仍在 `portable/dsh` 内）。
+保留策略：会话留最近 10 个且 30 天内用过的不删，启动日志留 14 天。实测：14 个会话里 3 个 40 天前的被列待删、保留 11 个；
+安全边界也被实测（把边界一起改掉时**正确拒绝**）。
+
+**② DSH 体检 + 升级 runbook**：`dsh-runtime.sh` 新增 `doctor`（版本漂移/解析来源/产物/home 占用/凭据权限/profile，
+有❌则退出码 1）；新增 `docs/operations/DSH-UPGRADE.md`。**版本面核准为 3 处钉死**
+（`DSH_VERSION`、spike 的 11 个包、plugin 的 cordis peer）+ **1 处形状钉死**（`types.ts`），
+推翻了"两处"的旧说法。**真漂移演练**：把 `DSH_VERSION` 改成 `9.9.9-rc.0` ⇒ doctor 报 ❌（退出码 1）；改回 ⇒ 🎉。
+
+**③ 范围感知的 DSH 守门**：golden 新增**第 22 步**（`--smoke` 的无头冒烟顺延为第 23 步）。判据：
+改动触及 `custom/adapters/dsh/**`、`dsh/**`、`custom/bootstrap.ts`、`scripts/dsh-*`（**含未提交改动**）⇒
+自动跑三个 DSH 场景；也可 `MY_PI_GOLDEN_DSH_SCENARIOS=1` 强制；无宿主/无凭据**明确 SKIP**。
+此前三个场景全是 opt-in ⇒ 改了适配层也不会红。
+
+**④ DR-4 部分恢复（当前会话收件箱）**：`scripts/dsh-inbox.mjs`（外部写文件）+ 插件桥 `session-inbox.ts`
+（`inbox.enabled`，默认关）：外部进程投递 → 该会话**活 agent**，`steer`/`followup`，`seq`+state 幂等可重放，
+坏行跳过并计数、失败不推进 state。单测 **9 项**；**真 Host 实测** 3 条外部投递全部 `steer` 送达、
+state 推进到 `{"consumed":3}`、会话记录出现插话文本。
+✗ **子代理中途投递仍未做**：宿主 `subagent/start` 只带 `{runId, provider, id, local}`，**没有"子会话↔发起它的工具"**的
+可靠关联（`description` 只在创建参数里）；要做得先补该关联或另造一条自己调 `ctx.subagents.start()` 的委派工具
+（会与宿主 `subagent` 重复，暂不做）。
+
+**✗ 另一条如实登记**：Host 级"中途投递"的 E2E 曾想用"bash sleep 8"撑窗口，**失败于本地沙箱**
+（无 bubblewrap/Landlock ⇒ `workspace-write` 被拒；`danger-full-access` 需审批而本会话审批关闭）⇒
+改用"连续三次工具调用"撑出时间窗完成验证。这条沙箱约束是环境事实，与插件无关。

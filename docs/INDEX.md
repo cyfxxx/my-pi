@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（241 条）
+## 决策台账（256 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ **主线回退到 DSH 合并之前**（`main` → `eda6d1405`），迁移经验回灌到主线 · **用户决定**：把项目主线回退到合并之前，但**合并过程中的优化与经验不能丢**。 · 数字: 46 条 / 16 条 / 883 条 · 证据: eda6d1405 / dcdc3dfe2
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
 - `DECISIONS.md` · [2026-10-11] ★ 更正：`daily-review` **已经跑了且成功** ✓（我先前"自 10-10 起从未再跑"**被现实推翻** ✗✓） · **实测（`tasks.json` 字段 diff vs `daily-health` ✓）**：`daily-review` 现在 `lastResult=**success**` ✓、 · 数字: 4 个 / 5 个
@@ -248,6 +249,20 @@
 - `DECISIONS.md` · [2026-10-15] 三件收尾：删冗余 `patches-next/`、加 packs 链接守门、新建 termux 技能 · **① `patches-next/` 已删（已切换完成后它就是冗余）**：`patches-next/1.2/002-local-pi-mods.patch` 与 `010-disable-share-bug.patch` · 数字: 681 个 / 1236 条 / 94MB / 83MB · 证据: bc3e4ba11 / 4294967295
 - `DECISIONS.md` · [2026-10-15] packs 结构约定升格为守门（R1–R7）；被吞的上游文件按"本仓该有 / 上游声明不发布"分流处置 · **起因（两类"沉默出错"，都无任何信号）**：① `packs/README.md` 写"经验沉淀已落地 13 个"，实测 **17 个**；② 把 `git ls-files packs/reverse-skill` · 数字: 13 个 / 17 个 / 147 个 / 4 条 · 证据: cab634bd
 - `DECISIONS.md` · [2026-10-15] Linux 完全便携化：运行时进仓库（`runtime/<平台>/`）、解析收敛一处、通用 Python 包用 `--target` 而非 venv · **背景**：用户在 Windows 上已实现"插到任何机器都能跑"（`<repo>\runtime` 放 PortableGit + Node）。Linux 侧当时只是"能在本机跑"： · 数字: 10 分钟 / 545 个 / 9 条 / 8 条
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：部署方案：用 profile 级 pnpm.overrides 把 pi 包 specifier 别名到本仓 shim · **理由（不采用）**：dsh/plugin/package.json 的 files 只发 dist+README，shim 根本不在分发包里 ⇒ 真 profile 装出来解析不到；改为构建期 esbuild --alias 把 shi · 数字: 0 条
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：同名冲突处置：写死一份「让位名单」（宿主占用的名字直接跳过） · **理由（不采用）**：不采用：名单会过期——宿主哪天不再提供同名工具时，我们仍会跳过 ⇒ 静默少能力；改为靠宿主注册表抛同名错就地跳过并点名上报，宿主不提供时自动生效
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：把 my-pi 的 subagent 工具改名保留（如 mypi_subagent） · **理由（不采用）**：不采用：它在 DSH 底座上是跨运行时 spawn pi 子进程，且 context:fork 在 DSH 上已静默降级；宿主原生 subagent 是同进程 spawn/fork 且自带 steer/cancel/
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：让 plan 命令直接让位给宿主的 /plan（只保留护栏与 plan_enter/plan_exit） · **理由（不采用）**：会丢掉用户命令面（resume/todos/plans/clear/help）与 clear/resume 的计划落盘·续跑路径；改为适配层命令名重映射，以 mypi-plan 换名注册（工具名不做此重映射，因为工具
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：诊断 trace 报「入桶 yes/no」表示会话用量是否记上 · **理由（不采用）**：不采用：同一回合的第二个 step 不会让桶数增加 ⇒ 会把「已并入已有桶」打成「没入桶」，诊断自己在说谎；改为报桶内调用数 · 数字: 2 次
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：写 sessionKeyOf 的单测时用箭头函数 fake（{getSessionFile: () => '…'}） · **理由（不采用）**：不采用：箭头函数不依赖 this，会把「方法被解绑调用」这类 bug 保护起来——实际就这么漏掉了一次真回归（留出集 33/33 → 11/33）；fake 必须模仿真实实现形状（getSessionFile() {
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：用 ln -sfn 整体软链整个 @scope 目录来补宿主包 · **理由（不采用）**：不采用：目标已是真目录时链接会建到目录里面（@scope/@scope → SRC），症状是「补了却还是找不到」；改为逐包补并跳过已存在项
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：把 vendored packs 里所有 web_search 表述一并改成 searxng · **理由（不采用）**：不采用：packs/ 是上游技能包（有各自同步与链接/结构守门），本地改名不该制造与上游的漂移；只改本仓自己维护的 packs/README.md，其余三处保留并逐条登记后果
+- `DECISIONS.md` · [2026-10-16] ★ DSH 换基座迁移收口：阶段 P0–P6 全部完成（同名冲突处置 / 产物自包含 / 守门扩到 J·K·L 段） · **结论**：分支 `feat/base-switch-dsh` 上，my-pi 的底座从 pi 迁到 DSH 已收口；`main` 全程未动。 · 数字: 3 B / 4 个
+- `DECISIONS.md` · [2026-10-16] ✗ 不采用：为每个 my-pi agent 自动注册一个宿主 subagent 工具实例（具名委派 = 按目录动态加载 dsh-tool-subagent） · **理由（不采用）**：暂不采用（技术上可行）：它会把每个 agent 变成**模型可见工具** ⇒ 工具面与 token 成本上升，并改变模型可见行为；本项目对工具面有预算纪律、宿主也刻意保持精简。改为登记为**可选部署特性**（需要时按
+- `DECISIONS.md` · [2026-10-17] ★ DSH 宿主进仓内 + `my-pi.sh` 一条指令双底座（tui / web / headless） · **问题**：`dsh` CLI 原先只活在 npm 的 npx 缓存（`~/.npm/_npx/<hash>/`，523 MB）里 —— 那是**仓外**、 · 数字: 523 MB / 0 次 · 证据: bash scripts/dsh-launch.sh --print-host
+- `DECISIONS.md` · [2026-10-17] ★ 合并到 main：DSH 成为**实验性第二底座**（`v1.3.0-dsh` 为回滚点） · **决策（用户批准后执行）**：把 `feat/base-switch-dsh`（69 提交 / 110 文件 / +10,886 −94）以 · 数字: 92% / 223 个 / 523 MB · 证据: eda6d1405
+- `DECISIONS.md` · [2026-10-17] ★ DR-2 落地：具名 agent 成为**可选能力**（默认关闭），并用"行为验证"取代"调用即成功" · **决策**：能力审计里 DR-2（目录扫描式 agent 定义 ⇒ 宿主上的具名委派）按"**可选部署特性**"实现，**默认关闭**。 · 数字: 0 个 / 2 个
+- `DECISIONS.md` · [2026-10-17] ★ 收口四项：home 治理 / DSH 体检 + 升级 runbook / 范围感知的 DSH 守门 / DR-4 部分恢复 · **① `portable/dsh` 增长治理**：新增 `scripts/dsh-gc.sh`（`status|prune`）。只动 `portable/dsh/{sessions,logs}`， · 数字: 10 个 / 30 天 / 14 天 / 14 个
 
 ## 进度记录（239 条）
 
@@ -491,7 +506,7 @@
 - `PROGRESS.md` · packs 全量整理：补回 1 个被静默吞掉的上游文件 + 结构约定升格为守门（2026-10-15） · - 用户："查看 packs 目录，做一下整理和优化"。先做全量只读体检（体积/追踪面/147 个 SKILL.md 的 frontmatter/许可/空目录/跨包重复/索引登记/引用可达性）， · 数字: 147 个 / 2 个 / 13 个 / 17 个 · 证据: cab634bd
 - `PROGRESS.md` · Linux 完全便携化：运行时装进仓库、随项目移动（2026-10-15） · - 用户："之前在 windows 上实现了完全便携化……现在继续优化便携化能力，实现在 Linux 环境中的完全便携化，所有项目相关内容全部集中在一起，不分散不依赖系统环境。 · 数字: 28.83 MB / 12 秒 / 6.5 MB / 29 个
 
-## 缺陷回放（38 条）
+## 缺陷回放（46 条）
 
 - `docs/BUG-REPLAYS.md` · #1 切了模式、重启后没生效：`modes.json` 里的全局 `current` 被任何 git 操作（checkout/stash/pull）静默退回 `full` · `git status` 后模式变了；`modes.json` 里出现 `current` 字段
 - `docs/BUG-REPLAYS.md` · #2 模式解析"第 3 轮工厂执行后漂回 full"：`PI_AGENT_MODE_SOURCE` 从 `file` 被翻成 `env`，此后把首轮值当外部注入钉死 · 同一进程内多轮工厂执行（/reload、/new、会话切换）后模式与磁盘不一致 · 证据: npx vitest run custom/features/mode/__tests__/mode-switch.test.ts
@@ -531,8 +546,16 @@
 - `docs/BUG-REPLAYS.md` · #36 **迁移验证的三个陷阱：会得出"数据丢了"的错误结论（其中两个是静默的）**：从一块损坏的 exFAT 盘做救援备份后对账，同一个事实被误判了三次。① **单位口径**：robocopy 的 `g` 是 **GiB** 不是 GB（ · ①两份数值口径不同却"看起来差 2.5 GB"；②对账脚本报缺失、但 `Test-Path` 对同名路径回 True；③递归总数比清单推算少、差值恰好等于那两个目录的文件数（本盘为 20）；④`Get-ChildItem -LiteralP · 数字: 2.5 GB
 - `docs/BUG-REPLAYS.md` · #37 **[已修 · 平台] supervisor 的实例身份用 bash `$$`，而 pi 报的是 Windows PID ⇒ admin 重启链路在 MSYS/Windows 上静默失效**：supervisor 以 `SUPERV · supervisor 测试曾 16 项失败，其中 8 项即此：`主循环跑满两轮（期望 2，实际 1）`、`ownerPid = 本 supervisor（ppid 链路）→ 请求被认领并执行（期望 2，实际 1）`、`轮次记录：两轮 res
 - `docs/BUG-REPLAYS.md` · #38 **创建/切换会话打断在跑的那一轮**：TUI 里 `/new`（新建会话）或 `/resume`（会话选择器）会把当前会话**正在跑的那一轮直接中止** —— 用户视角是「我刚让它做的事被打断、结果丢了」。**根因在 pi 内部* · 切换前 pane 有工作指示器；切换后**旧会话文件末条是 `stopReason=aborted` / 空 content 的 assistant 记录**；同一轮本该落盘的回复**永远不再出现**在旧会话文件里；PID 不变（不是重启） · 证据: npx vitest run custom/features/mode/__tests__/session-switch-guard.test.ts
+- `docs/BUG-REPLAYS.md` · #39 **守门脚本的开关组合会把它变成"只测量"（虚假绿）**：`scripts/dsh-baseline.sh` 最初把参数写成三选一的位置参数（`--check` / `--update` / `--tools`／`--prompt` · 未改任何文件时 `--prompt --check` 与 `--prompt` 输出**完全一样**且都 exit 0；改一行源文件后 `--prompt --check` 仍 exit 0（应 1） · 证据: bash scripts/dsh-baseline.sh --prompt
+- `docs/BUG-REPLAYS.md` · #40 **"取走即销毁"的共享状态被多个订阅者消费 ⇒ 只有第一个拿到，其余静默拿空**（DSH 换基座时抓到的真事故）：`turn_end` 这类 pi 事件会被**多个特性**注册（本仓 3 个），而适配层是"每个 pi 事件注册 ⇒ · 真 Host 打开 `MY_PI_DSH_TRACE_EVENTS=1` 一眼可见：`用量补丁=yes(calls=1)` 之后紧跟着**两条** `用量补丁=no`；而 `portable/memory/context/.usage-di · 数字: 1.66 天 / 3 个 · 证据: npx vitest run custom/adapters/dsh/__tests__/usage-accumulator.test.ts
+- `docs/BUG-REPLAYS.md` · #41 **上游"注册冲突"错误冒泡 ⇒ 连带丢掉该特性后面的一切注册**（DSH 换基座实录）：真 Host 里 my-pi 的 3 个名字与 DSH 原生撞车（`web_search`/`subagent` 工具、`plan` 命令）。 · 修前：`grep -c "注册功能失败" /tmp/dsh-host-run.log` = 3，且注册汇总缺失（根本无从知道少了什么）。修后真 Host：`⚠️ 注册功能失败` **0 条**，改为 3 条点名上报 `registerToo · 数字: 0 条 / 3 条 / 52 个 / 9 个
+- `docs/BUG-REPLAYS.md` · #42 **`local`/`declare` 同一行里引用刚声明的变量 ⇒ `set -u` 下失败，报错却指向变量名**：写 DSH 模式场景脚本时写成 `local label="$1" mode="$2" out="$LOG_DIR · 脚本输出只有那一条 unbound variable（第 89 行），函数第一行；同一函数改成多条 `local` 后立刻正常（场景随即跑通并给出 53/10 与 0/1 两组注册汇总）
+- `docs/BUG-REPLAYS.md` · #43 **打包形态冒烟自 2026-10-18 起静默失效**（连带暴露 `ln -sfn` 的目录语义坑）：`dsh-package.sh` 把 tgz 装到**独立目录**再从那里加载，而 `entry.ts` 那天为 `define · 失败栈：`Cannot find package '@deepseek-ai/dsh-tools' imported from /tmp/my-pi-plugin-install/node_modules/my-pi-dsh-plugin/
+- `docs/BUG-REPLAYS.md` · #44 **把依赖 `this` 的方法「取下来」再调用 ⇒ 静默返回 undefined，打穿整条重启链**（本分支自己造成的真实回归）：DSH 换基座时新增了 `sessionKeyOf()` 统一"这是哪个会话"的键，内部写成了 `c · 留出集（`PI_GOLDEN_SCENARIO=1`）从 **33/33 掉到 11/33（模式切换）与 8/33（两实例隔离）**，失败点集中在"没触发真重拉/`targetSession=undefined`/`modes-sessio · 证据: npx vitest run custom/features/mode/__tests__/session-key.test.ts
+- `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
+- `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（200 条）
+## 设计文档（240 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -561,22 +584,64 @@
 - `docs/design/CODING-TRAPS.md` · 7. 真 pty 场景里，用"切片里没有某段文本"做断言 ⇒ 被 TUI 全屏重绘污染成**假失败** · - **症状**：断言"发 `/new` 之后 pane 里还没有 `New session started`"失败，而行为其实完全正确； · 数字: 2 次 / 3 分钟
 - `docs/design/CODING-TRAPS.md` · 8. `readdir` 给的 `Dirent` 类型在 PRoot/FUSE 下**不可信** ⇒ 遍历结果会"时好时坏" · - **症状**：同一个 `check-packs-structure.mjs`，前一分钟报 `147 个 SKILL.md`，下一分钟报 · 数字: 147 个 / 0 个
 - `docs/design/CODING-TRAPS.md` · 9. PRoot/FUSE 下"覆盖更短的符号链接目标"不截断 ⇒ 留下 `0001` 尾巴；`cp -al` 还会**改到源** · - **症状 A（静默）**：`python3 -V` 仍能跑，但用的是**另一个解释器**（系统/Termux 的）， · 数字: 545 个 · 证据: bash scripts/portable-runtime.sh repair
+- `docs/design/CODING-TRAPS.md` · 10. `find -type f` 在本机 PRoot/FUSE 下会**间歇性漏掉普通文件**（比 #8 更毒：它会污染守门结论） · - **症状 A（守门虚假失败）**：`check-conventions.sh` 的"模式资产引用成对"突然报 · 数字: 0 个 / 0KB / 9 个 / 8 条
+- `docs/design/CODING-TRAPS.md` · 11. 共享状态对外给"取走即销毁"的接口 ⇒ 多订阅者场景下静默丢数据 · - **症状**：某功能"看着接上了却永远没数据"——处理器正常返回、字段只是**恰好为空**， · 数字: 3 个 / 3 条
+- `docs/design/CODING-TRAPS.md` · 12. 上游"注册冲突"错误直接冒泡 ⇒ **连带丢掉该特性后面的一切注册**（且数量上看不出来） · - **症状**：真实宿主里某些能力就是没有，而**日志只说了一个冲突**。2026-10-18 DSH 换基座实测：
+- `docs/design/CODING-TRAPS.md` · 13. `local`/`declare` 同一行里引用前面刚声明的变量 ⇒ `set -u` 下报 `unbound variable` · - **症状**：函数里写
+- `docs/design/CODING-TRAPS.md` · 14. `ln -sfn <源> <目标>` 在"目标已是**真目录**"时会把链接建到**它里面** · - **症状**：`ln -sfn "$SRC" "$D/node_modules/@scope"` 之后，`$D/node_modules/@scope/pkg` **依然找不到**
+- `docs/design/CODING-TRAPS.md` · 15. 把依赖 `this` 的方法"取下来"再调用 ⇒ 静默 undefined；而**箭头函数 fake 会把这个 bug 保护起来** · - **症状**：`const f = ctx.sessionManager.getSessionFile; f()` 在 `this` 依赖型方法上**抛 TypeError**， · 数字: 6 条
+- `docs/design/CODING-TRAPS.md` · 16. 把**派生产物**当事实来源写 ⇒ 记录被生成器静默覆盖（还打印"已记录"） · - **症状**：`record-change.mjs --reject` 打印"✓ 已记录被否的提案"，但**下一次**重建台账时那条记录消失。 · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
+- `docs/design/CODING-TRAPS.md` · 17. `pkill -f <pattern>` 会匹配到**你自己的命令行** ⇒ 自杀 · - **症状**：命令返回 `[killed by signal: SIGTERM]`，后续语句一条没跑（比如本该删凭据的 `rm` 没执行）。
+- `docs/design/CODING-TRAPS.md` · 18. 把"症状汇总表"当病因：`Missing services` 不是根因 · - **症状**：`dsh` 启动失败，输出一张 `Plugin / Missing services` 表（`connection` 缺 `webRuntime`、
+- `docs/design/CODING-TRAPS.md` · 19. 把插件 `apply` 改成 `async` ⇒ 工具在全局工具面**看不见** · - **症状**：`apply` 改成 `async` 后，插件自己的 `apply` 里 `ctx.tools.register()` 明明都执行了 · 数字: 54 个 / 0 个
+- `docs/design/CODING-TRAPS.md` · 20. "注册调用成功" ≠ "工具面可见"：缺注入会**静默不激活** · - **症状（同一件事的两次误判）**： · 数字: 2 个 / 0 个
+- `docs/design/CODING-TRAPS.md` · 21. 改了 `custom/**` 只跑 `tsc -p dsh/` ⇒ 漏检 · - **症状**：本地以为类型没问题，`git push` 被 pre-push 的 golden 拦住：`❌ tsc（见 /tmp/golden-tsc.log）`。
+- `docs/design/CODING-TRAPS.md` · 22. 改了插件入口只跑 `tsc` 不重建产物 ⇒ 新配置"不生效"、日志也不出现 · - **症状**：给 `dsh/plugin/entry.ts` 加了可选项（`inbox.enabled`），`tsc -p dsh/` 通过、composed config 里 · 数字: 10 秒
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条
 - `docs/design/DORMANT-AUDIT.md` · 三、结论与建议（按"先做哪个"排序） · 1. **`TOOL_LAYERING` 必须二选一**（最高优先）。它是"关着但留着"的典型：`enable_tool` 历史上被调用过 8 次 · 数字: 8 次 / 5 条 / 3 条 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 四、本次的实测数字（本项的"效率指标"） · - 未接线清单规模：**A 段 18 条 + B 段 4 条 + C 段 1 条（我误放的，已移正）**； · 数字: 18 条 / 4 条 / 1 条 / 5 条
 - `docs/design/DORMANT-AUDIT.md` · 五、执行结果（2026-10-08）：`TOOL_LAYERING` 已删除 · 用户授权"由你决定"。**判断：删除。** 依据（按分量排序）： · 数字: 100 个 / 18 个 / 442B / 60.8%
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 1. `web_search`：DSH **覆盖不了**（真缺口） · ⇒ **让位会丢**：无 key/自建后端搜索、模型可控的结果条数与抓取长度。
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 2. `subagent`：DSH **大体覆盖**，但 my-pi 有 5 项独有 · ⇒ **让位会丢**：chain、目录扫描式 agent 定义、逐任务 `cwd`、进程外投递、Termux 并发降级。 · 证据: node scripts/subagent-inbox.mjs post
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 3. `plan`：DSH 只管"入口"，**完全不管强制** · ★ **关键区分（别混为一谈）**：让位只跳过 `plan` **命令**。`plan_enter`/`plan_exit` 工具与那条 · 数字: 18 个
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 4. 汇总：三块全部让位时会真正丢失什么 · - **`web_search`**：① 无 key/自建 SearXNG 端点；② 免配置 Bing 降级；③ 模型可控 `maxResults`；④ `max_length`。
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 5. 明确的"未查到"清单（附检索面） · - DSH：搜索的**时间范围过滤 / 分页 / cookie**（检索面：`dsh-tool-web`、`dsh-web` 的 schema 与
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 6. 决策（**2026-10-18 已定**） · **命令名重映射（为什么只给命令做）**：工具名对**模型**可见，改名会改变模型行为 ⇒ 工具冲突只能 · 数字: 3 个 / 2 个 / 10 个 / 1 个
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 7. 待重设计项（登记，**不静默丢**） · 让位/改名的代价逐条登记如下。每项都是"my-pi 有、宿主没有"，需要重设计才能回到 DSH 上。 · 数字: 3 条
+- `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md` · 相关 · - 冲突本身与隔离修复：[`DSH-MIGRATION-PLAN.md`](design/DSH-MIGRATION-PLAN.md) 实测 #18-u、#18-v；决策记录 #18-x
 - `docs/design/DSH-HOOK-MAPPING.md` · 0. 一句话结论 · - my-pi 实际有 **53 个** `registerHook` 特性调用点（另 2 处在适配器里），去重后 **18 个 distinct 事件**。 · 数字: 53 个 / 18 个 / 105 个 / 59 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 1. 第一步：my-pi 的钩子归类（实测，非估算） · grep 命令（可复跑）： · 数字: 55 个 / 53 个 / 2 个 / 18 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 2. 第二步：DSH 实际声明的事件（附行号） · DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不在 my-pi 的 `node_modules`**）。 · 数字: 105 个 / 41 个 / 59 个 / 2 条 · 证据: 1e7f6d9597241db0
-- `docs/design/DSH-HOOK-MAPPING.md` · 3. 第三步：逐类映射（18 个 my-pi 事件） · ### 3.1 三档汇总 · 数字: 23 个 / 29 个 / 0 个 / 21 个
+- `docs/design/DSH-HOOK-MAPPING.md` · 3. 第三步：逐类映射（18 个 my-pi 事件） · ### 3.1 三档汇总 · 数字: 1 次 / 3 条 / 0 条 / 22 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 4. 未核实项（必读，明确列出） · 1. **自动化任务（autopilot）的 21 个调用点是本清单里最难的一块**：它注册 `session_start`/`session_shutdown`/`turn_*`/`tool_*`/`input`/`agent_settl · 数字: 21 个
 - `docs/design/DSH-HOOK-MAPPING.md` · 5. 复跑命令（供核对） · # my-pi 侧 · 数字: 53 个 / 105 个 / 59 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 6. 复核轮（2026-10-11）：验证或推翻"压缩前干预缺失" · **结论：原结论被推翻。** DSH **有**压缩前介入能力，只是形态与 pi 不同（pi 是"每次压缩前的回调闸门"，DSH 是"**可替换的压缩引擎服务**"＋失败路径瀑布）。 · 数字: 289 个 / 5 个 / 4 个 / 1 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 7. 第三类扩展点：服务替换清单（2026-10-11 复核二新增） · **为什么要清点它**：第 6 节发现「扩展点不止事件一类」。本轮把**服务替换**这一类**完整清点**了一遍 —— · 数字: 132 个 / 85 个 / 47 个 / 84 个 · 证据: 1e7f6d9597241db0
 - `docs/design/DSH-HOOK-MAPPING.md` · 8. 复核二：追 `CompactionEngine` 的调用者（补齐第 4 节第 2 条的残留缺口） · **结论：缺口②已被回答 —— 存在「每次压缩前必然触发」的服务级点** ✓； · 数字: 1 条
 - `docs/design/DSH-HOOK-MAPPING.md` · 7.4 复核三：`schedule` 是否依赖交互客户端（**已核实 ✓**） · **问题**：my-pi 的调度器受 `hasUI` 门控（`custom/features/autopilot/index.ts:886`：无头会话只做种子对账、不启调度器 ✗） · 数字: 289 个 / 3011 个 · 证据: 1e7f6d9597241db0
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 1. 状态 · 证据: npx vitest run custom/adapters/dsh
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 2. 怎么复跑全部验证（分层，从上到下由快到慢） · # ① 本地守门层（秒级～分钟级；含 DSH 双基线 J、dsh/plugin 类型 K、Markdown 表体 L） · 数字: 30 分钟 · 证据: bash scripts/check-conventions.sh
+node / node scripts/check-md-tables.mjs && / node scripts/check-dead-exports.mjs
+node
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 3. 部署与运行形态 · **日常用就一条指令**（仓内便携，见 `DECISIONS.md` 2026-10-17）： · 数字: 764 KB / 53 个 / 10 个 / 1 个 · 证据: bash scripts/dsh-runtime.sh install
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 4. 关键实测结论（每条都有可复跑证据） · 数字: 3 条 / 0 条
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 5. 剩余缺口（**不假装已完成**） · 数字: 3 条 / 4 个
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 6. 经验与陷阱（本次新增）
+- `docs/design/DSH-MIGRATION-CLOSEOUT.md` · 7. 交接提示 · - 合并状态：**已并入 `main`**（快进，合并点 `dcdc3dfe2`，标签 `v1.3.0-dsh`）；原分支 `feat/base-switch-dsh` · 证据: dcdc3dfe2
+- `docs/design/DSH-MIGRATION-PLAN.md` · 0. 策略：**外观层（façade）+ 适配层（adapter）**，features 不改 · my-pi 的分层本来就为这件事准备好了（`custom/adapters/README.md`）： · 数字: 223 个 / 18 个 / 4 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 1. 本轮实测补充的契约事实（都带出处，纠正/收窄了评估阶段的估算） · --- · 数字: 57 个 / 12 MB / 25 秒 / 18 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 2. 迁移面（本仓实测口径） · ### 2.1 四个原语与 DSH 的对应（登记表） · 数字: 18 个
+- `docs/design/DSH-MIGRATION-PLAN.md` · 3. 阶段与验收（每阶段都要有可复跑证据） · > ✅ **2026-10-18 更新**：P5 的完整 Host 验证**已获用户授权并跑通**（隔离 `DSH_HOME`、不动 `~/.dsh`、 · 数字: 19 个 / 100% / 3 个 / 758 B · 证据: dcdc3dfe2 / npx vitest run custom/adapters/dsh
+- `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个 / 53 个 / 758 B / 19 个 · 证据: bash scripts/dsh-baseline.sh --tools / bash scripts/dsh-baseline.sh --prompt
+- `docs/design/DSH-MIGRATION-PLAN.md` · 5. 未核实（✗，本轮开工时如实登记） · 1. ~~`@deepseek-ai/dsh-commands` 的命令契约**未读**~~ **已补读并实测（2026-10-16）**： · 数字: 4 个 / 223 个
+- `docs/design/DSH-ROLLBACK.md` · 1. 回退到哪、为什么 · - **回退点**：`eda6d1405`（`feat/base-switch-dsh` 分叉前的 `main`）。 · 证据: eda6d1405
+- `docs/design/DSH-ROLLBACK.md` · 2. DSH 的东西在哪（一件没丢） · 恢复任意状态： · 证据: dcdc3dfe2
+- `docs/design/DSH-ROLLBACK.md` · 3. 回灌到 `main` 的经验（这才是"不要丢失"的部分） · 数字: 16 条
+- `docs/design/DSH-ROLLBACK.md` · 4. 没回灌的部分（DSH 专属，留在分支） · `dsh/`（插件与 profile）、`custom/adapters/dsh/**`、`scripts/dsh-*.sh|mjs`（宿主安装/启动/体检/回收/收件箱/golden 第 22 步）、
+- `docs/design/DSH-ROLLBACK.md` · 5. 回退后 `main` 的形状 · - 仍是**单一底座 pi**：`./my-pi.sh` 走 pi TUI；`scripts/` 71 个（回灌了 `check-md-tables.mjs`）； · 数字: 71 个
+- `docs/design/DSH-ROLLBACK.md` · 6. 其它分支的关系 · - `feat/private-assistant`（拼接式助手实验）基于**合并后的** `4453d3965`，回退后它不再是 `main` 的后代； · 证据: 4453d3965
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ② 分材料明细 · ### 2.1 WikiSkill（arXiv:2608.27454） · 数字: 48.7% / 63.7% / 15.0% / 60.9%
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ③ 这些新信息改变了什么判断（只写确凿的） · 1. **WikiSkill：那条"读 wiki 有害"必须带条件引用。** 新数字显示它是**条件性**的：只有在 **Skill Proposer 也有 wiki 访问**时， · 数字: 10 个 / 204 个 / 46 个

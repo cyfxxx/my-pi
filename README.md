@@ -302,6 +302,13 @@ sudo yum install tmux
 - **Node.js**: >= 22.19.0
 - **npm**: 用于安装依赖
 
+## 关于 DSH（已回退，保留在分支）
+
+`main` 是**单一底座（pi）**。曾经尝试把 deepseek-harness 作为实验性第二底座并合并进 `main`，
+后已回退到合并前（`eda6d1405`）；那套实现与它的跑法完整保留在 `feat/base-switch-dsh`、
+标签 `v1.3.0-dsh`、分支 `archive/dsh-on-main`。回退了什么、哪些经验回灌到了 `main`：
+见 [DSH-ROLLBACK.md](docs/design/DSH-ROLLBACK.md)。
+
 ## 文档
 
 - [项目愿景](docs/design/VISION.md)（开发目标、方法论、落地路线）

@@ -12,6 +12,7 @@
  */
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { isSessionPath, sessionKeyOf } from './session-key';
 import { registerHook } from '../../adapters/hook-adapter';
 import { registerCommand, getThinkingLevel, setThinkingLevel, sendMessage, sendMessageAfterRebind } from '../../adapters/ui-adapter';
 import { parseSubcommand, filterCompletions } from '../../core/cli';
@@ -99,7 +100,7 @@ export function register(pi: ExtensionAPI): void {
     },
     handler: async (args, ctx) => {
       const { sub: subcmd } = parseSubcommand(args);
-      const sessionFile = sessionFileOf(ctx);
+      const sessionFile = sessionKeyOf(ctx);
       const currentName = getSessionMode(sessionFile) ?? getDefaultMode();
 
       if (subcmd === 'help' || subcmd === '-h' || subcmd === '--help') {
@@ -207,7 +208,7 @@ export function register(pi: ExtensionAPI): void {
     event: 'session_start',
     handler: async (_event, ctx) => {
       // 会话应有的模式：本会话的记录，没有记录就是 default（新会话）。
-      const sessionFile = sessionFileOf(ctx);
+      const sessionFile = sessionKeyOf(ctx);
       const recorded = getSessionMode(sessionFile);
       const intended = recorded ?? getDefaultMode();
 
@@ -429,17 +430,6 @@ function takePendingModeNotice(sessionFile: string | undefined): { from: string;
   }
 }
 
-/** 当前会话文件（内存会话 / --no-session 返回 undefined） */
-function sessionFileOf(ctx: {
-  sessionManager?: { getSessionFile?: () => string | undefined };
-}): string | undefined {
-  try {
-    return ctx.sessionManager?.getSessionFile?.();
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * 提交自动重启请求并退出当前进程。
  *
@@ -467,9 +457,11 @@ function requestModeRestart(
 ): boolean {
   let written = false;
   try {
-    const sessionFile = sessionFileOf(ctx);
+    const sessionKey = sessionKeyOf(ctx);
+    // ★ DSH 的会话没有文件路径：`dsh-session:<id>` 是稳定键，**不能**当 supervisor 的 `--session` 用。
+    //   只有确实是路径时才写进重启请求（pi 侧行为不变；DSH 侧省略该字段而不是塞一个假路径）。
     writeRestartRequest('restart', {
-      targetSession: sessionFile,
+      ...(isSessionPath(sessionKey) ? { targetSession: sessionKey } : {}),
       reason,
       notice: 'mode',
       mode: modeName,

@@ -13,7 +13,7 @@ my-pi/
 ├── docs/                # 项目文档（使用/开发/运维）
 ├── deploy/              # 可选系统级部署产物（systemd 等）
 ├── patches/             # 上游补丁
-├── scripts/             # 70 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
+├── scripts/             # 71 个运维脚本（.sh/.mjs/.py；含共享库 lib-vendor.sh、lib-mode.sh、lib-state-audit.mjs、lib-fake-provider.mjs、lib-pty-harness.mjs）
 ├── my-pi.sh             # 便携启动脚本
 ├── package.json         # 依赖和 piConfig 配置
 ├── README.md            # 项目简介
@@ -99,7 +99,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 
 ### `scripts/`
 （另有 `docs/CHANGES.jsonl` 改动台账：由 pre-push 追加、由约定守门校验格式）
-共 70 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
+共 71 个运维脚本（`.sh`/`.mjs`/`.py`，含 5 个共享库 `lib-vendor.sh`、`lib-mode.sh`、`lib-state-audit.mjs`、`lib-fake-provider.mjs`、`lib-pty-harness.mjs`；另有 4 个非脚本文件：`README.md`、`dead-exports-allowlist.txt`、`registration-baseline.json`、`task-summarizer.d.mts` 类型声明）：
 
 - `build.sh`：一键重建/引导（Node 检查 → 根依赖 `npm ci` → vendor 引导与补丁幂等提交 → 工作区按依赖顺序构建（模型数据缺失时联网生成）；可选 fd-rg shim / 自愈缓存）；`custom/` 不编译，由 pi 的扩展加载器直接加载 TypeScript
 - `doctor.sh`：本地环境 vs 仓库体检（依赖/vendor/补丁/dist 新鲜度/自愈缓存/shim/外部工具/类型/本地 vs origin），`--fix` 自动修复可修复项，`--full`/`--no-net`
@@ -109,6 +109,7 @@ my-pi 的自定义代码。三层结构，外加一个独立的接入通道：
 - `lib-mode.sh`：被 `pi-supervisor.sh` / `dev.sh` source 的模式解析共享逻辑（`modes.json` 配置 + `modes-sessions.json` 会话记录 → 模式名/记忆命名空间/人设绝对路径，并导出 `PI_SESSION_MODE` 供 pi 侧采用）；`mode_session_arg` 从启动参数里取 `--session <绝对路径>`（其余形态交给 pi 侧自愈）。抽出来的原因是此前逻辑只在 supervisor 里，`dev.sh` 静默不注入人设
 - `check-isolation.sh`：验证隔离边界
 - `check-features.sh`：功能完整性（12 功能目录 + 生成式注册面基线 + 适配器 API + 钩子事件 + 配置/脚本/补丁）
+- `check-md-tables.mjs`：Markdown 表体完整性（表行被写断/台账表体空行；跳过围栏代码块与 vendored 的 packs/）——从 DSH 分支回灌的守门，见 `docs/design/DSH-ROLLBACK.md`
 - `gen-registrations.mjs`：从代码生成/校验注册面基线（`registration-baseline.json`；`--update` 刷新）——替代原先手写清单，防漂移
 - `check-packs-links.mjs`：**packs 内部 Markdown 相对链接守门**（既有 `check-doc-links.mjs` 有意排除 `packs/`；本脚本按 vendored 布局判定，口径与上游 `verify-doc-links.py` 一致：只查相对链接、跳过围栏代码、命中集合 = git 跟踪文件∪目录；反证探针：注入一条断链 ⇒ exit 1 并点名 `md:行 -> 目标`）
 - `lib-portable.sh`：**便携运行时的单一事实来源**（2026-10-15 新增）：平台判定（`pi_platform`）、运行时目录（`pi_runtime_root`/`pi_ext_dir`/`pi_py_site`）、Node 解析（`pi_resolve_node`：`MY_PI_NODE` → 仓内 `<repo>/runtime/<平台>/node` → 旧扁平 `runtime/node` → 同级历史布局 → PATH，且必须版本达标）、Python 解析（便携 CPython → 系统 python3）、便携环境导出（`pi_portable_env`：把仓内 node/python 前置进 PATH、npm/pip 缓存与 pycache **强制**指到仓内）、服务私有 HOME/XDG/TMP（`pi_service_env`）、venv 自愈（`pi_py_repair_venv`）。解析点从"三份拷贝"收敛到这一处（此前的漂移缺陷见 [docs/operations/BUILD-PORTABILITY.md](docs/operations/BUILD-PORTABILITY.md) §4.3）

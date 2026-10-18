@@ -77,7 +77,7 @@
     ],
     "web-search": [
       "fetch_url",
-      "web_search"
+      "searxng"
     ]
   },
   "commands": {

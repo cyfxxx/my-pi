@@ -1,12 +1,5 @@
 {
   "create_patterns": [],
-  "update_patterns": [
-    {
-      "name": "bug-038",
-      "edits": [
-        "命令 更新"
-      ]
-    }
-  ],
+  "update_patterns": [],
   "update_index": true
 }

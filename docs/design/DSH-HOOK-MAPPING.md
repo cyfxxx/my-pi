@@ -1,5 +1,8 @@
 # DSH 换基座：钩子映射清单（my-pi `registerHook` → DSH 事件）
 
+> ⚠️ **本文件描述 DSH 分支（`feat/base-switch-dsh` / `v1.3.0-dsh`）的实现**；`main` 已回退到合并前，
+> 现状与处置见 [DSH-ROLLBACK.md](DSH-ROLLBACK.md)。
+
 > 目的：把「**64 处钩子要人工映射**」这个最大不确定项，变成**可换算的输入**。
 > 本文件**只做静态分析**（未运行任何东西），每条结论都带 `文件:行号`。
 > 结论口径分三档：**①可映射**（有直接对应事件、能力等价，改动基本是换事件名 + 换接入方式）、
@@ -110,7 +113,7 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 | `agent/created` | serial | `dsh-agent/lib/types/runtime-types.d.ts:227` | agent 进入后、创建落定前的逐个初始化；**抛错会让创建失败** |
 | `agent/disposed` | emit | 同上 `:240` | agent 离开注册表（驱动静默、作用域注销之后） |
 | `agent/status` | emit | 同上 `:252` | 状态在 `idle` ⇄ `running`；`idle` 指没有驱动在排队或在跑 |
-| `agent/pre-step` | waterfall | 同上 `:304` | **可否决该 step、或替换进入它的 messages** |
+| `agent/pre-step` | waterfall | 同上 `:304`（判定类型 `:92-99`） | **可否决该 step、或替换进入它的 messages**；判定形状实测读到：`{kind:'reject'}` 或 `{kind:'enter', messages: UserMessage[], startsRequestSeries?: true}` ⇒ 改写是**整组替换**（不是就地改文本），与 pi 的 `input` 语义可按此翻译 |
 | `agent/request` | waterfall | 同上 `:327` | 替换冻结的调用配置（可在系统提示词前改） |
 | `agent/request-error` | waterfall | 同上 `:348` | 一次模型请求失败后决定 retry 或终止 |
 | `agent/assistant-stream` | emit | 同上 `:366` | 助手流式分片（有序帧） |
@@ -156,22 +159,22 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 
 | # | my-pi 事件 | 档 | DSH 对应 | 一行理由 |
 |---|---|---|---|---|
-| 1 | `session_start` | **②** | `agent/created`（serial, `dsh-agent:227`）；旁证 `session/created`（emit, `dsh-session:42`） | 粒度从「会话」变成「agent」，且 resume 语义要重查；`agent/created` 还能否决创建，需确认原处理器不做假设 |
-| 2 | `session_shutdown` | **②** | `agent/disposed`（emit, `:240`）、`session/disposed`（emit, `:52`）、`workspace/session-stop`（parallel, `dsh-workspace:110`） | pi 是"会话被替换时"的一次性清理通知；DSH 拆成 agent 级/存储级/归档级三种时机，顺序与"能否 veto"都不同 |
+| 1 | `session_start` | **②** | ★ **2026-10-17 首选会话级**：`session/created`（emit, `dsh-session:42`；由 `SessionStore.announce()` 发出，**负载是 Session 对象本身**）；备选 `agent/created`（serial, `dsh-agent:227`） | pi 的"会话开始"与 DSH 的"会话创建公告"同层 ✓ **运行时已验证**（spike A11：`Session.create → enter → announce` ⇒ 处理器触发 1 次、拿到会话身份）；✗ 处理器内部的资源启停语义仍需逐条对齐 |
+| 2 | `session_shutdown` | **②** | ★ **2026-10-17 首选会话级**：`session/disposed`（emit, `:52`；由 `enter()` 的 detach disposer 发出，**负载是 Session 对象本身**）；补充 `agent/disposed`（emit, `:240`）、`workspace/session-stop`（parallel, `dsh-workspace:110`） | pi 是"会话被替换时"的一次性清理；DSH 拆成存储级/agent 级/归档级三种时机 ✓ **运行时已验证**（spike A11：调用 detach disposer ⇒ 处理器触发 1 次、身份一致）；✗ 三种时机各该做什么清理仍需按功能定义 |
 | 3 | `before_agent_start` | **②** | `agent/pre-step`（waterfall, `:304`）、`system-prompt/assemble`（waterfall, `dsh-system-prompt:27`） | pi 是"agent 启动前一次"；DSH 对应点是**每步**（`pre-step`）或**提示词装配**，需改成幂等/每步语义 |
 | 4 | `turn_start` | **①** | `turn/start`（SessionEventMap, `dsh-agent/types.d.ts:86`） | 能力都是"观察回合开始"；接入方式要从直接订阅改为订阅 `session/event` 再按 `event.type` 派发 |
 | 5 | `turn_end` | **①** | `turn/end`（同上）；更强的是 `agent/turn-stopping`（serial, `:387`） | 观察点存在；若需要"能否让回合继续"，DSH 的 `turn-stopping` 比 pi 更强（可 steer 继续），按需选一个 |
 | 6 | `agent_settled` | **①** | `agent/status`（emit, `:252`，进入 `idle`） | DSH 把「settled」表达为状态翻到 `idle`（无驱动在排队/在跑），语义等价、形态不同 |
 | 7 | `agent_end` | **②** | `agent/turn-stopping`（serial, `:387`）、`agent/status`（emit, `:252`） | pi 的 `agent_end` 是"整段 agent 结束"；DSH 这一层是**回合级**，需要把处理器从"结束一次"改成"每回合判条件" |
-| 8 | `input` | **②** | `agent/pre-step`（waterfall, `:304`，可替换进入 step 的 messages）、`agent/inbox/inserted`（emit, `:263`） | pi 的 `input` 能改写用户输入；DSH 的对应干预点在"步"这一层（inbox 只是观察），改写对象从"输入"变成"进入 step 的消息数组" |
+| 8 | `input` | **②** | `agent/pre-step`（waterfall, `:304`，可替换进入 step 的 messages）、`agent/inbox/inserted`（emit, `:263`）、`agent/inbox/spliced`（会话日志事件，带 `target`） | pi 的 `input` 能改写用户输入；DSH 的对应干预点在"步"这一层（inbox 只是观察），改写对象从"输入"变成"进入 step 的消息数组"。**`streamingBehavior` 已可派生（2026-10-18）**：DSH 把它记在会话日志 `agent/inbox/spliced.target`（`InboxTarget = 「next-turn」｜「next-step」`，`dsh-agent/lib/types/types.d.ts:31`）⇒ `next-step`=steer、`next-turn`=followUp，按"进入本步的消息 id"反查填入；查不到才置空并上报（不猜）。真 Host 实测：该降级上报从每次运行 3 条降为 0 条 |
 | 9 | `tool_call` | **①** | `tools/pre-execute`（waterfall, `dsh-tools:47`） | 两者都是分发前的闸门，能力等价乃至更强（DSH 多了 cancel/ask）；改动基本是换事件名 + 换 decision 形状 |
 | 10 | `tool_result` | **①** | `tools/post-execute`（waterfall, `:70`）；只观察用 `tools/result`（emit, `:92`） | 两者都能 accept/replace/enrich/block 工具结果；差别只在 decision 形状与错误路径的表达 |
 | 11 | `tool_execution_start` | **①** | `tools/execute`（waterfall, `:58`） | 阶段相同（分发前），DSH 版本是环绕瀑布、能力是超集（超时/重试/指标） |
 | 12 | `session_compact` | **①** | `compaction/end`（SessionEventMap） | "压缩完成"有直接对应类型；接入同样走 `session/event` |
-| 13 | `session_before_compact` | **②**（**理由已更正**；原判"无等价闸门"**被推翻**） | ~~只找到 `compaction/summary-error` 与 `compaction/start`~~；实为 **服务级**：`CompactionEngine`（`dsh-compaction/lib/types/index.d.ts:102`，注册为 `ctx.compaction` @ `:67-70`）＋ **`compaction/summary-error` 瀑布**（`@mode waterfall` @ `:83`，可在失败后**持久改写被选中的输入** @ `:72-77`）＋ 配置化策略（`dsh-compaction-basic/lib/types/config.d.ts:22`、`:29`、`:42`） | 能力**存在**但**形态不同**：pi 是"**每次压缩前**的回调（可取消/可自定义，`vendor/pi/.../types.ts:763`）"；DSH 是"**换一个压缩引擎实现**"（契约原文"Implementations own trigger policy, retention, and summarization" @ `dsh-compaction:94-95`；首方实现 `BasicCompactionEngine extends CompactionEngine` @ `dsh-compaction-basic/lib/types/index.d.ts:24`）＋失败路径瀑布（首方用法 `dsh-compaction-image-offload/lib/index.js:146`）。⇒ 仍需改语义（要换介入形态），但**不是缺口** |
-| 14 | `thinking_level_select` | **②** | `model/selection`（SessionEventMap）；**未找到** thinking-level 专属事件 | 只能拿到"模型选择"，拿不到"思考级别选择"本身；需确认处理器是否真的依赖级别语义（本轮新增证据见第 6.4 节） |
-| 15 | `context` | **①** | `system-prompt/assemble`（waterfall, `dsh-system-prompt:27`） | 两者都允许**权威地改写**上下文/提示词装配结果，是最干净的一处对应 |
-| 16 | `before_provider_request` | **①** | `agent/request`（waterfall, `dsh-agent:327`）；需要包流时用 `llm/stream`（waterfall, `dsh-llm:45`） | 都能在请求发出前替换调用配置；DSH 另有更强的流级瀑布可短路 |
+| 13 | `session_before_compact` | **②**（**理由已更正**；原判"无等价闸门"**被推翻**） | ★ **2026-10-16 关键区分（观察 vs 干预）**：`compaction/start` 确实是**会话日志事件**（声明于 `dsh-compaction` 的 `SessionEventMap`，`types.d.ts:21`；同族 `:35/73/88`），经 `session/event` 追加派发 ⇒ **观察型用法够用**（我们唯一那处=压缩前落快照+记账：`compaction/start` 到达时 summary 与替换用的 `user/message` 都还没落 ✓，已把映射从`via:'service'` 改为 `via:'session-event'`）；但它是**提交后**的，**不能否决压缩** ⇒ **干预型**用法仍需服务替换/瀑布（见右列分析）✗ | ~~只找到 `compaction/summary-error` 与 `compaction/start`~~；实为 **服务级**：`CompactionEngine`（`dsh-compaction/lib/types/index.d.ts:102`，注册为 `ctx.compaction` @ `:67-70`）＋ **`compaction/summary-error` 瀑布**（`@mode waterfall` @ `:83`，可在失败后**持久改写被选中的输入** @ `:72-77`）＋ 配置化策略（`dsh-compaction-basic/lib/types/config.d.ts:22`、`:29`、`:42`） | 能力**存在**但**形态不同**：pi 是"**每次压缩前**的回调（可取消/可自定义，`vendor/pi/.../types.ts:763`）"；DSH 是"**换一个压缩引擎实现**"（契约原文"Implementations own trigger policy, retention, and summarization" @ `dsh-compaction:94-95`；首方实现 `BasicCompactionEngine extends CompactionEngine` @ `dsh-compaction-basic/lib/types/index.d.ts:24`）＋失败路径瀑布（首方用法 `dsh-compaction-image-offload/lib/index.js:146`）。⇒ 仍需改语义（要换介入形态），但**不是缺口** |
+| 14 | `thinking_level_select` | **②** | ~~`model/selection`（SessionEventMap）~~ ★ **2026-10-16 更正**：**应用点**是 `agent/request`（waterfall，替换冻结调用配置；配置里有 `reasoningEffort?: ReasoningEffortId`，`dsh-llm/lib/types/call-config.d.ts:19`，模块注释原话 "request waterfalls replace them"）；**触发点**在 DSH 仍**无**等价物 | 两者形态不同：pi 是"**选中档位时**触发 + 处理器改档"；DSH 没有选中事件，但有**每请求**的配置替换点 ⇒ 正确移植方式是**把"缓存安全夹档"逻辑搬到请求点**（每请求幂等），级别→档位的纯映射已实现（`custom/adapters/dsh/thinking-level.ts`，只降不升）；✗ 真正改配置需模型路由（`LlmModelReasoningInfo.efforts`）故运行时未验 |
+| 15 | `context` | **②**（★ 2026-10-17 由 ① 降档：**语义面搞错了**） | `system-prompt/assemble`（waterfall, `dsh-system-prompt:27`）＋ `ctx.systemPrompt.context()`（动态上下文，实测见 spike A12）；转录改写只有服务级去处：`ctx.toolResultPruner`（压缩前必跑）/ 替换 `CompactionEngine` | pi 的 `context` 拿到的是**消息转录**且可**替换它**（`ContextEventResult {messages?}`，`types.ts:1443-1445`）；DSH 的 assemble 拿到的是**提示词分段/工具/变量**、**不是转录** ⇒ 不是换事件名的事。我们那处（旧摘要去重 + 工具输出分层擦除）在 DSH 上是**两个服务级点**，需重设计 ✗ |
+| 16 | `before_provider_request` | **②**（★ 2026-10-17 由 ① 降档：能力面被高估） | `agent/request`（waterfall, `dsh-agent:327`，只能替换**调用配置**）；`llm/stream`（waterfall, `dsh-llm:45`）**不能改写 loop 构造的请求** | pi 这条可**替换整个请求负载**（我们的暖前缀处理器返回 `{messages, tools}`）；DSH 契约写明 loop 请求**深度冻结**、listeners "**read it, never rewrite it**"（`dsh-llm/lib/types/index.d.ts:33-44`，可重建性不变量）⇒ 暖前缀"重放已记录 payload"在 DSH 上**没有对应** ✗ |
 | 17 | `message_update` | **①** | `agent/assistant-stream`（emit, `:366`） | 两者都是助手流式增量；DSH 明确是"有序帧 + 结束帧"的形态 |
 | 18 | `message_end` | **①** | `assistant/message`（SessionEventMap）；或 `agent/assistant-stream` 的终结帧 | "一条助手消息定稿"有对应（日志类型），接入走 `session/event` |
 
@@ -179,13 +182,13 @@ DSH 装在 `/root/.npm/_npx/1e7f6d9597241db0/node_modules/@deepseek-ai/`（**不
 
 | 档 | 数量 | 事件 |
 |---|---|---|
-| **① 可映射** | **11** | `turn_start`、`turn_end`、`agent_settled`、`tool_call`、`tool_result`、`tool_execution_start`、`session_compact`、`context`、`before_provider_request`、`message_update`、`message_end` |
-| **② 需改语义** | **7** | `session_start`、`session_shutdown`、`before_agent_start`、`agent_end`、`input`、`session_before_compact`、`thinking_level_select` |
+| **① 可映射** | **9**（2026-10-17 由 11 降） | `turn_start`、`turn_end`、`agent_settled`、`tool_call`、`tool_result`、`tool_execution_start`、`session_compact`、`message_update`、`message_end` |
+| **② 需改语义** | **10**（2026-10-17 由 7 升） | `session_start`、`session_shutdown`、`before_agent_start`、`agent_end`、`input`、`session_before_compact`、`thinking_level_select`、**`context`**、**`before_provider_request`**（含 2026-10-16 新增的 `session_before_switch`，共 10 行） |
 | **③ 无对应** | **0** | — |
 
-按**调用点数**加权（更能反映改造量）：① 覆盖 3+3+4+3+3+1+2+1+1+1+1 = **23 个调用点**；
-② 覆盖 9+6+6+2+4+1+1 = **29 个调用点**；③ 0 个。
-⇒ **超过一半的调用点（29/53）落在"需改语义"那一档**，且集中在**会话生命周期**与**输入/压缩干预**这两族。
+按**调用点数**加权（更能反映改造量，逐条取自 §1.1 的计数）：
+① 覆盖 4+3+4+3+3+1+2+1+1 = **22 个调用点**；② 覆盖 9+6+6+2+4+1+1+1+1 = **31 个调用点**；③ 0 个。
+⇒ **接近六成的调用点（31/53）落在"需改语义"那一档**，且集中在**会话生命周期**与**输入/压缩干预**这两族。
 （**复核后计数不变**：第 13 行的档位仍是 ②，只是理由从"缺口"改成"形态不同"，见第 6.3 节；
 **复核二后仍是 ②**，但理由进一步精确为「三处等价落脚点 + 唯一缺「单独取消压缩」」，见第 8.5 节。）
 

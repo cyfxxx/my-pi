@@ -33,7 +33,7 @@ if [ -z "$NODE_BIN" ]; then
   exit 1
 fi
 
-echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对 / F 隐私边界） ==="
+echo "=== 约定守门（A 运行时状态不入库 / B 敏感文件不入库 / C 生产代码规范 / D 文档计数与台账一致 / E 模式资产引用成对 / F 隐私边界 / … / I 便携性 / J DSH 侧基线） ==="
 
 # ── A. 运行时/每环境状态不入库 ──
 # 判定：入库的 JSON 里出现这些键即失败（应改写入 gitignored 的 *-state.json）。
@@ -185,8 +185,21 @@ fi
 # 约定：资产文件名一律 `<两位序号>-<内容>.<ext>`，人设与 assets/README.md 都用反引号点它。
 MODE_ASSETS_DIR="portable/agent/modes/assets"
 MODE_ASSETS_MAX_BYTES=$((8 * 1024 * 1024))
+# ★ 这里**不能用 `find -type f`**（2026-10-15 实测陷阱）：
+#   本机 PRoot/FUSE 会**间歇性**把普通文件报成 `l`（符号链接）——同一路径 `find -printf '%y'`
+#   上一秒 `l`、下一秒 `f`；于是 `-type f` 可能命中 **0 个**，守门就报"0 个文件，0KB"（虚假失败），
+#   而任何用 `-type f` 做"有没有漏"的脚本则会**虚假通过**（更危险）。
+#   稳健口径：`find -print0` 列条目，再用 `[ -f ]`（stat）判类型。
+mode_asset_files() {
+  find "$MODE_ASSETS_DIR" -print0 2>/dev/null | while IFS= read -r -d '' p; do
+    [ -f "$p" ] || continue
+    case "$p" in */README.md) continue ;; esac
+    printf '%s\n' "$p"
+  done
+}
 if [ -d "$MODE_ASSETS_DIR" ]; then
-  ASSET_FILES="$(find "$MODE_ASSETS_DIR" -type f ! -name 'README.md' -printf '%f\n' 2>/dev/null | sort)"
+  ASSET_PATHS="$(mode_asset_files)"
+  ASSET_FILES="$(printf '%s\n' "$ASSET_PATHS" | while IFS= read -r p; do [ -n "$p" ] && basename "$p"; done | sort)"
   # 2026-10-12 修：原模式的否定字符类里放了全角标点（（）,，）。在 C.UTF-8 locale 下
   # grep 把 UTF-8 按**字节**处理，那个类会把整个中文件名吞掉 —— 实测 8 个资产只认出 3 个，
   # 甚至匹配不了本行自己的文件名，于是 5 个真实存在的引用被误判成"孤儿资产"。
@@ -195,14 +208,14 @@ if [ -d "$MODE_ASSETS_DIR" ]; then
   MISSING_REFS=""
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
-    [ -n "$(find "$MODE_ASSETS_DIR" -name "$ref" -print -quit 2>/dev/null)" ] || MISSING_REFS="$MISSING_REFS
+    printf '%s\n' "$ASSET_FILES" | grep -qxF "$ref" || MISSING_REFS="$MISSING_REFS
        $ref"
   done <<< "$ASSET_REFS"
   ORPHANS="$(printf '%s\n' "$ASSET_FILES" | while IFS= read -r f; do
     [ -n "$f" ] || continue
     printf '%s\n' "$ASSET_REFS" | grep -qxF "$f" || echo "       $f"
   done)"
-  ASSET_BYTES="$(find "$MODE_ASSETS_DIR" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END{print s+0}')"
+  ASSET_BYTES="$(printf '%s\n' "$ASSET_PATHS" | while IFS= read -r p; do [ -n "$p" ] && stat -c %s "$p" 2>/dev/null; done | awk '{s+=$1} END{print s+0}')"
   if [ -n "$MISSING_REFS" ]; then
     bad "人设/清单点名了不存在的资产文件（悬空引用）：$MISSING_REFS"
   elif [ -n "$ORPHANS" ]; then
@@ -334,6 +347,61 @@ if [ -f scripts/check-portability.sh ]; then
   fi
 else
   bad "缺少 scripts/check-portability.sh（便携性守门）"
+fi
+
+# ── J. DSH 侧基线（分支 feat/base-switch-dsh 的产物；依赖/产物在才跑，否则跳过）──
+# ★ 纪律：**没有守门的地方，错误不会被发现，只会被传播**。工具声明面与注入面的基线
+#   在 `dsh/baseline/*.json`，这里做**条件守门**：装了 spike 依赖并构建了产物就比对，
+#   否则明确打印"跳过"（而不是静默算通过）。
+if [ -d dsh/spike/node_modules/@deepseek-ai/dsh-tools ] && [ -f dsh/plugin/dist/my-pi-plugin.mjs ]; then
+  dsh_fail=0
+  if ! node dsh/spike/measure-surface.mjs --check >/tmp/dsh-baseline-tools.out 2>&1; then
+    dsh_fail=1
+    bad "DSH 工具声明面相对基线漂移（明细见 /tmp/dsh-baseline-tools.out；确认有意后跑 node dsh/spike/measure-surface.mjs --update）"
+  fi
+  if ! node dsh/spike/measure-prompt.mjs --check >/tmp/dsh-baseline-prompt.out 2>&1; then
+    dsh_fail=1
+    bad "DSH 注入面相对基线漂移（明细见 /tmp/dsh-baseline-prompt.out；确认有意后跑 node dsh/spike/measure-prompt.mjs --update）"
+  fi
+  if [ "$dsh_fail" -eq 0 ]; then
+    ok "DSH 侧基线一致（工具声明面 + 注入面；dsh/baseline/*.json）"
+  fi
+else
+  note "DSH 侧基线跳过（缺 dsh/spike/node_modules 或 dsh/plugin/dist 产物；跑 bash scripts/dsh-build.sh 与 scripts/dsh-spike.sh 后自动生效）"
+fi
+
+# ── K. dsh/plugin 的类型检查（条件：DSH 包在才跑，否则跳过）──
+# ★ 为什么需要单独一段：官方的 `tsc -p custom/` 只收 custom/**（无 include ⇒ 按 tsconfig 所在
+#   目录收文件）⇒ `dsh/` 长期只过 esbuild/tsx（**不做类型检查**），类型错误会一直积累。
+#   2026-10-18 手工 typecheck 就抓到 `facade.disposers.push(...)` 与 `readonly DshDisposer[]`
+#   冲突（两处）——那正是插件入口每次启动都要跑的一行。
+# ★ 为什么条件跑：`dsh/plugin/entry.ts` 会 import `@deepseek-ai/*`，而那是 `dsh-spike.sh`
+#   按需安装的；没装时报的是 `Cannot find module`（环境缺失，不是代码错误）⇒ 明确跳过。
+if [ -d dsh/spike/node_modules/@deepseek-ai ]; then
+  if npx tsc -p dsh/ >/tmp/dsh-tsc.out 2>&1; then
+    ok "dsh/plugin 类型检查通过（dsh/tsconfig.json）"
+  else
+    bad "dsh/plugin 类型检查失败（见 /tmp/dsh-tsc.out；跑 npx tsc -p dsh/ 复现）"
+  fi
+else
+  note "dsh/plugin 类型检查跳过（缺 dsh/spike/node_modules/@deepseek-ai；跑 bash scripts/dsh-spike.sh 后自动生效）"
+fi
+
+# ── L. Markdown 表体完整性（程序化编辑把表格行写断 / 台账表体空行）──
+# ★ 为什么有这一段（两份同源事故）：
+#   ① `BUG-REPLAYS.md` #33：台账表体被插空行 ⇒ 人眼仍看成一张表，按行解析的工具当成多张。
+#      当时结论是"建议后续加这条守门"，一直没加。
+#   ② 2026-10-18 自己踩到：用脚本改 `DSH-MIGRATION-PLAN.md` 时把**一行**表格写成 4 行、续行还带
+#      前导空格 + 单引号 ⇒ 那行在渲染里断成普通文本（该表少一条实测记录），而**当时所有守门都放行**。
+# ★ 判据放在 `scripts/check-md-tables.mjs` 里（要跳过围栏代码块、要排除 vendored 的 packs/，
+#   用 grep 表达不了 —— 直接 grep 会误报 60+ 个合法文件）。台账空行只报告不失败：实测
+#   `knowledge-compile --check` 在 3 处空行下仍解析出 41/41 条 ⇒ 做成硬门禁属于无证据。
+if [ -f scripts/check-md-tables.mjs ]; then
+  if "$NODE_BIN" scripts/check-md-tables.mjs >/tmp/md-tables.out 2>&1; then
+    ok "Markdown 表体完整（表行未被写断；明细见 /tmp/md-tables.out）"
+  else
+    bad "Markdown 表体守门失败（表行被写断；明细见 /tmp/md-tables.out）"
+  fi
 fi
 
 echo ""

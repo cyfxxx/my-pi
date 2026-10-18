@@ -13,7 +13,16 @@ import type { SearchConfig } from './types';
 
 export function register(pi: ExtensionAPI): void {
   registerTool(pi, {
-    name: 'web_search',
+    // ★ 工具名是 `searxng`（2026-10-18 由 `web_search` 改名）：DSH 底座的**宿主自带**
+    //   同名工具 `web_search`（DeepSeek 官方后端、需账号/API key），而本工具是**自建后端**
+    //   （本地/自托管 SearXNG，不可达时降级为免配置 HTTP 直搜，**全程不需要任何 key**）⇒
+    //   两者能力不同、必须并存，故让本工具用一个不会被宿主占用的名字。
+    //   决策与证据（含"让位/改名/挂 per-agent"的取舍）见
+    //   `docs/design/DSH-DUPLICATE-CAPABILITY-AUDIT.md`。pi 底座上此名同样有效（只是名字变了）。
+    name: 'searxng',
+    // ★ 描述刻意**不**加长：工具声明面字节数被基线守门盯着（`dsh/baseline/tool-surface.json` +
+    //   `check-conventions` J 段，纪律是"不擅自抬预算"）。后端细节写在 `portable/agent/AGENTS.md`
+    //   与本节注释里，不额外占用**每次请求都要付**的声明面；改名本身让总字节**下降** 3 B。
     description: '搜索网络并返回结果列表',
     parameters: {
       query: { type: 'string', description: '搜索关键词' },
@@ -52,7 +61,7 @@ export function register(pi: ExtensionAPI): void {
   });
 
   // 曾经还有一个 `web_fetch` 工具，但它的名字与 `fetch_url` 撞语义（听起来是"抓取 URL"），
-  // 实际执行的是 `searchDirect(query)`——与 `web_search` 上面那条自动降级分支**完全同一件事**。
+  // 实际执行的是 `searchDirect(query)`——与 `searxng` 上面那条自动降级分支**完全同一件事**。
   // 模型很容易 `web_fetch(url)` 想抓页面却拿到一串搜索结果，白烧一个回合。
-  // 2026-10-07：删除该工具；免 SearXNG 的 HTTP 搜索能力由 `web_search` 的自动降级保留。
+  // 2026-10-07：删除该工具；免 SearXNG 的 HTTP 搜索能力由 `searxng` 的自动降级保留。
 }
