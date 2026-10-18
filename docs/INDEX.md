@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（276 条）
+## 决策台账（277 条）
 
+- `DECISIONS.md` · [2026-10-19] ★ 自动化重叠核查：**autopilot 的调度/自主运行已被 DSH 原生覆盖**，不移植 · **用户要求**：看看 DSH 自带的自动化任务功能跟 autopilot 有没有重叠。 · 数字: 4 个 / 256 轮 / 1512 次
 - `DECISIONS.md` · [2026-10-18] ★ 自动化最小版 + 分支状态收口（合并就绪） · **自动化（✓）**：`assistant/scripts/maintain.sh` —— 一条命令跑"生命周期报告 + 教训挖掘（默认只读、`--ingest` 才写）+ 摘要修剪（上限 50）"， · 数字: 11 个
 - `DECISIONS.md` · [2026-10-18] ★ P2 收尾：会话摘要（确定性）+ 来源轮转 · **会话摘要（✓）**：`assistant/memory/summaries.ts`，与原项目 `summaries.json` **同 schema** · 数字: 50 条 / 3 条
 - `DECISIONS.md` · [2026-10-18] ★ M1 社区 TUI：**在 DSH 0.2.0-rc.2 上真跑通**，并做成"共享 DSH_HOME"的接入 · **验证（✓ 真机 pty）**：`@deepseek-harness-tui/dsh-tui@0.16.1`
@@ -575,7 +576,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（275 条）
+## 设计文档（281 条）
 
 - `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
 - `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
@@ -593,10 +594,16 @@
 - `docs/design/ASSISTANT-STATUS.md` · 1. 现在实际跑的六层 · **已不再有 facade**：`--with-facade` 只剩对照用途；默认组合 27 工具（+我们新加的 8 个 = 35），verify 第⑦步断言之。 · 数字: 8 个
 - `docs/design/ASSISTANT-STATUS.md` · 2. 已完成（都有断言） · 数字: 127 条
 - `docs/design/ASSISTANT-STATUS.md` · 3. 怎么跑 · assistant/scripts/mypi.sh web # 起宿主并给带 token 的 URL（数据在 assistant/.run/home） · 数字: 8 分钟
-- `docs/design/ASSISTANT-STATUS.md` · 4. 已知缺口（按代价） · 1. **压缩第②步**（自定义 `CompactionEngine`）：接口已查清（`compactIfNeeded/compactNow/compactRegion` 三个抽象方法），
+- `docs/design/ASSISTANT-STATUS.md` · 4. 已知缺口（按代价） · 1. **压缩第②步**（自定义 `CompactionEngine`）：接口已查清（`compactIfNeeded/compactNow/compactRegion` 三个抽象方法）， · 数字: 6 次
 - `docs/design/ASSISTANT-STATUS.md` · 5. 合并就绪判断 · - 主验收 **19 项全绿**（`verify-m1.sh`），黄金任务与约定守门均通过； · 数字: 127 条
 - `docs/design/ASSISTANT-STATUS.md` · 4. 本地模型：上下文管理不是放宽，是**必须换一套预算** · 直觉是"本地不花钱 ⇒ 上下文可以给更多"。钱确实为 0，但**默认参数在本地会直接让压缩失效**。 · 数字: 10%
 - `docs/design/ASSISTANT-STATUS.md` · 5. 下一步（待用户决定） · 1. 旧适配层：保留（渐进）还是砍掉重写（干净）——决定后续全部工作量。
+- `docs/design/AUTOMATION-OVERLAP.md` · 1. DSH 有什么（读代码/README 核实）
+- `docs/design/AUTOMATION-OVERLAP.md` · 2. autopilot 有什么（原项目） · - 调度：`schedule_task` + `/schedule`（含 cron/loop/remind/历史）+ `/daily`（**每日任务**视图：标签、种子、今日完成/失败）
+- `docs/design/AUTOMATION-OVERLAP.md` · 3. 重叠矩阵 · 数字: 4 个 / 11 个
+- `docs/design/AUTOMATION-OVERLAP.md` · 4. 实测使用频率（32 会话 / 1512 次工具调用） · ⇒ "失败自愈"这一组**没有使用证据**；唯一的真实需求是**会话重启**（`admin_restart` 6 次）， · 数字: 4 个 / 6 次
+- `docs/design/AUTOMATION-OVERLAP.md` · 5. 决定 · 1. **不移植 autopilot**。调度用 `dsh-schedule`，自主运行用 `dsh-goal`（本轮开发就是 goal 驱动的活例子）。
+- `docs/design/AUTOMATION-OVERLAP.md` · 6. 怎么验证 · # 组合断言（不需要起宿主）：三行出现在组合里
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · ClamAV：**更正**——之前写"判定不通、不再重复试"是**错的**（2026-10-10 当日推翻） · **正确结论（两次实测并列，都是真的）**：

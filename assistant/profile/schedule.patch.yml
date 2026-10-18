@@ -1,0 +1,10 @@
+# 挂载 DSH 原生自动化：定时提醒（一次性/固定间隔/每日/每周/cron）+ 任务页 + 时间上下文。
+# 用法：MYPI_SCHEDULE=1 assistant/scripts/mypi.sh web
+# 说明：这是 DSH 官方 experimental bundle 的等价 patch（不装 bundle 包，只叠同样的三行）。
+- insert:
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
+    - id: schedule
+      name: '@deepseek-ai/dsh-schedule'
+    - id: ui-schedule
+      name: '@deepseek-ai/dsh-client-ui-schedule'

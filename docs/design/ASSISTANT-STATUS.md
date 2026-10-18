@@ -48,7 +48,9 @@ bash assistant/scripts/probe-termux.sh   # 陌生环境探针
 
 1. **压缩第②步**（自定义 `CompactionEngine`）：接口已查清（`compactIfNeeded/compactNow/compactRegion` 三个抽象方法），
    但要自己实现"选区间 → 抽账本 → 只压工作历史 → 提交 checkpoint"，约 400–600 行；当前只有第①步（账本注入）。
-2. **autopilot 自动化**：只剩本地 cron 式维护（`maintain.sh`），没有原项目的看门狗/种子/会话重启。
+2. **automation**：DSH 原生 `dsh-schedule`（4 工具）+ `dsh-goal`（自动续跑）已覆盖 autopilot 的调度与自主运行；
+   启用方式 `MYPI_SCHEDULE=1`（工具面 35→39）。autopilot 独有只剩 failover/看门狗/验证器/预算，
+   **实测几乎无人使用**（唯一例外 `admin_restart` 6 次），故不移植。见 [AUTOMATION-OVERLAP.md](AUTOMATION-OVERLAP.md)。
 3. **摘要精炼**：现在是确定性摘要，`decisions/facts/prefs/lessons` 留空，未接 LLM 精炼。
 4. **品牌（M0.6）与体积（M0.5）**：按你的决定暂缓。
 5. **TUI 功能面差异**：社区 TUI 能跑，但"哪些面板在 TUI 里可用/不可用"还没盘点。

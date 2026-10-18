@@ -2,6 +2,31 @@
 
 ## 格式
 
+### [2026-10-19] ★ 自动化重叠核查：**autopilot 的调度/自主运行已被 DSH 原生覆盖**，不移植
+
+**用户要求**：看看 DSH 自带的自动化任务功能跟 autopilot 有没有重叠。
+
+**核实（✓ 读 README/代码）**：
+- `dsh-schedule`：4 个工具 `schedule_create/list/update/delete`，支持一次性/固定间隔/每日/每周/**cron**，
+  到点**投递回原 Session**、Host 重启后仍在、错过只补最近一次——**覆盖 autopilot 的 `schedule_task` + `/schedule`**。
+- `dsh-goal` + `dsh-goal-round-driver`：长目标跨轮/跨重启/跨 fork 持久，`pause/resume/complete/block`，
+  **自动续跑上限 256 轮**——**覆盖 autopilot 的"自主运行"**（本轮开发就是 goal 驱动的实例）。
+- `dsh-llm-retry`：agent-step 边界的有界/无限重试，但**只重试、不换模型**。
+
+**缺口（autopilot 独有）**：模型 failover、看门狗、验证器、每日预算、`admin_*` 会话管理（restart/switch/set_model…）。
+**使用证据（32 会话 / 1512 次调用）**：`admin_restart` **6** 次（唯一有使用的），
+`autopilot_status/policy`、`schedule_task`、其余 `admin_*` 全部 **0** 次。
+
+**决定（✓）**：
+1. **不移植 autopilot**——调度用 `dsh-schedule`、自主运行用 `dsh-goal`；
+2. schedule 做成**可选叠加**：`assistant/profile/schedule.patch.yml` + `MYPI_SCHEDULE=1`（默认关，避免工具面膨胀）；
+3. 实测启用后工具面 **39**（35+4），仍在断奶断言上限 40 内；`time-context` 同时生效；
+4. 运维兜底用 `host/launch.mjs stop/start` + `probe-termux.sh`；看门狗等出现明确卡住场景再写。
+
+**验证（✓）**：`test/schedule-compose.sh`（组合三行，verify 第⑲步）+
+真机启动检查（`MYPI_SCHEDULE=1` 起宿主，toolFace 出现 `schedule_create/delete/list/update`，`time-context` 生效）。
+主验收 **20 项全绿**。分析全文见 `docs/design/AUTOMATION-OVERLAP.md`。
+
 ### [2026-10-18] ★ 自动化最小版 + 分支状态收口（合并就绪）
 
 **自动化（✓）**：`assistant/scripts/maintain.sh` —— 一条命令跑"生命周期报告 + 教训挖掘（默认只读、`--ingest` 才写）+ 摘要修剪（上限 50）"，
