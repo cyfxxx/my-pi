@@ -55,6 +55,9 @@
 - **P2（检索已完成）**：`assistant/memory/retrieval.ts` —— BM25（标题加权 ×2、k1=1.2、b=0.75）
   × 质量分（置信度 + 复现次数 + 30 天半衰期）→ MMR（λ=0.7）去重；环境过滤在候选阶段完成。
   断言：`test/retrieval.mjs` 五条（稀有词 idf、标题命中优先、近似重复不占前两位、高置信排前、termux 不外泄）。
+  - **记录闭环（最小版）**：`assistant/plugin/stats.ts` —— 订阅 `tool/call` 与 `tool/result`，
+    按 `callId` 配对成 `{ts,session,tool,durationMs,ok}` 写入 `.run/stats/tool-events.jsonl`；
+    **只记名字/耗时/成败，不记参数与输出**（参数可能带密钥）。`test/stats.mjs` + verify 第⑮步。
   **仍未做**：会话摘要（`summaries.json` 63KB，需要摘要生成链）与"按会话轮转"（原项目按 session 分桶）。
 - **P3（入库/治理/挖掘脚本已完成）**：
   - `assistant/scripts/memory-store.ts`（headless 入库，`--json/--file/stdin`、`--source`、`--dry-run`）；
@@ -63,9 +66,12 @@
   - `assistant/scripts/lesson-miner.ts`（干预快照 → 教训候选，`--ingest` 才写库）。
   四个脚本都走同一个 `storeEntry`（去重/脱敏/环境语义与插件完全一致）；`test/scripts.mjs` 四条断言覆盖
   "首写 created / 重写 updated / 知识入库幂等 / 生命周期可算 / 挖掘可入库"，verify 扩到 **15 项全绿**。
+  - **记录闭环（最小版）**：`assistant/plugin/stats.ts` —— 订阅 `tool/call` 与 `tool/result`，
+    按 `callId` 配对成 `{ts,session,tool,durationMs,ok}` 写入 `.run/stats/tool-events.jsonl`；
+    **只记名字/耗时/成败，不记参数与输出**（参数可能带密钥）。`test/stats.mjs` + verify 第⑮步。
   **仍未做**：
   - 自动入库脚本：`knowledge-ingest`（95 行）+ `memory-store`（164 行）；
   - 治理：`memory-lifecycle`（83 行，只读候选报告）+ `lesson-miner`（121 行，读 `interventions.jsonl`）；
-  - 记录闭环：工具/子代理/上下文用量统计（原 `stats/*`）；
+  - 记录闭环：子代理/上下文用量（工具用量已做）、按日聚合；
   - 自动化闭环：autopilot 的调度/看门狗/种子、每日子摘要。
 - **明确不做**：`/memory` 命令（用户几乎不用）、`ctx_*`（实测 0–2 次）。

@@ -2,6 +2,20 @@
 
 ## 格式
 
+### [2026-10-18] ★ 记录闭环最小版：工具用量统计（只看名字/耗时/成败，不记参数）
+
+**实现（✓）**：`assistant/plugin/stats.ts` + `entry.ts` 接线。
+- 订阅 `session/event` 的 `tool/call`（记开始时间）与 `tool/result`（配对、算出耗时与成败）；
+- 落到 `.run/stats/tool-events.jsonl`，字段 `{ts, session, tool, durationMs, ok}`；
+- **不记录参数与输出**（参数里可能带密钥/隐私），聚合函数 `summarize()` 给"按工具的次数/失败/总耗时"。
+
+**踩坑（✗→✓）**：`tool/result` 的 `callId` **不在事件顶层**，在 `event.data.message.toolCallId` 里；
+第一版按顶层取，统计文件永远为空。
+
+**验证（✓）**：`test/stats.mjs`（跑一轮 `mypi_note` 后断言有一条成功事件）；verify 扩到 **17 项全绿**。
+
+**✗ 未做**：子代理/上下文用量、按日聚合、把统计接进生命周期治理。
+
 ### [2026-10-18] ★ 压缩两阶段改造第①步：意图账本落地（逐字 · 过滤推进语 · 折叠重复 · 预算内注入）
 
 **实现（✓）**：`assistant/memory/intent.ts` + `plugin/entry.ts` 接线。

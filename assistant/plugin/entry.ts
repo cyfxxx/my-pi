@@ -23,6 +23,7 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 import { formatHit, formatStats, recall, remember, renderInjection, resolveMemoryConfig } from './memory';
 import { ledgerFile, readLedger, recordIntent, renderIntentLedger, textOfContent } from '../memory/intent';
+import { createToolTracker, statsFile } from './stats';
 import { createSearxngProvider, resolveSearxngConfig } from './searxng';
 import {
   hasTmux,
@@ -135,13 +136,33 @@ export function apply(ctx: HostContext): void {
   }));
   tools.register(stringTool('memory_stats', '查看长期记忆库的条数、类别与环境分布。', {}, () => formatStats(memory)));
 
+  // 用量记录（记录闭环最小版）：只记工具名/耗时/成败，不记参数与输出。
+  const tracker = createToolTracker(statsFile(join(dirname(fileURLToPath(import.meta.url)), '..', '..')));
+
   // 意图账本：会话级、逐字、过滤纯推进语（压缩两阶段改造的第①步）。
   const assistantRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
   const OURS = new Set(['mypi-memory', 'mypi-intent', 'time-context']);
   // 注意：`session/event` 监听器是 (session, event) 两个位置参数，不是一个对象。
   ctx.on?.('session/event', (...args) => {
     const session = args[0] as { id?: unknown } | undefined;
-    const event = args[1] as { type?: string; data?: { source?: { kind?: string }; content?: unknown } } | undefined;
+    const event = args[1] as {
+      type?: string;
+      data?: { source?: { kind?: string }; content?: unknown; callId?: unknown; name?: unknown; message?: { isError?: boolean } };
+    } | undefined;
+    const sessionIdForStats = typeof session?.id === 'string' ? session.id : '';
+    if (event?.type === 'tool/call') {
+      const name = event.data?.name;
+      const callId = event.data?.callId;
+      if (typeof name === 'string' && typeof callId === 'string') tracker.onCall(sessionIdForStats, callId, name);
+      return;
+    }
+    if (event?.type === 'tool/result') {
+      // 注意：tool/result 的 callId 在 `message.toolCallId` 里（顶层没有 callId）。
+      const message = event.data?.message as { toolCallId?: unknown; isError?: boolean } | undefined;
+      const callId = message?.toolCallId;
+      if (typeof callId === 'string') tracker.onResult(sessionIdForStats, callId, message?.isError !== true);
+      return;
+    }
     if (event?.type !== 'user/message') return;
     const kind = event.data?.source?.kind;
     if (typeof kind === 'string' && OURS.has(kind)) return;
