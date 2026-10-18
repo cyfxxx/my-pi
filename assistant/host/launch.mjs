@@ -109,6 +109,8 @@ function patchArgs() {
   if (flag('--with-facade')) args.push('--patch', join(REPO, 'dsh', 'profile', 'my-pi.patch.yml'));
   // 本地瘦身：用一个更小的 agent preset（工具面由 preset 决定，这是 DSH 的正式机制）。
   if (process.env.MYPI_LEAN_TOOLS === '1') args.push('--patch', join(ASSISTANT, 'profile', 'local-preset.patch.yml'));
+  // 关闭账号登录（默认关；MYPI_LOGIN=1 恢复）：只用 API key 路线。
+  if (process.env.MYPI_LOGIN !== '1') args.push('--patch', join(ASSISTANT, 'profile', 'no-login.patch.yml'));
   // 自动化（DSH 原生 schedule）：MYPI_SCHEDULE=1 时叠加定时任务/任务页/时间上下文。
   if (process.env.MYPI_SCHEDULE === '1') args.push('--patch', join(ASSISTANT, 'profile', 'schedule.patch.yml'));
   // 兼容旧环境变量名（verify 与文档里用的是 MY_PI_DSH_EXTRA_PATCH）

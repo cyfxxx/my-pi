@@ -1,0 +1,14 @@
+# 关闭 DeepSeek 账号登录（只用 API key 路线）。
+#
+# 关掉的三行（都是"登录/账号 UI"专属，不影响 API-key 模型调用）：
+#   deepseek-account       浏览器登录 + 本地凭据存储（平台登录）
+#   llm-deepseek-account   deepseek-account provider 的鉴权与模型发现
+#   ui-settings-account    设置页里的账号区块 / 侧边栏登出
+# 保留：llm-deepseek（dsh-llm-deepseek-api-key，走 DEEPSEEK_API_KEY）、authorization（其他 provider 可能用）。
+# 想恢复登录：MYPI_LOGIN=1。
+- id: deepseek-account
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true
+- id: ui-settings-account
+  disabled: true

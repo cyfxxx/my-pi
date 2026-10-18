@@ -138,7 +138,10 @@ timeout 90 bash test/tui-community.sh || fail=1
 say "⑲ 自动化组合（DSH 原生 schedule 可挂载）"
 MYPI_HOME="$ROOT/.run/home-schedule" timeout 200 bash test/schedule-compose.sh || fail=1
 
-say "⑳ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
+say "⑳ 关闭登录（账号三行禁用、API-key 路线保留）"
+MYPI_HOME="$ROOT/.run/home-nologin" timeout 200 bash test/no-login.sh || fail=1
+
+say "㉑ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
 timeout 60 node -e "
 import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
   const c = await new HostClient({ url: process.argv[1] }).connect();
@@ -148,5 +151,5 @@ import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
 });" "$URL" && echo "✓ 默认模型已复原为 online" || { echo "✗ 复原失败"; fail=1; }
 
 say "结果"
-if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（20 项）"; else echo "❌ 有红项（见上）"; fi
+if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（21 项）"; else echo "❌ 有红项（见上）"; fi
 exit "$fail"

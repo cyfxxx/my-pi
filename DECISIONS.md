@@ -2,6 +2,37 @@
 
 ## 格式
 
+### [2026-10-19] ★ TUI 修复 + 关闭登录 + 模式/分支/升级四项决策
+
+**① TUI 启动失败（✓ 修）**：`mypi.sh tui` 原来用未导出的 `$DSH_HOME` 找社区 TUI（路径变成 `/profiles/...`，永远找不到），
+而且找不到时静默回退。现在：按 `MYPI_HOME||.run/home` 解析 home，依次查「我们的 home / 显式 DSH_HOME / ~/.dsh」三处；
+找不到时明确提示"先跑 setup-tui.sh"；宿主没起来时提示看 `host.log` 与 `mypi.sh stop`。
+自带 pi-tui 客户端在 pty 里实测正常（`› 说点什么…` 提示符出现）。
+另外新增 `mypi.sh doctor`（宿主/端口/URL/TUI/数据/处置），端口探测用 node 直连，不依赖 `ss/lsof`。
+**说明**：我没能复现你的具体报错；若仍失败，跑一次 `assistant/scripts/mypi.sh doctor` 把输出给我。
+
+**② Web 怎么关（✓ 明确）**：`assistant/scripts/mypi.sh stop`（= `node host/launch.mjs stop`）。
+`web` 子命令现在会直接打印"关闭：mypi.sh stop"。**注意**：`http://127.0.0.1:3080` 是 DSH 自己的 GUI，
+不是我们起的进程，不要用我们的 stop 去关它（我们的宿主在 3099）。
+
+**③ DSH 模式能否替代原项目 mode（✓ 部分可以）**：DSH 的 **agent preset** 覆盖 mode 的核心（会话挂哪些能力），
+且是"会话创建时选"，不需要原项目的重启+续接。但思考档位（reasoning effort）、人设（`dsh-persona`）、
+记忆命名空间（我们目前靠 `MYPI_MEMORY_FILE`）不在同一个开关上。映射：full→标准、lean→我们已有的 `local` preset、
+minimal/roleplay→待写。详见 `docs/design/MODE-COMPARISON.md`。
+
+**④ 三条 DSH 分支怎么收（✓ 建议）**：`feat/base-switch-dsh` 删分支（`v1.3.0-dsh` 已钉）；
+`archive/dsh-on-main` 删分支、保留 tag；`main` 合并 `feat/private-assistant` 后打 `v1.4.0-assistant`。
+命令与前置检查见 `docs/operations/BRANCHES.md`。原则：分支数量不是问题，事实源数量才是。
+
+**⑤ 升级 0.2.1 + 关闭登录（✓ 登录已关，升级待执行）**：npm 上 `latest=0.2.0-rc.2`、`next=0.2.1-rc.2`（0.2.1 还是预发布）。
+**登录已经默认关闭**：`profile/no-login.patch.yml` 禁用 `deepseek-account`/`llm-deepseek-account`/`ui-settings-account` 三行，
+保留 `llm-deepseek`（API key 路线）与 `authorization`；`MYPI_LOGIN=1` 可恢复。
+升级清单（改 `DSH_VERSION` → install → build → doctor → smoke → verify，含回滚与"0.2.1 改动逐条核对"）
+写在 `docs/operations/UPGRADE-0.2.1.md`，等你要升时按它执行。
+
+**验证（✓）**：`test/no-login.sh`（三行禁用 + API-key 路线在，verify 第⑳步）；
+主验收扩到 **21 项全绿**。
+
 ### [2026-10-19] ★ 自动化重叠核查：**autopilot 的调度/自主运行已被 DSH 原生覆盖**，不移植
 
 **用户要求**：看看 DSH 自带的自动化任务功能跟 autopilot 有没有重叠。

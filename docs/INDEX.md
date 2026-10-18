@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（277 条）
+## 决策台账（278 条）
 
+- `DECISIONS.md` · [2026-10-19] ★ TUI 修复 + 关闭登录 + 模式/分支/升级四项决策 · **① TUI 启动失败（✓ 修）**：`mypi.sh tui` 原来用未导出的 `$DSH_HOME` 找社区 TUI（路径变成 `/profiles/...`，永远找不到），
 - `DECISIONS.md` · [2026-10-19] ★ 自动化重叠核查：**autopilot 的调度/自主运行已被 DSH 原生覆盖**，不移植 · **用户要求**：看看 DSH 自带的自动化任务功能跟 autopilot 有没有重叠。 · 数字: 4 个 / 256 轮 / 1512 次
 - `DECISIONS.md` · [2026-10-18] ★ 自动化最小版 + 分支状态收口（合并就绪） · **自动化（✓）**：`assistant/scripts/maintain.sh` —— 一条命令跑"生命周期报告 + 教训挖掘（默认只读、`--ingest` 才写）+ 摘要修剪（上限 50）"， · 数字: 11 个
 - `DECISIONS.md` · [2026-10-18] ★ P2 收尾：会话摘要（确定性）+ 来源轮转 · **会话摘要（✓）**：`assistant/memory/summaries.ts`，与原项目 `summaries.json` **同 schema** · 数字: 50 条 / 3 条
@@ -576,7 +577,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（281 条）
+## 设计文档（286 条）
 
 - `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
 - `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
@@ -715,6 +716,11 @@ node
 - `docs/design/LEAN4AGENT-BORROW.md` · 四、可借鉴的（按性价比排序） · **A. 给关键工作流写一份"前置/后置条件"清单，并挂到既有守门上（推荐，成本低，零运行时改动）** · 数字: 5 个 / 4 条 / 30 天 / 8 次
 - `docs/design/LEAN4AGENT-BORROW.md` · 五、明确不该照搬的，以及决定可不可照搬的关键缺口 · **不该照搬**： · 数字: 40 个 / 3 个
 - `docs/design/LEAN4AGENT-BORROW.md` · 六、可执行的下一步（≤3 条） · 1. **做 A：`docs/design/WORKFLOW-INVARIANTS.md` + 把可自动化的挂进既有守门**，每条不变量配坏样本并证明守门会红。**不改任何默认行为**、不新增 golden 步。这是三篇论文里**唯一不需要
+- `docs/design/MODE-COMPARISON.md` · 1. 原项目 mode 是什么（`custom/features/mode`） · - **会话作用域**的启动档位：新会话用 `modes.json` 的 `default`，续接会话用该会话上次记录的模式；
+- `docs/design/MODE-COMPARISON.md` · 2. DSH 有什么
+- `docs/design/MODE-COMPARISON.md` · 3. 映射建议 · **切换方式**：原项目是"`/mode` → 重启 → 续接"；DSH 是"**新建会话时选 preset**"。
+- `docs/design/MODE-COMPARISON.md` · 4. 记忆命名空间 · - 插件在 `apply()` 时读 `MYPI_MEMORY_FILE`（进程级），所以**不同 preset 想用不同记忆库，目前只能靠不同进程/home**；
+- `docs/design/MODE-COMPARISON.md` · 5. 结论 · - **能替代**：mode 的核心（能力集）→ DSH preset，而且更干净（不用重启、不用续接）；
 - `docs/design/NET-ACCEL-RESEARCH.md` · 一、实测总表（HTTP 码；`000`＝连接失败，`301`＝重定向**而重定向目标是不可达的 raw**） · ### 1.1 GitHub 加速（本次调研的核心结论）
 - `docs/design/NET-ACCEL-RESEARCH.md` · 二、可参考的现成项目（用户要求"不从零开始"） · > 说明：`chsrc` / `mirrors-china` / `Thanks-Mirror` 的**项目内容我读不到**（GitHub 直连与 jsDelivr `gh/`
 - `docs/design/NET-ACCEL-RESEARCH.md` · 三、落地到 my-pi 的候选设计 · ### 3.1 形态判定
