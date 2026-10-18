@@ -26,6 +26,21 @@ git checkout v1.3.0-dsh          # 合并点的完整 DSH 迁移
 git checkout archive/dsh-on-main # 合并 + 之后的收口
 ```
 
+### 两个 DSH 分支有什么区别
+
+**同源**：`archive/dsh-on-main` 是 `feat/base-switch-dsh` 的**直接后代**（同一条线性历史，没有分叉）。
+
+| | `feat/base-switch-dsh` | `archive/dsh-on-main` |
+|---|---|---|
+| 指向 | `dcdc3dfe2`（= 标签 `v1.3.0-dsh`） | `4453d3965`（回退前的 `main`） |
+| 含多少提交 | 换基座那 69 笔 | 69 笔 + **合并后 9 笔** |
+| 净差异 | — | **29 文件 / +1740 −32** |
+| 多出来的内容 | — | 合并决策文档与两条经验；DR-2 具名 agent（可选、默认关）+ 两套单测；会话收件箱桥（DR-4 部分）；`dsh-runtime.sh` 的 `doctor`；`portable/dsh` 回收（`dsh-gc.sh`）；范围感知的 golden 第 22 步；`CODING-TRAPS #21/#22`；合并后收口四项 |
+| 什么时候用它 | 想拿"换基座本身"、在这个基础上继续开发 | 想复现"回退前 `main` 的样子"、或要看合并后那批收口 |
+
+一句话：**`base` 是"换基座这件事"，`archive` 是"换基座 + 合并到 main 之后又做的所有收口"。**
+两条都在远端；`v1.3.0-dsh` 是 `base` 那个提交的稳定引用（注解标签 `67e928b` → `dcdc3dfe2`）。
+
 ## 3. 回灌到 `main` 的经验（这才是"不要丢失"的部分）
 
 | 回灌项 | 为什么它跟 DSH 无关 |
@@ -55,7 +70,8 @@ git checkout archive/dsh-on-main # 合并 + 之后的收口
 
 ## 6. 其它分支的关系
 
-- `feat/private-assistant`（拼接式助手实验）基于**合并后的** `4453d3965`，回退后它不再是 `main` 的后代；
-  它自带完整实现（`assistant/`），与本次回退互不影响。
+- `feat/private-assistant`（拼接式助手实验）基于**合并后的** `4453d3965`（= `archive/dsh-on-main` 的 tip），
+  回退后它不再是 `main` 的后代；它自带完整实现（`assistant/`），且**已推送到远端**，与本次回退互不影响。
+  它的现状与"本地模型上下文预算"的实证见该分支的 `docs/design/ASSISTANT-STATUS.md`。
 - 若以后要让 DSH 回到主线，推荐做法仍是 `git merge --ff-only feat/base-switch-dsh`（先评估
   `archive/dsh-on-main` 里那 9 笔收口是否也要一起进来）。

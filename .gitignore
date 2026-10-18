@@ -105,3 +105,6 @@ __pycache__/
 # 由 scripts/run-my-pi.ps1 的 Find-Runtime（优先 <repo>\runtime）与
 # scripts/pi-supervisor.sh 的便携布局查找共同识别。
 runtime/
+# DSH 分支（feat/base-switch-dsh / archive/dsh-on-main）的仓内 home：会话/日志/凭据都在里面。
+# main 已回退、本不该出现；这里显式忽略，防"切分支后误提交凭据"。
+portable/dsh/

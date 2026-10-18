@@ -637,11 +637,11 @@ node
 - `docs/design/DSH-MIGRATION-PLAN.md` · 4. D 块（最容易被低估）：基线必须重建的清单 · 换底座后，**旧的绿色不能继承**。逐项处置（本轮只登记，做到哪算哪）： · 数字: 11 个 / 53 个 / 758 B / 19 个 · 证据: bash scripts/dsh-baseline.sh --tools / bash scripts/dsh-baseline.sh --prompt
 - `docs/design/DSH-MIGRATION-PLAN.md` · 5. 未核实（✗，本轮开工时如实登记） · 1. ~~`@deepseek-ai/dsh-commands` 的命令契约**未读**~~ **已补读并实测（2026-10-16）**： · 数字: 4 个 / 223 个
 - `docs/design/DSH-ROLLBACK.md` · 1. 回退到哪、为什么 · - **回退点**：`eda6d1405`（`feat/base-switch-dsh` 分叉前的 `main`）。 · 证据: eda6d1405
-- `docs/design/DSH-ROLLBACK.md` · 2. DSH 的东西在哪（一件没丢） · 恢复任意状态： · 证据: dcdc3dfe2
+- `docs/design/DSH-ROLLBACK.md` · 2. DSH 的东西在哪（一件没丢） · 恢复任意状态： · 证据: dcdc3dfe2 / 4453d3965
 - `docs/design/DSH-ROLLBACK.md` · 3. 回灌到 `main` 的经验（这才是"不要丢失"的部分） · 数字: 16 条
 - `docs/design/DSH-ROLLBACK.md` · 4. 没回灌的部分（DSH 专属，留在分支） · `dsh/`（插件与 profile）、`custom/adapters/dsh/**`、`scripts/dsh-*.sh|mjs`（宿主安装/启动/体检/回收/收件箱/golden 第 22 步）、
 - `docs/design/DSH-ROLLBACK.md` · 5. 回退后 `main` 的形状 · - 仍是**单一底座 pi**：`./my-pi.sh` 走 pi TUI；`scripts/` 71 个（回灌了 `check-md-tables.mjs`）； · 数字: 71 个
-- `docs/design/DSH-ROLLBACK.md` · 6. 其它分支的关系 · - `feat/private-assistant`（拼接式助手实验）基于**合并后的** `4453d3965`，回退后它不再是 `main` 的后代； · 证据: 4453d3965
+- `docs/design/DSH-ROLLBACK.md` · 6. 其它分支的关系 · - `feat/private-assistant`（拼接式助手实验）基于**合并后的** `4453d3965`（= `archive/dsh-on-main` 的 tip）， · 证据: 4453d3965
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ① 一句话结论 · **三篇论文的附录与关键机制细节基本全部拿到**（WikiSkill 的写入判据/pattern 规则/Table 3 消融数字、Humanize 的门类别与计划契约/合规判据/codebook、Lean4Agent 的消融/局限/成本），
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ② 分材料明细 · ### 2.1 WikiSkill（arXiv:2608.27454） · 数字: 48.7% / 63.7% / 15.0% / 60.9%
 - `docs/design/EXTERNAL-PAPERS-MISSING-INFO.md` · ③ 这些新信息改变了什么判断（只写确凿的） · 1. **WikiSkill：那条"读 wiki 有害"必须带条件引用。** 新数字显示它是**条件性**的：只有在 **Skill Proposer 也有 wiki 访问**时， · 数字: 10 个 / 204 个 / 46 个
