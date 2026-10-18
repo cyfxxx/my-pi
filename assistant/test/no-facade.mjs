@@ -1,6 +1,6 @@
 /**
  * 断奶断言（M0.2 的守门）：
- *   ① 工具面里**没有**旧 facade 的工具名（按已知前缀点名）
+ *   ① 工具面里**没有**旧 facade 的工具名（按已知前缀点名；memory_/tmux_ 现在是我们自己的新工具，不算）
  *   ② 工具面**有**我们自己的 mypi_note
  *   ③ 工具总数在上限内（facade 在时是 80，断奶后应 ≤40）
  * 数据来源：mock 端点记录的 `toolFace=` 行（模型侧真实拿到的工具清单）。
@@ -37,7 +37,7 @@ const line = lines.reverse().find((l) => {
   return face.length > 0;
 });
 const tools = line === undefined ? [] : line.split('\ttoolFace=')[1].split('\t')[0].split(',').filter(Boolean);
-const legacy = tools.filter((name) => /^(admin_|autopilot_|browser_|ctx_|memory_|mode_|voice_|link_)/.test(name));
+const legacy = tools.filter((name) => /^(admin_|autopilot_|browser_|ctx_|mode_|voice_|link_)/.test(name));
 const hasOurs = tools.includes('mypi_note');
 const withinLimit = tools.length > 0 && tools.length <= limit;
 const ok = legacy.length === 0 && hasOurs && withinLimit;

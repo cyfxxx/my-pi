@@ -43,19 +43,40 @@ const server = createServer(async (req, res) => {
     const wantsNote = /笔记|记一条|note/i.test(userText);
     const wantsSearch = /搜索|搜一下|search/i.test(userText);
     const wantsTmux = /tmux/i.test(userText);
+    const wantsRemember = /记住|remember/i.test(userText);
     appendFileSync(
       LOG,
       `${new Date().toISOString()}\tmodel=${parsed.model}\tmessages=${parsed.messages?.length}\ttools=${tools.length}`
         + `\ttoolFace=${toolNames.join(',')}\tlastRole=${last?.role ?? '-'}\ttoolResult=${toolResult}`
         + `\tuserText=${JSON.stringify(userText).slice(0, 120)}`
-        + `\ttoolMsg=${JSON.stringify(typeof last?.content === 'string' ? last.content : (last?.content ?? '')).slice(0, 200)}\n`,
+        + `\ttoolMsg=${JSON.stringify(typeof last?.content === 'string' ? last.content : (last?.content ?? '')).slice(0, 200)}`
+        + `\tfirstUser=${JSON.stringify((Array.isArray(parsed.messages) ? parsed.messages.find((m) => m?.role === 'user')?.content : '')).slice(0, 120)}`
+        + `\tinjections=${(Array.isArray(parsed.messages) ? parsed.messages : []).filter((m) => m?.role === 'user' && JSON.stringify(m.content).includes('[mypi-memory]')).length}\n`,
     );
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
     const id = `chatcmpl-mock-${Date.now()}`;
     const created = Math.floor(Date.now() / 1000);
     const base = { id, object: 'chat.completion.chunk', created, model: parsed.model ?? 'mock-local' };
     sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
-    if (!toolResult && wantsTmux && toolNames.includes('tmux_run')) {
+    if (!toolResult && wantsRemember && toolNames.includes('memory_store')) {
+      sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
+      sse(res, {
+        ...base,
+        choices: [{
+          index: 0,
+          delta: {
+            tool_calls: [{
+              index: 0,
+              id: 'call_mock_memory',
+              type: 'function',
+              function: { name: 'memory_store', arguments: JSON.stringify({ text: '项目代号 falcon', tags: '项目' }) },
+            }],
+          },
+          finish_reason: null,
+        }],
+      });
+      sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 } });
+    } else if (!toolResult && wantsTmux && toolNames.includes('tmux_run')) {
       sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
       sse(res, {
         ...base,

@@ -9,7 +9,18 @@
  */
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineTool } from '@deepseek-ai/dsh-tools';
+import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import type { ContextFormed } from '@deepseek-ai/dsh-llm';
+
+// 声明我们自己的消息来源（DSH 的 MessageSourceMap 是"各生产者自己声明 kind"的合并式联合）。
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'mypi-memory': { kind: 'mypi-memory' } & ContextFormed;
+  }
+}
+import { appendMemory, readMemories, renderInjection, resolveMemoryConfig, searchMemories } from './memory';
 import { createSearxngProvider, resolveSearxngConfig } from './searxng';
 import {
   hasTmux,
@@ -32,6 +43,8 @@ interface HostContext {
     services: readonly string[],
     callback: (child: { web: { registerSearchProvider: (provider: unknown) => () => void } }) => void,
   ) => unknown;
+  /** 事件订阅（agent/pre-step 是宿主的事件瀑布）。 */
+  on?: (event: string, listener: (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>) => unknown;
   [key: string]: unknown;
 }
 
@@ -87,6 +100,57 @@ export function apply(ctx: HostContext): void {
   const searxng = resolveSearxngConfig();
   ctx.inject?.(['web'], (child) => {
     child.web.registerSearchProvider(createSearxngProvider(searxng));
+  });
+
+  // 长期记忆：存储 + 三个工具 + append-only 注入（见 plugin/memory.ts 头注释）。
+  const memory = resolveMemoryConfig(join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
+  tools.register(stringTool('memory_store', '把一条长期记忆写进本机记忆库（JSONL），返回 id。', {
+    text: { type: 'string', description: '要记住的内容（一句话）' },
+    tags: { type: 'string', description: '（可选）逗号分隔的标签' },
+  }, (args) => {
+    const text = String(args.text ?? '').trim();
+    if (text === '') throw new Error('memory_store: text 不能为空');
+    const tags = String(args.tags ?? '').split(',').map((t) => t.trim()).filter(Boolean);
+    const entry = appendMemory(memory.file, text, tags);
+    return `已记住（${entry.id}）：${entry.text}`;
+  }));
+  tools.register(stringTool('memory_search', '按关键词检索长期记忆（中日韩按双字、拉丁按词匹配）。', {
+    query: { type: 'string', description: '检索词' },
+    limit: { type: 'number', description: '（可选）最多返回几条，默认 5' },
+  }, (args) => {
+    const hits = searchMemories(readMemories(memory.file), String(args.query ?? ''), Number(args.limit ?? 5));
+    if (hits.length === 0) return '没有匹配的长期记忆';
+    return hits.map((h) => `- ${h.text}${h.tags.length ? `（${h.tags.join('/')}）` : ''}`).join('\n');
+  }));
+  tools.register(stringTool('memory_stats', '查看长期记忆库的条数与位置。', {}, () => {
+    const entries = readMemories(memory.file);
+    const last = entries.at(-1);
+    return `记忆 ${entries.length} 条；文件 ${memory.file}${last ? `；最近一条 ${last.ts}` : ''}`;
+  }));
+
+  // append-only 注入：只在一回合的第一步、且内容与上次不同时，追加到请求消息末尾。
+  const lastInjected = new Map<string, string>();
+  ctx.on?.('agent/pre-step', async (payload, next) => {
+    const decision = (await next()) as { kind?: string; messages?: readonly unknown[] };
+    if (decision?.kind === 'reject' || decision?.messages === undefined) return decision;
+    const step = (payload as { step?: number } | undefined)?.step ?? 1;
+    if (step !== 1) return decision;
+    const text = renderInjection(readMemories(memory.file), memory);
+    if (text === '') return decision;
+    const sessionId =
+      ((payload as { agent?: { session?: { id?: unknown } } } | undefined)?.agent?.session?.id as string | undefined) ?? 'default';
+    if (lastInjected.get(sessionId) === text) return decision;
+    lastInjected.set(sessionId, text);
+    return {
+      ...decision,
+      messages: [
+        ...decision.messages,
+        createUserMessage({
+          content: [{ type: 'text', text }],
+          source: { kind: 'mypi-memory', form: 'snapshot', sections: [{ name: 'memory', text }] },
+        }),
+      ],
+    };
   });
 
   // tmux：只认 `MYPI_TMUX_PREFIX`（默认 mypi-）前缀的会话，避免误杀用户自己的会话。

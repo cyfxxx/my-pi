@@ -233,7 +233,17 @@
   前缀的会话，list/kill 都按前缀过滤，避免误杀用户自己的 tmux。verify 第 ⑩ 步真链路：
   mock 模型调 `tmux_run({name:'demo'})` ⇒ 宿主真的建出 `mypi-demo` ⇒ 收尾能清掉（没装 tmux 时明确 SKIP）。
 - **记忆注入与缓存命中（✓ 结论已核实，实现待做）**：见下节。
-- **未做**：M0.5 裁体积（用户决定暂缓）、M0.6 品牌（暂缓）、其余功能回填（memory/autopilot）、TUI 更换、Windows。
+- **功能回填 ③：长期记忆（✅ 完成，append-only 注入）**——先查清了 DSH 的注入面：
+  `agent/pre-step` 瀑布返回 `{...decision, messages:[...decision.messages, createUserMessage(...)]}`，
+  这正是官方 `dsh-time-context` 的做法（把"易变内容"作为**请求消息列表末尾的追加**，而不是改 system prompt）。
+  我们按同一形状实现（`assistant/plugin/memory.ts` + `entry.ts`）：
+  - 存储：`MYPI_MEMORY_FILE`（默认 `assistant/.run/memory.jsonl`），坏行跳过；
+  - 工具：`memory_store` / `memory_search`（中日韩双字 + 拉丁词的粗排）/ `memory_stats`；
+  - 注入：只在**回合第一步**、内容与上次不同、有上限（默认 12 条 / 800 字符）时追加一条
+    `source.kind = 'mypi-memory'` 的 user 消息（用 `declare module` 扩展 `MessageSourceMap`，与 `time-context` 同法）；
+  - 验证：`test/memory.mjs` 断言"写入生效 / 每回合只注入一次 / **第一条 user 消息逐字不变**"⇒ 前缀稳定、缓存可命中。
+  verify 现 **12 项全绿**。
+- **未做**：M0.5 裁体积（用户决定暂缓）、M0.6 品牌（暂缓）、autopilot 独有部分、TUI 更换、Windows。
 
 ### 记忆注入会不会打穿前缀缓存？——会，如果注入方式错了
 

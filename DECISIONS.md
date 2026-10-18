@@ -2,6 +2,29 @@
 
 ## 格式
 
+### [2026-10-18] ★ 功能回填③：长期记忆 —— 注入面查清（`agent/pre-step` 末尾追加），并证明**前缀稳定**
+
+**先答"怎么写进去"（✓ 读代码确认）**：DSH 的 `dsh-time-context` 就是官方样板——
+`ctx.on('agent/pre-step', …)` 拿到 `decision` 后返回 `{...decision, messages:[...decision.messages, createUserMessage(...)]}`，
+即**在请求消息列表末尾追加**；消息来源用 `declare module '@deepseek-ai/dsh-llm' { interface MessageSourceMap { … } }`
+自行声明（合并式联合，没有 catch-all）。
+
+**实现（✓）**：`assistant/plugin/memory.ts`（JSONL 存储、坏行跳过、中日韩双字+拉丁词检索、注入块渲染）
++ `entry.ts` 注册三个工具 `memory_store/search/stats` 与注入钩子：
+只在**回合第一步**、内容与上次不同、且不超过上限（默认 12 条/800 字符）时追加一条 `source.kind='mypi-memory'` 的 user 消息；
+旧快照随压缩折叠。
+
+**验证（✓ 真链路）**：`test/memory.mjs`：
+① `memory_store` 真的写入；② 下一回合请求里 `[mypi-memory]` **恰好一次**；
+③ **第一条 user 消息与上一回合逐字相同**（`firstUserStable:true`）⇒ 前缀没动、缓存可命中。
+主验收 **12 项全绿**。
+
+**顺带修的假阳性**：断奶断言把 `memory_*` 当"旧 facade 残留"，可我们现在故意沿用同名工具 ⇒ 从旧前缀正则里移除
+`memory_`（并注明 `tmux_`/`memory_` 已是我们自己的新工具）。
+
+**✗ 未做**：`ctx_note/ctx_list/ctx_snap/ctx_exec` 四个草稿类工具、`/memory` 命令、autopilot 独有部分；
+M0.5 裁体积与 M0.6 品牌按用户决定暂缓。
+
 ### [2026-10-18] ★ 功能回填②：tmux（5 工具，前缀保护）+ 记忆注入的缓存结论（**不能进 system prompt**）
 
 **tmux（✓ 完成）**：DSH 只有只读的 `tmux-context`，没有驱动 ⇒ 按"简单档"自己补
