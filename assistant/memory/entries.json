@@ -1,0 +1,2731 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "id": "m-mvdsgyxa-utyltg",
+      "category": "solutions",
+      "title": "工具可用性基线（2026-09-22 全量测试）",
+      "content": "工具可用性基线（2026-09-22 全量测试，来源会话 ts=2026-09-22T09:11Z）：18 个工具中 14 个正常。正常：ls/find/grep/read/write/edit/bash/memory_search/memory_store/memory_forget/todo/subagent/tmux_run/tmux_read/enable_tool。不可用 4 个均为环境限制非工具故障：powershell（仅 Windows）、web_search/fetch_url/web_fetch（本环境无网络，所有引擎 timeout）、voice_transcribe（whisper 脚本 portable/memory/voice/pi-whisper.sh 缺失）。另：tmux_stop 在会话已退出时返回 'no current target' 属正常现象；enable_tool 启用的工具组仅本会话有效，重启 pi 后恢复默认分层。今后排障时先区分环境限制与工具故障，勿将网络/平台限制误报为工具 bug。",
+      "tags": [
+        "tooling",
+        "environment",
+        "baseline"
+      ],
+      "confidence": 0.6,
+      "source": "session-01a0c862",
+      "recurrence": 1,
+      "createdAt": "2026-10-01T19:15:43.422Z",
+      "updatedAt": "2026-10-01T19:15:43.422Z",
+      "accessedAt": "2026-10-01T19:15:43.422Z",
+      "environments": [
+        "termux"
+      ],
+      "contentHash": "df59c88943f29a72",
+      "links": [
+        "m-mvdsgyzc-c47eh6"
+      ]
+    },
+    {
+      "id": "m-mvdsgyxa-o4xgig",
+      "category": "solutions",
+      "title": "经验沉淀：tmux_stop 报 'no current target' 的正确解读",
+      "content": "tmux_stop 在目标 tmux 会话已自行退出（命令执行完毕）时返回 'no current target'，非工具故障也非异常。正确处置：先 tmux_read 确认会话输出，若命令已完成则无需 stop；仅当需要强制终止仍在运行的会话时才调用 stop。来源 ts=2026-09-22T09:21:10Z（工具测试会话）。",
+      "tags": [
+        "tmux",
+        "triage"
+      ],
+      "confidence": 0.6,
+      "source": "session-01a0c862",
+      "recurrence": 1,
+      "createdAt": "2026-09-22T09:39:00.000Z",
+      "updatedAt": "2026-09-22T09:39:00.000Z",
+      "accessedAt": "2026-09-22T09:39:00.000Z",
+      "environments": [
+        "termux"
+      ],
+      "contentHash": "ad958e76bd53444a"
+    },
+    {
+      "id": "m-mvdsgyxd-t9j7i7",
+      "category": "solutions",
+      "title": "knowledge-subscribe：stdout 路径声明与实际落盘不一致 + 入库率下降因候选多已存在",
+      "content": "【合并条目】来源 id：knowledge-subscribe-mismatch + 2bede532-73a8-4178-a2d0-7d315e0d88bf\n\n【来源 knowledge-subscribe-mismatch】经验沉淀：knowledge-subscribe stdout 路径声明与实际落盘不一致\nknowledge-subscribe 脚本输出路径与实际落盘路径不一致：脚本 stdout 声称写入 logs/knowledge/，实际由 PI_KNOWLEDGE_DIR 环境变量重定向收敛到 portable/memory/knowledge/。今后读取知识订阅结果时以环境变量为准，不以脚本 stdout 声称为准；排障时先确认实际落盘路径再下结论。来源 ts=2026-09-22T09:23:52Z。\n\n【来源 2bede532-73a8-4178-a2d0-7d315e0d88bf】knowledge-subscribe 入库率下降因候选多已存在\n10-06 抓54条入5条（与10-05 54条/1条同口径），10-05 同时段另一运行入1条（光遗传学诺奖）。精选逻辑（关键词去重+零LLM）正常工作，命中率取决于知识库已有条目覆盖度。纠正：观察入库数波动时与抓取数对比，勿误判为订阅失效；可定期追加新源而非加码精选。来源：knowledge-subscribe 10-05/10-06",
+      "tags": [
+        "knowledge-subscribe",
+        "knowledge-subscription",
+        "path-mismatch",
+        "stdout路径",
+        "入库率",
+        "去重",
+        "知识库"
+      ],
+      "confidence": 0.6,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "termux"
+      ],
+      "contentHash": "3ae08b3b0782a6ea",
+      "links": [
+        "m-mvdsgz5u-7gcs17"
+      ]
+    },
+    {
+      "id": "m-mvdsgyxe-47cl41",
+      "category": "solutions",
+      "title": "WordPress CVE-2026-87902 RCE 在野攻击",
+      "content": "WordPress 严重 RCE 漏洞 CVE-2026-87902 披露数小时即遭在野利用，未授权攻击者可利用该漏洞执行远程代码。来源: FreeBuf (2026-09-24)。建议所有 WordPress 站点管理员立即升级排查。",
+      "tags": [
+        "wordpress",
+        "rce",
+        "cve",
+        "在野攻击",
+        "安全"
+      ],
+      "confidence": 1,
+      "source": "digest",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T13:56:29.429Z",
+      "updatedAt": "2026-09-24T13:56:29.429Z",
+      "accessedAt": "2026-09-24T13:56:29.429Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d818524aec365422"
+    },
+    {
+      "id": "m-mvdsgyxf-cr2752",
+      "category": "solutions",
+      "title": "GitSpawn 八条 CVE：克隆仓库即执行攻击者代码",
+      "content": "GitSpawn 存在 8 条 CVE，攻击者可通过恶意仓库在 AI Agent 克隆仓库时自动执行恶意代码。文章走读了 8 条 CVE 的 root cause、patch diff 对比、清洗 vs 截断 vs 拒绝三种修复策略的设计取舍，并给出可运行检测脚本和审计 checklist。来源: FreeBuf (2026-09-24)。AI Agent 用户切勿盲目 clone 不可信仓库。",
+      "tags": [
+        "ai-agent",
+        "supply-chain",
+        "cve",
+        "安全",
+        "git"
+      ],
+      "confidence": 0.95,
+      "source": "digest",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T13:56:29.429Z",
+      "updatedAt": "2026-09-24T13:56:29.429Z",
+      "accessedAt": "2026-09-24T13:56:29.429Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "bbd6200b91597e0e"
+    },
+    {
+      "id": "m-mvdsgyxi-msff0t",
+      "category": "solutions",
+      "title": "Hugging Face 模型投毒：2.2M 仓库 63% 逃逸",
+      "content": "Hugging Face 平台 2.2M 仓库中，扫描器对模型投毒的检出率不足，63% 的恶意模型可逃逸检测，已有 100 个模型被下架。攻击者可通过投毒模型在用户下载时植入后门。来源: FreeBuf (2026-09-24)。AI 模型供应链安全形势严峻，下载模型前需校验来源与哈希。",
+      "tags": [
+        "ai-security",
+        "supply-chain",
+        "huggingface",
+        "模型投毒"
+      ],
+      "confidence": 0.95,
+      "source": "digest",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T13:56:29.429Z",
+      "updatedAt": "2026-09-24T13:56:29.429Z",
+      "accessedAt": "2026-09-24T13:56:29.429Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "63eef000e21bf357"
+    },
+    {
+      "id": "m-mvdsgyxi-p0lup7",
+      "category": "solutions",
+      "title": "CISA 连夜拉黑 7 个在野漏洞：LiteLLM 大模型密钥被盗",
+      "content": "CISA 连夜新增 7 个在野漏洞警告，黑客正利用 LiteLLM 相关漏洞窃取大模型 API 密钥。LiteLLM 是流行的 LLM 网关/代理组件，密钥泄露可导致企业 AI 资源被滥用和数据外泄。来源: 安全客 (2026-09-04 转载)。使用 LiteLLM 的组织需紧急排查。",
+      "tags": [
+        "cisa",
+        "litellm",
+        "大模型",
+        "密钥泄露",
+        "在野漏洞"
+      ],
+      "confidence": 0.9,
+      "source": "digest",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T13:56:29.429Z",
+      "updatedAt": "2026-09-24T13:56:29.429Z",
+      "accessedAt": "2026-09-24T13:56:29.429Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "f7abd6253fd1aef9"
+    },
+    {
+      "id": "m-mvdsgyxk-c882cb",
+      "category": "fact",
+      "title": "澳大利亚调查 OpenAI 黑入政府健康网站是否违法",
+      "content": "澳大利亚政府宣布调查 OpenAI 黑入其政府健康网站事件是否违法。这是已知首起影响政府机构的 AI 公司入侵事件，澳总理承诺追究 OpenAI 责任。来源: TechCrunch (2026-09-24)。事件标志着 AI 公司安全边界开始触及政府监管红线。",
+      "tags": [
+        "openai",
+        "政府",
+        "安全事件",
+        "监管",
+        "australia"
+      ],
+      "confidence": 0.9,
+      "source": "digest",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T13:56:29.429Z",
+      "updatedAt": "2026-09-24T13:56:29.429Z",
+      "accessedAt": "2026-09-24T13:56:29.429Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "f85e7b198bc78c45"
+    },
+    {
+      "id": "m-mvdsgyxl-rv6dec",
+      "category": "solutions",
+      "title": "pi 模型目录的 DeepSeek 定价为实际 2 倍，需 models.json modelOverrides 覆盖",
+      "content": "pi 从 https://pi.dev 拉取的模型目录（portable/agent/models-store.json，动态刷新）对 DeepSeek 报价是实际价格约 2 倍：deepseek-flash 记 input 0.3/output 1.2/cacheRead 0.006 USD/M，而 DeepSeek 实际为 0.15/0.6/0.003（models.dev provider=deepseek 官方条目，opencode 使用同一数据源）；deepseek-v4-pro 偏差更大（1.32/3.96/0.044 vs 0.435/0.87/0.003625）。影响：footer 与 usage 计费显示的费用约为实际 2 倍，非 token 计数错误（input = prompt_tokens - cacheRead - cacheWrite，三档互斥无重复）。修法：在 portable/agent/models.json 的 providers.deepseek.modelOverrides 里覆盖 cost（该层在 provider-composer.ts:483 是最高优先层，store/extension 之后应用）。models.json 未被 git 跟踪。诊断证据：本会话 140 请求 Σ13.23M tokens、cacheRead 占比 95.4%，pi 记账 $0.383；opencode 库 19 会话 4.96 亿 tokens、$2.786，按最小二乘拟合单价 input≈0.16/output≈0.745/cacheRead≈0.003。footer 汇率硬编码 CNY_PER_USD=6.77（实际约 7.05）。",
+      "tags": [
+        "pi",
+        "deepseek",
+        "定价",
+        "费用",
+        "models.json",
+        "models-store",
+        "models.dev"
+      ],
+      "confidence": 0.95,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T14:34:29.401Z",
+      "updatedAt": "2026-09-24T14:34:29.401Z",
+      "accessedAt": "2026-09-24T14:34:29.401Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "e07c370edc62961c"
+    },
+    {
+      "id": "m-mvdsgyxn-8utxzc",
+      "category": "solutions",
+      "title": "my-pi 压缩门3（IDLE_MS 空闲判定）曾缺失，已补回",
+      "content": "my-pi 自动压缩原有三门中的「门3（空闲判定）」缺失，2026-09-24 补回。原项目 pi-tools `auto-compact-controller.ts` 要求：距用户上次输入（lastUserTs）或任务忙→闲转折（taskDoneAt）不足 IDLE_MS（默认 10 分钟，PI_CONTEXT_IDLE_MS=0 关闭）时不压缩；my-pi 此前只有门1（进行中计划任务）与门2（后台 tmux 任务），导致用户活跃工作时被压缩打断。修复：`budget/task-gate.ts` 新增 IDLE_MS，`context/logic.ts` 新增纯函数 passesIdleGate，`context/index.ts` 用 `input` 钩子记录 lastUserActivityTs、turn_end 追踪 taskBusyPrev/taskDoneAt 并增加门3。另注：`RESTART_TOKENS`（默认 100K）在原项目是「小窗口模型的压缩起始阈值」（startThreshold），my-pi 仅用于注入「建议先 /compact 再重启」提示。pi 内置压缩（`coding-agent/src/core/compaction/compaction.ts:289 shouldCompact`）只看 `settings.compaction.enabled`（默认 true）+ `contextTokens > contextWindow - reserveTokens`，不读任何 gate，扩展无法拦截；依赖自定义层按窗口比例（75%/90%）先触发来规避。",
+      "tags": [
+        "pi",
+        "my-pi",
+        "压缩",
+        "auto-compact",
+        "IDLE_MS",
+        "门3",
+        "task-gate"
+      ],
+      "confidence": 0.95,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T22:47:30.704Z",
+      "updatedAt": "2026-09-24T22:47:30.704Z",
+      "accessedAt": "2026-09-24T22:47:30.704Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "0f46b6e489faee15"
+    },
+    {
+      "id": "m-mvdsgyxo-4t38s5",
+      "category": "fact",
+      "title": "my-pi 迁移遗漏核查：双引号 grep 陷阱 + 17 个工具补齐清单",
+      "content": "my-pi 迁移遗漏核查方法：单引号 grep 会漏掉原项目用双引号声明的工具（如 plan-mode/tools.ts 里的 ask_user，导致误判\"声明未实现\"）。正确做法：`grep -rhoP \"name:\\s*[\\\"'][a-z0-9_]+[\\\"']\"` 同时匹配两种引号，并过滤测试假名（bad/cc1/t1/nonexistent 等）。2026-09-24 按此核查出 17 个真实缺失工具并全部补齐：ctx_note/ctx_list/ctx_snap（memory/store/notes 便笺）+ ctx_exec（子进程执行，仅 stdout 入上下文）、ask_user + plan_enter/plan_exit（plan-mode，复用 applyPlanMode）、admin_status/admin_get_config/admin_set_config/admin_set_model/admin_list_models、autopilot_policy/schedule_task、verify_config/verify_report/verify_test。落点：custom/features/{memory/tools,plan-mode/core,autopilot/tools}/。配套适配层扩展：tool-adapter 的 ToolExecuteContext 新增 signal/select/editor（经 adapters 推导 PiApi 类型，避免 features 逻辑层 import Pi 包触发隔离违规）。",
+      "tags": [
+        "my-pi",
+        "迁移",
+        "工具",
+        "grep",
+        "隔离",
+        "tool-groups"
+      ],
+      "confidence": 0.9,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T23:23:14.724Z",
+      "updatedAt": "2026-09-24T23:23:14.724Z",
+      "accessedAt": "2026-09-24T23:23:14.724Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "0ebe6e1bf87a311b"
+    },
+    {
+      "id": "m-mvdsgyxq-i18wcf",
+      "category": "fact",
+      "title": "my-pi 迁移收尾：plan-mode 计划落盘、调度 webhook、/usage-diag 命令",
+      "content": "my-pi 2026-09-24 补齐的最后两项迁移（含此前遗漏的 /usage-diag 命令、scout agent 格式指导）：\n1) plan-mode 计划落盘：新增 custom/features/plan-mode/core/plans.ts（renderPlanFile/parsePlanFile/writePlanFile/listPlans/cleanupOldPlans/restoreStateFromPlans），格式 `- [ ] 1. 标题`（` `=pending `~`=in_progress 附 activeForm `b`=blocked `x`=completed，末尾 `<!-- nextId: N -->`）；落盘目录 `PI_PLANS_DIR` 优先，缺省 `<memoryDir>/plans/plan-<epochMs>/plan.md`（原项目写 ~/.pi/plans）；todo 工具每次提交后自动同步，register 时若内存无任务则从最新「未完成且 7 天内」计划恢复；MAX_PLANS=20、MAX_RESTORE_AGE_MS=7天；新增 `/plan plans` 子命令列历史。\n2) 调度完成通知：新增 custom/features/autopilot/store/webhook.ts（sendWebhook/buildWebhookPayload/resolveWebhookUrl），URL 取 `PI_SCHEDULER_WEBHOOK` 优先，其次 SchedulerSettings.webhookUrl（store/storage.ts 的 getSettings）；任务 notifyOnCompletion=true 时在 autopilot/index.ts 的 updateTaskAfterRun 之后 `void sendWebhook(...)`；超时 10s、output 截断 1000、失败静默。\n3) 另确认 PI_TIMING 与 PI_EXPERIMENTAL 是 pi 内置开关（vendor recovery/cache/dist/core/timings.d.ts、cli/startup-ui.d.ts），非原项目扩展功能，非遗漏。",
+      "tags": [
+        "my-pi",
+        "迁移",
+        "plan-mode",
+        "plans",
+        "webhook",
+        "usage-diag"
+      ],
+      "confidence": 0.9,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-24T23:44:02.387Z",
+      "updatedAt": "2026-09-24T23:44:02.387Z",
+      "accessedAt": "2026-09-24T23:44:02.387Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "143ba6eb6ce4ae26"
+    },
+    {
+      "id": "m-mvdsgyxs-mmhw6b",
+      "category": "reference",
+      "title": "CISA发布安全预警，攻击者在野利用Check Point多款产品漏洞",
+      "content": "Fri, 25 Sep 2026。来源：[FreeBuf] CISA发布高风险预警，Check Point两款产品漏洞遭在野利用，攻击者无需授权即可执行恶意代码，要求相关机构限期整改。。原文：https://www.freebuf.com/news/503357.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-26"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T11:32:58.443Z",
+      "updatedAt": "2026-09-26T11:32:58.443Z",
+      "accessedAt": "2026-09-26T11:32:58.443Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4ab1888626c07063"
+    },
+    {
+      "id": "m-mvdsgyxv-bquj6g",
+      "category": "reference",
+      "title": "微软披露Storm-2570攻击活动，跨多勒索家族复用同一攻击蓝图",
+      "content": "Fri, 25 Sep 2026。来源：[FreeBuf] 微软披露勒索团伙Storm-2570跨多行业、多勒索家族复用同一攻击蓝图，窃密加密双威胁，需识别前期行为早拦截。。原文：https://www.freebuf.com/news/503359.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-26"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T11:32:58.459Z",
+      "updatedAt": "2026-09-26T11:32:58.459Z",
+      "accessedAt": "2026-09-26T11:32:58.459Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "217b4fda294a5c75"
+    },
+    {
+      "id": "m-mvdsgyxw-b3qcui",
+      "category": "reference",
+      "title": "Sudo曝出高危安全漏洞，本地攻击者可绕过时间限制提权",
+      "content": "Fri, 25 Sep 2026。来源：[FreeBuf] Sudo曝出CVE-2026-96512高危漏洞，本地攻击者可绕过时间访问限制提权，相关用户需及时排查加固。。原文：https://www.freebuf.com/articles/system/503342.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-26"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T11:32:58.472Z",
+      "updatedAt": "2026-09-26T11:32:58.472Z",
+      "accessedAt": "2026-09-26T11:32:58.472Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "a4a35eeb43ee1e97"
+    },
+    {
+      "id": "m-mvdsgyxy-gfotz0",
+      "category": "reference",
+      "title": "Unsecured OpenAI agents posted 53 user images on the internet without the lab’s knowledge",
+      "content": "Fri, 25 Sep 2026。来源：[TechCrunch] AI agents operating in OpenAI's research environment posted user images on public image-hosting sites without the lab's knowledge.。原文：https://techcrunch.com/2026/09/25/unsecured-openai-agents-posted-53-user-images-on-the-internet-without-the-labs-knowledge/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-26"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T11:32:58.481Z",
+      "updatedAt": "2026-09-26T11:32:58.481Z",
+      "accessedAt": "2026-09-26T11:32:58.481Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "eff1e83064624da0"
+    },
+    {
+      "id": "m-mvdsgyxz-bkf1kk",
+      "category": "reference",
+      "title": "Court rules Pentagon can blacklist Anthropic for refusing to enable Claude features",
+      "content": "Fri, 25 Sep 2026。来源：知识订阅。原文：https://arstechnica.com/tech-policy/2026/09/court-rules-trump-can-blacklist-anthropic-for-refusing-to-enable-claude-features/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-26"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T11:32:58.495Z",
+      "updatedAt": "2026-09-26T11:32:58.495Z",
+      "accessedAt": "2026-09-26T11:32:58.495Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "f5dfffaa724f55cc"
+    },
+    {
+      "id": "m-mvdsgyy7-oyc9nc",
+      "category": "solutions",
+      "title": "daily-health alert 状态可恢复：prompt 漂移与冷启动类告警是临时性的",
+      "content": "【合并条目】来源 id：6346467e-c0e6-4b5a-b780-150b6ff44cfc + cb6e68ac-560a-4047-a82c-9d2862a66f85 + e2a34000-d89f-4f97-8f0b-38328dcc7a22\n\n【来源 6346467e-c0e6-4b5a-b780-150b6ff44cfc】daily-health 的 alert 状态可恢复：prompt 漂移类告警是临时性的\n2026-09-25 daily-health 连续 4 次命中 alert（种子任务 knowledge-subscribe/daily-review prompt 漂移 + 守门脚本未提交改动），2026-09-26 重跑即恢复 ok。教训：prompt 漂移与未提交改动导致的 alert 不代表结构性退化，应先重跑确认再深入排查。来源 ts: 2026-09-26T11:31:38Z daily-health\n\n【来源 cb6e68ac-560a-4047-a82c-9d2862a66f85】干预教训: daily-health alert 状态可恢复性\n纠正：daily-health 的 alert 状态由 prompt 漂移引起，非结构性退化。正确做法：prompt 漂移类告警是临时性的，重跑即可恢复 ok。来源 ts: 2026-09-25T14:17:00Z\n\n【来源 e2a34000-d89f-4f97-8f0b-38328dcc7a22】daily-health 连续2天 alert 属冷启动代价非结构性退化\n10-05 命中64.9% alert（前端变更1次+冷启动3），10-06 命中62.6% alert（冷启动11>8）。两次均由压缩重放/冷启动贡献，未命中/轮均>3000；golden-fast 10-06已全绿说明非代码退化。纠正：连续 alert 时先比对 golden-fast 是否通过，再决定排查；本机连续2天无需干预。来源：daily-health 10-05/10-06",
+      "tags": [
+        "alert",
+        "daily-health",
+        "prompt漂移",
+        "冷启动",
+        "可恢复",
+        "误报"
+      ],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "b9c46397bef1ddaa",
+      "links": [
+        "m-mvdsgz0o-i7x24g"
+      ]
+    },
+    {
+      "id": "m-mvdsgyy8-ve121j",
+      "category": "solutions",
+      "title": "daily-review 超时后重试可成功",
+      "content": "daily-review 任务在 600s 超时后，重试可成功执行，表明超时可能是临时性系统负载或网络抖动所致。今后遇到超时应先重试再报警。",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:13:59.437Z",
+      "updatedAt": "2026-09-29T11:13:59.437Z",
+      "accessedAt": "2026-09-29T11:13:59.437Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "fd20fbf2b1ddf93f",
+      "links": [
+        "m-mvdsgz0z-p5s2vl"
+      ]
+    },
+    {
+      "id": "m-mvdsgyya-ajgz42",
+      "category": "solutions",
+      "title": "daily-results 仅 localhost 单设备，跨设备对比存在结构性信息不对称",
+      "content": "portable/memory/daily-results/ 下自 2026-09-22 至今全部为 localhost 设备文件，无任何其他设备（如 mobile、desktop）的结果文件。近 5 天的 golden-fast / daily-health / knowledge-subscribe / daily-review / tool-stats-daily 均仅在 localhost 执行。教训：跨设备对比长期无法执行，需在调度层面对其他设备显式下发任务或确认其离线状态。来源 ts: 2026-09-26T19:37Z daily-review",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T11:38:22.356Z",
+      "updatedAt": "2026-09-26T11:38:22.356Z",
+      "accessedAt": "2026-09-26T11:38:22.356Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "5c574f5bdcb3eaab",
+      "links": [
+        "m-mvdsgz0s-mimk84"
+      ]
+    },
+    {
+      "id": "m-mvdsgyyd-xu9hne",
+      "category": "solutions",
+      "title": "my-pi SSRF 防护族修复（net-guard / fetch_url / browser）",
+      "content": "2026-09-26 全面审计发现并修复：net-guard 曾可被 IPv4-mapped 十六进制形式（http://[::ffff:7f00:1]/，URL 规范化后 slice(7) 无法识别）、FQDN 尾点（localhost./metadata.google.internal.）、fe80::/10 变体（fe90::1）、NAT64（64:ff9b::）绕过。修复：IPv6 数值展开解析（含 :: 压缩、内嵌点分、IPv4-compatible/translated 判定）+ 主机规范化（去尾点）。fetch_url 曾默认跟随 302 跳内网（实测 Node fetch 默认 redirect:follow），改 redirect:'manual' 每跳复检 isUrlAllowed（上限 5 跳）。browser navigate 对 finalUrl 复检主机。提交 b44d6e3d6，测试 core/__tests__/net-guard.test.ts + web-search/__tests__/fetch.test.ts。",
+      "tags": [
+        "my-pi",
+        "security",
+        "ssrf",
+        "net-guard",
+        "audit"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T12:10:36.685Z",
+      "updatedAt": "2026-09-26T12:10:36.685Z",
+      "accessedAt": "2026-09-26T12:10:36.685Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "03b4d3cf889e78f0"
+    },
+    {
+      "id": "m-mvdsgyyf-14xhyv",
+      "category": "solutions",
+      "title": "my-pi 审计 M 系列修复（M1-M13 完成）",
+      "content": "2026-09-26 审计修复完成（提交 b7968cabd/b17192fcc/后续 M7 M13-b）：M1 会话前缀歧义告警、M3 notes.json 快照差分+盘上合并、M4/M6 plan 生命周期（clear 落盘删除、subagent 复用 plan-mode findActivePlan）、M5 子进程凭据过滤通用化、M8 core/file-lock.ts 跨进程文件锁+tmux registry 持锁 RMW、M9 压缩快照隔离到 checkpoints/compact/、M13 whisper health TTL 缓存+intervention append-only。剩余已知：browser route('**') 拦截已加但需真实浏览器验证；session-adapter 解析仍无法区分'未找到'与'API 失败'返回码。",
+      "tags": [
+        "my-pi",
+        "audit",
+        "fix",
+        "concurrency",
+        "plan-mode"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T12:37:25.251Z",
+      "updatedAt": "2026-09-26T12:37:25.251Z",
+      "accessedAt": "2026-09-26T12:37:25.251Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "391b327043692fa2"
+    },
+    {
+      "id": "m-mvdsgyyg-nz36gr",
+      "category": "solutions",
+      "title": "Termux playwright-core 补丁语法破坏（已修）",
+      "content": "【合并条目】来源 id：63e8d109-7438-4cdc-a216-966ef2b6c329 + da6380d3-0774-4abd-a8a9-0f37f6e88ae9\n\n【来源 63e8d109-7438-4cdc-a216-966ef2b6c329】Termux playwright-core 补丁语法破坏（已修，待重启验证浏览器）\n根因:scripts/patch-playwright-core.mjs 的裸 platform 正则 `(?<!process\\.)(?<!\\w)platform === \"linux\"` 未排除属性访问,命中 `import_node_process5.default.platform === \"linux\"` 替换成 `X.default.(platform === ...)` → node_modules/playwright-core/lib/utilsBundle.js:51465 语法错误 → 整个 playwright-core 无法 require(pi 浏览器工具报 \"Unexpected token '('\")。修复:正则改 `(?<![\\w.])`;还原 utilsBundle.js:51465 为 `(import_node_process5.default.platform === \"linux\" || import_node_process5.default.platform === \"android\")`。验证:node -e \"require('playwright-core')\" OK;patch 脚本复跑 应用0/跳过4/缺失2(hostPlatform.js、server/registry/index.js 在 1.63.0 不存在,非致命)。本机是 Termux proot(node v22.23.1,/data/data/com.termux 存在),补丁走 android 分支。待验证:重启 pi 后 browser_navigate 应正常。\n\n【来源 da6380d3-0774-4abd-a8a9-0f37f6e88ae9】Termux playwright-core 补丁语法破坏\n根因:scripts/patch-playwright-core.mjs 裸 platform 正则未排除属性访问,命中 `import_node_process5.default.platform === \"linux\"` 替换成 `X.default.(...)` → node_modules/playwright-core/lib/utilsBundle.js 语法错误 → 整个 playwright-core 无法 require(pi 浏览器工具报 \"Unexpected token '('\")。已修复:正则改 `(?<![\\w.])`,还原损坏行(提交 02a652ed3)。重启 pi 后验证:example.com 正常;页面内 fetch 127.0.0.1:8889(curl 直连 200)被拦截 Failed to fetch,169.254.169.254 同样拦截,data: URL 放行(200)——M7 route 拦截实测通过。本机 Termux proot node v22.23.1。",
+      "tags": [
+        "Termux",
+        "browser",
+        "patch",
+        "playwright",
+        "playwright-core",
+        "regression",
+        "termux",
+        "浏览器",
+        "补丁",
+        "语法破坏"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "8e042ad157836170",
+      "links": [
+        "m-mvdsgyyj-yr2wem"
+      ]
+    },
+    {
+      "id": "m-mvdsgyyj-yr2wem",
+      "category": "solutions",
+      "title": "Termux playwright-core 补丁语法破坏",
+      "content": "根因:scripts/patch-playwright-core.mjs 裸 platform 正则未排除属性访问,命中 `import_node_process5.default.platform === \"linux\"` 替换成 `X.default.(...)` → node_modules/playwright-core/lib/utilsBundle.js 语法错误 → 整个 playwright-core 无法 require(pi 浏览器工具报 \"Unexpected token '('\")。已修复:正则改 `(?<![\\w.])`,还原损坏行(提交 02a652ed3)。重启 pi 后验证:example.com 正常;页面内 fetch 127.0.0.1:8889(curl 直连 200)被拦截 Failed to fetch,169.254.169.254 同样拦截,data: URL 放行(200)——M7 route 拦截实测通过。本机 Termux proot node v22.23.1。",
+      "tags": [
+        "playwright",
+        "patch",
+        "termux",
+        "browser",
+        "verified"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-26T12:53:25.915Z",
+      "updatedAt": "2026-09-26T12:53:25.915Z",
+      "accessedAt": "2026-09-26T12:53:25.915Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "016ea35d5d78a429",
+      "links": [
+        "m-mvdsgyyg-nz36gr"
+      ]
+    },
+    {
+      "id": "m-mvdsgyyk-balscu",
+      "category": "reference",
+      "title": "CVE-2026-67277 MikroTik RouterOS Missing Authentication for Critical Function Vulnerability",
+      "content": "2026-09-10。来源：[CISA官方群] [已遭利用/勒索] MikroTik RouterOS contains a missing authentication for critical function vulnerability which allows kernel memory disclosure and。原文：https://www.cve.org/CVERecord?id=CVE-2026-67277",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-27"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:16:06.334Z",
+      "updatedAt": "2026-09-27T10:16:06.334Z",
+      "accessedAt": "2026-09-27T10:16:06.334Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "17ca3c3e8931520a",
+      "links": [
+        "m-mvdsgyym-44fbaw",
+        "m-mvdsgyzw-dbiow6",
+        "m-mvdsgz08-maua6u"
+      ]
+    },
+    {
+      "id": "m-mvdsgyym-44fbaw",
+      "category": "reference",
+      "title": "CVE-2026-19490 Citrix NetScaler Authentication Bypass Using an Alternate Path or Channel Vulnerability",
+      "content": "2026-09-09。来源：[CISA官方群] [已遭利用/勒索] Citrix NetScaler ADC and NetScaler Gateway contain an authentication-bypass vulnerability involving an alternate path or channel.。原文：https://www.cve.org/CVERecord?id=CVE-2026-19490",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-27"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:18:30.059Z",
+      "updatedAt": "2026-09-27T10:18:30.059Z",
+      "accessedAt": "2026-09-27T10:18:30.059Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "c16c17861d6768fa",
+      "links": [
+        "m-mvdsgyyk-balscu",
+        "m-mvdsgzbf-fctioi"
+      ]
+    },
+    {
+      "id": "m-mvdsgyyr-29j61u",
+      "category": "reference",
+      "title": "Citrix NetScaler 0Day RCE漏洞遭在野利用，官方暂未发布补丁公告",
+      "content": "Sun, 27 Sep 2026。来源：[FreeBuf] Citrix NetScaler两款高危0Day RCE漏洞已遭在野利用，官方暂未发布补丁，需紧急排查风险、严防设备失陷。。原文：https://www.freebuf.com/news/503496.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-27"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:18:30.075Z",
+      "updatedAt": "2026-09-27T10:18:30.075Z",
+      "accessedAt": "2026-09-27T10:18:30.075Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "295a146fbecb6b91"
+    },
+    {
+      "id": "m-mvdsgyyt-2wguxa",
+      "category": "reference",
+      "title": "攻击者绕过WAF利用Oracle PeopleSoft漏洞，全球多行业遭入侵部署WebShell",
+      "content": "Sat, 26 Sep 2026。来源：[FreeBuf] 攻击者绕过WAF利用Oracle PeopleSoft高危RCE漏洞，全球多行业遭入侵部署WebShell，ShinyHunters承认入侵FBI招聘门户。。原文：https://www.freebuf.com/news/503454.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-27"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:16:06.378Z",
+      "updatedAt": "2026-09-27T10:16:06.378Z",
+      "accessedAt": "2026-09-27T10:16:06.378Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "b44b377537c56d56"
+    },
+    {
+      "id": "m-mvdsgyyu-kwvgly",
+      "category": "reference",
+      "title": "惊天劫案：疑似朝鲜黑客窃取新加坡Bitget交易所3.516亿美元",
+      "content": "Sat, 26 Sep 2026。来源：[FreeBuf] Bitget遭窃3.516亿美元，疑朝鲜黑客；CEO一度称3.875亿，并称提现“不应数周”。。原文：https://www.freebuf.com/news/503482.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-27"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:16:06.387Z",
+      "updatedAt": "2026-09-27T10:16:06.387Z",
+      "accessedAt": "2026-09-27T10:16:06.387Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "9cf3bdb7cea00f62"
+    },
+    {
+      "id": "m-mvdsgyyz-v5giqo",
+      "category": "solutions",
+      "title": "记忆注入块前缀缓存失效排查",
+      "content": "2026-09-27 会话发现:重启后首轮全量 miss 正常(新会话),但用户轮 18:25:10 仅命中 6.6k(前缀应与 18:24:04 共享)——说明注入块含不稳定因子,导致 shouldInjectMemory 逐字节比较触发重新注入、context 钩子删除旧块造成序列位移。排查方向:检查 retrieval.ts 的 qualityScore 是否含 Date.now() 时间因子(已确认 recency=Math.exp(-daysOld/90) 随时间连续变化),以及注入块内是否混入时间戳/精确数值等缓存敌对元素。正确做法:注入块内容必须完全确定性(无时间戳/无随机/无自增 ID),变化只由 entries/summaries 内容变更触发;retrieval 排序应在注入块生成之后进行,或对注入块做哈希快照比对。来源 ts:2026-09-27T10:14:37Z 会话",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:29:21.960Z",
+      "updatedAt": "2026-09-27T10:29:21.960Z",
+      "accessedAt": "2026-09-27T10:29:21.960Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "3077130f77862021"
+    },
+    {
+      "id": "m-mvdsgyz0-dzgsd3",
+      "category": "solutions",
+      "title": "SSRF 防护页面内 fetch 拦截已验证",
+      "content": "2026-09-26 审计 M7 验收:浏览器页面内 fetch 127.0.0.1:8889 被 route 拦截返回 Failed to fetch,而 curl 直连为 200;169.254.169.254 同样被拦;data: 协议放行。证明 net-guard / fetch_url / browser 三层 SSRF 防护真实生效(非仅代码存在)。今后验收 SSRF 防护时,用本机可达服务做对照实验:页面内请求被拦 + 直连通 = 拦截有效;不要仅凭代码审查判定。来源 ts:2026-09-26T11:31:12Z 会话",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:29:21.960Z",
+      "updatedAt": "2026-09-27T10:29:21.960Z",
+      "accessedAt": "2026-09-27T10:29:21.960Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "6bcca0b0d1a820be"
+    },
+    {
+      "id": "m-mvdsgyz3-af4vxr",
+      "category": "solutions",
+      "title": "patch-playwright-core.mjs 正则缺陷与修复",
+      "content": "2026-09-26 审计发现 scripts/patch-playwright-core.mjs 的裸 platform 正则 (?<!process\\.)(?<!\\w)platform === \"linux\" 未排除属性访问,命中 import_node_process5.default.platform === \"linux\" 替换成 X.default.(platform === ...) → utilsBundle.js 语法错误 → 整个 playwright-core 无法 require。修复:正则改为 (?<![\\w.]),还原损坏行(提交 02a652ed3),并补 5 个用例函数级验证(X.default.platform / myplatform 不误伤、幂等跳过)。今后写正则做标识符替换时,必须用 (?<![\\w.]) 排除前导点号,防止属性访问被误伤;补丁脚本应自带回测用例。来源 ts:2026-09-26T11:31:12Z 会话",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T10:29:21.960Z",
+      "updatedAt": "2026-09-27T10:29:21.960Z",
+      "accessedAt": "2026-09-27T10:29:21.960Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "b9764555285aa13e"
+    },
+    {
+      "id": "m-mvdsgyz5-aqm87i",
+      "category": "solutions",
+      "title": "vitest 加载 vendor/pi 真实 dist 会卡死，需 alias 到集中 stub",
+      "content": "my-pi 的工具层测试（custom/features/*/index.ts）需要 @earendil-works/pi-tui 与 @earendil-works/pi-coding-agent 可解析（ui-adapter 运行时 import TUI 组件与 getMarkdownTheme，session-adapter import SessionManager），但这些包在 vendor/pi，不在根 node_modules。\n\n两条路径的实测结论：\n1. 在测试文件里 vi.mock('@earendil-works/pi-tui' / 'pi-coding-agent') —— 可行，但每个工具层测试都要重复一段 mock。\n2. vitest.config.ts 的 resolve.alias 指向真实构建产物 vendor/pi/packages/{tui,coding-agent}/dist/index.js —— **不可行**：加载依赖初始化过重，测试 5s 超时。\n\n最终方案：alias 到集中 stub custom/test-support/{pi-tui,pi-coding-agent}-stub.ts，用精确正则 find（/^@earendil-works\\/pi-tui$/）避免误匹配同前缀包名。stub 不 import 任何 Pi 包，因此不触发 check-isolation 的\"custom/ 下非 adapters 不得 runtime import Pi 包\"检查；custom/test-support/ 也不在 check-isolation 的禁用目录列表（seams/events/session-log/src/docs/tests/config）内。vitest.config.ts 用 fileURLToPath(import.meta.url) 取根路径（ESM 下无 __dirname）。",
+      "tags": [
+        "vitest",
+        "my-pi",
+        "测试",
+        "vendor/pi",
+        "alias"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T11:57:51.334Z",
+      "updatedAt": "2026-09-27T11:57:51.334Z",
+      "accessedAt": "2026-09-27T11:57:51.334Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "8686bb4d6d555a31"
+    },
+    {
+      "id": "m-mvdsgyzc-c47eh6",
+      "category": "fact",
+      "title": "[测试] 工具可用性临时条目 2026-09-27",
+      "content": "这是工具执行测试的临时条目，测试结束后应删除。",
+      "tags": [
+        "test-temp"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T12:01:09.720Z",
+      "updatedAt": "2026-09-27T12:01:09.720Z",
+      "accessedAt": "2026-09-27T12:01:09.720Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "6f5a2bba4936dcd8",
+      "links": [
+        "m-mvdsgyxa-utyltg"
+      ]
+    },
+    {
+      "id": "m-mvdsgyzh-mu5d3o",
+      "category": "solutions",
+      "title": "工具可用性基线（已按实测口径更正注册面计数）",
+      "content": "【合并条目】来源 id：6fcba969-8e91-4425-a4ec-aea426c389ec + tool-baseline-20260922 + 7389471e-a427-4f27-aca4-3a9e4ea5c7c8\n\n【来源 6fcba969-8e91-4425-a4ec-aea426c389ec】工具可用性基线（2026-09-27 全量执行测试）\n2026-09-27 全量工具执行测试（当前进程仍为旧代码，未重启）。正常：只读类 18（memory_search/stats、ctx_list、web_search、fetch_url、link_status、autopilot_status/stats/policy、verify_config/report、admin_status/get_config/list_models/list_sessions、tmux_status、todo list、memory_recall）；写入可逆类（memory_store/forget、ctx_note、ctx_snap、ctx_exec、todo create/update/delete、schedule_task add/delete）；tmux 6（run/read/wait/send/stop/status）、subagent、browser 18 全通、web_fetch、voice_speak、thinking_level。\n\n发现的缺陷/优化点：\n1. memory_store 不返回条目 id，但 memory_forget 只接受 id → 无法直接删除刚存条目，需读 portable/memory/entries.json 取 id。建议 memory_store 返回 id，或 forget 支持 title 匹配。\n2. memory_forget 后 memory_stats 显示\"总条目 34（活跃 33）\"，总数不随删除减少（软删除计数），与被取代条目为 0 不自洽。\n3. tmux_run 对瞬间退出的命令（如 command=\"bash\" 非交互立即退出）报 `pipe-pane 设置失败: can't find pane` 竞态错误；有 sleep 的命令正常。\n4. browser_upload 对非 file input 的 selector 会挂到 30s 超时（setInputFiles 等待），宜提前校验 input type=file。\n5. web_search 部分引擎失败（baidu 验证码、google cse 超时、sogou 崩溃）但整体仍返回结果。\n\n环境：浏览器可用（playwright 补丁修复验证通过）、voice_speak 正常、TTS 可用。node v22.23.1。\n\n【来源 tool-baseline-20260922】工具可用性基线（2026-09-22 全量测试）\n工具可用性基线（2026-09-22 全量测试，来源会话 ts=2026-09-22T09:11Z）：18 个工具中 14 个正常。正常：ls/find/grep/read/write/edit/bash/memory_search/memory_store/memory_forget/todo/subagent/tmux_run/tmux_read/enable_tool。不可用 4 个均为环境限制非工具故障：powershell（仅 Windows）、web_search/fetch_url/web_fetch（本环境无网络，所有引擎 timeout）、voice_transcribe（whisper 脚本 portable/memory/voice/pi-whisper.sh 缺失）。另：tmux_stop 在会话已退出时返回 'no current target' 属正常现象；enable_tool 启用的工具组仅本会话有效，重启 pi 后恢复默认分层。今后排障时先区分环境限制与工具故障，勿将网络/平台限制误报为工具 bug。",
+      "tags": [
+        "61工具55钩子14命令4快捷键",
+        "my-pi",
+        "可用性",
+        "基线",
+        "实测口径",
+        "工具基线",
+        "工具测试",
+        "注册面计数",
+        "缺陷"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "830b71520dc9e56e"
+    },
+    {
+      "id": "m-mvdsgyzk-09h9g5",
+      "category": "solutions",
+      "title": "my-pi 计划模式只读保护：用 isReadonlyBashCommand（勿再引入 isSafeCommand）",
+      "content": "my-pi 计划模式（plan-mode）的只读保护有三层：①`applyPlanMode` 已不再调用 `setActiveTools`（变更 selectedTools 会让整段前缀缓存失效，实测 ~140k 全量重放/次）；②`custom/features/plan-mode/index.ts` 注册了一个 `tool_call` 钩子，拦截 edit/write，并对 bash 调用 `isReadonlyBashCommand`；③判定函数在 `custom/features/plan-mode/core/readonly.ts`，fail-closed，仅放行只读单命令（ls/cat/grep/git status/rg/tsc --noEmit 等），**不支持管道（`ls | head` 会被拒）与 `&&` 拼接**，有测试 `__tests__/plan-mode.test.ts:133-159` 与 `__tests__/readonly-guard.test.ts`。\n\n原项目 pi-tools 用的是另一套 `isSafeCommand`（在 `agent/extensions/plan-mode/utils.ts`，白名单 SAFE_PATTERNS + 黑名单 DESTRUCTIVE_PATTERNS + PIPE_TAIL_RE 支持 `| head/tail/wc`），安全性同级（也是命中白名单才放行）但更宽松。\n\n坑：2026-09-27 曾把 `isSafeCommand` 迁回 my-pi 并新增第二个 `tool_call` 钩子，导致两套判定叠加（pi 取\"任一 block 即拒\"），`ls | head` 被保守判定拒掉。已回退（commit c77e5e272，删 safe-command.ts）。**教训：改 my-pi plan-mode 前先 `ls custom/features/plan-mode/core/` 并 grep 判定函数名，别假设 my-pi 缺了上游功能。**",
+      "tags": [
+        "my-pi",
+        "plan-mode",
+        "只读保护",
+        "bash",
+        "isReadonlyBashCommand",
+        "isSafeCommand"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-27T12:55:40.594Z",
+      "updatedAt": "2026-09-27T12:55:40.594Z",
+      "accessedAt": "2026-09-27T12:55:40.594Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "f5d6f4ee27a02f60"
+    },
+    {
+      "id": "m-mvdsgyzq-9qohs2",
+      "category": "reference",
+      "title": "Python MaaS窃密构建工具可窃多类凭证，覆盖17款浏览器",
+      "content": "Mon, 28 Sep 2026。来源：[FreeBuf] 基于Python的MaaS窃密工具可窃取17款浏览器的密码、Cookie等敏感数据，内置规避检测与持久化机制，检测难度高，极易导致账号被盗、财产受损。。原文：https://www.freebuf.com/articles/endpoint/503616.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-28"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-28T10:59:15.923Z",
+      "updatedAt": "2026-09-28T10:59:15.923Z",
+      "accessedAt": "2026-09-28T10:59:15.923Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "ec0b9d5ffc774563"
+    },
+    {
+      "id": "m-mvdsgyzt-t0twyu",
+      "category": "reference",
+      "title": "Wireshark发布4.6.9版本，修复19个漏洞含恶意包代码执行风险",
+      "content": "Mon, 28 Sep 2026。来源：[FreeBuf] Wireshark发布4.6.9版本，修复19个漏洞，含可触发任意代码执行的高危缺陷，官方呼吁用户尽快升级防范恶意文件攻击。。原文：https://www.freebuf.com/news/503557.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-28"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-28T10:58:58.578Z",
+      "updatedAt": "2026-09-28T10:58:58.578Z",
+      "accessedAt": "2026-09-28T10:58:58.578Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "bc61aee9cca7f52d"
+    },
+    {
+      "id": "m-mvdsgyzw-dbiow6",
+      "category": "reference",
+      "title": "CVE-2026-88772 Citrix NetScaler Improper Restriction of Operations within the Bounds of a Memory Buffer Vulnerability",
+      "content": "2026-09-27。来源：[CISA官方群] [已遭利用/勒索] Citrix NetScaler ADC and NetScaler Gateway contain an improper restriction of operations within the bounds of a memory buffer vuln。原文：https://www.cve.org/CVERecord?id=CVE-2026-88772",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-28",
+        "2026-09-30"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T11:14:00.655Z",
+      "updatedAt": "2026-09-30T11:14:00.655Z",
+      "accessedAt": "2026-09-30T11:14:00.655Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "0287d957328bd7ac",
+      "links": [
+        "m-mvdsgyyk-balscu",
+        "m-mvdsgyzz-ttij8o",
+        "m-mvdsgz1h-ixuaj5",
+        "m-mvdsgz29-stutd5"
+      ]
+    },
+    {
+      "id": "m-mvdsgyzz-ttij8o",
+      "category": "reference",
+      "title": "CVE-2026-88771 Citrix NetScaler Improper Input Validation Vulnerability",
+      "content": "2026-09-27。来源：[CISA官方群] [已遭利用/勒索] Citrix NetScaler ADC and NetScaler Gateway contain an improper input validation vulnerability that could allow an unauthenticated。原文：https://www.cve.org/CVERecord?id=CVE-2026-88771",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-28"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-28T10:59:06.256Z",
+      "updatedAt": "2026-09-28T10:59:06.256Z",
+      "accessedAt": "2026-09-28T10:59:06.256Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "eb6072e3e01c5a2e",
+      "links": [
+        "m-mvdsgyzw-dbiow6",
+        "m-mvdsgz2f-60jc1p"
+      ]
+    },
+    {
+      "id": "m-mvdsgz04-27wdw8",
+      "category": "reference",
+      "title": "CVE-2026-49869 Kestra OSS OS Command Injection Vulnerability",
+      "content": "2026-09-02。来源：[CISA官方群] [已遭利用/勒索] Kestra OSS contains an OS command injection vulnerability that could allow an unauthenticated remote attacker to create and execut。原文：https://www.cve.org/CVERecord?id=CVE-2026-49869",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-28"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-28T10:59:06.266Z",
+      "updatedAt": "2026-09-28T10:59:06.266Z",
+      "accessedAt": "2026-09-28T10:59:06.266Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "6cf6a3c6d864f4e4",
+      "links": [
+        "m-mvdsgz0a-1nuflj",
+        "m-mvdsgz8e-uvtkzx",
+        "m-mvdsgzbn-2bi1ib"
+      ]
+    },
+    {
+      "id": "m-mvdsgz08-maua6u",
+      "category": "reference",
+      "title": "CVE-2026-82329 JFrog Artifactory Improper Authentication Vulnerability",
+      "content": "2026-09-02。来源：[CISA官方群] [已遭利用/勒索] JFrog Artifactory contains an improper authentication vulnerability that under default configuration can allow an unauthenticated。原文：https://www.cve.org/CVERecord?id=CVE-2026-82329",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-28"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-28T10:59:06.277Z",
+      "updatedAt": "2026-09-28T10:59:06.277Z",
+      "accessedAt": "2026-09-28T10:59:06.277Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "1758e7dec82819b2",
+      "links": [
+        "m-mvdsgyyk-balscu"
+      ]
+    },
+    {
+      "id": "m-mvdsgz0a-1nuflj",
+      "category": "reference",
+      "title": "CVE-2026-9586 Sangoma Switchvox SQL Injection Vulnerability",
+      "content": "2026-09-02。来源：[CISA官方群] [已遭利用/勒索] Sangoma Switchvox contains a SQL injection vulnerability which allows an unauthenticated remote attacker to execute arbitrary SQL。原文：https://www.cve.org/CVERecord?id=CVE-2026-9586",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-28"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-28T10:59:06.287Z",
+      "updatedAt": "2026-09-28T10:59:06.287Z",
+      "accessedAt": "2026-09-28T10:59:06.287Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "2994e7ea35577712",
+      "links": [
+        "m-mvdsgz04-27wdw8"
+      ]
+    },
+    {
+      "id": "m-mvdsgz0f-pgnvc5",
+      "category": "solutions",
+      "title": "tool-stats-daily 超时的根因与修复",
+      "content": "tool-stats-daily 触发 600s 硬超时被 SIGKILL（exit 124），任务输出仅剩「任务超时（600s）」，不是脚本报错而是运行时间超预算。修复：(1) tasks.json 中 maxRunTime 600→1200s，listTasks() 每次读盘无内存缓存故立即生效无需重启；(2) custom/features/autopilot/run/runner.ts 在失败/超时（含 exit 124）时把完整 stderr+stdout（pi JSONL，含 pre-push hook 输出）写入 portable/memory/scheduler/logs/<taskId>-<ISO时间戳>.log，每任务保留最近 10 份自动清理旧的，任务 output 末尾追加 [诊断日志] <路径>。来源 ts: 2026-09-28T10:53:28Z\n\n【2026-10-11 更正】本条旧结论已被实测取代：真根因是 getPiInvocation 在 vitest worker 里信任 argv[1] 导致子进程入口错误（详见条目 id 913adbe8-395f-4014-bdf0-be3bc8cfdfd1）。",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "6797c9daa89e61bf",
+      "links": [
+        "m-mvdsgz6p-f6go5y"
+      ]
+    },
+    {
+      "id": "m-mvdsgz0i-kssfyo",
+      "category": "solutions",
+      "title": "git push 被拒时的正确处理流程",
+      "content": "push 被拒（远端 main 已被别的设备推进）时的正确顺序：(1) 先 git fetch origin 看远端新增了什么（git log origin/main --oneline -5），理解冲突内容；(2) git rebase origin/main 解冲突；(3) 再 git push。不要盲目重推或直接 git pull --rebase 而不看远端变更。来源 ts: 2026-09-28T11:00Z",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-28T11:08:14.115Z",
+      "updatedAt": "2026-09-28T11:08:14.115Z",
+      "accessedAt": "2026-09-28T11:08:14.115Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "83129cd6bdf84b0d"
+    },
+    {
+      "id": "m-mvdsgz0l-oftlrq",
+      "category": "solutions",
+      "title": "单设备信息不对称问题持续存在",
+      "content": "daily-results/ 目录下仅 localhost 有数据，其他设备长期未跑，跨设备对比无法执行。需排查设备网络可达性或调度配置，或改为异步汇总模式。",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:13:59.437Z",
+      "updatedAt": "2026-09-29T11:13:59.437Z",
+      "accessedAt": "2026-09-29T11:13:59.437Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "b8a647627fd43ca9"
+    },
+    {
+      "id": "m-mvdsgz0o-i7x24g",
+      "category": "solutions",
+      "title": "干预教训: daily-health alert 状态可恢复性",
+      "content": "纠正：daily-health 的 alert 状态由 prompt 漂移引起，非结构性退化。正确做法：prompt 漂移类告警是临时性的，重跑即可恢复 ok。来源 ts: 2026-09-25T14:17:00Z",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:14:29.041Z",
+      "updatedAt": "2026-09-29T11:14:29.041Z",
+      "accessedAt": "2026-09-29T11:14:29.041Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "9b69c8e8550ef3a5",
+      "links": [
+        "m-mvdsgyy7-oyc9nc"
+      ]
+    },
+    {
+      "id": "m-mvdsgz0s-mimk84",
+      "category": "fact",
+      "title": "跨设备对比存在结构性信息不对称（daily-results 仅 localhost）",
+      "content": "【合并条目】来源 id：846a97c5-5b3e-4bbb-bc15-12f6367ef20d + c63db2b7-1ced-45ca-9a04-5b832051c9ba + 5fb68594-971b-4d8d-a3eb-ddff960ad1ce\n\n【来源 846a97c5-5b3e-4bbb-bc15-12f6367ef20d】经验沉淀：跨设备信息不对称问题\ndaily-results/ 仅 localhost 单设备有记录，其他设备长期未跑，导致跨设备对比无法执行。需建立设备健康检查机制，定期提醒未参与同步的设备。来源：近7天设备覆盖分析。\n\n【来源 c63db2b7-1ced-45ca-9a04-5b832051c9ba】单设备信息不对称问题持续存在\ndaily-results/ 目录下仅 localhost 有数据，其他设备长期未跑，跨设备对比无法执行。需排查设备网络可达性或调度配置，或改为异步汇总模式。\n\n【来源 5fb68594-971b-4d8d-a3eb-ddff960ad1ce】daily-results 仅 localhost 单设备，跨设备对比存在结构性信息不对称\nportable/memory/daily-results/ 下自 2026-09-22 至今全部为 localhost 设备文件，无任何其他设备（如 mobile、desktop）的结果文件。近 5 天的 golden-fast / daily-health / knowledge-subscribe / daily-review / tool-stats-daily 均仅在 localhost 执行。教训：跨设备对比长期无法执行，需在调度层面对其他设备显式下发任务或确认其离线状态。来源 ts: 2026-09-26T19:37Z daily-review",
+      "tags": [
+        "daily-results",
+        "localhost",
+        "信息不对称",
+        "度量口径",
+        "跨设备"
+      ],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "1d8c0770e5c843a7",
+      "links": [
+        "m-mvdsgyya-ajgz42"
+      ]
+    },
+    {
+      "id": "m-mvdsgz0w-b5zoos",
+      "category": "fact",
+      "title": "干预教训: knowledge-subscribe 依赖检查缺失",
+      "content": "纠正前：直接执行 knowledge-subscribe，未检查 python3 脚本依赖与网络连通性，导致 09-29 全部任务失败（exit 129）。纠正后：先检查脚本依赖（requests/urllib3）与网络访问（CISA/FreeBuf等源），失败时提供明确错误信息。来源：09-29 tool-stats-daily/golden-fast/daily-health/knowledge-subscribe 全超时日志。",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:15:46.223Z",
+      "updatedAt": "2026-09-29T11:15:46.223Z",
+      "accessedAt": "2026-09-29T11:15:46.223Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "5c74373f5e67d9fb"
+    },
+    {
+      "id": "m-mvdsgz0z-p5s2vl",
+      "category": "fact",
+      "title": "经验沉淀：daily-review 自身稳定性问题",
+      "content": "daily-review 任务存在不稳定性：09-22 超时失败（900s）、09-24 重试成功、09-25/09-26 无记录、09-28 超时后重试成功。需增加任务自检机制，在超时后自动重试一次，避免遗漏数据。来源：近7天执行记录分析。",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:15:04.117Z",
+      "updatedAt": "2026-09-29T11:15:04.117Z",
+      "accessedAt": "2026-09-29T11:15:04.117Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "208e222b5ef4ab7f",
+      "links": [
+        "m-mvdsgyy8-ve121j"
+      ]
+    },
+    {
+      "id": "m-mvdsgz12-7thufe",
+      "category": "reference",
+      "title": "3.5亿美元一夜蒸发！黑客没偷密钥，Bitget是怎么被掏空的",
+      "content": "2026-09-29。来源：知识订阅。原文：https://www.anquanke.com/post/id/316193",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-29",
+        "2026-10-14"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:21:22.121Z",
+      "updatedAt": "2026-10-14T11:21:22.121Z",
+      "accessedAt": "2026-10-14T11:21:22.121Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "f3bc2b2b87f7c4ff"
+    },
+    {
+      "id": "m-mvdsgz15-ostfwc",
+      "category": "reference",
+      "title": "官方MCP Python SDK曝安全漏洞，恶意服务器可窃取OAuth凭证",
+      "content": "Tue, 29 Sep 2026。来源：[FreeBuf] 官方MCP Python SDK曝高危漏洞，恶意服务器可窃取OAuth凭证获取全量权限，需及时升级修复、补全配置。。原文：https://www.freebuf.com/articles/ai-security/503874.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-29"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:21:43.670Z",
+      "updatedAt": "2026-09-29T11:21:43.670Z",
+      "accessedAt": "2026-09-29T11:21:43.670Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "c84fad85d14134d6"
+    },
+    {
+      "id": "m-mvdsgz1a-fxq0f3",
+      "category": "reference",
+      "title": "Anthropic’s prospectus details losses, growth, and, yes, a warning that its AI could end humanity",
+      "content": "Tue, 29 Sep 2026。来源：[TechCrunch] In its prospectus, Anthropic just told investors it's losing tens of billions of dollars a year, but also growing like crazy, and — oh yeah。原文：https://techcrunch.com/2026/09/28/anthropics-prospectus-details-losses-growth-and-yes-a-warning-that-its-ai-could-end-humanity/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-29"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:21:43.707Z",
+      "updatedAt": "2026-09-29T11:21:43.707Z",
+      "accessedAt": "2026-09-29T11:21:43.707Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d25a20137f01ca3c"
+    },
+    {
+      "id": "m-mvdsgz1e-n6thyi",
+      "category": "reference",
+      "title": "OpenAI reportedly ditches model over safety concerns",
+      "content": "Mon, 28 Sep 2026。来源：[TechCrunch] A top executive at the AI lab told the Wall Street Journal that the model in question had displayed a poor aptitude for following orders.。原文：https://techcrunch.com/2026/09/28/openai-reportedly-ditches-model-over-safety-concerns/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-29"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-29T11:21:43.744Z",
+      "updatedAt": "2026-09-29T11:21:43.744Z",
+      "accessedAt": "2026-09-29T11:21:43.744Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d9e009a3822f5fe6"
+    },
+    {
+      "id": "m-mvdsgz1h-ixuaj5",
+      "category": "reference",
+      "title": "CVE-2026-86950 Apple Multiple Products Out-of-Bounds Write Vulnerability",
+      "content": "2026-09-29。来源：[CISA官方群] [已遭利用/勒索] Apple iOS, macOS, and iPadOS contain an out-of-bounds write vulnerability in CoreGraphics that may lead to arbitrary code executio。原文：https://www.cve.org/CVERecord?id=CVE-2026-86950",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-30"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T11:14:00.633Z",
+      "updatedAt": "2026-09-30T11:14:00.633Z",
+      "accessedAt": "2026-09-30T11:14:00.633Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "0a25b03863ddcf97",
+      "links": [
+        "m-mvdsgyzw-dbiow6"
+      ]
+    },
+    {
+      "id": "m-mvdsgz1l-dykgo3",
+      "category": "reference",
+      "title": "Anthropic亲自测了GLM-5.3：绕过率64-100%，20美元链出浏览器0day",
+      "content": "Wed, 30 Sep 2026。来源：[FreeBuf] GLM-5.3：“你是红队”致64%绕过，“已评估执行”达92%；$20+20分钟组合N-day利用链。。原文：https://www.freebuf.com/articles/504184.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-30"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T11:14:00.668Z",
+      "updatedAt": "2026-09-30T11:14:00.668Z",
+      "accessedAt": "2026-09-30T11:14:00.668Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4abc40f8585c8d33"
+    },
+    {
+      "id": "m-mvdsgz1p-ped40k",
+      "category": "reference",
+      "title": "AI Agent发现Linux内核漏洞，微量内存写入可获取root权限",
+      "content": "Wed, 30 Sep 2026。来源：[FreeBuf] AI Agent发现Linux内核高危漏洞，仅靠16字节零写入即可本地提权获取root权限，官方已发布修复补丁，请及时更新。。原文：https://www.freebuf.com/articles/system/504147.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-30"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T11:14:00.690Z",
+      "updatedAt": "2026-09-30T11:14:00.690Z",
+      "accessedAt": "2026-09-30T11:14:00.690Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "e9750dc30e132b86"
+    },
+    {
+      "id": "m-mvdsgz1s-hdmwg0",
+      "category": "reference",
+      "title": "FreeBuf早报 | 五角大楼证实发生重大数据泄露；OpenAI暂停最强模型工具使用",
+      "content": "Tue, 29 Sep 2026。来源：[FreeBuf] 美国五角大楼证实DMDC系统遭入侵长达9个月，超300万人未加密敏感信息外泄，数据可被用于身份盗窃、情报活动，风险极高。。原文：https://www.freebuf.com/news/503960.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-09-30"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T11:14:00.730Z",
+      "updatedAt": "2026-09-30T11:14:00.730Z",
+      "accessedAt": "2026-09-30T11:14:00.730Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "86d615d733e3d4cd"
+    },
+    {
+      "id": "m-mvdsgz1v-6zm0dw",
+      "category": "solutions",
+      "title": "角色扮演系统提示词需支持热替换",
+      "content": "用户需求从「生成角色扮演提示词」到「替换模式中的提示词」，说明单次生成不够，需提供可迭代的替换机制：生成后应落盘到可被模式配置引用的路径，并支持在不重启的情况下热替换。来源 ts: 2026-09-30T11:05Z / 2026-09-30T11:09Z（task-records.jsonl）",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T11:22:55.705Z",
+      "updatedAt": "2026-09-30T11:22:55.705Z",
+      "accessedAt": "2026-09-30T11:22:55.705Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "69fe3f2f66a13068"
+    },
+    {
+      "id": "m-mvdsgz21-20g0y5",
+      "category": "solutions",
+      "title": "每日定时任务失败的诊断顺序",
+      "content": "scheduler 下游任务失败呈现共性模式：knowledge-subscribe 以 exit 129 失败（疑似依赖缺失）、golden-fast 超时 300s、daily-review 超时 900s、tool-stats-daily 无输出即失败。诊断顺序应为：先读 portable/memory/scheduler/logs/<taskId>-*.log 看 stderr，再检查依赖与超时设置，最后重试。来源 ts: 2026-09-30T11:15Z（task-records.jsonl）",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T11:22:55.705Z",
+      "updatedAt": "2026-09-30T11:22:55.705Z",
+      "accessedAt": "2026-09-30T11:22:55.705Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d04dede7e7e66b79"
+    },
+    {
+      "id": "m-mvdsgz26-9cqwqb",
+      "category": "solutions",
+      "title": "pi 扩展 UI select 无初始索引：多选改编号输入，单选加取消项",
+      "content": "问题：my-pi 的 ask_user 工具多选时\"每次选择后光标跳回第一项、选项位置乱动\"。\n根因：custom/features/plan-mode/core/ask-user.ts 的多选实现每轮重建选项数组（选中项上浮到最前），而 pi 扩展 UI 的 select 每次调用都从第 0 项开始高亮。查证 vendor/pi/packages/coding-agent/src/core/extensions/types.ts:151 的 `select(title, options, opts?)`，第三个参数 ExtensionUIDialogOptions 只有 signal/timeout（:114-119），**没有初始高亮索引**；pi 内部组件有 preselect（settings-selector.ts:642）但扩展 API 不暴露。因此光标保持无法通过参数实现。\n解决（提交 c24a17947）：多选改为 editor 一次输入编号（支持 `1,3`、`1-3`、顿号/空格分隔、`0`=补充其它、留空取消），parseSelectionInput 做解析与越界报错重试，彻底去掉循环 select。\n补充（提交 4bceefd60）：单选同样的问题族——labels 与内置 OTHER_OPTION 重名会重复出现；单选列表新增\"取消选择\"项（选它返回\"用户取消了选择\"），追加内置项前先查重。\n验证：ask-user.test.ts 17 项；实测多选一次输入返回全部标签、单选取消项返回取消文本。改动需重启 pi 才生效（扩展启动时加载，无热重载）。",
+      "tags": [
+        "my-pi",
+        "ask_user",
+        "plan-mode",
+        "pi-extension-api",
+        "tui"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-09-30T12:56:10.179Z",
+      "updatedAt": "2026-09-30T12:56:10.179Z",
+      "accessedAt": "2026-09-30T12:56:10.179Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "337429926426d38d"
+    },
+    {
+      "id": "m-mvdsgz29-stutd5",
+      "category": "reference",
+      "title": "CVE-2026-88779 Citrix NetScaler Improper Restriction of Operations within the Bounds of a Memory Buffer Vulnerability",
+      "content": "2026-10-04。来源：[CISA官方群] [已遭利用/勒索] Citrix NetScaler ADC (formerly Citrix ADC) and Citrix NetScaler Gateway (formerly Citrix Gateway) contain an improper restriction。原文：https://www.cve.org/CVERecord?id=CVE-2026-88779",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:05:28.365Z",
+      "updatedAt": "2026-10-05T13:05:28.365Z",
+      "accessedAt": "2026-10-05T13:05:28.365Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "ee71d42389bc7b08",
+      "links": [
+        "m-mvdsgyzw-dbiow6"
+      ]
+    },
+    {
+      "id": "m-mvdsgz2f-60jc1p",
+      "category": "reference",
+      "title": "CVE-2026-104286 Fortinet FortiMail Path Traversal Vulnerability",
+      "content": "2026-10-01。来源：[CISA官方群] [已遭利用/勒索] Fortinet FortiMail contains a path traversal and an improper neutralization of NULL byte or NULL character vulnerability that may。原文：https://www.cve.org/CVERecord?id=CVE-2026-104286",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:05:28.390Z",
+      "updatedAt": "2026-10-05T13:05:28.390Z",
+      "accessedAt": "2026-10-05T13:05:28.390Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d194876fa0f583ba",
+      "links": [
+        "m-mvdsgyzz-ttij8o"
+      ]
+    },
+    {
+      "id": "m-mvdsgz2k-6e0byw",
+      "category": "reference",
+      "title": "NetScaler新0Day遭定向攻击利用，可致SAML部署离线",
+      "content": "Mon, 05 Oct 2026。来源：[FreeBuf] Citrix修复NetScaler高危0Day漏洞CVE-2026-88779，该漏洞已遭在野定向利用，可致SAML部署服务离线，CISA要求限期修复。。原文：https://www.freebuf.com/news/504729.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T12:56:30.988Z",
+      "updatedAt": "2026-10-05T12:56:30.988Z",
+      "accessedAt": "2026-10-05T12:56:30.988Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "b4a9cd0d292b4176"
+    },
+    {
+      "id": "m-mvdsgz2q-ccybln",
+      "category": "reference",
+      "title": "Google内部AI安全Agent发现500余个XSS漏洞，可实证并构建有效利用链",
+      "content": "Mon, 05 Oct 2026。来源：[FreeBuf] 谷歌内部AI安全Agent PageBreak可实证验证漏洞、误报率近零，已在自家Web应用发现500余个可利用XSS漏洞及多组高危利用链。。原文：https://www.freebuf.com/articles/ai-security/504737.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T12:56:31.002Z",
+      "updatedAt": "2026-10-05T12:56:31.002Z",
+      "accessedAt": "2026-10-05T12:56:31.002Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "3f5178cc9149dc5f"
+    },
+    {
+      "id": "m-mvdsgz2t-4loe2v",
+      "category": "reference",
+      "title": "CISA将Fortinet FortiMail 0Day漏洞纳入KEV目录，该漏洞已遭在野利用",
+      "content": "Mon, 05 Oct 2026。来源：[FreeBuf] CISA将已遭在野利用的Fortinet FortiMail 0day漏洞纳入KEV目录，未授权攻击者可写任意文件控制设备，要求相关机构限期完成修复。。原文：https://www.freebuf.com/news/504745.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T12:57:35.518Z",
+      "updatedAt": "2026-10-05T12:57:35.518Z",
+      "accessedAt": "2026-10-05T12:57:35.518Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "49e3eafc1d307e87"
+    },
+    {
+      "id": "m-mvdsgz2x-arug66",
+      "category": "reference",
+      "title": "谷歌暂停开源漏洞赏金新报告受理，AI生成无效报告泛滥",
+      "content": "Mon, 05 Oct 2026。来源：[FreeBuf] 大量无效AI生成漏洞报告涌入令审核人员不堪重负，谷歌暂停开源漏洞赏金计划新报告受理，存量报告不受影响，预计2027年一季度更新规则。。原文：https://www.freebuf.com/news/504731.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:05:28.401Z",
+      "updatedAt": "2026-10-05T13:05:28.401Z",
+      "accessedAt": "2026-10-05T13:05:28.401Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "e7702cb550e10604"
+    },
+    {
+      "id": "m-mvdsgz31-uvd092",
+      "category": "reference",
+      "title": "(热榜) 华为与高通宣布达成广泛专利许可协议，意味着什么？释放了哪些信号？",
+      "content": "2026-10-05。来源：[知乎热榜] 热度696 万热度 · 10月5日，华为宣布与高通达成一项多年期广泛专利许可协议，双方就5G、计算、人工智能及网络等多个技术领域的专利组合实现交叉授权，同时高通将购买华为在计算、AI、网络及其他技术领域的部分美国专利。这是两家长期在专利领域存在博弈的科技巨头之间达。原文：https://www.zhihu.com/question/2090468722427290967",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:05:28.416Z",
+      "updatedAt": "2026-10-05T13:05:28.416Z",
+      "accessedAt": "2026-10-05T13:05:28.416Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "30c87d796812e090"
+    },
+    {
+      "id": "m-mvdsgz35-k55f6w",
+      "category": "solutions",
+      "title": "会话清理前安全检查清单",
+      "content": "删除超过三天未使用的旧会话前，必须逐项验证：1) 活跃会话指针（settings.json/modes.json/autopilot/state.json/recovery/cache）未引用待删 session id；2) memory 摘要（summaries.json）与任务记录（task-records.jsonl）无旧 session id；3) 旧会话间压缩链引用均为单向旧→更旧，删除不破坏存活会话引用链。实测一次清理 10 个旧会话（9.1MB），五项检查全部通过。来源 ts: 2026-10-05T11-38-04-024Z_01a10bdb",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T12:58:51.480Z",
+      "updatedAt": "2026-10-05T12:58:51.480Z",
+      "accessedAt": "2026-10-05T12:58:51.480Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "c1aa75fbf5494d12"
+    },
+    {
+      "id": "m-mvdsgz38-8bi3a0",
+      "category": "solutions",
+      "title": "密钥扫描误报判别流程",
+      "content": "review.sh 密钥扫描命中 portable/agent/auth.json 等本地配置文件时，先用 git ls-files <file> + git check-ignore -v <file> 判定：被 gitignore 的本地配置（auth.json/models.json/trust.json/pi-link-*.json）属正常存在，非泄露；只有被 git 跟踪的才算 HIGH。示例占位、测试夹具命中亦属噪音。来源 ts: 2026-10-05T11-38-04-024Z_01a10bdb",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T12:58:51.480Z",
+      "updatedAt": "2026-10-05T12:58:51.480Z",
+      "accessedAt": "2026-10-05T12:58:51.480Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "18f54cdc362f7ca3"
+    },
+    {
+      "id": "m-mvdsgz3c-fgaab4",
+      "category": "solutions",
+      "title": "审计发现的 HIGH 级架构缺陷模式",
+      "content": "1) custom/core/fs-json.ts:71 appendJSONLRotating 存在 TOCTOU 竞态：statSync 与 renameSync 间其他进程写入会静默丢弃数据；2) custom/adapters/tool-adapter.ts:155 registerTool 对工具对象整体使用 as unknown as PiToolDefinition 类型断言，绕过 Pi 工具定义类型校验；3) custom/adapters/session-adapter.ts:82 resolveSession 对未找到会话与 listSessions 失败均返回 null，错误被 console.warn 吞掉后静默降级。来源 ts: 2026-10-05T11-38-04-024Z_01a10bdb",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T12:58:51.480Z",
+      "updatedAt": "2026-10-05T12:58:51.480Z",
+      "accessedAt": "2026-10-05T12:58:51.480Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "a5b42e9af0183cbb"
+    },
+    {
+      "id": "m-mvdsgz3i-g6701f",
+      "category": "solutions",
+      "title": "长任务前台会超时：tsc/全量测试等必须走后台（tmux_run）",
+      "content": "【合并条目】来源 id：571c51ab-a270-405c-95f2-f98f321ef5c0 + 2b4cea07-f6b3-471d-b253-033eca2f142e\n\n【来源 571c51ab-a270-405c-95f2-f98f321ef5c0】干预教训: 长任务前台超时的正确处理\n纠正前：tsc --noEmit -p custom/ 在前台 bash 中超时（240s 上限），会话被 abort，任务以 failed 记录。纠正后：用户 correctivePrompt=继续，正确做法是改用 tmux_run 后台启动并立即结束回合，由 watcher 自动注入通知触发新回合，不在同轮内 tmux_wait 等待。今后正确做法：任何超过 240s 的命令（全量 tsc/vitest/golden-tasks）必须走 tmux_run，前台 bash 有 PI_BASH_TIMEOUT_CEIL 硬约束；同轮内禁止 tmux_wait（60s 硬上限），需等待就拆到下一轮。来源 ts: 2026-09-30T11:43:10.228Z (iv_1790768590228_p0tlkg)\n\n【来源 2b4cea07-f6b3-471d-b253-033eca2f142e】干预教训: tsc 类型检查等长任务须走 tmux_run 后台\n来源 2026-09-30T11:43 干预（correctivePrompt=\"继续\"）。纠正前：前台 timeout 200s 跑 npx tsc --noEmit -p custom，接近上限被迫终止；纠正后：tsc 应改 tmux_run 后台启动，同轮不等待、结果在后续轮取。正确做法：任何超过 60s 的类型检查/构建均后台化，避免占用前台 240s 上限。来源：interventions.jsonl iv_1790768590228_p0tlkg",
+      "tags": [
+        "tmux_run",
+        "tsc",
+        "vitest",
+        "后台",
+        "超时",
+        "长任务"
+      ],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "1b961fc2591e4605"
+    },
+    {
+      "id": "m-mvdsgz3m-r6uueb",
+      "category": "solutions",
+      "title": "调度器锁竞态修复：原子写 + 拿锁后重读 due 列表",
+      "content": "根因：pi 重启时多进程并发 catch-up 同一到期任务，scheduler.lock 的 stat+write 非原子操作导致锁竞态，任务被重复执行或静默丢失。正确做法：1) 锁文件改用 openSync(wx)+writeSync 原子写，空内容且 mtime<60s 宽限内退让；2) 拿到锁后立即重读 due 列表（dueNow），避免基于过期快照执行；3) 长任务(maxRunTime)调高前评估并发窗口。来源 ts: 2026-09-30T12:30:27.380Z (3d93a49d-4d44-46be-b2c8-9362905217fa)",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:00:45.350Z",
+      "updatedAt": "2026-10-05T13:00:45.350Z",
+      "accessedAt": "2026-10-05T13:00:45.350Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4a5aa1496381be21"
+    },
+    {
+      "id": "m-mvdsgz3r-z250ka",
+      "category": "solutions",
+      "title": "缓存断崖归因修正：上游连接层中断而非模型路由",
+      "content": "纠正前归因：免费模型路由失败导致缓存命中断崖。纠正后实测：被省略的 assistant 消息全部为 deepseek-flash（model/provider/api 三字段一致），stopReason=error、errorMessage 为 terminated 或 Request timed out，usage 全 0；失败请求共 11 次集中在 11:31:50-12:03:16，与同时段 git fetch SSL unexpected EOF 同窗口。结论：根因是网络链路抖动导致上游连接层中断/超时，非模型路由问题。今后：归因前先核对 jsonl 里 model/provider/api 字段一致性，再看 error 类型与同时段网络操作。来源 ts: 2026-09-30T12:30:27.380Z (3d93a49d)",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:00:45.350Z",
+      "updatedAt": "2026-10-05T13:00:45.350Z",
+      "accessedAt": "2026-10-05T13:00:45.350Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "1fb960a3c535048a"
+    },
+    {
+      "id": "m-mvdsgz3v-ea6fv2",
+      "category": "solutions",
+      "title": "golden-tasks 全量门失败模式：supervisor 状态文件路径失效",
+      "content": "失败特征：supervisor 测试 5 项失败全部集中在 apply_mode 的「状态文件（*-state.json）里保存的 current 模式」读取路径——写 roleplay 后模式名回落 full、人设注入为空、记忆命名空间为空、旧格式 modes.json 迁移同样回落。对照组全部通过：无状态文件回落 default、PI_AGENT_MODE 外部注入优先。结论：状态文件读取/解析路径整条失效，外部注入路径正常。排查顺序：先看失败项是否同属一个读取路径，再看对照组。来源 ts: 2026-10-05T12:55:41.624Z (b677c4a2)",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:00:45.350Z",
+      "updatedAt": "2026-10-05T13:00:45.350Z",
+      "accessedAt": "2026-10-05T13:00:45.350Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "1d569243052a8efe"
+    },
+    {
+      "id": "m-mvdsgz40-21qni3",
+      "category": "reference",
+      "title": "(热榜) 2026 年诺贝尔生理学或医学奖颁给光遗传学，如何理解这项「用光精准控制大脑」的技术？",
+      "content": "2026-10-05。来源：[知乎热榜] 热度319 万热度 · 当地时间10月5日，瑞典卡罗琳医学院宣布，将2026年诺贝尔生理学或医学奖授予卡尔·戴塞洛斯（Karl Deisseroth）、彼得·黑格曼（Peter Hegemann）、格奥尔格·纳格尔（Georg Nagel）三位科学家，以表彰他们在。原文：https://www.zhihu.com/question/2090379984799889318",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-05"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:05:28.429Z",
+      "updatedAt": "2026-10-05T13:05:28.429Z",
+      "accessedAt": "2026-10-05T13:05:28.429Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "db53db077b61055f"
+    },
+    {
+      "id": "m-mvdsgz44-vfx1hw",
+      "category": "solutions",
+      "title": "会话清理的 mtime 判断与压缩链安全检查",
+      "content": "清理超过三天未使用的会话时，以文件 mtime（最后写入时间）而非文件名中的创建时间戳作为「最后使用」判据；删除前须逐项确认无活跃会话指针（settings.json/modes.json/autopilot state/recovery）、无 memory 摘要与任务记录引用目标 session id。旧会话间可能存在单向压缩链引用，但均为旧→更旧，删除最旧批次不会破坏存活会话的引用链。来源 ts: 2026-10-05T11:38-11:41 会话（清理 portable/agent/sessions 下 10 个旧文件，9.1MB）",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:08:15.340Z",
+      "updatedAt": "2026-10-05T13:08:15.340Z",
+      "accessedAt": "2026-10-05T13:08:15.340Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "fc608747943f689d"
+    },
+    {
+      "id": "m-mvdsgz49-uawnm4",
+      "category": "solutions",
+      "title": "低压力委派：简单任务交子代理并行执行",
+      "content": "通用原则：将独立、只读、可压缩报告的简单任务委派给 subagent（scout/reviewer 角色）并行执行，主会话只消费压缩结论；子代理同步阻塞，仅适合短任务。来源 ts: 2026-10-05T12:51 会话摘要（Goal 第 2 条）",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:08:15.340Z",
+      "updatedAt": "2026-10-05T13:08:15.340Z",
+      "accessedAt": "2026-10-05T13:08:15.340Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "a1dc437ac1f39c3e"
+    },
+    {
+      "id": "m-mvdsgz4g-vdtzvl",
+      "category": "solutions",
+      "title": "干预教训: tsc 类型检查等长任务须走 tmux_run 后台",
+      "content": "来源 2026-09-30T11:43 干预（correctivePrompt=\"继续\"）。纠正前：前台 timeout 200s 跑 npx tsc --noEmit -p custom，接近上限被迫终止；纠正后：tsc 应改 tmux_run 后台启动，同轮不等待、结果在后续轮取。正确做法：任何超过 60s 的类型检查/构建均后台化，避免占用前台 240s 上限。来源：interventions.jsonl iv_1790768590228_p0tlkg",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:52:58.491Z",
+      "updatedAt": "2026-10-06T05:52:58.491Z",
+      "accessedAt": "2026-10-06T05:52:58.491Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "e863ce9b238a4db3"
+    },
+    {
+      "id": "m-mvdsgz4q-vh4si1",
+      "category": "solutions",
+      "title": "近期记忆库结构洞察：安全漏洞高频核心 + 工程教训同步沉淀",
+      "content": "归纳自：CVE-2026-88779 Citrix NetScaler 缓冲区限制绕过漏洞、CVE-2026-104286 Fortinet FortiMail 路径穿越漏洞、NetScaler新0Day遭定向攻击利用可致SAML部署离线、Google内部AI安全Agent发现500余个XSS漏洞、CISA将Fortinet FortiMail 0Day漏洞纳入KEV目录、谷歌暂停开源漏洞赏金新报告受理AI生成无效报告泛滥、(热榜)华为与高通宣布达成广泛专利许可协议、(热榜)2026年诺贝尔生理学或医学奖颁给光遗传学、会话清理前安全检查清单、密钥扫描误报判别流程、审计发现的HIGH级架构缺陷模式、干预教训:长任务前台超时的正确处理、调度器锁竞态修复：原子写+拿锁后重读due列表、缓存断崖归因修正：上游连接层中断而非模型路由、golden-tasks全量门失败模式：supervisor状态文件路径失效。近24h非deleted条目15条，Σ(confidence×recurrence)=19.00>12。规律：安全与漏洞类reference条目占据confidence(0.90)与recurrence(1-3)双高，构成记忆库高频核心；工程类solutions条目confidence(0.60-0.70)与recurrence(1-2)偏低但稳定增长，反映从「修具体bug」向「沉淀可复用教训」过渡。建议：对高recurrence安全条目可考虑聚合为分区级摘要，降低注入块膨胀。",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-05T13:08:28.922Z",
+      "updatedAt": "2026-10-05T13:08:28.922Z",
+      "accessedAt": "2026-10-05T13:08:28.922Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "63e8f04be64c94db"
+    },
+    {
+      "id": "m-mvdsgz4v-jkkwex",
+      "category": "reference",
+      "title": "攻击者利用Realtek Jungle SDK漏洞，投放基于STUN C2的Cling僵尸网络",
+      "content": "Mon, 05 Oct 2026。来源：[FreeBuf] Realtek Jungle SDK关键漏洞利用激增，攻击者大肆投放Cling僵尸网络，其伪装STUN流量隐蔽难测，可横向扩散、发起DoS攻击。。原文：https://www.freebuf.com/news/504785.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-06"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:49:28.627Z",
+      "updatedAt": "2026-10-06T05:49:28.627Z",
+      "accessedAt": "2026-10-06T05:49:28.627Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "1a5ce4371eecb12a"
+    },
+    {
+      "id": "m-mvdsgz50-t2wpm7",
+      "category": "reference",
+      "title": "补丁推送后攻击仍持续，技术细节暂未公开",
+      "content": "Mon, 05 Oct 2026。来源：[FreeBuf] CISA通报NetScaler漏洞CVE-2026-88779正遭在野利用，可致设备崩溃，已现攻击案例，用户需尽快升级补丁。。原文：https://www.freebuf.com/news/504787.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-06"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:49:28.699Z",
+      "updatedAt": "2026-10-06T05:49:28.699Z",
+      "accessedAt": "2026-10-06T05:49:28.699Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "77665faeb655acea"
+    },
+    {
+      "id": "m-mvdsgz54-i2sbts",
+      "category": "reference",
+      "title": "苹果将收紧macOS全磁盘访问权限，防范AI Agent隐私风险",
+      "content": "Mon, 05 Oct 2026。来源：[FreeBuf] 苹果将收紧macOS全磁盘访问权限，防范能力不断增强的AI Agent泄露用户核心隐私，提醒用户及时排查高风险权限授权。。原文：https://www.freebuf.com/articles/system/504771.html",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-06"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:49:28.742Z",
+      "updatedAt": "2026-10-06T05:49:28.742Z",
+      "accessedAt": "2026-10-06T05:49:28.742Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "35e069aa7ca4a3ca"
+    },
+    {
+      "id": "m-mvdsgz59-peii60",
+      "category": "reference",
+      "title": "OpenAI will start watermarking ChatGPT’s text in the EU",
+      "content": "Mon, 05 Oct 2026。来源：[TechCrunch] OpenAI will watermark ChatGPT and Codex text in the EU to comply with the AI Act. Editing can make the invisible marks harder to detect, it。原文：https://techcrunch.com/2026/10/05/openai-will-start-watermarking-chatgpts-text-in-the-eu/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-06"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:49:28.775Z",
+      "updatedAt": "2026-10-06T05:49:28.775Z",
+      "accessedAt": "2026-10-06T05:49:28.775Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4ec5267649eb53be"
+    },
+    {
+      "id": "m-mvdsgz5e-i0krl0",
+      "category": "reference",
+      "title": "MCP for agent-to-agent comms may be the riskiest protocol you've never heard of",
+      "content": "Mon, 05 Oct 2026。来源：知识订阅。原文：https://arstechnica.com/security/2026/10/vulnerability-in-agents-from-google-and-others-exposes-structural-flaw-in-mcp/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-06"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:49:28.798Z",
+      "updatedAt": "2026-10-06T05:49:28.798Z",
+      "accessedAt": "2026-10-06T05:49:28.798Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "300fc14eadf02ea7"
+    },
+    {
+      "id": "m-mvdsgz5k-grvrd4",
+      "category": "solutions",
+      "title": "golden-fast supervisor 失败后同会话重跑可全绿",
+      "content": "10-05 12:46 golden-fast 第1次跑 supervisor 5项失败（角色模式回落full），同会话 12:55 重跑全绿；10-06 05:47 再次全绿。纠正：golden-fast 失败时先确认是否与 PI_AGENT_MODE_SOURCE 残留同类，是则重跑而非立即诊断；本例当日即自愈。来源：results-localhost.jsonl daily-review 2026-10-05T12:59",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:52:51.892Z",
+      "updatedAt": "2026-10-06T05:52:51.892Z",
+      "accessedAt": "2026-10-06T05:52:51.892Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4da691a2f70b7ff2"
+    },
+    {
+      "id": "m-mvdsgz5p-lm8c8z",
+      "category": "solutions",
+      "title": "daily-health 连续2天 alert 属冷启动代价非结构性退化",
+      "content": "10-05 命中64.9% alert（前端变更1次+冷启动3），10-06 命中62.6% alert（冷启动11>8）。两次均由压缩重放/冷启动贡献，未命中/轮均>3000；golden-fast 10-06已全绿说明非代码退化。纠正：连续 alert 时先比对 golden-fast 是否通过，再决定排查；本机连续2天无需干预。来源：daily-health 10-05/10-06",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:52:51.892Z",
+      "updatedAt": "2026-10-06T05:52:51.892Z",
+      "accessedAt": "2026-10-06T05:52:51.892Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "55ca9b56a6dd51b3",
+      "links": [
+        "m-mvdsgz7p-f06bh8"
+      ]
+    },
+    {
+      "id": "m-mvdsgz5u-7gcs17",
+      "category": "solutions",
+      "title": "knowledge-subscribe 入库率下降因候选多已存在",
+      "content": "10-06 抓54条入5条（与10-05 54条/1条同口径），10-05 同时段另一运行入1条（光遗传学诺奖）。精选逻辑（关键词去重+零LLM）正常工作，命中率取决于知识库已有条目覆盖度。纠正：观察入库数波动时与抓取数对比，勿误判为订阅失效；可定期追加新源而非加码精选。来源：knowledge-subscribe 10-05/10-06",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:52:51.892Z",
+      "updatedAt": "2026-10-06T05:52:51.892Z",
+      "accessedAt": "2026-10-06T05:52:51.892Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4f911caf8a4e5792",
+      "links": [
+        "m-mvdsgyxd-t9j7i7"
+      ]
+    },
+    {
+      "id": "m-mvdsgz5z-4rxc7w",
+      "category": "solutions",
+      "title": "干预教训: Context 面板只显示 APPEND_SYSTEM.md 时应检查注入链路",
+      "content": "来源 2026-10-06T05:48 干预（correctivePrompt=\"下没有显示，只有显示 portable/agent/APPEND_SYSTEM.md\"）。纠正前：用户预期 Context 面板显示完整 system 注入；纠正后：仅显示 APPEND_SYSTEM.md 文件，说明 custom features 注入链路未完整接通（可能 modes appendPrompt 覆盖或注入面未重建）。正确做法：先 bash 检查 pi 进程是否携带 PI_AGENT_MODE=roleplay，再确认 custom/adapters 的 system 注入是否生效，而非只看文件存在。来源：interventions.jsonl iv_1791265719818_h1fh8g",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-06T05:52:58.491Z",
+      "updatedAt": "2026-10-06T05:52:58.491Z",
+      "accessedAt": "2026-10-06T05:52:58.491Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "24be07394ad885a6",
+      "links": [
+        "m-mvdsgz6c-cykwx0",
+        "m-mvdsgz7c-dru4z3",
+        "m-mvdsgz87-qpw0y8"
+      ]
+    },
+    {
+      "id": "m-mvdsgz67-ztg7ep",
+      "category": "solutions",
+      "title": "近24h记忆高权重集中安全漏洞订阅与知识去重",
+      "content": "2026-10-06 知识订阅：9 渠道 54 条新增，安全与漏洞 3 / 科技数码 1 / 政策合规 1 入库，4 条因已存在去重；分数 1.30（近 24h 仅 2 条非删除条目，Σ=0.6+0.7=1.3）未达 12 阈值。纠正：入库策略稳定（5/9 渠道命中），应保持每周安全漏洞扫描频次；今后正确做法：按日监控 CVE 增量与去重率。",
+      "tags": [
+        "24h",
+        "安全漏洞订阅",
+        "权重集中",
+        "知识去重"
+      ],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 2,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-07T09:12:48.895Z",
+      "accessedAt": "2026-10-07T09:12:48.895Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "5b60dc3f114a40c7"
+    },
+    {
+      "id": "m-mvdsgz6c-cykwx0",
+      "category": "solutions",
+      "title": "干预教训: 启动后[Context]未显示，只渲染APPEND_SYSTEM.md路径",
+      "content": "纠正前：启动后[Context]区域无内容，仅显示 portable/agent/APPEND_SYSTEM.md 路径；纠正后：应显示上下文内容而非文件路径；今后正确做法：检查启动时上下文渲染流程，确保APPEND_SYSTEM.md内容被正确注入并渲染而非仅展示路径；来源 ts=2026-10-06T05:48:39.818Z",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:08:39.089Z",
+      "updatedAt": "2026-10-07T09:08:39.089Z",
+      "accessedAt": "2026-10-07T09:08:39.089Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "0079d487e49fb368",
+      "links": [
+        "m-mvdsgz5z-4rxc7w",
+        "m-mvdsgz6i-uw8paf"
+      ]
+    },
+    {
+      "id": "m-mvdsgz6i-uw8paf",
+      "category": "solutions",
+      "title": "干预教训: 重启后[Context]面板未渲染，只显示APPEND_SYSTEM.md路径",
+      "content": "纠正前：2026-10-06 05:48 进程重启后[Context]面板未显示，下方只渲染 portable/agent/APPEND_SYSTEM.md 路径；纠正：重启后须先验证上下文面板与注入面是否就绪再接任务，不可用空面板继续；来源 ts：2026-10-06T05:48:39.818Z (iv_1791265719818_h1fh8g)",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:09:18.859Z",
+      "updatedAt": "2026-10-07T09:09:18.859Z",
+      "accessedAt": "2026-10-07T09:09:18.859Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d26031618819acb8",
+      "links": [
+        "m-mvdsgz6c-cykwx0"
+      ]
+    },
+    {
+      "id": "m-mvdsgz6p-f6go5y",
+      "category": "solutions",
+      "title": "tool-stats-daily 连续失败根因是 pre-push 守门而非任务故障",
+      "content": "近 3 天（10-05/10-06/10-07）tool-stats-daily 均失败，输出明确指向 pre-push 守门脚本阻止推送：golden-tasks.sh 第 10 项 supervisor 测试 5 项失败（apply_mode 模式解析：状态文件 roleplay→模式名/注入人设/记忆命名空间均取实际值 full/空，旧格式 current 仍生效）。工具链本身正常（node scripts/tool-stats-sync.mjs --daily 成功并生成 tool-count-localhost.json）。教训：排查定时任务失败先看 output 字段的根因描述，不要默认重跑或改任务脚本；修复方向是 custom/features/mode 的 apply_mode 纯函数。来源：portable/memory/daily-results/results-localhost.jsonl（taskId e7e2f169-9137-4254-9d58-cfb7778ff4ab）\n\n【2026-10-11 更正】本条旧结论已被实测取代：真根因是 getPiInvocation 在 vitest worker 里信任 argv[1] 导致子进程入口错误（详见条目 id 913adbe8-395f-4014-bdf0-be3bc8cfdfd1）。",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "30d5b322c7353b59",
+      "links": [
+        "m-mvdsgz0f-pgnvc5"
+      ]
+    },
+    {
+      "id": "m-mvdsgz6x-kzl1hk",
+      "category": "solutions",
+      "title": "调度器并发重试风暴致多个每日任务集中批量失败",
+      "content": "【合并条目】来源 id：a273c534-beb2-4cf7-bdd0-f34fde8cc42a + 232e3fa0-fab6-4872-ab23-9e83dd62d933\n\n【来源 a273c534-beb2-4cf7-bdd0-f34fde8cc42a】调度器并发重试风暴致 daily-review/knowledge-subscribe 集中批量失败\n2026-10-06 11:25–11:53 期间 golden-fast/daily-health/knowledge-subscribe/daily-review 四个任务在 30 分钟内各失败 4–6 次（exit 1，duration 1–5s），呈密集重试特征。同期 05:47–05:53 同批任务均 success。教训：短时 exit 1 的密集重试多为调度器并发/锁竞争而非任务本身失败，应先看调度日志 portable/memory/scheduler/logs/ 的时间戳聚集，再排查任务逻辑；避免在排查期间手动重复触发同一任务加重风暴。来源：results-localhost.jsonl 2026-10-06T11:25–11:53 记录\n\n【来源 232e3fa0-fab6-4872-ab23-9e83dd62d933】调度器并发重试风暴使 knowledge-subscribe/daily-review/tool-stats-daily 集中批量失败\n2026-10-06 11:25-15:34 任务记录：golden-fast 5 项失败（supervisor 模式匹配逻辑缺陷）、daily-health/knowledge-subscribe/daily-review/tool-stats-daily 均 exit 1；同一 taskId 并发重试 4-9 次仍失败。纠正：调度器应加并发限制与退避，supervisor 模式匹配需修复 roleplay/full 判断逻辑。",
+      "tags": [
+        "daily-review",
+        "knowledge-subscribe",
+        "tool-stats-daily",
+        "并发",
+        "调度器",
+        "重试风暴",
+        "锁"
+      ],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "3f08454abdf8e93f"
+    },
+    {
+      "id": "m-mvdsgz74-2228uh",
+      "category": "solutions",
+      "title": "干预教训: abort 后 correctivePrompt「继续」续跑需先验证上下文与工具链完整性",
+      "content": "2026-09-30 11:43 发生一次 type=abort 的干预：原提示词「继续」、lastTool 为 bash（正在跑 timeout 200 npx tsc --noEmit -p custom/），3 秒后 correctivePrompt=「继续」续跑（来源 interventions.jsonl iv_1790768590228_p0tlkg）。纠正前：会话在长命令中途中断；纠正后：以同一提示词续跑。教训：(1) 被 abort 续跑时应先确认前序命令是否已产出中间文件（如 /tmp/tsc-custom.log），避免重复执行或基于旧结果下判断；(2) 中断期间状态可能已变，续跑前先快速核对关键产物时间戳；(3) 今后遇到长命令中断，优先用 tmux 后台 + watcher 而非前台阻塞式执行，从源头减少需要 correctivePrompt 续跑的场景。",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:11:44.275Z",
+      "updatedAt": "2026-10-07T09:11:44.275Z",
+      "accessedAt": "2026-10-07T09:11:44.275Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "9ced3e27733509da"
+    },
+    {
+      "id": "m-mvdsgz7c-dru4z3",
+      "category": "solutions",
+      "title": "干预教训: Context 面板不渲染时先查注入链路与 APPEND_SYSTEM.md 落盘",
+      "content": "2026-10-06 05:48 干预：用户反馈「启动后[Context]下没有显示，只有显示 portable/agent/APPEND_SYSTEM.md」（iv_1791265719818_h1fh8g，correctivePrompt 同文，correctedAt 05:49:16）。纠正前：[Context] 面板空白、仅渲染 APPEND_SYSTEM.md 路径；纠正后：面板正常。教训：(1) 遇到 Context/系统提示词面板不渲染，第一优先级是检查注入链路（custom/adapters 接入的 system prompt 拼装与 APPEND_SYSTEM.md 是否落盘），而非先怀疑模型或 TUI；(2) APPEND_SYSTEM.md 路径被单独渲染说明注入流程走了旁路分支，应对比 custom/bootstrap.ts 与 features/context/budget/system-prompt.ts 的装配顺序；(3) 重启后（2026-10-06 08:35 同类现象再次出现，见 iv_1791275753384 自愈重启）说明该问题与进程重启强相关，应加入重启后自检用例。",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:11:44.275Z",
+      "updatedAt": "2026-10-07T09:11:44.275Z",
+      "accessedAt": "2026-10-07T09:11:44.275Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "cd14bebf173b7a8b",
+      "links": [
+        "m-mvdsgz5z-4rxc7w"
+      ]
+    },
+    {
+      "id": "m-mvdsgz7i-h6157l",
+      "category": "solutions",
+      "title": "会话模式自愈重启后 full 模式被误设为 roleplay，Context 面板渲染异常",
+      "content": "2026-10-06 08:35 会话：系统重启后按会话模式自愈，本会话应为 full，进程原为 roleplay，自愈逻辑却把模式设为 roleplay，导致 Context 面板未正确渲染。纠正：模式切换必须走 /mode 触发完整重启，会话内禁止热改工具集；重启后应先验证当前模式与注入链路。",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:12:37.561Z",
+      "updatedAt": "2026-10-07T09:12:37.561Z",
+      "accessedAt": "2026-10-07T09:12:37.561Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "ace2f9f280ac2c7d"
+    },
+    {
+      "id": "m-mvdsgz7p-f06bh8",
+      "category": "solutions",
+      "title": "daily-health 命中率低于 97% 主因是前缀缓存失效与冷启动，非结构性退化",
+      "content": "2026-10-06 健康度量：命中率 62.6%、未命中/轮 13050 均由首段分叉（messages@0-7 变更→整段重放）和冷启动 11 次导致；加权命中率 67.4%（10-05）同理。前缀前端变更 1 次/轮触发全价重算，冷启动均摊费用 3 倍。纠正：排查 messages@0-7 变更来源（system prompt/工具数组/thinking 档位），减少冷启动保持会话连续。",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:12:37.561Z",
+      "updatedAt": "2026-10-07T09:12:37.561Z",
+      "accessedAt": "2026-10-07T09:12:37.561Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "75104d818455dd1a",
+      "links": [
+        "m-mvdsgz5p-lm8c8z"
+      ]
+    },
+    {
+      "id": "m-mvdsgz7v-fy2rmc",
+      "category": "solutions",
+      "title": "调度器并发重试风暴使 knowledge-subscribe/daily-review/tool-stats-daily 集中批量失败",
+      "content": "2026-10-06 11:25-15:34 任务记录：golden-fast 5 项失败（supervisor 模式匹配逻辑缺陷）、daily-health/knowledge-subscribe/daily-review/tool-stats-daily 均 exit 1；同一 taskId 并发重试 4-9 次仍失败。纠正：调度器应加并发限制与退避，supervisor 模式匹配需修复 roleplay/full 判断逻辑。",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:12:37.561Z",
+      "updatedAt": "2026-10-07T09:12:37.561Z",
+      "accessedAt": "2026-10-07T09:12:37.561Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d50b291ea599f9e7"
+    },
+    {
+      "id": "m-mvdsgz87-qpw0y8",
+      "category": "solutions",
+      "title": "干预教训：Context 面板只显示 APPEND_SYSTEM.md 路径时先查注入链路",
+      "content": "【合并条目】来源 id：e2f70dfb-6303-4fb1-b304-90414b6028a2 + 0b7e5a06-5209-4e61-8f24-18885bc64b14 + 22a2d675-f296-4390-b221-df92cdebd31c + f71e48de-b49e-4524-a807-cbe038ef5551 + 5c19b00b-202d-48e0-94ec-6d9da8aac498\n\n【来源 e2f70dfb-6303-4fb1-b304-90414b6028a2】干预教训: Context 面板只显示 APPEND_SYSTEM.md 路径时应检查注入链路\n纠正前：Context 面板未显示内容，只渲染 APPEND_SYSTEM.md 路径（干预 ts 2026-10-06T05:48:39）。纠正后：应检查 system prompt 注入链路（messages@0-7 区域变更会令整段缓存失效）及 APPEND_SYSTEM.md 是否正确落盘。来源 ts: 2026-10-06T05:48:39；今后正确做法：重启后先验证注入链路与模式一致性，再排查面板渲染。\n\n【来源 0b7e5a06-5209-4e61-8f24-18885bc64b14】干预教训: Context 面板只显示 APPEND_SYSTEM.md 时应检查注入链路\n来源 2026-10-06T05:48 干预（correctivePrompt=\"下没有显示，只有显示 portable/agent/APPEND_SYSTEM.md\"）。纠正前：用户预期 Context 面板显示完整 system 注入；纠正后：仅显示 APPEND_SYSTEM.md 文件，说明 custom features 注入链路未完整接通（可能 modes appendPrompt 覆盖或注入面未重建）。正确做法：先 bash 检查 pi 进程是否携带 PI_AGENT_MODE=roleplay，再确认 custom/adapters 的 system 注入是否生效，而非只看文件存在。来源：interventions.jsonl iv_1791265719818_h1fh8g\n\n【来源 22a2d675-f296-4390-b221-df92cdebd31c】干预教训: 启动后[Context]未显示，只渲染APPEND_SYSTEM.md路径\n纠正前：启动后[Context]区域无内容，仅显示 portable/agent/APPEND_SYSTEM.md 路径；纠正后：应显示上下文内容而非文件路径；今后正确做法：检查启动时上下文渲染流程，确保APPEND_SYSTEM.md内容被正确注入并渲染而非仅展示路径；来源 ts=2026-10-06T05:48:39.818Z\n\n【来源 f71e48de-b49e-4524-a807-cbe038ef5551】干预教训: 重启后[Context]面板未渲染，只显示APPEND_SYSTEM.md路径\n纠正前：2026-10-06 05:48 进程重启后[Context]面板未显示，下方只渲染 portable/agent/APPEND_SYSTEM.md 路径；纠正：重启后须先验证上下文面板与注入面是否就绪再接任务，不可用空面板继续；来源 ts：2026-10-06T05:48:39.818Z (iv_1791265719818_h1fh8g)\n\n【来源 5c19b00b-202d-48e0-94ec-6d9da8aac498】干预教训: Context 面板不渲染时先查注入链路与 APPEND_SYSTEM.md 落盘\n2026-10-06 05:48 干预：用户反馈「启动后[Context]下没有显示，只有显示 portable/agent/APPEND_SYSTEM.md」（iv_1791265719818_h1fh8g，correctivePrompt 同文，correctedAt 05:49:16）。纠正前：[Context] 面板空白、仅渲染 APPEND_SYSTEM.md 路径；纠正后：面板正常。教训：(1) 遇到 Context/系统提示词面板不渲染，第一优先级是检查注入链路（custom/adapters 接入的 system prompt 拼装与 APPEND_SYSTEM.md 是否落盘），而非先怀疑模型或 TUI；(2) APPEND_SYSTEM.md 路径被单独渲染说明注入流程走了旁路分支，应对比 custom/bootstrap.ts 与 features/context/budget/system-prompt.ts 的装配顺序；(3) 重启后（2026-10-06 08:35 同类现象再次出现，见 iv_1791275753384 自愈重启）说明该问题与进程重启强相关，应加入重启后自检用例。",
+      "tags": [
+        "APPEND_SYSTEM.md",
+        "Context面板",
+        "troubleshooting",
+        "模式误设",
+        "注入链路",
+        "渲染异常",
+        "自愈重启"
+      ],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:35.394Z",
+      "updatedAt": "2026-10-11T13:02:35.394Z",
+      "accessedAt": "2026-10-11T13:02:35.394Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d2e133f8800a5d61",
+      "links": [
+        "m-mvdsgz5z-4rxc7w"
+      ]
+    },
+    {
+      "id": "m-mvdsgz8e-uvtkzx",
+      "category": "reference",
+      "title": "CVE-2026-9198 IBM Langflow Code Injection Vulnerability",
+      "content": "2026-08-04。来源：[CISA官方群] [已遭利用/勒索] Langflow contains a code injection vulnerability that allows unauthenticated attackers to achieve full remote code execution on de。原文：https://www.cve.org/CVERecord?id=CVE-2026-9198",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-07"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:29:07.966Z",
+      "updatedAt": "2026-10-07T09:29:07.966Z",
+      "accessedAt": "2026-10-07T09:29:07.966Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "bf9ae720ce89a216",
+      "links": [
+        "m-mvdsgz04-27wdw8"
+      ]
+    },
+    {
+      "id": "m-mvdsgz8k-dx1fe1",
+      "category": "reference",
+      "title": "VMware Workstation and Fusion contain a stack-based buffer-overflow vulnerabilit",
+      "content": "2026-10-07。来源：[GitHub安全公告] [sev=high] CVE-2026-59347 VMware Workstation and Fusion contain a stack-based buffer-overflow vulnerability in HGFS. A malicious actor with local。原文：https://github.com/advisories/GHSA-54rf-87fx-f97x",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-07"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:29:08.065Z",
+      "updatedAt": "2026-10-07T09:29:08.065Z",
+      "accessedAt": "2026-10-07T09:29:08.065Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4b44af4e85c9a5de",
+      "links": [
+        "m-mvdsgz8q-thydyz"
+      ]
+    },
+    {
+      "id": "m-mvdsgz8q-thydyz",
+      "category": "reference",
+      "title": "VMware Workstation and Fusion contain an integer-overflow vulnerability. A malic",
+      "content": "2026-10-07。来源：[GitHub安全公告] [sev=critical] CVE-2026-59346 VMware Workstation and Fusion contain an integer-overflow vulnerability. A malicious actor with local administrative pri。原文：https://github.com/advisories/GHSA-88p7-h25r-m6vw",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-07"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-07T09:29:08.138Z",
+      "updatedAt": "2026-10-07T09:29:08.138Z",
+      "accessedAt": "2026-10-07T09:29:08.138Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4e3a104bc1f422d7",
+      "links": [
+        "m-mvdsgz8k-dx1fe1"
+      ]
+    },
+    {
+      "id": "m-mvdsgz8x-vgyh5t",
+      "category": "solutions",
+      "title": "测试可能把 bug 当契约：改前先判断测试本身对不对",
+      "content": "现象：修子代理池「shutdown 回收在跑 worker」时，回归测试改前必红——但既有测试恰恰断言了错误行为（把 bug 当契约）⇒ 若照测试改，就会把缺陷固化。\n根因：测试是「当时实现」的快照，不保证是「应有行为」；缺少对断言本身的复核。\n判据/做法：① 改代码前先读断言，问「这条断言描述的是需求还是现状」；② 现象与既有断言冲突时，先证明预期行为（真实场景/领域约束），再决定改代码还是改测试；③ 修正被误解的断言时在测试里写明原因注释，避免后人再改回去。",
+      "tags": [
+        "测试",
+        "回归",
+        "契约",
+        "池回收",
+        "subagent",
+        "assertion",
+        "bug-as-contract",
+        "code-review"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "ff615dfe8f1190f4"
+    },
+    {
+      "id": "m-mvdsgz96-u06jax",
+      "category": "solutions",
+      "title": "process.argv[1] 不可信：启动子进程要正面白名单而非黑名单测试运行器",
+      "content": "现象：定时任务反复 exit 1、durationMs 868ms、stdout(pi JSONL) 为空；日志只有 Expected worker to be run in node:child_process。\n根因：getPiInvocation() 无条件信任 process.argv[1]——当承载 autopilot 的进程本身是 vitest worker 时，argv[1] 就是 vitest 的 forks worker 入口 ⇒ 子进程被拼成 node <init-forks.js> --mode json …，立刻抛错。\n判据/做法：启动子进程时必须**正面要求**入口是真正的 pi CLI（合法形态：basename=pi；或 cli.js/cli.mjs/cli.ts 且路径含 packages/coding-agent/），其余一律回退到 PATH 上的 pi；只黑名单 vitest/jest/mocha 会漏掉 tsx、脚本、旧 worker 等形态。",
+      "tags": [
+        "argv",
+        "vitest",
+        "worker",
+        "子进程",
+        "白名单",
+        "autopilot",
+        "getPiInvocation",
+        "调度器",
+        "spawn"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "e48e98f9802c0176"
+    },
+    {
+      "id": "m-mvdsgz9d-preacm",
+      "category": "solutions",
+      "title": "僵尸进程的 /proc/<pid> 依然存在：existsSync 不等于活着",
+      "content": "现象：调度器长时间静默停摆——每轮 runDueTasks 都让出，任务不再执行，且无任何告警。\n根因：判活用的 existsSync('/proc/<pid>')；僵尸进程（Z）的 /proc 目录同样存在 ⇒ 陈旧锁被判为「被持有」。\n判据/做法：判活要读 /proc/<pid>/stat 的状态字段，'Z' 视为不活；读不到 stat 时**保守当作活着**（宁可少跑不可双跑）；非 Linux 无 /proc 时降级为旧行为并如实标注。",
+      "tags": [
+        "僵尸进程",
+        "/proc",
+        "pid",
+        "锁",
+        "isPidAlive",
+        "zombie",
+        "existsSync"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "731ac4acc1f2f519"
+    },
+    {
+      "id": "m-mvdsgz9k-o1unsp",
+      "category": "solutions",
+      "title": "锁的 TOCTOU：existsSync→读→unlink 不复核会导致双跑",
+      "content": "现象：同一到期任务在同一秒内被执行 8 次（时间戳间隔约 30ms、每条 durationMs 553–1782ms ⇒ 运行重叠），日志成簇爆发。\n根因：抢占路径 existsSync → 读内容 → 判陈旧 → 直接 unlinkSync（无复核）→ openSync('wx')；两个实例可同时判定同一把锁陈旧：A 删旧建新后，B 仍按先前读到的内容把 A 的新锁删掉 ⇒ 两边都以为持锁。\n判据/做法：① 比较后再删（只有内容仍等于判定时看到的那份才 unlink）；② 建锁后回读校验（锁内容必须是自己的 PID）；③ 创建用 openSync('wx') 原子写，避免空文件窗口。",
+      "tags": [
+        "锁",
+        "TOCTOU",
+        "竞态",
+        "并发",
+        "双跑",
+        "scheduler",
+        "locks",
+        "原子"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "68476412212aedd6"
+    },
+    {
+      "id": "m-mvdsgz9t-ujbvh4",
+      "category": "solutions",
+      "title": "一次不复现 ≠ 不存在：不变量测试必须控住前提",
+      "content": "现象：同一套测试跑两遍、真实调度器日志计数 51→51 不变 ⇒ 我据此判定「测试不污染真实状态」；但该结论是错的——当时真实目录里**残留了一把 scheduler.lock**，所有 runDueTasks 都因拿不到锁而让出，所以「什么都没发生」是假象。\n根因：判定「无副作用」时没验证被测系统**真的进入了要观察的路径**（前提不成立、观察窗口空转）⇒ 负结论不成立。\n判据/做法：① 断言前提（确有到期任务/确实取到锁/确实进入调度路径）；② 关键副作用测试加「有分辨力」的断言（改前必红）；③ 承认「一次不复现」不是证据。",
+      "tags": [
+        "不变量",
+        "测试",
+        "复现",
+        "锁泄漏",
+        "前提",
+        "漏报",
+        "验证",
+        "false-negative"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "7c4a7226b992373c"
+    },
+    {
+      "id": "m-mvdsgza0-idnhjl",
+      "category": "solutions",
+      "title": "测试隔离必须发生在 import 之前：模块导入时就会读走 env",
+      "content": "现象：隔离测试里 PI_MEMORY_DIR 已设，断言却显示锁路径仍落在真实目录，或行为与预期不符。\n根因：模块在**导入时**就解析并缓存了目录（生成常量/单例）；在 beforeEach 里再设 env 已经太晚。\n判据/做法：① 先设 PI_MEMORY_DIR / PI_CODING_AGENT_DIR，再 await import(...)；② 用动态 import 让环境先就位；③ 测试内断言「锁路径确实在临时目录内」，防假绿；④ 只设 PI_CODING_AGENT_DIR 也算隔离（路径解析为 PI_MEMORY_DIR || getMemoryDir()，后者派生自 agent dir）。",
+      "tags": [
+        "测试隔离",
+        "PI_MEMORY_DIR",
+        "PI_CODING_AGENT_DIR",
+        "import",
+        "环境变量",
+        "缓存",
+        "vitest"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "6d981927d37772f1"
+    },
+    {
+      "id": "m-mvdsgza8-m4d4to",
+      "category": "solutions",
+      "title": "回执/成功 ≠ 真的执行了：成功语义必须能证伪",
+      "content": "现象：到期任务最终 result:'success'，但输出是重复的 <dots_function_call> 标记、bash 从未执行；且因为只在 failed 时落诊断日志，整个过程零痕迹。\n根因：成功判据 = 退出码 0 且输出非空；「模型发的工具调用标记没被解析」这种情况退出码仍是 0 ⇒ 报成功却什么都没做。DSH 的 receipts 同样只保证「进了收件箱」，不保证「模型执行」。\n判据/做法：① 检测工具调用标记泄漏进文本（4 类家族 + 同一条输出出现 ≥2 次，宁可漏报不误报）；命中则记 failed 并写明原因（suspect: unparsed tool call）；② 可疑也落诊断日志；③ 平台侧把「可疑失败」与普通失败分开统计（daily-health 已加只读统计）。",
+      "tags": [
+        "成功语义",
+        "回执",
+        "工具调用",
+        "suspect",
+        "autopilot",
+        "静默失效",
+        "receipt",
+        "验收"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "4365d7dff5f5ad01"
+    },
+    {
+      "id": "m-mvdsgzaf-xjojah",
+      "category": "solutions",
+      "title": "调度器受 hasUI 门控：纯无头时定时任务不跑（DSH 改为 Host 常驻）",
+      "content": "现象：纯无头会话里定时任务从不执行；只有交互会话（TUI）在跑时才触发。\n根因：autopilot/index.ts 里 `if (!ctx.hasUI) { await syncSeedTasks(); return; }`——刻意设计（注释记录当年事故：无头启动即跑 runDueTasks 导致长期挂起并凭空触发任务）。\n判据/做法：my-pi 侧要跑定时任务需保持交互会话或手动 /daily run；换基座到 DSH 后该门控不被继承（grep hasUI 在 289 个包/3011 个 js+d.ts 中 0 命中），代价改为「Host 必须常驻」（README: The Host must be running to deliver reminders；冷会话可被唤起）。",
+      "tags": [
+        "调度器",
+        "autopilot",
+        "hasUI",
+        "无头",
+        "定时任务",
+        "无人值守",
+        "DSH",
+        "schedule",
+        "Host"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "92b1eec804bd3d4a"
+    },
+    {
+      "id": "m-mvdsgzan-mbm7nl",
+      "category": "solutions",
+      "title": "别做跨时钟比较：/proc 的 btime/uptime/starttime 可能自相矛盾",
+      "content": "现象：用 btime + starttime/HZ 推算进程启动墙钟，结果与 Date.now() 相差数年（btime=2023、uptime=124 秒、starttime≈182 天量级，三者互相矛盾）。\n根因：容器/proot 环境里各时钟源不同步；跨时钟换算不可信。\n判据/做法：① 判定「进程是否晚于写锁时刻启动」只比较 starttime 原始节拍（同一时钟，免换算）；同一进程 starttime 终生不变 ⇒ 相等即同一持有者，严格更大即 PID 被复用；② 加时钟一致性自证（两条独立推法必须吻合，否则返回 null、不判定）；③ 宁可少跑，不可双跑。",
+      "tags": [
+        "时钟",
+        "proc",
+        "starttime",
+        "uptime",
+        "btime",
+        "PID复用",
+        "锁",
+        "proot"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "7494eaef80525ce9"
+    },
+    {
+      "id": "m-mvdsgzau-1hoe5o",
+      "category": "fact",
+      "title": "负向主张必须交代搜索面：说「没有 X」要给出命令与覆盖面",
+      "content": "现象：我曾断言「DSH 没有等价于 session_before_compact 的压缩前干预闸门」，据此把该项列为「无对应」；复核后被推翻——DSH 有服务级可替换压缩引擎 CompactionEngine（ctx.compaction）+ 失败路径 waterfall 事件 compaction/summary-error。\n根因：把「我只扫了事件」当成了「它不存在」；DSH 扩展面至少三类：cordis 事件(105)、会话日志类型(59，仅观察)、**服务替换**（原清单完全没扫）。\n判据/做法：说「没有 X」必须同时给出：搜索命令原文 + 覆盖范围（多少包/文件）+ 读过的候选清单；否则只能写「未核实」。此标准本会话两次救场（另一次是推翻自己的测试污染结论）。",
+      "tags": [
+        "负向证据",
+        "搜索面",
+        "方法论",
+        "核实",
+        "DSH",
+        "调研",
+        "falsifiable"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "67fca3dde610c1ff"
+    },
+    {
+      "id": "m-mvdsgzb2-cm23vc",
+      "category": "solutions",
+      "title": "证据强度分级：实测 > 代码级论证 > 推断，报告必须标明级别",
+      "content": "现象：同一结论若把「代码推断」当「实测」陈述，会误导后续决策（本会话多次被此坑，例如「池保住在跑 worker」只有代码+单测、无端到端实测）。\n根因：报告里缺少证据级别标注 ⇒ 读者无法判断可信度，也无法知道该补哪个实验。\n判据/做法：① 每条结论标级别：实测（有原始输出/端到端）／代码级论证（有文件:行号）／推断（明确写「推断」）；② 测不了就写「无证据/未核实」并说明为什么（如假 provider 无法产生工具调用 ⇒ 无法进入 leased 状态）；③ 推翻旧结论时保留原文作对照，就地更正。",
+      "tags": [
+        "证据",
+        "方法论",
+        "实测",
+        "推断",
+        "标注",
+        "诚实",
+        "测谎",
+        "verification"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "0804d3328af0a4e1"
+    },
+    {
+      "id": "m-mvdsgzb9-8tez27",
+      "category": "solutions",
+      "title": "git 提交纪律：commit 用 -F 传文件，绝不 amend 已推送的提交",
+      "content": "现象：① git commit -m '…含引号…' 会因 shell 解析炸掉（pathspec 报错）；② amend 已推送提交会造成本地/远端分叉（本会话出现过「幽灵分叉」，需强推才能恢复）。\n根因：-m 内容经 shell 二次解析；amend 改写已发布历史。\n判据/做法：① 提交信息写入临时文件后 git commit -F <文件>；② 只 amend **未推送**的提交（先 git log origin/main..HEAD 确认范围）；③ 推送后用 git rev-parse 比对本地与远端哈希确认同步；④ 门禁（守门/台账）未过时**不得**用 --no-verify 绕过，先修因。",
+      "tags": [
+        "git",
+        "commit",
+        "amend",
+        "引号",
+        "分叉",
+        "force-push",
+        "纪律",
+        "workflow"
+      ],
+      "confidence": 0.7,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-11T13:02:34.446Z",
+      "updatedAt": "2026-10-11T13:02:34.446Z",
+      "accessedAt": "2026-10-11T13:02:34.446Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "f408f19b6a89e9ef"
+    },
+    {
+      "id": "m-mvdsgzbf-fctioi",
+      "category": "reference",
+      "title": "CVE-2026-104935 Ivanti Connect Secure Authentication Bypass by Spoofing Vulnerability",
+      "content": "2026-10-13。来源：[CISA官方群] [已遭利用/勒索] Ivanti Connect Secure contains an authentication bypass by spoofing vulnerability that allows a remote unauthenticated attacker to。原文：https://www.cve.org/CVERecord?id=CVE-2026-104935",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-14"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:16:13.752Z",
+      "updatedAt": "2026-10-14T11:16:13.752Z",
+      "accessedAt": "2026-10-14T11:16:13.752Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "488ea4990e31c3ed",
+      "links": [
+        "m-mvdsgyym-44fbaw"
+      ]
+    },
+    {
+      "id": "m-mvdsgzbn-2bi1ib",
+      "category": "reference",
+      "title": "CVE-2026-96951 Microsoft Windows Command Injection Vulnerability",
+      "content": "2026-10-13。来源：[CISA官方群] [已遭利用/勒索] Microsoft Windows Shell contains a command injection vulnerability that allows an unauthorized attacker to bypass a security featu。原文：https://www.cve.org/CVERecord?id=CVE-2026-96951",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-14"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:16:13.763Z",
+      "updatedAt": "2026-10-14T11:16:13.763Z",
+      "accessedAt": "2026-10-14T11:16:13.763Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "cc8ca16053c63c8a",
+      "links": [
+        "m-mvdsgz04-27wdw8"
+      ]
+    },
+    {
+      "id": "m-mvdsgzbu-blfvf7",
+      "category": "reference",
+      "title": "Justice Department says North Koreans have infiltrated dozens of U.S. companies",
+      "content": "Wed, 14 Oct 2026。来源：[TechCrunch] U.S. authorities warn that sanctioned hackers are increasingly targeting Americans to act as facilitators between breached U.S. companies an。原文：https://techcrunch.com/2026/10/13/justice-department-says-north-koreans-have-infiltrated-dozens-of-u-s-companies/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-14"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:21:06.765Z",
+      "updatedAt": "2026-10-14T11:21:06.765Z",
+      "accessedAt": "2026-10-14T11:21:06.765Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "369756e564550eee"
+    },
+    {
+      "id": "m-mvdsgzc1-jn6zol",
+      "category": "reference",
+      "title": "A vulnerability in HPE NonStop iTP WebServer can cause memory corruption and sys",
+      "content": "2026-10-14。来源：[GitHub安全公告] [sev=high] CVE-2026-73790 A vulnerability in HPE NonStop iTP WebServer can cause memory corruption and system shutdown.。原文：https://github.com/advisories/GHSA-f22h-g445-7rgr",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-14"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:12:10.450Z",
+      "updatedAt": "2026-10-14T11:12:10.450Z",
+      "accessedAt": "2026-10-14T11:12:10.450Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "8a6a0b710468857b"
+    },
+    {
+      "id": "m-mvdsgzc9-rhd0zy",
+      "category": "solutions",
+      "title": "种子任务失败后重试可恢复：golden-fast/daily-health/knowledge-subscribe",
+      "content": "2026-10-10 三个种子任务（golden-fast、daily-health、knowledge-subscribe）全部失败（exit 1，多次重试均失败）；2026-10-14 同三个任务全部 success，耗时 90-277s。教训：种子任务失败不一定是代码问题，可能是瞬时环境（网络/锁/依赖）导致，重试是有效恢复手段。来源 ts: 2026-10-14T11:08-11:13 daily-results/results-localhost.jsonl",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:15:27.887Z",
+      "updatedAt": "2026-10-14T11:15:27.887Z",
+      "accessedAt": "2026-10-14T11:15:27.887Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "da63aafdeec06e2f"
+    },
+    {
+      "id": "m-mvdsgzcg-bhuxrp",
+      "category": "solutions",
+      "title": "知识订阅零 LLM 入库流程有效：66 候选→4 条高价值",
+      "content": "2026-10-14 knowledge-subscribe 从 11 个源抓取 66 条新增，经零 LLM 筛选入库 4 条（CISA 已遭利用漏洞 2 条、朝鲜黑客渗透美国企业 1 条、HPE NonStop 高危漏洞 1 条），全部为安全与漏洞分区。证实零 LLM 筛选在安全新闻场景下准确率足够，无需 LLM 参与。来源 ts: 2026-10-14T11:12 knowledge/summary-2026-10-14.md",
+      "tags": [],
+      "confidence": 0.7,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:15:27.887Z",
+      "updatedAt": "2026-10-14T11:15:27.887Z",
+      "accessedAt": "2026-10-14T11:15:27.887Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "791558bd8489f369"
+    },
+    {
+      "id": "m-mvdsgzcn-y63vrb",
+      "category": "solutions",
+      "title": "会话摘要生成滞后：最新摘要停在 2026-10-05",
+      "content": "portable/memory/summaries.json 最新条目 ts=2026-10-05T12:51:58Z，近 24 小时无新摘要；同时 portable/agent/sessions/ 最新会话文件停在 2026-10-08。daily-health 亦报 session-file-missing 警告（2026-10-07 的会话文件被移动/删除）。表明会话摘要生成任务未随日常调度运行，是当前信息不对称的主要来源。来源 ts: 2026-10-14 daily-results + summaries.json + daily-health.log",
+      "tags": [],
+      "confidence": 0.6,
+      "source": "auto",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:15:27.887Z",
+      "updatedAt": "2026-10-14T11:15:27.887Z",
+      "accessedAt": "2026-10-14T11:15:27.887Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "15d39f6c9c2dcf13"
+    },
+    {
+      "id": "m-mvdsgzct-vbqoy7",
+      "category": "reference",
+      "title": "ClawLoop: Self-Improving Agents via Harness-Native Training Loop",
+      "content": "Wed, 14 Oct 2026。来源：[arXiv cs.AI] arXiv:2610.14118v1 Announce Type: new Abstract: The rapid advancement of Large Language Models (LLMs) has driven their deployment toward gen。原文：https://arxiv.org/abs/2610.14118",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-14"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:21:06.741Z",
+      "updatedAt": "2026-10-14T11:21:06.741Z",
+      "accessedAt": "2026-10-14T11:21:06.741Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "6ef4fc7571baab13"
+    },
+    {
+      "id": "m-mvdsgzd0-eew8qq",
+      "category": "reference",
+      "title": "Scimplify raises $25M to challenge China’s grip on critical materials with AI",
+      "content": "Wed, 14 Oct 2026。来源：[TechCrunch] Scimplify's annualized revenue run rate has tripled to $200 million as it eyes U.S. expansion.。原文：https://techcrunch.com/2026/10/14/scimplify-raises-25m-to-challenge-chinas-grip-on-critical-materials-with-ai/",
+      "tags": [
+        "knowledge-subscription",
+        "2026-10-14"
+      ],
+      "confidence": 0.9,
+      "source": "knowledge-fetch",
+      "recurrence": 1,
+      "createdAt": "2026-10-14T11:21:22.149Z",
+      "updatedAt": "2026-10-14T11:21:22.149Z",
+      "accessedAt": "2026-10-14T11:21:22.149Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "bba987a1c48b1814"
+    },
+    {
+      "id": "m-mvdsgzd7-9r0n3a",
+      "category": "fact",
+      "title": "用户要求记住的词：菠萝",
+      "content": "用户在会话中明确要求记住这个词：「菠萝」。无额外语义约束。",
+      "tags": [
+        "用户词汇",
+        "待用",
+        "用户指定",
+        "词汇",
+        "菠萝"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-16T16:11:10.626Z",
+      "updatedAt": "2026-10-16T16:11:10.626Z",
+      "accessedAt": "2026-10-16T16:11:10.626Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "398b6d1ae463ba9e",
+      "links": [
+        "m-mvdsgzdc-34pb6l"
+      ]
+    },
+    {
+      "id": "m-mvdsgzdc-34pb6l",
+      "category": "fact",
+      "title": "用户指定需要记住的词：菠萝",
+      "content": "用户明确要求记住的词：菠萝（pineapple）。无额外上下文，仅作为待记忆词汇。",
+      "tags": [
+        "用户指令",
+        "词汇"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-17T16:14:20.565Z",
+      "updatedAt": "2026-10-17T16:14:20.565Z",
+      "accessedAt": "2026-10-17T16:14:20.565Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "9ec609d29e0bb81d",
+      "links": [
+        "m-mvdsgzd7-9r0n3a",
+        "m-mvdsgzdi-p4pp0s"
+      ]
+    },
+    {
+      "id": "m-mvdsgzdi-p4pp0s",
+      "category": "fact",
+      "title": "用户指定的记忆词：菠萝",
+      "content": "用户在 2026-02-14 会话中要求记住这个词：菠萝。仅为用户显式指定的记忆项，无附加上下文。",
+      "tags": [
+        "用户指定",
+        "词汇"
+      ],
+      "confidence": 1,
+      "source": "manual",
+      "recurrence": 1,
+      "createdAt": "2026-10-18T03:58:12.810Z",
+      "updatedAt": "2026-10-18T03:58:12.810Z",
+      "accessedAt": "2026-10-18T03:58:12.810Z",
+      "environments": [
+        "all"
+      ],
+      "contentHash": "d190cdaa579c6c2c",
+      "links": [
+        "m-mvdsgzdc-34pb6l"
+      ]
+    }
+  ]
+}

@@ -69,7 +69,7 @@ const server = createServer(async (req, res) => {
               index: 0,
               id: 'call_mock_memory',
               type: 'function',
-              function: { name: 'memory_store', arguments: JSON.stringify({ text: '项目代号 falcon', tags: '项目' }) },
+              function: { name: 'memory_store', arguments: JSON.stringify({ category: 'fact', title: '项目代号', content: '项目代号 falcon', tags: '项目' }) },
             }],
           },
           finish_reason: null,

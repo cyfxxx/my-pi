@@ -11,5 +11,5 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["plugin/**/*.ts"]
+  "include": ["plugin/**/*.ts", "memory/**/*.ts", "scripts/**/*.ts"]
 }

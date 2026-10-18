@@ -20,7 +20,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'mypi-memory': { kind: 'mypi-memory' } & ContextFormed;
   }
 }
-import { appendMemory, readMemories, renderInjection, resolveMemoryConfig, searchMemories } from './memory';
+import { formatHit, formatStats, recall, remember, renderInjection, resolveMemoryConfig } from './memory';
 import { createSearxngProvider, resolveSearxngConfig } from './searxng';
 import {
   hasTmux,
@@ -102,40 +102,45 @@ export function apply(ctx: HostContext): void {
     child.web.registerSearchProvider(createSearxngProvider(searxng));
   });
 
-  // 长期记忆：存储 + 三个工具 + append-only 注入（见 plugin/memory.ts 头注释）。
+  // 长期记忆：与原项目同 schema（entries.json）+ 三级去重合并 + append-only 注入。
   const memory = resolveMemoryConfig(join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
-  tools.register(stringTool('memory_store', '把一条长期记忆写进本机记忆库（JSONL），返回 id。', {
-    text: { type: 'string', description: '要记住的内容（一句话）' },
-    tags: { type: 'string', description: '（可选）逗号分隔的标签' },
+  tools.register(stringTool('memory_store', '存入一条长期记忆（自动脱敏、按标题/内容/近似去重合并）。', {
+    category: { type: 'string', description: '类别：fact/preference/habit/procedure/reference/solutions' },
+    title: { type: 'string', description: '简短标题（作索引与去重键）' },
+    content: { type: 'string', description: '详细内容' },
+    tags: { type: 'string', description: '（可选）逗号分隔标签' },
+    confidence: { type: 'number', description: '（可选）置信度 0-1，默认 0.7' },
+    environment: { type: 'string', description: '（可选）适用环境：all/linux/macos/windows/termux' },
   }, (args) => {
-    const text = String(args.text ?? '').trim();
-    if (text === '') throw new Error('memory_store: text 不能为空');
-    const tags = String(args.tags ?? '').split(',').map((t) => t.trim()).filter(Boolean);
-    const entry = appendMemory(memory.file, text, tags);
-    return `已记住（${entry.id}）：${entry.text}`;
+    const title = String(args.title ?? '').trim();
+    const content = String(args.content ?? '').trim();
+    if (title === '' || content === '') throw new Error('memory_store: title 与 content 都不能为空');
+    return remember(memory, {
+      category: String(args.category ?? 'fact'),
+      title,
+      content,
+      tags: String(args.tags ?? '').split(',').map((t) => t.trim()).filter(Boolean),
+      confidence: typeof args.confidence === 'number' ? args.confidence : undefined,
+      environment: typeof args.environment === 'string' && args.environment.trim() ? args.environment.trim() : undefined,
+    });
   }));
-  tools.register(stringTool('memory_search', '按关键词检索长期记忆（中日韩按双字、拉丁按词匹配）。', {
+  tools.register(stringTool('memory_search', '按关键词检索长期记忆（标题/内容/标签；带置信度与复现次数加权）。', {
     query: { type: 'string', description: '检索词' },
-    limit: { type: 'number', description: '（可选）最多返回几条，默认 5' },
+    limit: { type: 'number', description: '（可选）最多几条，默认 5' },
   }, (args) => {
-    const hits = searchMemories(readMemories(memory.file), String(args.query ?? ''), Number(args.limit ?? 5));
-    if (hits.length === 0) return '没有匹配的长期记忆';
-    return hits.map((h) => `- ${h.text}${h.tags.length ? `（${h.tags.join('/')}）` : ''}`).join('\n');
+    const hits = recall(memory, String(args.query ?? ''), Number(args.limit ?? 5));
+    return hits.length === 0 ? '没有匹配的长期记忆' : hits.map(formatHit).join('\n');
   }));
-  tools.register(stringTool('memory_stats', '查看长期记忆库的条数与位置。', {}, () => {
-    const entries = readMemories(memory.file);
-    const last = entries.at(-1);
-    return `记忆 ${entries.length} 条；文件 ${memory.file}${last ? `；最近一条 ${last.ts}` : ''}`;
-  }));
+  tools.register(stringTool('memory_stats', '查看长期记忆库的条数、类别与环境分布。', {}, () => formatStats(memory)));
 
-  // append-only 注入：只在一回合的第一步、且内容与上次不同时，追加到请求消息末尾。
+  // append-only 注入：只在回合第一步、内容与上次不同时，追加到请求消息末尾（前缀不动 ⇒ 缓存可命中）。
   const lastInjected = new Map<string, string>();
   ctx.on?.('agent/pre-step', async (payload, next) => {
     const decision = (await next()) as { kind?: string; messages?: readonly unknown[] };
     if (decision?.kind === 'reject' || decision?.messages === undefined) return decision;
     const step = (payload as { step?: number } | undefined)?.step ?? 1;
     if (step !== 1) return decision;
-    const text = renderInjection(readMemories(memory.file), memory);
+    const text = renderInjection(memory);
     if (text === '') return decision;
     const sessionId =
       ((payload as { agent?: { session?: { id?: unknown } } } | undefined)?.agent?.session?.id as string | undefined) ?? 'default';

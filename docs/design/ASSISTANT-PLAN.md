@@ -243,7 +243,10 @@
     `source.kind = 'mypi-memory'` 的 user 消息（用 `declare module` 扩展 `MessageSourceMap`，与 `time-context` 同法）；
   - 验证：`test/memory.mjs` 断言"写入生效 / 每回合只注入一次 / **第一条 user 消息逐字不变**"⇒ 前缀稳定、缓存可命中。
   verify 现 **12 项全绿**。
-- **未做**：M0.5 裁体积（用户决定暂缓）、M0.6 品牌（暂缓）、autopilot 独有部分、TUI 更换、Windows。
+- **功能回填 ④：记忆 P1（✅ schema 对齐 + 迁移 127 条）**——见 [`SELF-OPTIMIZATION.md`](SELF-OPTIMIZATION.md)：
+  存储改为与原项目同 schema、三级去重、脱敏、环境可见性、token 预算注入；128 条历史迁入仓库内 `assistant/memory/`。
+  **P2/P3 待做**：BM25/MMR 检索、会话摘要、自动入库脚本、生命周期治理、教训挖掘、用量统计、autopilot。
+- **未做**：M0.5 裁体积（暂缓）、M0.6 品牌（暂缓）、TUI 更换、Windows。
 
 ### 记忆注入会不会打穿前缀缓存？——会，如果注入方式错了
 

@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（266 条）
+## 决策台账（267 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ 记忆迁移 P1：**scheme 对齐原项目**并保住 127 条历史（自我优化闭环不破） · **用户强调（本轮）**：自我优化系统是原项目最重要的独有功能，还包含技能使用优化、信息记录与自动化； · 数字: 128 条 / 97 条 / 76% / 63 KB
 - `DECISIONS.md` · [2026-10-18] ★ 功能回填③：长期记忆 —— 注入面查清（`agent/pre-step` 末尾追加），并证明**前缀稳定** · **先答"怎么写进去"（✓ 读代码确认）**：DSH 的 `dsh-time-context` 就是官方样板—— · 数字: 12 条
 - `DECISIONS.md` · [2026-10-18] ★ 功能回填②：tmux（5 工具，前缀保护）+ 记忆注入的缓存结论（**不能进 system prompt**） · **tmux（✓ 完成）**：DSH 只有只读的 `tmux-context`，没有驱动 ⇒ 按"简单档"自己补 · 数字: 5 个 / 83 次 / 61.1% / 39%
 - `DECISIONS.md` · [2026-10-18] ★ 功能回填①：网络搜索 —— **DSH 原生不需要额外 API**，但一次搜索=一轮模型调用；改用 SearXNG 接缝 · **先回答用户的问题（✓ 核实）**：DSH 的网络搜索**不需要额外 API key**。
@@ -565,7 +566,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（261 条）
+## 设计文档（266 条）
 
 - `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
 - `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
@@ -741,6 +742,11 @@ node
 - `docs/design/SECURITY-SCAN.md` · 五、落点文件清单
 - `docs/design/SECURITY-SCAN.md` · 六、怎么验证（**含自证**，这是必须的） · 1. **自证（恶意样本必须红）**：用业界标准测试串 **EICAR**
 - `docs/design/SECURITY-SCAN.md` · 七、诚实的局限（写清，避免给人虚假安全感） · - **必然漏报**：L0/L1 是**结构性检查**，不是病毒特征库；**没有 ClamAV/YARA 就没有真正的"杀毒"**。
+- `docs/design/SELF-OPTIMIZATION.md` · 1. 四条闭环（不是一条） · 四条的连接方式：**记录闭环**产出证据 → **记忆/知识闭环**把证据沉淀为条目 → **回忆闭环**在会话开始注入 → **自动化闭环**定期驱动前两者。
+- `docs/design/SELF-OPTIMIZATION.md` · 2. 迁移契约（不变量，改动前必须三思） · 1. **schema 不换**：`entries.json` 保持原字段（`category/title/content/tags/confidence/source/recurrence/createdAt/updatedAt/acce · 数字: 127 条 / 61.1%
+- `docs/design/SELF-OPTIMIZATION.md` · 3. 数据现状（迁移前实测） · ⚠️ 只看"工具调用次数"会得出"记忆没人用"的错误结论（`memory_store` 只有 2 次）——**记忆的引擎是脚本自动入库**，不产生工具调用。 · 数字: 128 条 / 76% / 19 条 / 63 KB
+- `docs/design/SELF-OPTIMIZATION.md` · 4. P1（已完成） · - `assistant/memory/store.ts`：与原项目同 schema 的存储（原子写）、`scrubSecrets`、三级去重合并、环境可见性、自动互链、评分与**token 预算注入**。 · 数字: 128 条 / 1 条 / 39 条
+- `docs/design/SELF-OPTIMIZATION.md` · 5. P2 / P3（待做） · - **P2**：检索升级为 BM25 + 质量分 + MMR + 会话轮转（原 `recall/retrieval.ts` 267 行）；会话摘要（`summaries.json`）。 · 数字: 2 次
 - `docs/design/SOL-PI-BORROW.md` · 0. 全局纪律（每一项都必须满足，不是可选项） · 来自 SoL-Pi 的做法，也是我们这几轮已经在用的：
 - `docs/design/SOL-PI-BORROW.md` · 1. 自主推进的边界（用户已去休息，这条最重要） · **可以直接做**：
 - `docs/design/SOL-PI-BORROW.md` · P1 目标完成语义：区分 verified / declared / advisory ✅ **已完成（2026-10-08）** · **SoL-Pi 依据**：P 族发现——"Separate verified, declared, and advisory completion modes"、

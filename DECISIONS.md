@@ -2,6 +2,34 @@
 
 ## 格式
 
+### [2026-10-18] ★ 记忆迁移 P1：**scheme 对齐原项目**并保住 127 条历史（自我优化闭环不破）
+
+**用户强调（本轮）**：自我优化系统是原项目最重要的独有功能，还包含技能使用优化、信息记录与自动化；
+迁移必须小心、做好适配，**不要破坏闭环**。
+
+**先纠正上一轮的错判（✓ 诚实修正）**：我用"工具调用次数"判断记忆没人用，这是错的。
+`portable/memory/entries.json` 实际有 **128 条**（solutions 70 / reference 47 / fact 11），其中
+**97 条（76%）来自自动入库**（knowledge-fetch 48 + auto 44 + digest 5）——引擎是脚本，不产生工具调用。
+另有 summaries 63 KB、检索台账 6 条、干预记录 5 条、`recurrence>1` 19 条、termux 专用 3 条。
+
+**落地（✓ P1）**：
+- `assistant/memory/store.ts`：与原项目**同 schema**（13 个字段）的存储，原子写；`scrubSecrets` 全套模式；
+  **三级去重**（标题 → 内容 hash → jaccard>0.7 近似，合并时 confidence 取最大 / recurrence+1 / tags+environments 并集）；
+  自动互链（标题 bigram ≥0.34）；环境可见性；评分 + **token 预算注入**。
+- 迁移脚本 `assistant/scripts/import-memory.ts`（esbuild 到 `dist/import-memory.mjs`）：
+  **实测 128 → 127**（1 条按标题合并），类别/来源/环境/时间戳全部保留，39 条保留互链。
+- 数据落在 `assistant/memory/entries.json`（**进仓、随仓库便携**），不再放 `.run/` 临时区。
+- 工具升级为 `memory_store{category,title,content,tags,confidence,environment}` / `memory_search` / `memory_stats`。
+- 新增 `test/memory-store.mjs`（schema/条数/字段完整性，实际输出 127 条、0 缺字段、环境 all+termux）
+  与既有 `test/memory.mjs`（写入 / 每回合只注入一次 / **首条 user 消息逐字不变**）；verify **13 项全绿**。
+
+**契约（✓ 写进 `docs/design/SELF-OPTIMIZATION.md`）**：schema 不换、注入只追加、写入先脱敏、环境可见性、
+三级去重、数据进仓、淘汰只出候选不自动删。四条闭环（记忆 / 知识技能 / 记录 / 自动化）与数据落点均已成文。
+
+**✗ 待做（P2/P3）**：BM25+MMR 检索、会话摘要；`knowledge-ingest`/`memory-store` 自动入库脚本、
+`memory-lifecycle` 治理报告、`lesson-miner` 教训挖掘；工具/子代理/上下文用量统计；autopilot 自动化。
+**明确不做**：`/memory` 命令、`ctx_*` 工具（用户确认几乎不用 / 实测 0–2 次）。
+
 ### [2026-10-18] ★ 功能回填③：长期记忆 —— 注入面查清（`agent/pre-step` 末尾追加），并证明**前缀稳定**
 
 **先答"怎么写进去"（✓ 读代码确认）**：DSH 的 `dsh-time-context` 就是官方样板——

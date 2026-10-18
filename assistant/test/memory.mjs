@@ -9,7 +9,7 @@ import { HostClient } from '../src/transport.mjs';
 
 const url = process.argv[2];
 const mockLog = process.argv[3] ?? '.run/mock-requests.log';
-const memoryFile = process.argv[4] ?? '.run/memory.jsonl';
+const memoryFile = process.argv[4] ?? '.run/memory-test.json';
 if (!url) throw new Error('用法：node test/memory.mjs "<宿主地址>" <mock 日志> <记忆文件>');
 
 const readLog = () => (existsSync(mockLog) ? readFileSync(mockLog, 'utf8').trim().split('\n').filter(Boolean) : []);
@@ -46,16 +46,17 @@ await turn('继续');
 const after = readLog().slice(beforeCount);
 
 const stored = existsSync(memoryFile) ? readFileSync(memoryFile, 'utf8') : '';
+const storedOk = stored.includes('项目代号 falcon');
 const secondTurnLines = after.filter((line) => Number(field(line, 'tools')) > 0);
 const injected = secondTurnLines.some((line) => Number(field(line, 'injections')) === 1);
 const firstUserStable =
   secondTurnLines.length > 0 &&
   new Set([field(secondTurnLines[0], 'firstUser'), ...secondTurnLines.map((l) => field(l, 'firstUser'))]).size === 1;
 
-const ok = stored.includes('项目代号 falcon') && injected && firstUserStable && text !== '';
+const ok = storedOk && injected && firstUserStable && text !== '';
 console.log(JSON.stringify({
   sessionId,
-  stored: stored.includes('项目代号 falcon'),
+  stored: storedOk,
   injectedExactlyOnce: injected,
   firstUserStable,
   reply: text.slice(0, 20),
