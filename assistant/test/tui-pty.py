@@ -7,13 +7,21 @@ import select
 import sys
 import time
 
-url = sys.argv[1]
-prompt = sys.argv[2] if len(sys.argv) > 2 else '只回一个字：好'
-expect = sys.argv[3] if len(sys.argv) > 3 else '好'
+args = sys.argv[1:]
+via_launcher = bool(args) and args[0] == '--via-launcher'
+if via_launcher:
+    args = args[1:]
+url = args[0] if args else ''
+prompt = args[1] if len(args) > 1 else '只回一个字：好'
+expect = args[2] if len(args) > 2 else '好'
 
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pid, fd = pty.fork()
 if pid == 0:
-    os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    os.chdir(root)
+    if via_launcher:
+        # 走文档里写的那一条指令（宿主已在跑时不会重启），而不是直接调 bin/
+        os.execvp('bash', ['bash', 'scripts/mypi.sh', 'tui'])
     os.execvp('node', ['node', 'bin/tui.mjs', url])
 
 out = b''

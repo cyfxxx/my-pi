@@ -404,6 +404,35 @@ if [ -f scripts/check-md-tables.mjs ]; then
   fi
 fi
 
+# ── M. assistant/（拼接架构那一层）的静态守门 ──
+# ★ 为什么需要：`custom/` 与 `dsh/` 都有各自 tsconfig 守门，而 assistant/ 是新增的一层
+#   （原生客户端 + pi-tui 渲染 + 自写插件），不纳入就等于"新代码没人拦"。
+# ★ 为什么只做静态检查（不跑 verify-m1.sh）：真跑要起宿主 + 占端口，会打扰正在用的实例；
+#   端到端验收是 `assistant/scripts/verify-m1.sh`，由人和 pre-push 之外的场景显式触发。
+if [ -f assistant/tsconfig.json ] && [ -d node_modules/@deepseek-ai ]; then
+  if npx tsc -p assistant/tsconfig.json >/tmp/assistant-tsc.out 2>&1; then
+    ok "assistant 插件类型检查通过（assistant/tsconfig.json）"
+  else
+    bad "assistant 插件类型检查失败（见 /tmp/assistant-tsc.out）"
+  fi
+  # ★ 编码 CODING-TRAPS #23：插件就近 package.json 有 name 缺 version ⇒ 每个 DeepSeek 请求
+  #   都以 REQUEST_EXTENSION 静默失败。这条用一行断言把那次事故钉住。
+  if "$NODE_BIN" -e "const p=require('./assistant/package.json');process.exit(p.name&&p.version?0:1)"; then
+    ok "assistant/package.json 有 name+version（TRAPS #23 的硬条件）"
+  else
+    bad "assistant/package.json 缺 name 或 version ⇒ 在线模型会以 REQUEST_EXTENSION 全线失败"
+  fi
+  if node --check assistant/src/transport.mjs >/dev/null 2>&1 \
+     && node --check assistant/src/tui.mjs >/dev/null 2>&1 \
+     && node --check assistant/spike/mock-openai.mjs >/dev/null 2>&1; then
+    ok "assistant 的 .mjs 语法检查通过"
+  else
+    bad "assistant 的 .mjs 有语法错误（node --check 复现）"
+  fi
+else
+  note "assistant 静态守门跳过（缺 assistant/tsconfig.json 或 node_modules/@deepseek-ai）"
+fi
+
 echo ""
 if [ "$FAIL" -eq 0 ]; then
   echo "🎉 约定守门全部通过"

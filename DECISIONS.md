@@ -46,6 +46,14 @@ esbuild 打成 `assistant/plugin/dist/plugin.mjs`（`--packages=external`），
 **在线路线本轮复验（✓）**：`{"reply":"好","mockCallsBefore":"0","mockCallsAfter":"0","wentOnline":true}`
 —— 显式选 `deepseek-official/deepseek-flash`，真模型返回、本机 mock 端点**零调用**。
 
+**守门（✓）**：`scripts/check-conventions.sh` 新增 **M 段**（条件跑，缺依赖明确跳过）：
+① `tsc -p assistant/tsconfig.json` 插件类型检查；② `assistant/package.json` 必须 name+version
+（把 TRAPS #23 那次事故钉成断言）；③ 三个 `.mjs` 的 `node --check`。
+端到端验收仍是 `assistant/scripts/verify-m1.sh`（要起宿主+占端口，**不进** pre-commit，避免打扰在跑的实例）。
+
+**验收口径升级（✓）**：第 ③ 步改成**走文档里那条指令**（`assistant/scripts/mypi.sh tui`，在真实 pty 里），
+不再直接调 `bin/tui.mjs` ⇒ "一条指令启动 TUI"从文档承诺变成断言。
+
 **✗ 仍未做**：终端前端的工具调用**可视化/审批**（现在只有事件流里的 `tool/call`、`tool/result`）；
 Web 端品牌替换；opencode 外部 agent 接入；浏览器人工确认。
 

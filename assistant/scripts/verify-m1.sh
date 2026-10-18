@@ -56,7 +56,7 @@ URL="$(cat .run/url 2>/dev/null || true)"
 
 say "③ 终端前端（真实 pty）"
 MYPI_PROVIDER=local MYPI_MODEL=mock-local \
-  timeout 60 python3 test/tui-pty.py "$URL" "你是谁" "我是本地模型" || fail=1
+  timeout 90 python3 test/tui-pty.py --via-launcher "$URL" "你是谁" "我是本地模型" || fail=1
 
 say "④ 两端同步"
 timeout 60 node test/sync.mjs "$URL" || fail=1
