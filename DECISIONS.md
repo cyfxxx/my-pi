@@ -2,6 +2,31 @@
 
 ## 格式
 
+### [2026-10-18] ★ 功能回填①：网络搜索 —— **DSH 原生不需要额外 API**，但一次搜索=一轮模型调用；改用 SearXNG 接缝
+
+**先回答用户的问题（✓ 核实）**：DSH 的网络搜索**不需要额外 API key**。
+`dsh-web-search-deepseek` 复用 `DEEPSEEK_API_KEY`（或 DeepSeek 账号登录），走 Anthropic 兼容端点
+（`DEEPSEEK_SEARCH_BASE_URL`，默认 `https://api.deepseek.com/anthropic/v1` + `/messages`）；
+`dsh-web-fetch-http` 是匿名 HTTP 抓取、无 key。**代价**：官方搜索把一次搜索做成**一整轮模型调用**
+（延迟 + 生成 token 都按模型轮次算），所以不当作默认首选。
+
+**决策（结合使用，✓ 已落地）**：`ctx.web` 是官方接缝（`registerSearchProvider` + `searchProvider` 选择策略），
+把本仓原有的 **SearXNG** 作为 provider 挂进去，而不是 fork 或替换工具：
+- 新增 `assistant/plugin/searxng.ts`：`id: searxng`、`available()` 只做本地判断（契约要求不发网络请求）、
+  `search()` 打 `SEARXNG_URL/search?format=json&q=…`（默认 `http://127.0.0.1:8889`，超时 30s，与原项目一致）；
+- `entry.ts` 用 `ctx.inject(['web'], child => child.web.registerSearchProvider(...))` 注册（服务不在就不注册，不报错）；
+- `profile/mypi.patch.yml` 把 `web.searchProvider` 钉成 `searxng`；切回官方：`DSH_WEB_SEARCH_PROVIDER=deepseek-official`。
+
+**验证（✓ 真链路）**：新增 `test/web-search.mjs` + `spike/mock-searxng.mjs`（最小 SearXNG 替身），
+verify 第 ⑨ 步：mock 模型发 `web_search({queries:["deepseek harness"]})` ⇒ **mock SearXNG 收到 `q=deepseek harness`**
+⇒ 工具结果回灌 ⇒ 回复入流。主验收 **10 项全绿**。
+
+**踩到的两个坑（✗→✓）**：① `web_search` 的参数是 `queries`（数组）不是 `query` —— 用错会得到
+`missing required property "queries"`；② patch 里的 `!!js` 表达式在 `--dump-config` 中**不会被求值**（原样打印），
+所以环境变量覆盖改用服务自带的 `DSH_WEB_SEARCH_PROVIDER`，而不是在 YAML 里写表达式。
+
+**✗ 未做**：其余功能回填（tmux / memory / autopilot 的独有部分）、M0.5 裁体积（用户暂缓）、M0.6 品牌（暂缓）。
+
 ### [2026-10-18] ★ M0.3b 收口：本地窗口靠 **agent preset 瘦身**（工具面 5201→1423）+ 压缩内联预算（0→3 次压缩）
 
 **用户批准继续执行 M0**；目标含 M0.3b（本地压缩档位），上一轮只落了配置、行为判据未过。

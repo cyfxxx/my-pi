@@ -10,12 +10,18 @@
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { defineTool } from '@deepseek-ai/dsh-tools';
+import { createSearxngProvider, resolveSearxngConfig } from './searxng';
 
 export const name = 'mypi-assistant';
 
-/** 宿主 ctx 的最小面：只声明我们真正会用的两个方法，避免 `any`。 */
+/** 宿主 ctx 的最小面：只声明我们真正会用的方法，避免 `any`。 */
 interface HostContext {
   get?: (service: string) => unknown;
+  /** cordis 的服务注入：服务就绪后才回调（未就绪则永不调用，不报错）。 */
+  inject?: (
+    services: readonly string[],
+    callback: (child: { web: { registerSearchProvider: (provider: unknown) => () => void } }) => void,
+  ) => unknown;
   [key: string]: unknown;
 }
 
@@ -45,6 +51,12 @@ function notesPath(): string {
 
 export function apply(ctx: HostContext): void {
   const tools = toolsOf(ctx);
+  // 搜索接缝：把 SearXNG 注册成 `ctx.web` 的 provider（官方扩展点，不 fork）。
+  // 选哪个 provider 由 profile 的 `web.searchProvider` 或 `DSH_WEB_SEARCH_PROVIDER` 决定。
+  const searxng = resolveSearxngConfig();
+  ctx.inject?.(['web'], (child) => {
+    child.web.registerSearchProvider(createSearxngProvider(searxng));
+  });
   tools.register(
     defineTool({
       name: 'mypi_note',

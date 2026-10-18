@@ -41,18 +41,38 @@ const server = createServer(async (req, res) => {
           : ''))
       .join('\n');
     const wantsNote = /笔记|记一条|note/i.test(userText);
+    const wantsSearch = /搜索|搜一下|search/i.test(userText);
     appendFileSync(
       LOG,
       `${new Date().toISOString()}\tmodel=${parsed.model}\tmessages=${parsed.messages?.length}\ttools=${tools.length}`
         + `\ttoolFace=${toolNames.join(',')}\tlastRole=${last?.role ?? '-'}\ttoolResult=${toolResult}`
-        + `\tuserText=${JSON.stringify(userText).slice(0, 120)}\n`,
+        + `\tuserText=${JSON.stringify(userText).slice(0, 120)}`
+        + `\ttoolMsg=${JSON.stringify(typeof last?.content === 'string' ? last.content : (last?.content ?? '')).slice(0, 200)}\n`,
     );
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
     const id = `chatcmpl-mock-${Date.now()}`;
     const created = Math.floor(Date.now() / 1000);
     const base = { id, object: 'chat.completion.chunk', created, model: parsed.model ?? 'mock-local' };
     sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
-    if (!toolResult && wantsNote && toolNames.includes('mypi_note')) {
+    if (!toolResult && wantsSearch && toolNames.includes('web_search')) {
+      sse(res, { ...base, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] });
+      sse(res, {
+        ...base,
+        choices: [{
+          index: 0,
+          delta: {
+            tool_calls: [{
+              index: 0,
+              id: 'call_mock_search',
+              type: 'function',
+              function: { name: 'web_search', arguments: JSON.stringify({ queries: ['deepseek harness'] }) },
+            }],
+          },
+          finish_reason: null,
+        }],
+      });
+      sse(res, { ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 } });
+    } else if (!toolResult && wantsNote && toolNames.includes('mypi_note')) {
       // 第一次请求：让"模型"调用我们的插件工具，从而真的走一遍工具循环
       sse(res, {
         ...base,

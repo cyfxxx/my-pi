@@ -218,7 +218,17 @@
   或走 DSH 的延迟加载（`deferLoading`）。压缩档位是第二杠杆。
   ⇒ 另：`messageTokens` 与实际输出对不上（40 轮×370 字，`sessionStats.outputTokens=14800`，但投影只有 4844）——
   计量对中文疑似按 ~3 字符/token 估，**偏乐观**；这意味着"压力表看着安全，实际可能已经超窗"。**待进一步核实（✗）**。
-- **未做**：M0.5 裁体积、M0.6 品牌、功能回填、TUI 更换、Windows。
+- **功能回填 ①：网络搜索（✅ 完成）**——先回答了"DSH 要不要额外 API"：
+  **不要**。`dsh-web-search-deepseek` 复用 `DEEPSEEK_API_KEY`（或 DeepSeek 账号登录），走 Anthropic 兼容端点
+  （`DEEPSEEK_SEARCH_BASE_URL`，默认 `https://api.deepseek.com/anthropic/v1`）；`dsh-web-fetch-http` 匿名、无 key。
+  代价是**一次搜索 = 一整轮模型调用**（延迟与 token 都按模型轮次算），所以采用"结合使用"：
+  - 把本仓原有的 **SearXNG** 以官方接缝形式注册进 `ctx.web`（`registerSearchProvider`，id `searxng`，
+    `assistant/plugin/searxng.ts`），在 profile 里把 `web.searchProvider` 钉到 `searxng`；
+  - 想切回 DSH 原生搜索：`DSH_WEB_SEARCH_PROVIDER=deepseek-official`；
+  - 端点沿用原项目口径：`SEARXNG_URL`（默认 `http://127.0.0.1:8889`），超时 30s；
+  - verify 新增第 ⑨ 步：mock 模型发 `web_search({queries:[…]})` ⇒ mock SearXNG 收到 query ⇒ 工具结果回灌 ⇒ 回复入流
+    （`searxngHit:true`）。主验收现 **10 项全绿**。
+- **未做**：M0.5 裁体积（用户决定暂缓）、M0.6 品牌（暂缓）、其余功能回填（tmux/memory/autopilot）、TUI 更换、Windows。
 
 **M1/M2 沿用第 10 节**；M0 完成后立刻做 M1（TUI 插件验证），因为它是"备用界面"的可行性前提。
 

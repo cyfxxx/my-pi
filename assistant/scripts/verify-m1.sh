@@ -15,6 +15,7 @@ export MYPI_HOME="$HOME_DIR" MYPI_PORT="$PORT"
 export MY_PI_DSH_EXTRA_PATCH="$ROOT/profile/local-provider.patch.yml"   # 插件由 mypi.sh 默认挂上
 export LOCAL_MOCK_KEY="sk-local-dummy"
 export MYPI_NOTES_FILE="$ROOT/.run/notes.md"
+export SEARXNG_URL="http://127.0.0.1:8899"
 
 fail=0
 say() { printf '\n=== %s ===\n' "$1"; }
@@ -35,10 +36,15 @@ pids=$(pgrep -f "^node .*mock-openai\.mjs" || true)
 [ -n "$pids" ] && kill $pids 2>/dev/null
 sleep 1
 : >"$MOCK_LOG"
+: >"$ROOT/.run/searxng-requests.log"
+pids=$(pgrep -f "^node .*mock-searxng\.mjs" || true)
+[ -n "$pids" ] && kill $pids 2>/dev/null
+setsid node "$ROOT/spike/mock-searxng.mjs" 8899 "$ROOT/.run/searxng-requests.log" >.run/mock-searxng.log 2>&1 &
+SEARXNG_PID=$!
 node spike/mock-openai.mjs 11435 "$MOCK_LOG" "我是本地模型，在你机器上跑。" >.run/mock.log 2>&1 &
 MOCK_PID=$!
 cleanup() {
-  kill "$MOCK_PID" 2>/dev/null
+  kill "$MOCK_PID" ${SEARXNG_PID:-} 2>/dev/null
   node "$ROOT/host/launch.mjs" stop >/dev/null 2>&1 || true
   # 兜底：清掉任何以我们 profile 名起的宿主
   local pids; pids=$(pgrep -f "^node .*--profile mypi" || true)
@@ -88,7 +94,10 @@ else
   echo "✗ Web 入口异常（HTTP $WEB_CODE）"; fail=1
 fi
 
-say "⑨ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
+say "⑨ 网络搜索（SearXNG 接缝）"
+timeout 120 node test/web-search.mjs "$URL" "$ROOT/.run/searxng-requests.log" || fail=1
+
+say "⑩ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
 timeout 60 node -e "
 import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
   const c = await new HostClient({ url: process.argv[1] }).connect();
@@ -98,5 +107,5 @@ import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
 });" "$URL" && echo "✓ 默认模型已复原为 online" || { echo "✗ 复原失败"; fail=1; }
 
 say "结果"
-if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（9 项）"; else echo "❌ 有红项（见上）"; fi
+if [ "$fail" -eq 0 ]; then echo "🎉 验收全部通过（10 项）"; else echo "❌ 有红项（见上）"; fi
 exit "$fail"

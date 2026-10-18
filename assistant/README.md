@@ -49,6 +49,17 @@ MYPI_PROVIDER=local MYPI_MODEL=mock-local assistant/scripts/mypi.sh
 `profile/local-provider.patch.yml` 是「本地路线」的样板（指向一个假的 OpenAI 兼容端点），
 把 `baseURL` 换成 `http://127.0.0.1:11434/v1` 就是 Ollama。
 
+## 网络搜索
+
+官方 `web_search` 由 DSH 的 `ctx.web` 接缝提供，**默认后端已换成我们自己的 SearXNG**（本地实例、无模型轮次开销）：
+
+```bash
+SEARXNG_URL=http://127.0.0.1:8889 assistant/scripts/mypi.sh      # 默认端点即这个
+DSH_WEB_SEARCH_PROVIDER=deepseek-official assistant/scripts/mypi.sh   # 切回 DSH 原生（复用 DEEPSEEK_API_KEY）
+```
+
+原生后端**不需要额外 API key**，但一次搜索 = 一整轮模型调用（慢、耗 token），所以默认不用它。
+
 ## 可执行验收
 
 ```bash

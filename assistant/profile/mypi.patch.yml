@@ -1,5 +1,12 @@
-# 我们自己的 profile 覆盖层：把自研插件挂进宿主。
+# 我们自己的 profile 覆盖层。
 # `name` 相对于本文件所在目录（DSH 的 patch 约定）。
 - insert:
     - id: mypi-assistant
       name: "../plugin/dist/plugin.mjs"
+
+# 搜索接缝：默认用本地 SearXNG（我们的 provider）；要切回 DSH 原生 DeepSeek 搜索：
+#   MYPI_SEARCH_PROVIDER=deepseek-official
+- id: web
+  config:
+    # 切回 DSH 原生 DeepSeek 搜索：DSH_WEB_SEARCH_PROVIDER=deepseek-official
+    searchProvider: searxng
