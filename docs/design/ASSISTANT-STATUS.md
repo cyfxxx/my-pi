@@ -1,45 +1,64 @@
-# 拼接分支现状：跑的是什么、离构想差多少、本地模型该怎么管上下文
+# 拼接分支现状：跑的是什么、已完成到哪、离构想差多少
 
-> 记录时间：2026-10-18。分支 `feat/private-assistant`（基于合并后的 `4453d3965`，与回退后的 `main` 不同线）。
-> 本文是**现状快照**，不是目标；目标见 [ASSISTANT-PLAN.md](ASSISTANT-PLAN.md)，接缝规则见 [PRIVATE-ASSISTANT.md](PRIVATE-ASSISTANT.md)。
+> 记录时间：2026-10-18（深夜快照）。分支 `feat/private-assistant`，自包含（依赖 `archive/dsh-on-main` 的只有历史提交）。
+> 目标是 [ASSISTANT-PLAN.md](ASSISTANT-PLAN.md)，接缝规则见 [PRIVATE-ASSISTANT.md](PRIVATE-ASSISTANT.md)，
+> 自我优化闭环见 [SELF-OPTIMIZATION.md](SELF-OPTIMIZATION.md)，压缩改造见 [COMPACTION-INTENT.md](COMPACTION-INTENT.md)。
 
-## 1. 现在实际跑的七层
+## 1. 现在实际跑的六层
 
 | # | 层 | 是什么 | 归属 |
 |---|---|---|---|
 | 1 | 运行时 | 仓内 vendored DSH `0.2.0-rc.2`（289 包，`runtime/<平台>/ext/dsh`，gitignored） | 上游 |
-| 2 | 启停 | `scripts/dsh-launch.sh` + profile `mypi-web` + `dsh/profile/my-pi.patch.yml` | **来自 DSH 那条线** |
-| 3 | 旧适配层 | `my-pi` 插件：facade + 12 个 feature（54 工具 / 12 命令 / 18 钩子） | 待决策去留 |
-| 4 | 新插件 | `assistant/plugin/entry.ts`（72 行，只注册 `mypi_note`，只依赖 `@deepseek-ai/dsh-tools`） | 新写 |
-| 5 | 前端 | DSH React GUI（零改动）+ `assistant/src/tui.mjs`（183 行，pi-tui 渲染） | 上游 + 新写 |
-| 6 | 模型 | `dsh-llm-deepseek`（在线）+ `dsh-llm-pi-ai`（本地/任意 OpenAI 兼容端点） | 上游 |
-| 7 | 客户端传输 | `assistant/src/transport.mjs`（126 行：`?token=`→cookie、`POST /api/<ep> {args:{…}}`、`WS /api/remote.mux`） | 新写 |
+| 2 | 启停 | `assistant/host/launch.mjs`（自包含：建 profile、拼 patch、起停、抓 URL） | 本仓 |
+| 3 | 插件 | `assistant/plugin/`：`mypi_note` + tmux×5 + memory×3 + SearXNG provider + 意图账本/摘要/用量钩子（≈1.2k 行，只依赖 `dsh-tools`/`dsh-llm`） | 本仓 |
+| 4 | 记忆 | `assistant/memory/`：store（同原项目 schema）+ retrieval（BM25/质量/MMR）+ intent + summaries + 四个 headless 脚本 | 本仓 |
+| 5 | 前端 | DSH Web（零改动）／社区 TUI `@deepseek-harness-tui/dsh-tui`（可装、可回退）／`mypi.sh tui` 自带 pi-tui 客户端（回退） | 上游 + 本仓 |
+| 6 | 模型 | `dsh-llm-deepseek`（在线）+ `dsh-llm-pi-ai`（本地/OpenAI 兼容） | 上游 |
 
-**必须直说的一点**：第 3 层还在。`mypi.sh` 借的是 `scripts/dsh-launch.sh`，而它默认挂 `my-pi.patch.yml`
-⇒ 终端里绝大多数工具来自旧的 facade 适配层，不是新插件。**所以现在是"新前端 + 旧适配层"，
-不是干净拼接。** 另外第 2 层来自已回退的 DSH 线，分支目前**依附**于 `archive/dsh-on-main`。
+**已不再有 facade**：`--with-facade` 只剩对照用途；默认组合 27 工具（+我们新加的 8 个 = 35），verify 第⑦步断言之。
 
-## 2. 对照最初的构想
+## 2. 已完成（都有断言）
 
-| 构想 | 现状 | 判断与原因 |
+| 里程碑 | 内容 | 断言 |
 |---|---|---|
-| DSH 插件系统 | 脊柱：会话/工具/权限/持久化/压缩都在宿主，两端共享一份 | ✅ 成立；这是唯一不可让的部分（两份会话日志 = 两个事实源） |
-| DSH Web UI | `dsh web` 直接用，一行没改 | ✅ 成立；品牌仍 `DeepSeek Harness`（`dsh-brand` 接缝，未做） |
-| pi 的分层架构 | **没采用**；用的是 pi 的**包**（`pi-ai`、`pi-tui`），不是分层方式 | ⚠️ DSH 的 cordis 本身就是分层（服务注册 + `inject` + fiber）；再叠一层 features/adapters 是**两套权限模型**，出问题恰在两套规则的缝上；且这套分层是 my-pi 自创，不是 pi 上游的 |
-| pi 的 TUI | 用 `pi-tui`（纯渲染库，依赖只有 `marked` + `get-east-asian-width`） | ⚠️ 渲染层可拿；pi 的 **TUI 应用**绑定 pi 自己的会话/扩展模型，拿过来等于拉进第二个 agent loop |
-| opencode 的 TUI | 未接 | ❌ 它是 **opencode server 协议的客户端**（server + protocol + client + tui），数据层与 DSH 不同；接它要重写数据层，比用 `pi-tui` 自写更贵。干净用法是**外部 agent**（ACP/MCP），但那样它看它自己的会话，不共享 |
+| M0 断奶 | 自包含启动器 + 无 facade | ①–⑧ |
+| M0.1 便携 | 单目录运行、profile 由模板生成、凭据复制 | ②③ |
+| 网络搜索 | SearXNG 挂进 `ctx.web`（官方无需额外 API，但一次搜索=一轮模型） | ⑨ |
+| tmux | 5 工具、`mypi-` 前缀保护 | ⑩ |
+| 记忆 P1 | 同 schema + 迁移 128→127 条 + 三级去重/脱敏/环境/预算注入 | ⑬⑭ |
+| 记忆 P2 | BM25×质量分 → MMR → 来源轮转；确定性会话摘要 | ⑪⑰ |
+| 记忆 P3 | headless 入库/知识订阅/生命周期报告/教训挖掘 + 定时维护脚本 | ⑫ |
+| 压缩① | 意图账本（逐字、过滤推进语、折叠、预算内 append-only） | ⑯ |
+| 记录闭环 | 工具用量（名字/耗时/成败，不记参数） | ⑮ |
+| M1 TUI | 社区 TUI 在 DSH 0.2.0-rc.2 上真跑通 + 共享 DSH_HOME 接入 | ⑱（可 SKIP） |
+| M2 探针 | Termux/陌生环境一条命令自检（本机实测：PRoot+glibc 可跑） | 手动 |
 
-## 3. 待解决的问题（按代价排序）
+## 3. 怎么跑
 
-1. **旧适配层去留**（最大）：留 facade ⇒ 54 工具里大半是"把 pi 能力翻译到 DSH"＝继续修修补补；
-   砍 ⇒ 12 个 feature 要么重写成 DSH 插件，要么放弃。二选一，没有中间态。
-2. **启动脚本归属**：把 ~100 行宿主启动从 `scripts/dsh-launch.sh` 搬进 `assistant/`，
-   让分支**自包含**，不再依附已回退的线。
-3. **工具呈现**：工具只注册一次，但"怎么画"每个前端各写一遍。应以 `output.render` / `presentationMeta`
-   定义一份共享呈现，而不是 TUI / Web 各画各的。
-4. **会话格式**：DSH 的 append-only 日志 vs pi 的 JSONL。要"两套界面读同一份历史"，只能是 DSH 格式，
-   pi 历史需要迁移器。
-5. **便携体积**：DSH 289 包 ≈ 523 MB；组合越多包越沉。
+```bash
+assistant/scripts/mypi.sh web            # 起宿主并给带 token 的 URL（数据在 assistant/.run/home）
+assistant/scripts/mypi.sh tui            # 优先社区 TUI；MYPI_TUI=builtin 回退到 pi-tui 客户端
+assistant/scripts/setup-tui.sh           # 安装社区 TUI 并把本仓插件挂进它的 profile
+assistant/scripts/verify-m1.sh           # 19 项验收（约 6–8 分钟）
+assistant/scripts/maintain.sh [--ingest] # 定时维护：生命周期报告 + 教训挖掘 + 摘要修剪
+bash assistant/scripts/probe-termux.sh   # 陌生环境探针
+```
+
+## 4. 已知缺口（按代价）
+
+1. **压缩第②步**（自定义 `CompactionEngine`）：接口已查清（`compactIfNeeded/compactNow/compactRegion` 三个抽象方法），
+   但要自己实现"选区间 → 抽账本 → 只压工作历史 → 提交 checkpoint"，约 400–600 行；当前只有第①步（账本注入）。
+2. **autopilot 自动化**：只剩本地 cron 式维护（`maintain.sh`），没有原项目的看门狗/种子/会话重启。
+3. **摘要精炼**：现在是确定性摘要，`decisions/facts/prefs/lessons` 留空，未接 LLM 精炼。
+4. **品牌（M0.6）与体积（M0.5）**：按你的决定暂缓。
+5. **TUI 功能面差异**：社区 TUI 能跑，但"哪些面板在 TUI 里可用/不可用"还没盘点。
+
+## 5. 合并就绪判断
+
+- 主验收 **19 项全绿**（`verify-m1.sh`），黄金任务与约定守门均通过；
+- 分支**自包含**：起停、插件、记忆、脚本、文档都在 `assistant/` 与 `docs/`，不再依赖已回退的 DSH 线；
+- 数据**进仓**：记忆库 `assistant/memory/entries.json`（127 条）、摘要与用量在 `.run/`（gitignored）；
+- 合入 `main` 前只剩"人决定"的事：是否要压缩②、autopilot、品牌/体积。
 
 ## 4. 本地模型：上下文管理不是放宽，是**必须换一套预算**
 

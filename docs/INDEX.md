@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（275 条）
+## 决策台账（276 条）
 
+- `DECISIONS.md` · [2026-10-18] ★ 自动化最小版 + 分支状态收口（合并就绪） · **自动化（✓）**：`assistant/scripts/maintain.sh` —— 一条命令跑"生命周期报告 + 教训挖掘（默认只读、`--ingest` 才写）+ 摘要修剪（上限 50）"， · 数字: 11 个
 - `DECISIONS.md` · [2026-10-18] ★ P2 收尾：会话摘要（确定性）+ 来源轮转 · **会话摘要（✓）**：`assistant/memory/summaries.ts`，与原项目 `summaries.json` **同 schema** · 数字: 50 条 / 3 条
 - `DECISIONS.md` · [2026-10-18] ★ M1 社区 TUI：**在 DSH 0.2.0-rc.2 上真跑通**，并做成"共享 DSH_HOME"的接入 · **验证（✓ 真机 pty）**：`@deepseek-harness-tui/dsh-tui@0.16.1`
 - `DECISIONS.md` · [2026-10-18] ★ Termux 探针落地（一条命令回答"这台机器能不能跑"），并发现**本机就是 PRoot** · **实现（✓）**：`assistant/scripts/probe-termux.sh`（`--quick` 只体检）+ `docs/operations/TERMUX-PROBE.md`（判读表）。
@@ -574,7 +575,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（273 条）
+## 设计文档（275 条）
 
 - `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
 - `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
@@ -589,9 +590,11 @@
 - `docs/design/ASSISTANT-PLAN.md` · 11. 升级影响清单（每次 DSH 升级真正要动的东西） · **结论**：绝大多数升级零改动；真要改，只落在 6 个文件里（合计约 700–900 行）。 · 数字: 6 个 / 3 个 / 183 条
 - `docs/design/ASSISTANT-PLAN.md` · 12. 执行流程（M0，待确认后开工） · **顺序按"风险从低到高"排，每步都以 verify 断言收口。** · 数字: 183 条 / 146 MB / 380 MB / 185 条
 - `docs/design/ASSISTANT-PLAN.md` · 13. 待确认 · 1. 本方案作为执行蓝本；
-- `docs/design/ASSISTANT-STATUS.md` · 1. 现在实际跑的七层 · **必须直说的一点**：第 3 层还在。`mypi.sh` 借的是 `scripts/dsh-launch.sh`，而它默认挂 `my-pi.patch.yml` · 数字: 12 个
-- `docs/design/ASSISTANT-STATUS.md` · 2. 对照最初的构想
-- `docs/design/ASSISTANT-STATUS.md` · 3. 待解决的问题（按代价排序） · 1. **旧适配层去留**（最大）：留 facade ⇒ 54 工具里大半是"把 pi 能力翻译到 DSH"＝继续修修补补； · 数字: 12 个 / 523 MB
+- `docs/design/ASSISTANT-STATUS.md` · 1. 现在实际跑的六层 · **已不再有 facade**：`--with-facade` 只剩对照用途；默认组合 27 工具（+我们新加的 8 个 = 35），verify 第⑦步断言之。 · 数字: 8 个
+- `docs/design/ASSISTANT-STATUS.md` · 2. 已完成（都有断言） · 数字: 127 条
+- `docs/design/ASSISTANT-STATUS.md` · 3. 怎么跑 · assistant/scripts/mypi.sh web # 起宿主并给带 token 的 URL（数据在 assistant/.run/home） · 数字: 8 分钟
+- `docs/design/ASSISTANT-STATUS.md` · 4. 已知缺口（按代价） · 1. **压缩第②步**（自定义 `CompactionEngine`）：接口已查清（`compactIfNeeded/compactNow/compactRegion` 三个抽象方法），
+- `docs/design/ASSISTANT-STATUS.md` · 5. 合并就绪判断 · - 主验收 **19 项全绿**（`verify-m1.sh`），黄金任务与约定守门均通过； · 数字: 127 条
 - `docs/design/ASSISTANT-STATUS.md` · 4. 本地模型：上下文管理不是放宽，是**必须换一套预算** · 直觉是"本地不花钱 ⇒ 上下文可以给更多"。钱确实为 0，但**默认参数在本地会直接让压缩失效**。 · 数字: 10%
 - `docs/design/ASSISTANT-STATUS.md` · 5. 下一步（待用户决定） · 1. 旧适配层：保留（渐进）还是砍掉重写（干净）——决定后续全部工作量。
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，

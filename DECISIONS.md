@@ -2,6 +2,19 @@
 
 ## 格式
 
+### [2026-10-18] ★ 自动化最小版 + 分支状态收口（合并就绪）
+
+**自动化（✓）**：`assistant/scripts/maintain.sh` —— 一条命令跑"生命周期报告 + 教训挖掘（默认只读、`--ingest` 才写）+ 摘要修剪（上限 50）"，
+脚本头给了 cron 示例。这是原项目 autopilot 的**最小替代**（看门狗/种子/会话重启仍未迁移）。
+
+**分支状态收口（✓）**：`docs/design/ASSISTANT-STATUS.md` 重写为当前事实：
+六层架构（自包含 launcher / 插件 / 记忆 / 前端 / 模型）、11 个里程碑对照表、怎么跑、已知缺口、合并就绪判断。
+关键结论：**分支已自包含**（起停/插件/记忆/脚本/文档都在仓内），主验收 **19 项全绿**；
+合并前只剩"人决定"的四件事——压缩②、autopilot、品牌（M0.6）、体积（M0.5）。
+
+**✗ 未做**：自定义 `CompactionEngine`（接口已查清：`compactIfNeeded/compactNow/compactRegion`，约 400–600 行）；
+LLM 精炼摘要；TUI 功能面差异盘点。
+
 ### [2026-10-18] ★ P2 收尾：会话摘要（确定性）+ 来源轮转
 
 **会话摘要（✓）**：`assistant/memory/summaries.ts`，与原项目 `summaries.json` **同 schema**

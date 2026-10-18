@@ -62,6 +62,8 @@
     回合结束（`turn/end`）时按"意图账本 + 最后一条助手回复"落一条，同会话覆盖、最多 50 条；
     `memory_search summaries=true` 会附带匹配摘要。不花模型调用（`decisions/facts/prefs/lessons` 留给后续 LLM 精炼）。
   - **来源轮转**：检索在 MMR 之后按 `source` 轮转（避免同一知识源/同一会话占满整页）。
+  - **自动化（本地最小版）**：`assistant/scripts/maintain.sh` —— 生命周期报告 + 教训挖掘（默认只读，`--ingest` 才写）+ 摘要修剪；
+    cron 示例写在脚本头。原项目的 autopilot（看门狗/种子/会话重启）仍未迁移。
   **仍未做**：会话摘要（`summaries.json` 63KB，需要摘要生成链）与"按会话轮转"（原项目按 session 分桶）。
 - **P3（入库/治理/挖掘脚本已完成）**：
   - `assistant/scripts/memory-store.ts`（headless 入库，`--json/--file/stdin`、`--source`、`--dry-run`）；
@@ -77,6 +79,8 @@
     回合结束（`turn/end`）时按"意图账本 + 最后一条助手回复"落一条，同会话覆盖、最多 50 条；
     `memory_search summaries=true` 会附带匹配摘要。不花模型调用（`decisions/facts/prefs/lessons` 留给后续 LLM 精炼）。
   - **来源轮转**：检索在 MMR 之后按 `source` 轮转（避免同一知识源/同一会话占满整页）。
+  - **自动化（本地最小版）**：`assistant/scripts/maintain.sh` —— 生命周期报告 + 教训挖掘（默认只读，`--ingest` 才写）+ 摘要修剪；
+    cron 示例写在脚本头。原项目的 autopilot（看门狗/种子/会话重启）仍未迁移。
   **仍未做**：
   - 自动入库脚本：`knowledge-ingest`（95 行）+ `memory-store`（164 行）；
   - 治理：`memory-lifecycle`（83 行，只读候选报告）+ `lesson-miner`（121 行，读 `interventions.jsonl`）；
