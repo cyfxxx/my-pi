@@ -1,0 +1,15 @@
+{
+  "//": "assistant/plugin 的独立类型检查：只覆盖插件源码。运行时前端是 .mjs（无构建），",
+  "//2": "渲染层没有类型面可查；插件进宿主、要过真实 provider 的 schema 校验，必须有类型检查。",
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["plugin/**/*.ts"]
+}

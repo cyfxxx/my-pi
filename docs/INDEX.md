@@ -5,9 +5,10 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（256 条）
+## 决策台账（257 条）
 
-- `DECISIONS.md` · [2026-10-19] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座） · **问题（用户提出）**：现有路线是「选一个上游底座 + 持续修补」，而选底座后期仍要修修补补；
+- `DECISIONS.md` · [2026-10-18] ★ **拼接架构补上「自写插件工具」这一层：工具注册一次，两端共享**（M1 收口） · **做了什么（✓）**：`assistant/plugin/entry.ts` —— 一个**独立**的 DSH 插件（只依赖宿主提供的
+- `DECISIONS.md` · [2026-10-18] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座） · **问题（用户提出）**：现有路线是「选一个上游底座 + 持续修补」，而选底座后期仍要修修补补；
 - `DECISIONS.md` · [2026-10-11] ★ **上游 pi 1.2 同步已执行**：`vendor/pi` 1.0.4 → **1.2.0**（目标 `6374c2baf` ✓），全部验证门槛通过 ✓ · **结果（关键事实 ✓）**：`vendor/pi` HEAD **`db03484e2` → `c3bc10e24 local: 011-tool-search-cjk`** ✓； · 数字: 3 次 / 11 个 · 证据: db03484e2 / c3bc10e24 / bash scripts/sync-upstream.sh 6374c2baf…
 - `DECISIONS.md` · [2026-10-11] 修缺陷：`gen-changes-ledger.mjs --settle` **不收敛**（`❌ 4 轮仍未收敛` ✗）⇒ 台账**排除 HEAD** ✓ · **症状（实测 ✓）**：改 `DECISIONS.md`（**内容不改变生成结果**）→ `--update` → `git commit` → `--settle` ⇒ · 数字: 4 轮 / 120 条 / 1 轮 · 证据: bc3e4ba11
 - `DECISIONS.md` · [2026-10-11] ★ 更正：`daily-review` **已经跑了且成功** ✓（我先前"自 10-10 起从未再跑"**被现实推翻** ✗✓） · **实测（`tasks.json` 字段 diff vs `daily-health` ✓）**：`daily-review` 现在 `lastResult=**success**` ✓、 · 数字: 4 个 / 5 个
@@ -555,7 +556,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（242 条）
+## 设计文档（243 条）
 
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 结论先行 · **走通了的路 = apt 系统包**（不是 pip）：本环境是 proot-distro 的 Ubuntu，`apt-get` **可用（apt 2.8.3 arm64）**，
 - `docs/design/AV-INSTALL-ATTEMPTS.md` · 为什么 YARA 是关键收获 · **YARA 是规则引擎，不需要病毒库** —— 它只需要**规则文件**（可自写、也可用公开规则集）。
@@ -597,6 +598,7 @@
 - `docs/design/CODING-TRAPS.md` · 20. "注册调用成功" ≠ "工具面可见"：缺注入会**静默不激活** · - **症状（同一件事的两次误判）**： · 数字: 2 个 / 0 个
 - `docs/design/CODING-TRAPS.md` · 21. 改了 `custom/**` 只跑 `tsc -p dsh/` ⇒ 漏检 · - **症状**：本地以为类型没问题，`git push` 被 pre-push 的 golden 拦住：`❌ tsc（见 /tmp/golden-tsc.log）`。
 - `docs/design/CODING-TRAPS.md` · 22. 改了插件入口只跑 `tsc` 不重建产物 ⇒ 新配置"不生效"、日志也不出现 · - **症状**：给 `dsh/plugin/entry.ts` 加了可选项（`inbox.enabled`），`tsc -p dsh/` 通过、composed config 里 · 数字: 10 秒
+- `docs/design/CODING-TRAPS.md` · 23. 插件的**最近 package.json 有 `name` 却缺 `version`** ⇒ 每个 DeepSeek 请求都失败，报错却指向"请求扩展" · - **症状**：挂了一个新插件（哪怕 `apply()` 是空函数），在线模型（DeepSeek）**每一轮**都回
 - `docs/design/CODING-TRAPS.md` · 附：一条与"记录"本身有关的陷阱 · **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但
 - `docs/design/DORMANT-AUDIT.md` · 一、消费证据的来源（先说明判据，避免拿过期数据当结论） · - 30 天工具调用分布：`portable/memory/stats/tool-count-localhost.json`（窗口 30 天，**1920 次调用 / 71 个工具**）； · 数字: 30 天 / 1920 次 / 71 个 / 0 次
 - `docs/design/DORMANT-AUDIT.md` · 二、清单 · ### A. 代码级未接线（`dead-exports-allowlist.txt` 的 A 段，共 18 条） · 数字: 18 条 / 5 条 / 4 条 / 1 条

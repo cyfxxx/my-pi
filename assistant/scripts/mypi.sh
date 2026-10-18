@@ -14,6 +14,20 @@ LOG="$RUN_DIR/host.log"
 TOKEN_FILE="$RUN_DIR/url"
 PORT="${MYPI_PORT:-3099}"
 HOST_HOME="${MYPI_HOME:-$ROOT/.run/home}"
+# 默认把我们自己的插件挂进宿主（它是产品的一部分）；要跑"裸宿主"对比时设 MYPI_NO_PLUGIN=1。
+# 产物不进 git（仓库约定 dist/ 忽略）⇒ 缺了就现构建；没有 esbuild 就明确跳过，不静默。
+if [ -z "${MYPI_NO_PLUGIN:-}" ] && [ ! -f "$ROOT/plugin/dist/plugin.mjs" ] && [ -x "$REPO/node_modules/.bin/esbuild" ]; then
+  echo "→ 构建 assistant 插件（缺产物）…"
+  ( cd "$REPO" && node_modules/.bin/esbuild assistant/plugin/entry.ts --bundle --format=esm \
+      --platform=node --packages=external --outfile=assistant/plugin/dist/plugin.mjs --log-level=warning )
+fi
+if [ -z "${MYPI_NO_PLUGIN:-}" ] && [ -f "$ROOT/plugin/dist/plugin.mjs" ]; then
+  case ":${MY_PI_DSH_EXTRA_PATCH:-}:" in
+    *":$ROOT/plugin/mount.patch.yml:"*) : ;;
+    *) MY_PI_DSH_EXTRA_PATCH="$ROOT/plugin/mount.patch.yml${MY_PI_DSH_EXTRA_PATCH:+:$MY_PI_DSH_EXTRA_PATCH}" ;;
+  esac
+fi
+export MY_PI_DSH_EXTRA_PATCH="${MY_PI_DSH_EXTRA_PATCH:-}"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "缺少依赖：$1" >&2; exit 1; }; }
 need node

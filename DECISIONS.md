@@ -2,7 +2,54 @@
 
 ## 格式
 
-### [2026-10-19] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座）
+### [2026-10-18] ★ **拼接架构补上「自写插件工具」这一层：工具注册一次，两端共享**（M1 收口）
+
+**做了什么（✓）**：`assistant/plugin/entry.ts` —— 一个**独立**的 DSH 插件（只依赖宿主提供的
+`@deepseek-ai/dsh-tools` 与 node 内置模块，不 import pi / 不复用本仓 custom 层），注册工具
+`mypi_note`（追加一行笔记到 `assistant/.run/notes.md`，返回行号与路径）。
+esbuild 打成 `assistant/plugin/dist/plugin.mjs`（`--packages=external`），
+经 `assistant/plugin/mount.patch.yml` 的 `insert:` 挂进 profile；`assistant/scripts/mypi.sh`
+**默认**挂它（`MYPI_NO_PLUGIN=1` 可跑裸宿主对比）。
+
+**为什么这条最重要（✓ 结构论点）**：工具只在**宿主**注册一次，终端前端与 Web GUI 都是同一个运行时
+的客户端 ⇒ 「两端可见」不是同步出来的，而是**只有一份**。这正是「一个脊柱」的收益；
+反过来若两端各注册一份，就会重新掉回"两个事实源"。
+
+**实测（`verify-m1.sh` 第 ⑥ 步，mock 端点驱动真实工具循环 ✓）**：
+`{"toolFaceSeen":true,"toolResultSeen":true,"toolEvents":["tool/call","tool/result"],"wroteNote":true,"reply":"记住啦。"}`
+—— ① 模型请求的工具清单里出现 `mypi_note`（`tools=80`）；② 模型发出 tool_calls ⇒ **宿主真的执行**、
+笔记文件被写入；③ 工具结果回灌后模型继续生成、文本进入会话流。全程不花额度（本地 mock 端点）。
+
+**同时补的 Web 断言（✓）**：`curl -L -c <jar> <token URL>` ⇒ 200 且页面含 `id="root"`
+（此前只验了协议层；现在连"SPA 确实由该宿主提供"也有证据）。标题仍是 `DeepSeek Harness` ——
+品牌属于 `dsh-brand` 接缝，**登记为下一步**，不在 M1 里假装做完 ✗。
+
+**踩到的两个坑（已修 ✓）**：
+① **运行时上下文快照是最后一条 user 消息** ⇒ 用"最后一条 user 消息"判断用户意图会永远判断错
+（工具一次都没被调用）；改为扫描**全部** user 消息 ✗→✓。
+② `pgrep -f "[m]ock-openai.mjs"` 仍会命中**调用者自己的命令行**（同一条 `bash -c` 里出现了该文件名）
+⇒ SIGTERM 杀掉自己（`CODING-TRAPS #17` 的第三种变体）；改为**锚定** `^node .*mock-openai\.mjs` ✗→✓。
+
+**★ 本轮最贵的一个坑（已修 ✓，已登记 CODING-TRAPS #23）**：把插件挂上后，**在线（DeepSeek）路线每一轮都失败**，
+报 `DeepSeek request extension preparation failed`（`REQUEST_EXTENSION`），而本地 pi-ai 路线完全正常、宿主日志**没有任何异常**。
+用"空插件"也能复现 ⇒ 与插件内容无关；同 home 去掉额外 patch 即恢复 ⇒ 与 patch 数量无关；
+最后在 `plugin-package-inventory-deepseek` 的 `identityFromManifest()` 找到真因：
+**插件上溯到的最近 `package.json` 有 `name` 却缺 `version` ⇒ 遍历时直接 throw**，
+异常被 `LlmError` 的 `cause` 吞掉、只留在进程内 ⇒ 线上只看到"请求扩展准备失败"。
+修法：`assistant/package.json` 补 `version`（一行）⇒ 在线恢复 ✓。
+
+**★ 另一个行为发现（✓ 实测）**：`session/selectModel` 不只在会话上生效，还会**立刻写回 profile 的默认模型**
+（`<home>/profiles/mypi-web/cordis.patch.yml` 的 `agent-default-model`）。
+所以"给这个会话换成本地模型"= "把默认模型也换成本地" ⇒ 后续不显式选模型的会话都会走本地。
+处置：验收脚本最后一步**复原为在线** ✓；README 里写明这个副作用；需要"只改本会话"时上游暂无该能力（✗ 未做）。
+
+**在线路线本轮复验（✓）**：`{"reply":"好","mockCallsBefore":"0","mockCallsAfter":"0","wentOnline":true}`
+—— 显式选 `deepseek-official/deepseek-flash`，真模型返回、本机 mock 端点**零调用**。
+
+**✗ 仍未做**：终端前端的工具调用**可视化/审批**（现在只有事件流里的 `tool/call`、`tool/result`）；
+Web 端品牌替换；opencode 外部 agent 接入；浏览器人工确认。
+
+### [2026-10-18] ★ **新分支 `feat/private-assistant`：改用「一个脊柱 + 三类接缝」的拼接架构**（不是再换一个底座）
 
 **问题（用户提出）**：现有路线是「选一个上游底座 + 持续修补」，而选底座后期仍要修修补补；
 能否不绑定某一个项目，按需拼接三个常用 agent 项目（opencode / pi / deepseek-harness）的能力。

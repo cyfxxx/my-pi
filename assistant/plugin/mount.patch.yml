@@ -1,0 +1,5 @@
+# 把「我们自己的插件」挂进宿主 —— 拼接架构里的 A 类接缝（插件 API）。
+# 路径相对于本 patch 文件所在目录（DSH 的约定）。
+- insert:
+    - id: mypi-assistant
+      name: "./dist/plugin.mjs"

@@ -43,7 +43,7 @@
 | 终端界面 | `@earendil-works/pi-tui` `1.3.0` | **C** | 真实 pty 里创建会话、发问、流式出字、退出 |
 | Web 界面 | DSH 自带 React GUI（`dsh web`） | 上游自带 | 打印带 `?token=` 的地址；`/api` 需签名 cookie |
 | 两端数据同步 | 同一宿主的两个 `/api` 客户端 | **B** | 两客户端对同一会话的直播流**逐字相同** |
-| 我们自己的工具/功能 | 本仓插件（下一步） | **A** | 规划中 |
+| 我们自己的工具/功能 | `assistant/plugin/`（`mypi_note`） | **A** | 工具面可见（`tools=80` 含 `mypi_note`）→ 宿主真执行 → 结果回灌 → 回复入流 |
 
 ### 为什么这不叫「又包了一层」
 
@@ -75,12 +75,17 @@ assistant/
 1. `/api` 线格式只出现在 `transport.mjs`；渲染层不许直接拼 RPC。
 2. 功能以**插件**形式进宿主（工具、命令、persona、模型路线），终端前端不再实现一遍。
 3. 宿主是**依赖 + profile/patch**，不是 fork；上游升级只改 pin。
+4. 插件目录上溯到的最近 `package.json` **必须同时有 `name` 与 `version`** ——缺 `version` 会让每个
+   DeepSeek 请求都以 `REQUEST_EXTENSION` 失败（异常被吞，只留在进程内；空 `apply()` 也一样）。
+   见 `docs/design/CODING-TRAPS.md` #23。
 
 ## 5. M1 验收（可重复执行）
 
 `assistant/scripts/verify-m1.sh` 在干净状态下的实测输出：
 
 ```
+=== ⓪ 插件产物 ===
+✓ 插件产物就绪
 === ① 本机模型端点（mock OpenAI 兼容） ===
 ✓ 端点就绪
 === ② 宿主 ===
@@ -91,8 +96,12 @@ TUI 退出码检查：回复含「我是本地模型」= True
 {"a":"我是本地模型，在你机器上跑。","b":"我是本地模型，在你机器上跑。","same":true}
 === ⑤ 本地模型路线 ===
 {"reply":"我是本地模型，在你机器上跑。","mockHits":6,"ok":true}
+=== ⑥ 自写插件工具 ===
+{"toolFaceSeen":true,"toolResultSeen":true,"toolEvents":["tool/call","tool/result"],"wroteNote":true,"reply":"记住啦。"}
+=== ⑦ Web 前端 ===
+✓ Web 入口 200 且挂载了 SPA
 === 结果 ===
-🎉 M1 四项全过
+🎉 M1 五项全过
 ```
 
 四项各自证明什么：
@@ -102,6 +111,8 @@ TUI 退出码检查：回复含「我是本地模型」= True
 | ③ pty | 终端界面在**真实终端**里可用（不是函数返回值对） | 没做工具调用可视化/审批 |
 | ④ 同步 | 两个独立客户端对同一会话的直播流逐字一致 | 没做浏览器自动化截图 |
 | ⑤ 本地路线 | 请求**真的**打到本机端点（服务端日志计数） | 没有真跑 Ollama（用等价协议端点） |
+| ⑥ 插件工具 | 工具面可见 + 宿主真执行 + 结果回灌（工具循环走完） | 终端里没有工具调用的**渲染**（只有事件） |
+| ⑦ Web | 该宿主确实在提供 SPA（200 + `id="root"`） | 没做浏览器交互/截图 |
 | 在线 | 早前探针用真实凭据拿到流式回复 | 只跑过一次小请求（额度） |
 
 ## 6. 明确不做
@@ -123,7 +134,8 @@ TUI 退出码检查：回复含「我是本地模型」= True
 
 - 只验过：Linux arm64 / Node 22 / DSH `0.2.0-rc.2` / pi-tui `1.3.0`。
 - 终端前端目前只有：会话、流式文本、tokens 计数、`/new`、`/quit`、环境变量选模型。
-  缺：工具调用卡片、审批、命令面板、历史滚动、附件。
+  缺：工具调用卡片、审批、命令面板、历史滚动、附件；工具调用目前只进事件流（`tool/call`、`tool/result`）。
+- Web 端品牌仍是 `DeepSeek Harness`：品牌属于 `dsh-brand` 接缝，未做替换。
 - `session/modelCatalog` 的参数形状还没摸对（`_request` vs `request`），当前不用它。
 - 宿主 home 在 `assistant/.run/home`（隔离），与 `portable/dsh` 的既有数据不共享；
   要共享得显式设 `MYPI_HOME`。

@@ -280,6 +280,23 @@
   （真 Host / spike A18-A21 / 打包冒烟用的都是产物）；只跑 `tsc` 只能证明"类型对"。
 - **同类**：`--dump-config` 证明的是"配置组合对了"，**不是**"插件读到了它"——两者之间还隔着"产物是否最新"。
 
+## 23. 插件的**最近 package.json 有 `name` 却缺 `version`** ⇒ 每个 DeepSeek 请求都失败，报错却指向"请求扩展"
+
+- **症状**：挂了一个新插件（哪怕 `apply()` 是空函数），在线模型（DeepSeek）**每一轮**都回
+  `DeepSeek request extension preparation failed`（`REQUEST_EXTENSION`）；换成另一条路线（本地 pi-ai）却完全正常；
+  宿主日志里**没有**任何异常（异常被 `LlmError` 的 `cause` 吞掉，只留在进程内）。
+- **排查路径（值得记住）**：① 先怀疑自己的插件 → 用"空插件"复现 ⇒ 仍然失败 ⇒ 说明与插件**内容**无关；
+  ② 再怀疑 patch 文件数量/顺序 → 合并成单文件仍失败 ⇒ 与 patch 无关；③ 用**同一 home** 去掉额外 patch ⇒ 恢复
+  ⇒ 变量锁定在"多挂了一个插件"；④ 读 `dsh-llm-deepseek` 的 `prepareRequestExtensions` 与两个贡献者
+  （`session-log-deepseek`、`plugin-package-inventory-deepseek`），在后者里找到
+  `identityFromManifest()`：**`name` 存在但 `version` 缺失 ⇒ 直接 throw**。
+- **真因**：插件文件上溯到的最近 `package.json` 声明了 `name` 却没有 `version`；清单遍历把它当"具名包"校验，
+  缺版本就抛，抛异常被包成 `REQUEST_EXTENSION`。**空 `apply()` 也会中招** —— 与插件代码无关。
+- **判据（改法）**：任何被宿主加载的插件目录，其最近 `package.json` 必须**同时**有非空 `name` 与 `version`；
+  一次性验证：挂一个空插件、跑一轮在线对话，能过就说明清单没问题。
+- **教训**：`REQUEST_EXTENSION` 这个错误名**指向贡献者**，不指向"你的插件功能"；看到它先查清单与贡献者，
+  别去改自己的工具定义。
+
 ## 附：一条与"记录"本身有关的陷阱
 
 **"写进台账" ≠ "记进会被人翻到的地方"** —— 本会话多次出现：内容在 `DECISIONS.md`（台账）里，但

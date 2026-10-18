@@ -12,16 +12,26 @@ PORT="${MYPI_PORT:-3099}"
 HOME_DIR="$ROOT/.run/home"
 MOCK_LOG="$ROOT/.run/mock-requests.log"
 export MYPI_HOME="$HOME_DIR" MYPI_PORT="$PORT"
-export MY_PI_DSH_EXTRA_PATCH="$ROOT/spike/local-provider.patch.yml"
+export MY_PI_DSH_EXTRA_PATCH="$ROOT/spike/local-provider.patch.yml"   # 插件由 mypi.sh 默认挂上
 export LOCAL_MOCK_KEY="sk-local-dummy"
+export MYPI_NOTES_FILE="$ROOT/.run/notes.md"
 
 fail=0
 say() { printf '\n=== %s ===\n' "$1"; }
 
+say "⓪ 插件产物"
+if [ ! -f "$ROOT/plugin/dist/plugin.mjs" ]; then
+  echo "→ 构建 assistant/plugin（缺产物）"
+  ( cd "$ROOT/.." && node_modules/.bin/esbuild assistant/plugin/entry.ts --bundle --format=esm \\
+      --platform=node --packages=external --outfile=assistant/plugin/dist/plugin.mjs --log-level=warning ) \
+    || { echo "✗ 插件构建失败"; exit 1; }
+fi
+echo "✓ 插件产物就绪"
+
 say "① 本机模型端点（mock OpenAI 兼容）"
 mkdir -p .run
 # 清掉上一次遗留的 mock（否则新进程 EADDRINUSE，而旧进程写的是别的日志 ⇒ 假绿）
-pids=$(pgrep -f "[m]ock-openai.mjs" || true)
+pids=$(pgrep -f "^node .*mock-openai\.mjs" || true)
 [ -n "$pids" ] && kill $pids 2>/dev/null
 sleep 1
 : >"$MOCK_LOG"
@@ -35,7 +45,7 @@ echo "✓ 端点就绪"
 
 say "② 宿主"
 # 先清掉占着端口的旧宿主：否则新进程起不来，只会看到一堆"缺少服务"（假象，真因是 EADDRINUSE）
-pids=$(pgrep -f "[m]ypi-web.*--port $PORT" || true)
+pids=$(pgrep -f "^node .*--profile mypi-web" || true)
 [ -n "$pids" ] && kill $pids 2>/dev/null
 for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && sleep 0.5 || break; done
 rm -f .run/url
@@ -54,6 +64,28 @@ timeout 60 node test/sync.mjs "$URL" || fail=1
 say "⑤ 本地模型路线"
 timeout 60 node test/local-route.mjs "$URL" "$MOCK_LOG" || fail=1
 
+say "⑥ 自写插件工具（工具面 + 真执行 + 结果回灌）"
+: >"$MYPI_NOTES_FILE" 2>/dev/null || true
+timeout 90 node test/plugin-tool.mjs "$URL" "$MOCK_LOG" "$MYPI_NOTES_FILE" || fail=1
+
+say "⑦ Web 前端（同一宿主的 SPA）"
+rm -f .run/cookies.txt
+WEB_CODE="$(curl -sL -c .run/cookies.txt -o .run/web.html -w '%{http_code}' "$URL")"
+if [ "$WEB_CODE" = "200" ] && grep -q 'id="root"' .run/web.html; then
+  echo "✓ Web 入口 200 且挂载了 SPA"
+else
+  echo "✗ Web 入口异常（HTTP $WEB_CODE）"; fail=1
+fi
+
+say "⑧ 复原默认模型（用例选过本地，会把 profile 默认改掉）"
+timeout 60 node -e "
+import('$ROOT/src/transport.mjs').then(async ({ HostClient }) => {
+  const c = await new HostClient({ url: process.argv[1] }).connect();
+  const { value } = await c.call('session/create', { request: { cwd: '$ROOT' } });
+  await c.call('session/selectModel', { request: { sessionId: value.sessionId, provider: 'deepseek-official', model: 'deepseek-flash' } });
+  process.exit(0);
+});" "$URL" && echo "✓ 默认模型已复原为 online" || { echo "✗ 复原失败"; fail=1; }
+
 say "结果"
-if [ "$fail" -eq 0 ]; then echo "🎉 M1 四项全过"; else echo "❌ 有红项（见上）"; fi
+if [ "$fail" -eq 0 ]; then echo "🎉 M1 五项全过"; else echo "❌ 有红项（见上）"; fi
 exit "$fail"
