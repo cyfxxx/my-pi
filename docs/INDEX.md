@@ -5,8 +5,9 @@
 > 它**不进模型上下文**，只是给人/给下一轮优化检索；细节与完整论证仍在源文档里。
 > 字段：来源 · 标题 ·（标题后首句结论）· 数字（实测值）· 证据（提交 sha 或可重跑命令）。
 
-## 决策台账（279 条）
+## 决策台账（280 条）
 
+- `DECISIONS.md` · [2026-10-19] ★ 迁移策略改为"先整体搬、再删减"——可行性结论与四条硬条件 · **用户判断**：上次"按需添加"导致功能缺失/不全；这次改为**先整体迁移，再在新项目里删除/修改不需要或不适配的功能**。
 - `DECISIONS.md` · [2026-10-19] ★ 干净新仓库：分析结论 = **单提交导出**（不是推分支）；已备好一条命令 · **用户诉求**：主线 my-pi 稳定不动，把当前分支推到一个**新仓库**里以干净状态开发。 · 数字: 141 MB / 1.6 MB / 3.9 MB
 - `DECISIONS.md` · [2026-10-19] ★ TUI 修复 + 关闭登录 + 模式/分支/升级四项决策 · **① TUI 启动失败（✓ 修）**：`mypi.sh tui` 原来用未导出的 `$DSH_HOME` 找社区 TUI（路径变成 `/profiles/...`，永远找不到），
 - `DECISIONS.md` · [2026-10-19] ★ 自动化重叠核查：**autopilot 的调度/自主运行已被 DSH 原生覆盖**，不移植 · **用户要求**：看看 DSH 自带的自动化任务功能跟 autopilot 有没有重叠。 · 数字: 4 个 / 256 轮 / 1512 次
@@ -578,7 +579,7 @@
 - `docs/BUG-REPLAYS.md` · #45 **"记录被否提案"的机制实际不生效**：`record-change.mjs --reject` 把条目**追加进 `docs/CHANGES.jsonl`**，而那个文件是**派生物** —— `gen-changes-ledg · 实测三步（2026-10-16）：① `--reject "探测…"` ⇒ rejected 行数 **7 → 8**；② `gen-changes-ledger --check` ⇒ **❌ 已漂移**（因为重建集合里没有这条手写记录）； · 证据: node scripts/record-change.mjs --reject / node scripts/gen-changes-ledger.mjs --check; / node scripts/gen-changes-ledger.mjs --update;
 - `docs/BUG-REPLAYS.md` · #46 **插件入口改成 `async apply` ⇒ 工具在全局工具面全缺席**（本次实现 DR-2 时引入的回归）：为了动态 `import` 宿主工具包，把 `dsh/plugin/entry.ts` 的 `apply` 改成 `a · spike **A19** 立刻变红：`注册 0 个工具；admin_get_config.type=undefined`（此前 54）；对照实验：`cordis 装载 ⇒ 0`、`直接 await apply ⇒ 54` · 数字: 0 个
 
-## 设计文档（286 条）
+## 设计文档（297 条）
 
 - `docs/design/ASSISTANT-PLAN.md` · 1. 结论一句话 · **脊柱用 DSH 的 loop 与 Web，模型层用 pi-ai（经 `dsh-llm-pi-ai`），终端渲染用 pi-tui 或社区 TUI 插件；
 - `docs/design/ASSISTANT-PLAN.md` · 2. 为什么是这个组合（用需求硬碰）
@@ -624,6 +625,10 @@
 - `docs/design/BASE-SWITCH-DSH.md` · 4. 成本与换算（**明确不给"假装精确的工期"** ✗） · - **实测**：工具定义 + 事件订阅的**运行时代价可忽略**（**406 ms**，其中导入 **358 ms** ✓）。 · 数字: 3 轮 / 223 个 / 4 个 / 57 个
 - `docs/design/BASE-SWITCH-DSH.md` · 5. 本次未验证（如实 ✗） · 1. **未跑完整 profile** ⇒ `ctx.tools.register` 在**真实服务里未验证** ✗（`dsh plugin` 需 pnpm/网络，未跑 ✗）； · 数字: 11 个 / 2.5 GB
 - `docs/design/BASE-SWITCH-DSH.md` · 6. 结论（相对上一版的变化） · **从"最大未知 ✗"变成"契约已知、两原语可用 ✓，成本集中在 57 工具的输出 schema 与 64 钩子的事件映射"** ✓✓。 · 数字: 3011 个
+- `docs/design/CAPABILITY-LEDGER.md` · 1. 旧项目 12 个 feature · 数字: 1512 次 / 127 条 / 5 条
+- `docs/design/CAPABILITY-LEDGER.md` · 2. 旧项目非 feature 资产 · 数字: 3 MB / 91 个 / 1.1 MB / 12 MB
+- `docs/design/CAPABILITY-LEDGER.md` · 3. DSH 侧"默认关闭、按需开启"的项
+- `docs/design/CAPABILITY-LEDGER.md` · 4. 账本纪律 · 1. 新增能力 = 新增一行 + 断言，不许"只加代码不记账"；
 - `docs/design/CODING-TRAPS.md` · 1. 注释里出现"两个星号紧跟斜杠"⇒ 块注释被提前关闭 · - **症状**：`ReferenceError: xxx is not defined`，而报错行**看起来完全正常**（因为它是被"挤出注释"的普通文本）。 · 数字: 3 轮
 - `docs/design/CODING-TRAPS.md` · 2. 形参名与导入的模块名同名 ⇒ 块内引用模块会打到形参上 · - **症状**：`path.join is not a function`；**而且"补一个 import"完全无效**（导入同样被形参遮蔽）。 · 数字: 1 轮
 - `docs/design/CODING-TRAPS.md` · 3. `pkill -f <模式>` 可能杀掉自己 · - **症状**：命令自己被打断（`[killed by signal: SIGTERM]`），后续步骤静默不执行。
@@ -717,6 +722,13 @@ node
 - `docs/design/LEAN4AGENT-BORROW.md` · 四、可借鉴的（按性价比排序） · **A. 给关键工作流写一份"前置/后置条件"清单，并挂到既有守门上（推荐，成本低，零运行时改动）** · 数字: 5 个 / 4 条 / 30 天 / 8 次
 - `docs/design/LEAN4AGENT-BORROW.md` · 五、明确不该照搬的，以及决定可不可照搬的关键缺口 · **不该照搬**： · 数字: 40 个 / 3 个
 - `docs/design/LEAN4AGENT-BORROW.md` · 六、可执行的下一步（≤3 条） · 1. **做 A：`docs/design/WORKFLOW-INVARIANTS.md` + 把可自动化的挂进既有守门**，每条不变量配坏样本并证明守门会红。**不改任何默认行为**、不新增 golden 步。这是三篇论文里**唯一不需要
+- `docs/design/MIGRATION-STRATEGY.md` · 1. 两种"整体迁移"，成本差 10 倍 · **推荐 A**：功能"不缺失"靠的是**参照物在**，不是"跑着"。真正会缺失的是"你删掉之后没法验证"—— · 数字: 12 个
+- `docs/design/MIGRATION-STRATEGY.md` · 2. 旧家底有多大（决定"整体搬"贵不贵） · 搬文件：几乎零成本。**跑起来**：facade + 12 feature 的联调成本才是大头。 · 数字: 12 个 / 127 条
+- `docs/design/MIGRATION-STRATEGY.md` · 3. 可判定判据（避免"删不删"拍脑袋） · 每个能力按四维打分，分数决定 keep / adapt / drop： · 数字: 30 天 / 1512 次
+- `docs/design/MIGRATION-STRATEGY.md` · 4. 删除本身也有成本（这是上次翻车的镜像）
+- `docs/design/MIGRATION-STRATEGY.md` · 5. 与当前进度的衔接（其实你已经在"删除优先"的路上） · 已经完成的反向删除：facade 从默认组合里移除（**80 → 27 工具**）、不移植 `ctx_*`、不移植 autopilot 调度、 · 数字: 10 个 / 8 次 / 15 次 / 11 次
+- `docs/design/MIGRATION-STRATEGY.md` · 6. 建议的执行顺序 · 1. **P0 账本**：把上表落成 `CAPABILITY-LEDGER.md`（每行：状态/证据/数据归属/断言/负责人）；
+- `docs/design/MIGRATION-STRATEGY.md` · 7. 一句话 · **"先整体迁移"应该发生在文件/数据层，不是运行层**；"再删除"必须发生在**有断言护着的现行区**。
 - `docs/design/MODE-COMPARISON.md` · 1. 原项目 mode 是什么（`custom/features/mode`） · - **会话作用域**的启动档位：新会话用 `modes.json` 的 `default`，续接会话用该会话上次记录的模式；
 - `docs/design/MODE-COMPARISON.md` · 2. DSH 有什么
 - `docs/design/MODE-COMPARISON.md` · 3. 映射建议 · **切换方式**：原项目是"`/mode` → 重启 → 续接"；DSH 是"**新建会话时选 preset**"。
