@@ -2,6 +2,27 @@
 
 ## 格式
 
+### [2026-10-19] ★ 新仓库 my-dsh 已建立；策略 A 落地；browser/link/packs 定案；工作策略成文
+
+**新仓库**：`https://github.com/cyfxxx/my-dsh`（私有），已推 `main`（`0c35244`，**134 文件 / ~4 MB**，单条初始提交）。
+实测新仓库可直接构建（`assistant/scripts/build.sh` 产出插件与脚本），上游检查可用。
+老仓库 `my-pi` 冻结为只读参照。
+
+**策略定案（用户）**：
+- **选 A**：代码/数据整体进仓（`legacy/`，只读参照），不跑 facade；删除在现行区、先断言后删。
+- **browser**：使用少但有用 ⇒ 建议**最小插件 4 工具**（open/act/extract/screenshot），可选 Playwright + `MYPI_BROWSER=1` 默认关；
+  只读浏览已由 DSH `web_fetch` 覆盖。账本改 `adapt`。
+- **link**：**drop**（以后需要再处理）。
+- **packs**：**pi 专属内容不迁移**；其余做索引（`docs/PACK-INDEX.md`+`json`，18 包/147 技能/10MB），按需 `git archive` 取。
+- **工作策略（新增长期规则）**：先脚本/工具/软件 → 再模型直接操作 → 重要决策问用户；命名内容优先且跨迁移通用；
+  迁移三类（直接入库/索引/只记来源）；有明确上游用 `check-upstreams.mjs` 一键查更新。
+
+**落地物（✓）**：`docs/POLICIES.md`、`docs/MIGRATION-MANIFEST.md`、`docs/UPSTREAMS.md`、
+`assistant/scripts/check-upstreams.mjs`（实测 dsh 可升 0.2.1-rc.2）、`assistant/scripts/gen-pack-index.mjs` + `docs/PACK-INDEX.{md,json}`；
+`export-clean.sh` 纳入这些文档并更名 my-dsh。
+
+**✗ 未做**：`legacy/` 快照进新仓库；browser 最小插件；pending 收敛（packs 已定，剩 browser 需实现）。
+
 ### [2026-10-19] ★ 迁移策略改为"先整体搬、再删减"——可行性结论与四条硬条件
 
 **用户判断**：上次"按需添加"导致功能缺失/不全；这次改为**先整体迁移，再在新项目里删除/修改不需要或不适配的功能**。

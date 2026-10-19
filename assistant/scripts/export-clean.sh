@@ -58,7 +58,7 @@ GITIGNORE
 
 cat >"$TARGET/package.json" <<'PKG'
 {
-  "name": "mypi",
+  "name": "my-dsh",
   "private": true,
   "type": "module",
   "scripts": {
@@ -75,7 +75,7 @@ cat >"$TARGET/package.json" <<'PKG'
 PKG
 
 cat >"$TARGET/README.md" <<'README'
-# mypi（干净仓库）
+# my-dsh
 
 从一个私人助手项目的 `assistant/` 子树导出，**独立开发**。
 
@@ -125,7 +125,7 @@ cd "$TARGET"
 git init -q -b main
 git add -A
 git -c user.name="${GIT_AUTHOR_NAME:-mypi}" -c user.email="${GIT_AUTHOR_EMAIL:-mypi@localhost}" \
-  commit -q -m "init: mypi assistant（从 my-pi 导出的干净起点）"
+  commit -q -m "init: my-dsh（从 my-pi 导出的干净起点）"
 
 echo "✓ 已导出：$TARGET"
 echo "  文件数：$(git ls-files | wc -l)  首个提交：$(git rev-parse --short HEAD)"
