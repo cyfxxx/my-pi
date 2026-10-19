@@ -626,7 +626,7 @@
 - `docs/design/BASE-SWITCH-DSH.md` · 5. 本次未验证（如实 ✗） · 1. **未跑完整 profile** ⇒ `ctx.tools.register` 在**真实服务里未验证** ✗（`dsh plugin` 需 pnpm/网络，未跑 ✗）； · 数字: 11 个 / 2.5 GB
 - `docs/design/BASE-SWITCH-DSH.md` · 6. 结论（相对上一版的变化） · **从"最大未知 ✗"变成"契约已知、两原语可用 ✓，成本集中在 57 工具的输出 schema 与 64 钩子的事件映射"** ✓✓。 · 数字: 3011 个
 - `docs/design/CAPABILITY-LEDGER.md` · 1. 旧项目 12 个 feature · 数字: 1512 次 / 127 条 / 5 条
-- `docs/design/CAPABILITY-LEDGER.md` · 2. 旧项目非 feature 资产 · 数字: 3 MB / 91 个 / 1.1 MB / 12 MB
+- `docs/design/CAPABILITY-LEDGER.md` · 2. 旧项目非 feature 资产 · 数字: 3 MB / 91 个 / 1.1 MB / 10 MB
 - `docs/design/CAPABILITY-LEDGER.md` · 3. DSH 侧"默认关闭、按需开启"的项
 - `docs/design/CAPABILITY-LEDGER.md` · 4. 账本纪律 · 1. 新增能力 = 新增一行 + 断言，不许"只加代码不记账"；
 - `docs/design/CODING-TRAPS.md` · 1. 注释里出现"两个星号紧跟斜杠"⇒ 块注释被提前关闭 · - **症状**：`ReferenceError: xxx is not defined`，而报错行**看起来完全正常**（因为它是被"挤出注释"的普通文本）。 · 数字: 3 轮

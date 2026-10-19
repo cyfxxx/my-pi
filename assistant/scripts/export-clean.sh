@@ -38,6 +38,7 @@ copy() {
 copy assistant
 copy docs/design
 copy docs/operations
+copy docs/POLICIES.md docs/MIGRATION-MANIFEST.md docs/UPSTREAMS.md docs/PACK-INDEX.md docs/PACK-INDEX.json
 copy DECISIONS.md
 
 cat >"$TARGET/.gitignore" <<'GITIGNORE'

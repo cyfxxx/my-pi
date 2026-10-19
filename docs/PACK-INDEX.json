@@ -1,0 +1,863 @@
+{
+  "generatedAt": "2026-10-19T10:04:06.996Z",
+  "packs": [
+    {
+      "pack": "reverse-skill",
+      "skills": 89,
+      "sizeKb": 8202,
+      "items": [
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-ad-certificate-abuse/SKILL.md",
+          "name": "competition-ad-certificate-abuse",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for AD CS, certificate templates, enrollmen"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-agent-cloud/SKILL.md",
+          "name": "competition-agent-cloud",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for AI-agent, prompt-injection, MCP or tool"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-android-hooking/SKILL.md",
+          "name": "competition-android-hooking",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for Android APK hooking, Frida tracing, req"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-browser-persistence/SKILL.md",
+          "name": "competition-browser-persistence",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for browser cookies, localStorage, sessionS"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-bundle-sourcemap-recovery/SKILL.md",
+          "name": "competition-bundle-sourcemap-recovery",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for source maps, build manifests, chunk reg"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-cloud-metadata-path/SKILL.md",
+          "name": "competition-cloud-metadata-path",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for cloud metadata services, instance ident"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-container-runtime/SKILL.md",
+          "name": "competition-container-runtime",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for live container runtime analysis, mounte"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-crypto-mobile/SKILL.md",
+          "name": "competition-crypto-mobile",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for crypto, encoding, steganography, APK, I"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-custom-protocol-replay/SKILL.md",
+          "name": "competition-custom-protocol-replay",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for custom binary or text protocol recovery"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-dpapi-credential-chain/SKILL.md",
+          "name": "competition-dpapi-credential-chain",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for DPAPI masterkeys, vault blobs, browser "
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-file-parser-chain/SKILL.md",
+          "name": "competition-file-parser-chain",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for file uploads, imports, previews, archiv"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-firmware-layout/SKILL.md",
+          "name": "competition-firmware-layout",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for firmware images, partition tables, boot"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-forensic-timeline/SKILL.md",
+          "name": "competition-forensic-timeline",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for DFIR chronology, cross-artifact correla"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-graphql-rpc-drift/SKILL.md",
+          "name": "competition-graphql-rpc-drift",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for GraphQL schemas, persisted queries, RPC"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-identity-windows/SKILL.md",
+          "name": "competition-identity-windows",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for Active Directory, Kerberos, LDAP, OAuth"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-ios-runtime/SKILL.md",
+          "name": "competition-ios-runtime",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for IPA runtime analysis, Frida hooks, Obje"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-jwt-claim-confusion/SKILL.md",
+          "name": "competition-jwt-claim-confusion",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for JWT, JWS, and JWE validation paths, hea"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-k8s-control-plane/SKILL.md",
+          "name": "competition-k8s-control-plane",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for Kubernetes API analysis, service-accoun"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-kerberos-delegation/SKILL.md",
+          "name": "competition-kerberos-delegation",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for Kerberos delegation, SPN trust edges, S"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-kernel-container-escape/SKILL.md",
+          "name": "competition-kernel-container-escape",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for kernel attack surface, namespace and cg"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-linux-credential-pivot/SKILL.md",
+          "name": "competition-linux-credential-pivot",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for Linux credential artifacts, service tok"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-lsass-ticket-material/SKILL.md",
+          "name": "competition-lsass-ticket-material",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for LSASS-resident secrets, Windows logon s"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-mailbox-abuse/SKILL.md",
+          "name": "competition-mailbox-abuse",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for enterprise mail abuse, OAuth consent, i"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-malware-config/SKILL.md",
+          "name": "competition-malware-config",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for malware configuration recovery, staged "
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-oauth-oidc-chain/SKILL.md",
+          "name": "competition-oauth-oidc-chain",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for OAuth, OIDC, redirect flows, state or n"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-pcap-protocol/SKILL.md",
+          "name": "competition-pcap-protocol",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for packet capture analysis, session recons"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-prompt-injection/SKILL.md",
+          "name": "competition-prompt-injection",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for prompt-injection, retrieval poisoning, "
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-queue-worker-drift/SKILL.md",
+          "name": "competition-queue-worker-drift",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for queues, async workers, cron jobs, delay"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-race-condition-state-drift/SKILL.md",
+          "name": "competition-race-condition-state-drift",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for race windows, ordering bugs, idempotenc"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-relay-coercion-chain/SKILL.md",
+          "name": "competition-relay-coercion-chain",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for forced-auth coercion, relay chains, tar"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-request-normalization-smuggling/SKILL.md",
+          "name": "competition-request-normalization-smuggling",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for parser differentials, HTTP normalizatio"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-reverse-pwn/SKILL.md",
+          "name": "competition-reverse-pwn",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for reverse engineering, malware, DFIR, fir"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-runtime-routing/SKILL.md",
+          "name": "competition-runtime-routing",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for reverse proxies, Host headers, forwarde"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-ssrf-metadata-pivot/SKILL.md",
+          "name": "competition-ssrf-metadata-pivot",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for SSRF reachability, internal route probi"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-stego-media/SKILL.md",
+          "name": "competition-stego-media",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for image, audio, video, document, and cont"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-supply-chain/SKILL.md",
+          "name": "competition-supply-chain",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for CI/CD, registry, dependency drift, arti"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-template-render-path/SKILL.md",
+          "name": "competition-template-render-path",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for SSR, template rendering, route loaders,"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-web-runtime/SKILL.md",
+          "name": "competition-web-runtime",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for CTF web, API, SSR, frontend, queue-back"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-websocket-runtime/SKILL.md",
+          "name": "competition-websocket-runtime",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for WebSocket and SSE handshakes, auth mate"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-windows-pivot/SKILL.md",
+          "name": "competition-windows-pivot",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for Kerberos, WinRM, SMB, RDP, Windows cred"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/competition-zip-archive/SKILL.md",
+          "name": "competition-zip-archive",
+          "description": "Internal downstream skill for ctf-sandbox-orchestrator. CTF-sandbox workflow for ZIP and PKZIP archive challenges, legac"
+        },
+        {
+          "path": "packs/reverse-skill/CTF-Sandbox-Orchestrator/ctf-sandbox-orchestrator/SKILL.md",
+          "name": "ctf-sandbox-orchestrator",
+          "description": "Default entrypoint and master ctf-sandbox-orchestrator workflow for CTF, exploit, reverse engineering, DFIR, pwnable, cr"
+        },
+        {
+          "path": "packs/reverse-skill/plugins/reverse-skill/skills/reverse-skill-router/SKILL.md",
+          "name": "reverse-skill-router",
+          "description": "Use the reverse-skill repository from Codex for authorized reverse engineering, security analysis, CTF, and defensive te"
+        },
+        {
+          "path": "packs/reverse-skill/skills/SKILL.md",
+          "name": "reverse-skill-router",
+          "description": "Routes reverse engineering, exploitation, penetration testing, malware, mobile, firmware, browser automation, documentat"
+        },
+        {
+          "path": "packs/reverse-skill/skills/api-security/SKILL.md",
+          "name": "api-security",
+          "description": "Use for authorized security assessment of REST, GraphQL, WebSocket, or SOAP APIs, including discovery, authentication, a"
+        },
+        {
+          "path": "packs/reverse-skill/skills/apk-reverse/SKILL.md",
+          "name": "apk-reverse",
+          "description": "在 CLI 环境下做 Android APK 逆向时使用。适用于 APK 解包、Java 反编译、smali 修改、重打包、Frida 动态 Hook，以及按需切换到 so/native 分析。优先使用本机已安装的 jadx、apktool"
+        },
+        {
+          "path": "packs/reverse-skill/skills/attack-chain/SKILL.md",
+          "name": "attack-chain",
+          "description": "Use for authorized multi-stage attack-path planning and orchestration when a task spans reconnaissance, initial access, "
+        },
+        {
+          "path": "packs/reverse-skill/skills/binary-diff/SKILL.md",
+          "name": "binary-diff",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/binary-ninja-reverse/SKILL.md",
+          "name": "binary-ninja-reverse",
+          "description": "Use for authorized binary analysis in Binary Ninja, including HLIL/MLIL/LLIL inspection, strings/imports/exports, cross-"
+        },
+        {
+          "path": "packs/reverse-skill/skills/browser-automation/SKILL.md",
+          "name": "browser-automation",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/browser-extension-reverse/SKILL.md",
+          "name": "browser-extension-reverse",
+          "description": "Use for authorized reverse engineering of browser extensions (Chrome/Firefox) including manifest analysis, background wo"
+        },
+        {
+          "path": "packs/reverse-skill/skills/case-review/SKILL.md",
+          "name": "case-review",
+          "description": "Reviews a reverse-skill case package for scope readiness, Evidence to Finding to Path traceability, work item coverage, "
+        },
+        {
+          "path": "packs/reverse-skill/skills/cloud-k8s/SKILL.md",
+          "name": "cloud-k8s",
+          "description": "Use for authorized cloud, container, and Kubernetes security assessment including metadata SSRF, IAM misconfig, containe"
+        },
+        {
+          "path": "packs/reverse-skill/skills/code-audit/SKILL.md",
+          "name": "code-audit",
+          "description": "Use for authorized source-code security review and SAST workflows including Semgrep, CodeQL patterns, dangerous API hunt"
+        },
+        {
+          "path": "packs/reverse-skill/skills/ctf-sandbox/SKILL.md",
+          "name": "ctf-sandbox",
+          "description": "Thin PRIMARY for CTF / AWD / 靶场 multi-type orchestration. Hands off to the sidecar CTF-Sandbox-Orchestrator. Use when th"
+        },
+        {
+          "path": "packs/reverse-skill/skills/database-security/SKILL.md",
+          "name": "database-security",
+          "description": "Use for authorized database security assessment covering PostgreSQL/MySQL/MSSQL/Mongo/Redis exposure, authz, UDF/command"
+        },
+        {
+          "path": "packs/reverse-skill/skills/diagram-generator/SKILL.md",
+          "name": "diagram-generator",
+          "description": "generate, refine, validate, and render diagrams from natural language, notes, code snippets, schemas, tables, or existin"
+        },
+        {
+          "path": "packs/reverse-skill/skills/digital-forensics/SKILL.md",
+          "name": "digital-forensics",
+          "description": "Use for authorized digital forensics including memory dumps, disk timelines, PCAP investigation, artifact triage, and IR"
+        },
+        {
+          "path": "packs/reverse-skill/skills/docs-generator/SKILL.md",
+          "name": "docs-generator",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/dotnet-reverse/SKILL.md",
+          "name": "dotnet-reverse",
+          "description": ".NET / C# 二进制逆向。当目标是 .NET assembly（PE 头含 CLR、.exe/.dll 托管程序）、C# 编译产物（含 NativeAOT）、红队 Sharp* 工具（Rubeus / SharpHound / Sha"
+        },
+        {
+          "path": "packs/reverse-skill/skills/edr-bypass-re/SKILL.md",
+          "name": "edr-bypass-re",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/email-security/SKILL.md",
+          "name": "email-security",
+          "description": "Use for authorized email security review including phishing analysis, header authentication (SPF/DKIM/DMARC), BEC patter"
+        },
+        {
+          "path": "packs/reverse-skill/skills/firmware-pentest/SKILL.md",
+          "name": "firmware-pentest",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/ghidra-reverse/SKILL.md",
+          "name": "ghidra-reverse",
+          "description": "Use for free/open reverse engineering with Ghidra (headless or GUI), including decompile, cross-refs, and optional Ghidr"
+        },
+        {
+          "path": "packs/reverse-skill/skills/go-rust-reverse/SKILL.md",
+          "name": "go-rust-reverse",
+          "description": "Use for reverse engineering stripped Go and Rust binaries including runtime recognition, pclntab/moduel data recovery, p"
+        },
+        {
+          "path": "packs/reverse-skill/skills/hardware-security/SKILL.md",
+          "name": "hardware-security",
+          "description": "Use for authorized hardware and embedded interface security research including UART/JTAG discovery, debug pad triage, se"
+        },
+        {
+          "path": "packs/reverse-skill/skills/ida-reverse/SKILL.md",
+          "name": "ida-reverse",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/identity-federation/SKILL.md",
+          "name": "identity-federation",
+          "description": "Use for authorized assessment of federated identity systems including SAML, OIDC, OAuth2 flows, SSO misconfiguration, an"
+        },
+        {
+          "path": "packs/reverse-skill/skills/js-reverse/SKILL.md",
+          "name": "js-reverse",
+          "description": "在使用 js-reverse-mcp 做前端 JavaScript 逆向时使用，适用于签名链路定位、页面观察取证、运行时采样、本地补环境复现与证据化输出。优先适配当前环境里的 js-reverse_* 工具，需要更强的浏览器/CDP/Hoo"
+        },
+        {
+          "path": "packs/reverse-skill/skills/llm-security/SKILL.md",
+          "name": "llm-security",
+          "description": "Use for authorized security assessment of LLM applications and AI agents, including prompt injection, tool abuse, RAG ex"
+        },
+        {
+          "path": "packs/reverse-skill/skills/macos-reverse/SKILL.md",
+          "name": "macos-reverse",
+          "description": "Use for authorized macOS and Mach-O reverse engineering including codesign, Objective-C/Swift recovery, endpoint securit"
+        },
+        {
+          "path": "packs/reverse-skill/skills/malware-analysis/SKILL.md",
+          "name": "malware-analysis",
+          "description": "Use when analyzing suspected malware through static, dynamic, and behavioral techniques, including IOC extraction, YARA "
+        },
+        {
+          "path": "packs/reverse-skill/skills/mobile-reverse/SKILL.md",
+          "name": "mobile-reverse",
+          "description": "Use for authorized Android or iOS application reverse engineering and security testing, including APK or IPA analysis, r"
+        },
+        {
+          "path": "packs/reverse-skill/skills/ot-ics/SKILL.md",
+          "name": "ot-ics",
+          "description": "Use for authorized OT/ICS security assessment covering Purdue model zoning, PLC/SCADA exposure, industrial protocol disc"
+        },
+        {
+          "path": "packs/reverse-skill/skills/patch-diff-exploit/SKILL.md",
+          "name": "patch-diff-exploit",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/pentest-tools/SKILL.md",
+          "name": "pentest-tools",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/pentest-tools/src-hunter/SKILL.md",
+          "name": "src-hunter",
+          "description": "实战 SRC / 众测 / Bug bounty 漏洞挖掘工作流 skill。包含：5 阶段方法论（intake → recon → enum → hunt → report）、19 个攻击类 playbook（SQLi/XSS/RCE/S"
+        },
+        {
+          "path": "packs/reverse-skill/skills/protocol-reverse/SKILL.md",
+          "name": "protocol-reverse",
+          "description": "Use for authorized reverse engineering of custom binary protocols, Protobuf/gRPC, WebSocket frames, and PCAP-driven prot"
+        },
+        {
+          "path": "packs/reverse-skill/skills/pwn-chain/SKILL.md",
+          "name": "pwn-chain",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/radare2/SKILL.md",
+          "name": "radare2",
+          "description": "|"
+        },
+        {
+          "path": "packs/reverse-skill/skills/radio-sdr/SKILL.md",
+          "name": "radio-sdr",
+          "description": "Use for authorized RF/SDR security research including signal identification, replay feasibility study in shielded labs, "
+        },
+        {
+          "path": "packs/reverse-skill/skills/reverse-engineering/SKILL.md",
+          "name": "reverse-engineering",
+          "description": "Provides reverse engineering techniques. Use when the main job is to understand how a compiled, obfuscated, packed, or v"
+        },
+        {
+          "path": "packs/reverse-skill/skills/reverse-engineering/dsl-vm-reverse/SKILL.md",
+          "name": "dsl-vm-reverse",
+          "description": "Reverse JavaScript-based custom DSL/VM interpreters, non-standard WASM-like runtimes, and risk-control engines. Use when"
+        },
+        {
+          "path": "packs/reverse-skill/skills/supply-chain-security/SKILL.md",
+          "name": "supply-chain-security",
+          "description": "Use for software supply-chain security assessment covering SBOM, SCA, CI/CD pipelines, container images, build integrity"
+        },
+        {
+          "path": "packs/reverse-skill/skills/thick-client/SKILL.md",
+          "name": "thick-client",
+          "description": "Use for authorized security testing of desktop thick clients including local storage, update channels, IPC, traffic, and"
+        },
+        {
+          "path": "packs/reverse-skill/skills/threat-hunting/SKILL.md",
+          "name": "threat-hunting",
+          "description": "Use for blue-team threat hunting, detection engineering with Sigma/YARA, SIEM query design, and incident detection valid"
+        },
+        {
+          "path": "packs/reverse-skill/skills/threat-intelligence/SKILL.md",
+          "name": "threat-intelligence",
+          "description": "Use for authorized OSINT and cyber threat intelligence that enriches IOCs, campaigns, impersonation, scams, or threat ac"
+        },
+        {
+          "path": "packs/reverse-skill/skills/wifi-wireless/SKILL.md",
+          "name": "wifi-wireless",
+          "description": "Use for authorized wireless security assessment including Wi-Fi capture, WPA handshake analysis, rogue AP detection rese"
+        },
+        {
+          "path": "packs/reverse-skill/skills/windows-ad/SKILL.md",
+          "name": "windows-ad",
+          "description": "Use for authorized Active Directory and Windows identity attacks including Kerberos, AD CS, BloodHound paths, NTLM relay"
+        }
+      ]
+    },
+    {
+      "pack": "gamedev",
+      "skills": 40,
+      "sizeKb": 474,
+      "items": [
+        {
+          "path": "packs/gamedev/SKILL.md",
+          "name": "gamedev",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/audio-design/SKILL.md",
+          "name": "audio-design",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/camera-systems/SKILL.md",
+          "name": "camera-systems",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/create-game-assets/SKILL.md",
+          "name": "create-game-assets",
+          "description": "Plan, generate, source, normalize, and validate cohesive visual game assets. Use for art direction, style bibles, sprite"
+        },
+        {
+          "path": "packs/gamedev/skills/design/dialogue-systems/SKILL.md",
+          "name": "dialogue-systems",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/game-ai/SKILL.md",
+          "name": "game-ai",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/game-feel/SKILL.md",
+          "name": "game-feel",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/game-ui-ux/SKILL.md",
+          "name": "game-ui-ux",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/input-systems/SKILL.md",
+          "name": "input-systems",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/level-design/SKILL.md",
+          "name": "level-design",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/performance-optimization/SKILL.md",
+          "name": "performance-optimization",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/physics-tuning/SKILL.md",
+          "name": "physics-tuning",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/procedural-gen/SKILL.md",
+          "name": "procedural-gen",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/save-systems/SKILL.md",
+          "name": "save-systems",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/design/shader-programming/SKILL.md",
+          "name": "shader-programming",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-2d-movement/SKILL.md",
+          "name": "godot-2d-movement",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-3d-essentials/SKILL.md",
+          "name": "godot-3d-essentials",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-animation/SKILL.md",
+          "name": "godot-animation",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-audio/SKILL.md",
+          "name": "godot-audio",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-csharp/SKILL.md",
+          "name": "godot-csharp",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-export/SKILL.md",
+          "name": "godot-export",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-gdscript/SKILL.md",
+          "name": "godot-gdscript",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-multiplayer/SKILL.md",
+          "name": "godot-multiplayer",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-nodes-scenes/SKILL.md",
+          "name": "godot-nodes-scenes",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-physics/SKILL.md",
+          "name": "godot-physics",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-resources/SKILL.md",
+          "name": "godot-resources",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-shaders/SKILL.md",
+          "name": "godot-shaders",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-signals-groups/SKILL.md",
+          "name": "godot-signals-groups",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-tilemap/SKILL.md",
+          "name": "godot-tilemap",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/godot/godot-ui-control/SKILL.md",
+          "name": "godot-ui-control",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/web/phaser-arcade-physics/SKILL.md",
+          "name": "phaser-arcade-physics",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/web/phaser-core/SKILL.md",
+          "name": "phaser-core",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/web/pixijs-rendering/SKILL.md",
+          "name": "pixijs-rendering",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/web/threejs-gltf-loading/SKILL.md",
+          "name": "threejs-gltf-loading",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/web/threejs-materials-lighting/SKILL.md",
+          "name": "threejs-materials-lighting",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/web/threejs-scene-setup/SKILL.md",
+          "name": "threejs-scene-setup",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/workflow/game-jam/SKILL.md",
+          "name": "game-jam",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/workflow/itch-publish/SKILL.md",
+          "name": "itch-publish",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/workflow/prototype-fast/SKILL.md",
+          "name": "prototype-fast",
+          "description": ">"
+        },
+        {
+          "path": "packs/gamedev/skills/workflow/steam-publish/SKILL.md",
+          "name": "steam-publish",
+          "description": ">"
+        }
+      ]
+    },
+    {
+      "pack": "media-toolkit",
+      "skills": 4,
+      "sizeKb": 33,
+      "items": [
+        {
+          "path": "packs/media-toolkit/SKILL.md",
+          "name": "media-toolkit",
+          "description": "图片/视频/游戏美术处理技能包。用户要处理图片（缩放/裁剪/压缩/格式/水印/批量）、视频（转码/剪辑/拼接/抽帧/音频/GIF/字幕）、游戏美术资产（精灵表拆分/图集打包/透明底/优化压缩）时触发。依赖本机 ImageMagick+ffm"
+        },
+        {
+          "path": "packs/media-toolkit/skills/game-art/SKILL.md",
+          "name": "game-art",
+          "description": "面向游戏项目（Godot/Unity/Web）的资产管线：精灵表拆分/图集打包/透明底/优化压缩/九宫格，经 bin/media_core game（Pillow + ImageMagick）；美术方向与引擎侧资产规划见 gamedev 的"
+        },
+        {
+          "path": "packs/media-toolkit/skills/image-basics/SKILL.md",
+          "name": "image-basics",
+          "description": "通用图片处理：缩放/裁剪/格式转换/压缩/水印/批量/透明底/PDF 转图；图片操作走 bin/media_core image，PDF→图走 pdftoppm（或 pdf-toolkit 的 pdf_core render）。"
+        },
+        {
+          "path": "packs/media-toolkit/skills/video-basics/SKILL.md",
+          "name": "video-basics",
+          "description": "通用视频处理：转码/剪辑/拼接/抽帧/音频/GIF/字幕烧录，经 bin/media_core video（ffmpeg）。"
+        }
+      ]
+    },
+    {
+      "pack": "pdf-toolkit",
+      "skills": 3,
+      "sizeKb": 46,
+      "items": [
+        {
+          "path": "packs/pdf-toolkit/SKILL.md",
+          "name": "pdf-toolkit",
+          "description": "PDF 全场景处理入口：文本/表格/图片提取、合并拆分旋转加密、生成、水印、扫描件 OCR、表单填写。用户提到 .pdf 文件或要求产出 PDF 时使用。通用操作走 bin/pdf_core；表单走 pdf-forms 子技能；扫描件 OC"
+        },
+        {
+          "path": "packs/pdf-toolkit/skills/pdf-forms/SKILL.md",
+          "name": "pdf-forms",
+          "description": "填写 PDF 表单：自动识别可填写字段（AcroForm），对无字段的扫描/版式表单按视觉坐标插入文字，并渲染验证结果。处理表单填写场景（申请表/合同/税表/SF 表）。依赖 pdf-forms/scripts 下三个脚本。"
+        },
+        {
+          "path": "packs/pdf-toolkit/skills/pdf-ocr/SKILL.md",
+          "name": "pdf-ocr",
+          "description": "扫描版/图片型 PDF 的 OCR 识别：渲染 + tesseract 文本层，输出可搜索 PDF 与 Markdown 文本。用户说\"扫描件\"\"图片型 PDF\"\"不能复制文字的 PDF\"\"OCR\"时使用。整本翻译/竖排古籍/EPUB 导出"
+        }
+      ]
+    },
+    {
+      "pack": "books",
+      "skills": 1,
+      "sizeKb": 8,
+      "items": [
+        {
+          "path": "packs/books/SKILL.md",
+          "name": "books",
+          "description": "书籍知识库（本机索引 + 按需提取页 + 缓存复用）。用户要求\"查书里某段内容\"\"这个说法出自哪本书哪一页\"\"核对原文\"时使用；也可用于把一批书的目录建成索引。用法：python3 scripts/books.py {probe|index"
+        }
+      ]
+    },
+    {
+      "pack": "cangjie-skill",
+      "skills": 1,
+      "sizeKb": 64,
+      "items": [
+        {
+          "path": "packs/cangjie-skill/SKILL.md",
+          "name": "cangjie-skill",
+          "description": "Distill a book, long-video transcript, podcast, course, or interview into a coherent set of executable skills. Use when "
+        }
+      ]
+    },
+    {
+      "pack": "colab-bridge",
+      "skills": 1,
+      "sizeKb": 29,
+      "items": [
+        {
+          "path": "packs/colab-bridge/SKILL.md",
+          "name": "colab-bridge",
+          "description": "把 Google Colab（免费 GPU）作为 pi 的远程 Python/GPU 执行后端。用法：colab_exec status/run/sh/up/down。触发词：Colab、谷歌云笔记本、远程 GPU 执行、在 Colab 里"
+        }
+      ]
+    },
+    {
+      "pack": "comfyui-agent",
+      "skills": 1,
+      "sizeKb": 75,
+      "items": [
+        {
+          "path": "packs/comfyui-agent/SKILL.md",
+          "name": "comfyui-agent",
+          "description": "让 pi 把远程 ComfyUI（其他有 GPU 的设备上运行的实例）当作图像生成工具使用。提供完整操控：连接配置（servers add/status）、提交并等待工作流（run）、参数化占位符（{{prompt}}/{{int:step"
+        }
+      ]
+    },
+    {
+      "pack": "dg-piagent",
+      "skills": 1,
+      "sizeKb": 1110,
+      "items": [
+        {
+          "path": "packs/dg-piagent/SKILL.md",
+          "name": "dg-piagent",
+          "description": "|"
+        }
+      ]
+    },
+    {
+      "pack": "embedded-dev",
+      "skills": 1,
+      "sizeKb": 16,
+      "items": [
+        {
+          "path": "packs/embedded-dev/SKILL.md",
+          "name": "embedded-dev",
+          "description": "嵌入式/MCU 开发的 AI 辅助技能入口：构建、烧录、调试、串口、协议测试的领域地图与工具链路由，含上游技能集目录与专用工具索引。做嵌入式固件开发、烧录调试、硬件联测时使用。"
+        }
+      ]
+    },
+    {
+      "pack": "knowledge-fetch",
+      "skills": 1,
+      "sizeKb": 12,
+      "items": [
+        {
+          "path": "packs/knowledge-fetch/SKILL.md",
+          "name": "knowledge-fetch",
+          "description": "搭建零 LLM 官方源直连的知识订阅（渠道调研、抓取脚本、去重过滤容错、定时任务接入）。用户说\"新闻功能没触发\"\"加信息渠道\"\"做知识订阅\"时触发。"
+        }
+      ]
+    },
+    {
+      "pack": "novel-writing",
+      "skills": 1,
+      "sizeKb": 44,
+      "items": [
+        {
+          "path": "packs/novel-writing/SKILL.md",
+          "name": "novel-writing",
+          "description": "长篇中文小说（网文）工程化写作系统。当用户要写/续写/规划/大纲/细纲/目录/草案/正文/审查/体检/存档长篇小说，或需保证跨章节世界观一致性、伏笔回收、节奏与文风稳定时使用。分工：用户负责创意/世界观/文风，系统负责一致性、伏笔、节奏的执"
+        }
+      ]
+    },
+    {
+      "pack": "pcb-design",
+      "skills": 1,
+      "sizeKb": 22,
+      "items": [
+        {
+          "path": "packs/pcb-design/SKILL.md",
+          "name": "pcb-design",
+          "description": "PCB/硬件设计的 AI 辅助技能入口：KiCad 工具链路由、设计审查闭环契约、ERC/DRC/Gerber/EMC 检查命令速查，含上游技能包与 MCP server 目录。做原理图审查、PCB Layout 检查、制造交付、EMC 预"
+        }
+      ]
+    },
+    {
+      "pack": "skill-integration",
+      "skills": 1,
+      "sizeKb": 4,
+      "items": [
+        {
+          "path": "packs/skill-integration/SKILL.md",
+          "name": "skill-integration",
+          "description": "外部技能包（GitHub zip 等）引入与整合进仓库内 packs/ 的统一流程：选包下载、安全审查、验收冒烟、通用/专用三层归置、整合纪律。用户说\"去 GitHub 找 xxx 整合进 packs\"\"引入技能包\"\"外部技能整合\"时触发。"
+        }
+      ]
+    },
+    {
+      "pack": "termux",
+      "skills": 1,
+      "sizeKb": 29,
+      "items": [
+        {
+          "path": "packs/termux/SKILL.md",
+          "name": "termux",
+          "description": "在 Android 平板/手机上的 ZeroTermux（Termux 0.118.3 的中文增强 fork）或官方 Termux 里做开发时使用：先判身份（宿主 Termux / proot 容器 / PC），再做宿主↔容器互通、包管理与"
+        }
+      ]
+    },
+    {
+      "pack": "drafts",
+      "skills": 0,
+      "sizeKb": 0,
+      "items": []
+    },
+    {
+      "pack": "net-mirror",
+      "skills": 0,
+      "sizeKb": 3,
+      "items": []
+    },
+    {
+      "pack": "security-baseline",
+      "skills": 0,
+      "sizeKb": 20,
+      "items": []
+    }
+  ]
+}

@@ -17,8 +17,8 @@
 | context | 10.1k 行 | 0（指标类） | ✅ token-meter / compaction | 部分（瘦身 preset） | 旧：`portable/memory/context/usage.jsonl` | **adapt** | 压缩两阶段②未做 |
 | autopilot | 9.8k 行 | 仅 `admin_restart` 6 | ✅ schedule + goal | 部分（`maintain.sh`） | 旧：`portable/memory/scheduler/` | **adapt** | 见 `AUTOMATION-OVERLAP.md`；failover/看门狗/验证器未做 |
 | voice | 3.7k 行 | 0 | ✅ voice-input bundle（SenseVoice） | — | 旧：`portable/memory/voice?`（无独立目录） | **drop** | 需要时 `MYPI_VOICE=1` 挂 bundle |
-| browser | 1.3k 行 | 0 | ❌（只有 UI 侧栏） | — | 旧：`portable/memory/tool-outputs/`（浏览器产物） | **pending** | 真要用时自建（Playwright 工具） |
-| link | 2.0k 行 | 0 | 部分（`/api/remote.mux` 协议） | 我们的 transport 用到 mux | 旧：`portable/memory/`（scattered） | **pending** | 先确认链路场景（手机配对？） |
+| browser | 1.3k 行 | 0（但用户确认"少而有用"） | 只读浏览已由 `web_fetch` 覆盖；交互式无原生 | **未做**：建议做**最小插件**（4 工具：open/act/extract/screenshot），可选 Playwright + `MYPI_BROWSER=1`，默认关 | 旧：`portable/memory/tool-outputs/` | **adapt** | 需要时补 `test/browser.mjs`（无 chromium 时 SKIP） |
+| link | 2.0k 行 | 0 | 部分（`/api/remote.mux` 协议） | 我们的 transport 用到 mux | 旧：`portable/memory/`（scattered） | **drop**（用户决定：以后需要再处理） | 无 |
 | intervention | 0.8k 行 | 0 | 部分（`dsh-message-feedback`） | 部分（教训挖掘读旧数据） | 旧：`portable/memory/interventions.jsonl`（5 条） | **adapt** | `scripts/lesson-miner.ts` 已读 |
 
 ## 2. 旧项目非 feature 资产
@@ -28,7 +28,7 @@
 | facade（`dsh/`，pi→DSH 翻译层） | 2441 行 | 不迁移；只作历史参照 | **drop**（已从默认组合移除） |
 | `custom/core/`（适配器/原子写/密钥清洗等） | 见 `custom/` 3 MB | 密钥清洗已重写进 `memory/store.ts`；其余不迁 | **drop**（按需搬） |
 | `scripts/`（旧项目 91 个脚本） | 1.1 MB | 只保留 `dsh-runtime.sh`/`lib-portable.sh` 的等价物（已重写为 `assistant/scripts/vendor-dsh.sh`） | **drop** |
-| `packs/`（技能包） | 12 MB | 需要技能时按需挑；不整体迁 | **pending** |
+| `packs/`（技能包，18 包/147 技能/10 MB） | 10 MB | **pi 专属内容不迁移**；其余做成索引（`docs/PACK-INDEX.md` + `PACK-INDEX.json`），按需 `git archive` 取 | **索引** |
 | `docs/`（旧文档） | 2.1 MB | 只带 design/operations 与相关部分 | **adapt** |
 | `portable/agent/sessions`（历史会话） | 2.8 MB | DSH 会话格式不同；要"可读历史"需迁移器 | **pending** |
 | `portable/memory/*`（记忆/摘要/台账） | 5 MB | 记忆已迁；摘要/台账/干预按需 | **adapt**（部分已做） |
