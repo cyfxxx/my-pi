@@ -10,9 +10,16 @@
  * 已存在的（同 title+hash）只做合并，不重复增加条数。可重复执行（幂等）。
  */
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadStore, saveStore, storeEntry, type MemoryCategory, type MemoryEntry } from '../memory/store';
 
-const [, , src = '/root/my-pi/portable/memory/entries.json', dest = new URL('../memory/entries.json', import.meta.url).pathname] = process.argv;
+// 默认从仓根 portable/memory/entries.json 迁到本仓 assistant/memory/entries.json；
+// 路径都相对定位（不写死绝对路径），换机器/导出到新仓库都能用。
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// 目标固定在本仓 assistant/memory/entries.json（源默认仓根 portable/memory/entries.json）。
+const ASSISTANT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const [, , src = join(REPO_ROOT, 'portable', 'memory', 'entries.json'), dest = join(ASSISTANT_ROOT, 'memory', 'entries.json')] = process.argv;
 if (!existsSync(src)) {
   console.error(`源文件不存在：${src}`);
   process.exit(2);

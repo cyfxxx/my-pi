@@ -16,7 +16,9 @@ import { loadStore, saveStore, storeEntry } from '../memory/store';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_MEMORY = resolve(HERE, '..', 'memory', 'entries.json');
-const DEFAULT_INTERVENTIONS = resolve('/root/my-pi/portable/memory/interventions.jsonl');
+// 干预快照默认在仓根 portable/memory/ 下；可用 MYPI_INTERVENTIONS_FILE 覆盖。
+// 注意：不要写死绝对路径——这个仓会被导出到新仓库/换机器。
+const DEFAULT_INTERVENTIONS = resolve(process.env.MYPI_REPO_ROOT ?? resolve(HERE, '..', '..'), 'portable', 'memory', 'interventions.jsonl');
 
 const argv = process.argv.slice(2);
 const ingest = argv.includes('--ingest');

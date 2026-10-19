@@ -24,10 +24,8 @@ say() { printf '\n=== %s ===\n' "$1"; }
 
 say "⓪ 插件产物"
 if [ ! -f "$ROOT/plugin/dist/plugin.mjs" ]; then
-  echo "→ 构建 assistant/plugin（缺产物）"
-  ( cd "$ROOT/.." && node_modules/.bin/esbuild assistant/plugin/entry.ts --bundle --format=esm \
-      --platform=node --packages=external --outfile=assistant/plugin/dist/plugin.mjs --log-level=warning ) \
-    || { echo "✗ 插件构建失败"; exit 1; }
+  echo "→ 构建产物（插件 + 脚本）"
+  bash "$ROOT/scripts/build.sh" >/dev/null || { echo "✗ 构建失败（先 npm install 或装 esbuild）"; exit 1; }
 fi
 echo "✓ 插件产物就绪"
 
