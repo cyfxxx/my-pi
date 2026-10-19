@@ -2,6 +2,26 @@
 
 ## 格式
 
+### [2026-10-19] ★ 干净新仓库：分析结论 = **单提交导出**（不是推分支）；已备好一条命令
+
+**用户诉求**：主线 my-pi 稳定不动，把当前分支推到一个**新仓库**里以干净状态开发。
+
+**核查（✓）**：直接推 `feat/private-assistant` 会带走 **7107 提交 / 141 MB / 1625 文件**（旧项目 `custom/` `packs/` `portable/` 全在），
+最大文件是旧项目 PNG（1.6 MB）——那不是干净，是换地址。另发现并**已修**两个"换仓库必坏"的问题：
+① `import-memory.ts`/`lesson-miner.ts` 写死 `/root/my-pi/...`；② `verify` 第⓪步依赖根目录 `node_modules/.bin/esbuild`。
+
+**决定（✓）**：用**单提交干净导出**（方案 C），不推历史：
+- `assistant/scripts/export-clean.sh`：只拷 `git ls-files` 命中的 `assistant/` + `docs/{design,operations}` + `DECISIONS.md`，
+  写 `package.json`（esbuild/typescript）/`README.md`/`LINEAGE.md`（来源提交号）/`.gitignore`，`git init -b main` + 一条初始提交；
+- 实测导出 **124 文件 / ~3.9 MB**，`npm run build` 能产出插件与脚本产物（路径正确性已用软链验证）；
+- 新仓库自包含：`vendor-dsh.sh`（不依赖老项目 `lib-portable.sh`，`DSH_VERSION` 单点钉版本）+ `build.sh` + `doctor-mypi.sh`。
+
+**保留的坑与处置（写进 `docs/operations/NEW-REPO.md`）**：
+`assistant/memory/entries.json` 是跟踪的真实记忆（公开仓库需清空/脱敏）；`.run/`（凭据/session）已被忽略；
+hooks 是本机 `core.hooksPath` 配置、新克隆不会有；**新仓库是唯一事实源**，不与老仓库双向同步。
+
+**未做**：真正建远端仓库/推送（需要用户账号）；旧仓库分支收尾（`BRANCHES.md` 已给命令）。
+
 ### [2026-10-19] ★ TUI 修复 + 关闭登录 + 模式/分支/升级四项决策
 
 **① TUI 启动失败（✓ 修）**：`mypi.sh tui` 原来用未导出的 `$DSH_HOME` 找社区 TUI（路径变成 `/profiles/...`，永远找不到），
